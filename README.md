@@ -19,28 +19,28 @@ This project demonstrates a safer enterprise pattern:
 - Structured audit logging
 
 ---
-
 ## High-level architecture
-User / Channel (WhatsApp, Web, etc)
-  |
-  v
-Conversation Gateway (webhooks)
-  |
-  v
-AI Decision Layer
-(intent + next action)
-  |
-  v
-Tool Orchestrator / Router
-  | | |
-  v v v
-Payment Provider CRM/DB
-Adapter Adapter Adapter
-  |
-  v
-Audit Log / Trace Store
 
----
+```
+User / Channel (WhatsApp, Web, etc)
+          |
+          v
+  Conversation Gateway (webhooks)
+          |
+          v
+     AI Decision Layer
+   (intent + next action)
+          |
+          v
+  Tool Orchestrator / Router
+   |        |          |
+   v        v          v
+ Payment   Provider   CRM/DB
+ Adapter    Adapter    Adapter
+   |
+   v
+ Audit Log / Trace Store
+```
 
 ## Core principles
 
