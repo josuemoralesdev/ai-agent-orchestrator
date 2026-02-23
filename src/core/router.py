@@ -1,7 +1,8 @@
 from typing import Any, Dict, Tuple
 
+from src.core.errors import UNKNOWN_TOOL
 from src.core.models import ToolResult
-from src.tools.echo import EchoTool
+from src.tools.registry import build_registry
 
 
 def route(message: str) -> Tuple[str, Dict[str, Any]]:
@@ -14,11 +15,15 @@ def route(message: str) -> Tuple[str, Dict[str, Any]]:
 
 
 def execute(tool_name: str, args: Dict[str, Any]) -> ToolResult:
-    # Minimal registry (expand later)
-    registry = {
-        "echo": EchoTool(),
-    }
+    registry = build_registry()
     tool = registry.get(tool_name)
+
     if not tool:
-        return ToolResult(ok=False, tool=tool_name, output={}, error="unknown_tool")
+        return ToolResult(
+            ok=False,
+            tool=tool_name,
+            output={},
+            error=UNKNOWN_TOOL.code
+        )
+
     return tool.run(args=args)
