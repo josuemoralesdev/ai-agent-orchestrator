@@ -6,13 +6,15 @@ from src.tools.registry import build_registry
 
 
 def route(message: str) -> Tuple[str, Dict[str, Any]]:
-    """
-    Placeholder router.
-    Later: LLM decides tool + args.
-    Now: always selects echo tool.
-    """
-    return "echo", {"message": message}
+    msg = message.lower().strip()
 
+    if msg.startswith("http "):
+        # Example: "http https://httpbin.org/get"
+        parts = msg.split(maxsplit=1)
+        url = parts[1] if len(parts) > 1 else "https://httpbin.org/get"
+        return "httpbin_get", {"url": url}
+
+    return "echo", {"message": message}
 
 def execute(tool_name: str, args: Dict[str, Any]) -> ToolResult:
     registry = build_registry()
