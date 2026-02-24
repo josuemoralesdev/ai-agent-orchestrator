@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from src.core.models import AuditEvent, new_trace_id
 from src.core.router import execute, route
+from src.core.audit_store import append_events
 
 app = FastAPI(title="AI Agent Orchestrator")
 
@@ -35,6 +36,8 @@ async def inbound(req: InboundRequest):
             {"tool": result.tool, "ok": result.ok, "error": result.error},
         )
     )
+
+    append_events(audit) 
 
     return {
         "trace_id": trace_id,
