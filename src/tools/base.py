@@ -8,7 +8,9 @@ from src.core.models import ToolResult
 
 class Tool(ABC):
     name: str
+    requires_approval: bool = False
 
     @abstractmethod
     def run(self, *, args: Dict[str, Any]) -> ToolResult:
         raise NotImplementedError
+    

@@ -8,6 +8,7 @@ from src.tools.base import Tool
 
 class HttpbinGetTool(Tool):
     name = "httpbin_get"
+    requires_approval = True
 
     def run(self, *, args: Dict[str, Any]) -> ToolResult:
         url = args.get("url") or "https://httpbin.org/get"
