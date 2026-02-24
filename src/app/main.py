@@ -6,6 +6,8 @@ from src.core.audit_store import append_events
 from src.core.approval_store import write_pending
 from src.tools.registry import build_registry
 from src.core.approval_store import find_pending, mark_approved
+from src.core.policy_resolver import requires_approval
+from src.core.config import settings
 
 app = FastAPI(title="AI Agent Orchestrator")
 class InboundRequest(BaseModel):
@@ -33,39 +35,61 @@ async def inbound(req: InboundRequest):
     registry = build_registry()
     tool_obj = registry.get(planned_tool)
 
-    if tool_obj and getattr(tool_obj, "requires_approval", False):
+    if tool_obj and requires_approval(tool_obj, planned_args, env=settings.env):
         approval_id = new_trace_id()  # separate id for approval tracking
 
+        audit.append(
+            AuditEvent.create(
+                trace_id,
+                "approval_required",
+                {"approval_id": approval_id, "tool": planned_tool, "args": planned_args},
+            )
+        )
+
+        # persist pending approval
+        write_pending(
+            {
+                "approval_id": approval_id,
+                "trace_id": trace_id,
+                "tool": planned_tool,
+                "args": planned_args,
+                "status": "pending",
+            }
+        )
+
+        append_events(audit)
+
+        return {
+            "trace_id": trace_id,
+            "status": "pending_approval",
+            "approval_id": approval_id,
+            "tool": planned_tool,
+            "planned_args": planned_args,
+            "audit": [a.__dict__ for a in audit],
+        }
+
+    # If no approval required, execute immediately
     result = execute(planned_tool, planned_args)
 
     audit.append(
         AuditEvent.create(
             trace_id,
-            "approval_required",
-            {"approval_id": approval_id, "tool": planned_tool, "args": planned_args},
+            "tool_executed",
+            {"tool": result.tool, "ok": result.ok, "error": result.error},
         )
-    )
-
-    # persist pending approval
-    write_pending(
-        {
-            "approval_id": approval_id,
-            "trace_id": trace_id,
-            "tool": planned_tool,
-            "args": planned_args,
-            "status": "pending",
-        }
     )
 
     append_events(audit)
 
     return {
         "trace_id": trace_id,
-        "status": "pending_approval",
-        "approval_id": approval_id,
+        "received": True,
+        "user_id": req.user_id,
+        "message": req.message,
         "tool": planned_tool,
-        "planned_args": planned_args,
+        "result": result.__dict__,
         "audit": [a.__dict__ for a in audit],
+        "next_step": "decision_layer_llm_placeholder",
     }
 
 @app.post("/approve")

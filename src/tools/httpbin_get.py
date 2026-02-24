@@ -4,11 +4,12 @@ from src.core.models import ToolResult
 from src.core.retry import with_retries
 from src.adapters.http_client import HttpClient
 from src.tools.base import Tool
+from src.core.policy import RiskLevel
 
 
 class HttpbinGetTool(Tool):
     name = "httpbin_get"
-    requires_approval = True
+    risk = RiskLevel.EXTERNAL_CALL
 
     def run(self, *, args: Dict[str, Any]) -> ToolResult:
         url = args.get("url") or "https://httpbin.org/get"

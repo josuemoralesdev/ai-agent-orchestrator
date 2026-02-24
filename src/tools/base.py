@@ -4,11 +4,12 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from src.core.models import ToolResult
+from src.core.policy import RiskLevel
 
 
 class Tool(ABC):
     name: str
-    requires_approval: bool = False
+    risk: RiskLevel = RiskLevel.SAFE
 
     @abstractmethod
     def run(self, *, args: Dict[str, Any]) -> ToolResult:

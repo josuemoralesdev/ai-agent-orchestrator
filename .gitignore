@@ -208,3 +208,8 @@ __marimo__/
 
 #LOGS
 logs/
+
+__pycache__/
+*.pyc
+.venv/
+.env
