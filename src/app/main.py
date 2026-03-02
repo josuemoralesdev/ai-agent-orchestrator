@@ -10,6 +10,7 @@ from src.core.approval_store import find_pending, mark_approved
 from src.core.config import settings
 from src.core.planner import plan_next
 from src.core.planner_types import Plan
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="AI Agent Orchestrator")
 class InboundRequest(BaseModel):
@@ -123,4 +124,11 @@ async def root():
 
 @app.post("/plan", response_model=Plan)
 async def plan(req: InboundRequest):
+
+    msg = (req.message or "").strip()
+    if not msg:
+        return JSONResponse(status_code=400, content={"ok": False, "error": "empty_message"})
+    if len(msg) > 2000:
+        return JSONResponse(status_code=400, content={"ok": False, "error": "message_too_long"})
+    
     return plan_next(user_id=req.user_id, message=req.message)

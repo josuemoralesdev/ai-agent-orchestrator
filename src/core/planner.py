@@ -14,15 +14,30 @@ def plan_next(*, user_id: str, message: str) -> Plan:
 
     registry = build_registry()
     tool_obj = registry.get(tool)
+    risk = "unknown"
+    if tool_obj and getattr(tool_obj, "risk", None):
+        risk = str(tool_obj.risk.value) if hasattr(tool_obj.risk, "value") else str(tool_obj.risk)
+    elif tool == "echo":
+        risk = "safe"
 
     needs_approval = False
     if tool_obj:
         needs_approval = requires_approval(tool_obj, args, env=settings.env)
 
+    policy_decision = "approval_required" if needs_approval else "auto"
+    confidence = 0.6
+    if tool == "echo":
+        confidence = 0.95
+    elif tool == "httpbin_get":
+        confidence = 0.85
+
     tool_call = ToolCall(
         tool=tool,
         args=args,
         requires_approval=needs_approval,
+        policy_decision=policy_decision,
+        risk_level=risk,
+        confidence=confidence,
         reason="rule_router_v1",
     )
 
