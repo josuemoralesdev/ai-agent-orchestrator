@@ -11,6 +11,8 @@ from src.core.config import settings
 from src.core.planner import plan_next
 from src.core.planner_types import Plan
 from fastapi.responses import JSONResponse
+from src.core.executor import execute_tool_call
+from typing import Any, Dict
 
 app = FastAPI(title="AI Agent Orchestrator")
 class InboundRequest(BaseModel):
@@ -19,6 +21,11 @@ class InboundRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     approval_id: str
+
+class ExecuteRequest(BaseModel):
+    trace_id: str
+    tool: str
+    args: Dict[str, Any] = {}
 
 @app.get("/health")
 async def health():
@@ -37,14 +44,20 @@ async def inbound(req: InboundRequest):
         AuditEvent.create(trace_id, "tool_planned", {"tool": planned_tool, "args": planned_args}),
     ]
 
-    if p.tool_call.requires_approval:
+    if p.tool_call.policy_decision == "approval_required":
         approval_id = new_trace_id()  # separate id for approval tracking
 
         audit.append(
             AuditEvent.create(
                 trace_id,
-                "approval_required",
-                {"approval_id": approval_id, "tool": planned_tool, "args": planned_args},
+                "policy_decision",
+                {
+                #    "approval_id": approval_id, "tool": planned_tool, "args": planned_args
+                "policy_decision": p.tool_call.policy_decision,
+                "risk_level": p.tool_call.risk_level,
+                "confidence": p.tool_call.confidence,
+                "reason": p.tool_call.reason,
+                },
             )
         )
 
@@ -68,6 +81,7 @@ async def inbound(req: InboundRequest):
             "tool": planned_tool,
             "planned_args": planned_args,
             "audit": [a.__dict__ for a in audit],
+            "tool_call": p.tool_call.__dict__,
         }
 
     # If no approval required, execute immediately
@@ -92,6 +106,7 @@ async def inbound(req: InboundRequest):
         "result": result.__dict__,
         "audit": [a.__dict__ for a in audit],
         "next_step": "decision_layer_llm_placeholder",
+        "tool_call": p.tool_call.__dict__,
     }
 
 @app.post("/approve")
@@ -104,19 +119,44 @@ async def approve(req: ApprovalRequest):
     args = pending["args"]
     trace_id = pending["trace_id"]
 
-    result = execute(tool, args)
-
     mark_approved(req.approval_id)
 
     audit = [
         AuditEvent.create(trace_id, "approved", {"approval_id": req.approval_id}),
-        AuditEvent.create(
-            trace_id, "tool_executed", {"tool": result.tool, "ok": result.ok, "error": result.error}
-        ),
     ]
+
+    result_dict, audit = execute_tool_call(
+        trace_id=trace_id,
+        tool=tool,
+        args=args,
+        audit=audit,
+    )
+
     append_events(audit)
 
-    return {"ok": True, "trace_id": trace_id, "result": result.__dict__}
+    return {"ok": True, "trace_id": trace_id, "result": result_dict}
+
+@app.post("/execute")
+async def execute_endpoint(req: ExecuteRequest):
+    audit = [
+        AuditEvent.create(req.trace_id, "execute_requested", {"tool": req.tool}),
+    ]
+
+    result_dict, audit = execute_tool_call(
+        trace_id=req.trace_id,
+        tool=req.tool,
+        args=req.args,
+        audit=audit,
+    )
+
+    append_events(audit)
+
+    return {
+        "ok": True,
+        "trace_id": req.trace_id,
+        "result": result_dict,
+        "audit": [a.__dict__ for a in audit],
+    }
 
 @app.get("/")
 async def root():
