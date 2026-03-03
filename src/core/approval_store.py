@@ -18,16 +18,20 @@ def find_pending(approval_id: str) -> Optional[Dict[str, Any]]:
     if not PENDING_PATH.exists():
         return None
 
-    # Simple linear scan (fine for demo; later becomes DB)
+    latest = None
     with PENDING_PATH.open("r", encoding="utf-8") as f:
         for line in f:
+            line = line.strip()
+            if not line:
+                continue
             try:
                 obj = json.loads(line)
             except Exception:
                 continue
-            if obj.get("approval_id") == approval_id and obj.get("status") == "pending":
-                return obj
-    return None
+            if obj.get("approval_id") == approval_id:
+                latest = obj
+
+    return latest
 
 
 def mark_approved(approval_id: str) -> None:
@@ -49,3 +53,19 @@ def mark_approved(approval_id: str) -> None:
         else:
             out.append(line)
     PENDING_PATH.write_text("\n".join(out) + ("\n" if out else ""), encoding="utf-8")
+
+
+def mark_executed(approval_id: str, result: Dict[str, Any]) -> None:
+    rec = find_pending(approval_id)
+    if not rec:
+        return
+
+    record = {
+        "approval_id": approval_id,
+        "trace_id": rec.get("trace_id"),
+        "tool": rec.get("tool"),
+        "args": rec.get("args"),
+        "status": "executed",
+        "result": result,
+    }
+    write_pending(record)

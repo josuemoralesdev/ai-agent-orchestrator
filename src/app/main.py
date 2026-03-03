@@ -5,7 +5,7 @@ from src.core.router import execute #, route
 from src.core.audit_store import append_events
 from src.core.approval_store import write_pending
 #from src.tools.registry import build_registry
-from src.core.approval_store import find_pending, mark_approved
+from src.core.approval_store import find_pending, mark_approved, mark_executed
 #from src.core.policy_resolver import requires_approval
 from src.core.config import settings
 from src.core.planner import plan_next
@@ -111,13 +111,22 @@ async def inbound(req: InboundRequest):
 
 @app.post("/approve")
 async def approve(req: ApprovalRequest):
-    pending = find_pending(req.approval_id)
-    if not pending:
+    rec = find_pending(req.approval_id)
+    if not rec:
         return {"ok": False, "error": "approval_not_found"}
 
-    tool = pending["tool"]
-    args = pending["args"]
-    trace_id = pending["trace_id"]
+    #Idempotency Gate
+    if rec.get("status") == "executed":
+        return {
+            "ok": True,
+            "trace_id": rec.get("trace_id"),
+            "result": rec.get("result"),
+            "already_executed": True,
+        }
+    
+    tool = rec["tool"]
+    args = rec["args"]
+    trace_id = rec["trace_id"]
 
     mark_approved(req.approval_id)
 
@@ -126,13 +135,15 @@ async def approve(req: ApprovalRequest):
     ]
 
     result_dict, audit = execute_tool_call(
-        trace_id=trace_id,
-        tool=tool,
-        args=args,
-        audit=audit,
+    trace_id=trace_id,
+    tool=tool,
+    args=args,
+    audit=audit,
     )
 
     append_events(audit)
+
+    mark_executed(req.approval_id, result_dict)
 
     return {"ok": True, "trace_id": trace_id, "result": result_dict}
 
