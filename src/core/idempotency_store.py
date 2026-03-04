@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from datetime import datetime, timezone, timedelta
 
+import fcntl
+from src.core.file_lock import locked_open
+
 IDEMPOTENCY_PATH = Path("logs/idempotency.ndjson")
 
 
@@ -13,27 +16,20 @@ def ensure_log_dir() -> None:
 
 
 def write_idempotency(key: str, response: Dict[str, Any]) -> None:
-    """
-    Append a cached response for an idempotency key.
-    NDJSON append-only log.
-    """
     ensure_log_dir()
     record = {"key": key, "ts": datetime.now(timezone.utc).isoformat(), "response": response}
-    with IDEMPOTENCY_PATH.open("a", encoding="utf-8") as f:
+    with locked_open(IDEMPOTENCY_PATH, "a", fcntl.LOCK_EX) as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def find_idempotency(key: str, *, ttl_seconds: int = 86400) -> Optional[Dict[str, Any]]:
-    
-    """
-    Return the most recent cached response for this key, if present.
-    Linear scan is fine for demo; later becomes DB/Redis.
-    """
     if not IDEMPOTENCY_PATH.exists():
         return None
 
-    latest: Optional[Dict[str, Any]] = None
-    with IDEMPOTENCY_PATH.open("r", encoding="utf-8") as f:
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=ttl_seconds)
+    latest = None
+
+    with locked_open(IDEMPOTENCY_PATH, "r", fcntl.LOCK_SH) as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -54,5 +50,5 @@ def find_idempotency(key: str, *, ttl_seconds: int = 86400) -> Optional[Dict[str
                     except Exception:
                         continue  # bad ts -> ignore this entry
                 latest = obj.get("response")
-                
+
     return latest
