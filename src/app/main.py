@@ -37,11 +37,12 @@ async def health():
 async def inbound(req: InboundRequest, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
 
     if idempotency_key:
-        cached = find_idempotency(idempotency_key)
+        scoped_key = f"{req.user_id}:{idempotency_key}" if idempotency_key else None
+        cached = find_idempotency(scoped_key)
         if cached is not None:
             # optional: you can add a flag so you know it was cached
             cached = dict(cached)
-            cached["idempotency"] = {"hit": True, "key": idempotency_key}
+            cached["idempotency"] = {"hit": True, "key": idempotency_key, "scoped_key": scoped_key}
             return cached
 
     p = plan_next(user_id=req.user_id, message=req.message)
@@ -95,7 +96,8 @@ async def inbound(req: InboundRequest, idempotency_key: str | None = Header(defa
         }
 
         if idempotency_key:
-            write_idempotency(idempotency_key, resp)
+            scoped_key = f"{req.user_id}:{idempotency_key}"
+            write_idempotency(scoped_key, resp)
 
         return resp
 
@@ -125,7 +127,8 @@ async def inbound(req: InboundRequest, idempotency_key: str | None = Header(defa
     }
 
     if idempotency_key:
-        write_idempotency(idempotency_key, resp)
+        scoped_key = f"{req.user_id}:{idempotency_key}"
+        write_idempotency(scoped_key, resp)
 
     return resp
 
