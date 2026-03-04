@@ -13,6 +13,8 @@ from src.core.planner_types import Plan
 from fastapi.responses import JSONResponse
 from src.core.executor import execute_tool_call
 from typing import Any, Dict
+from fastapi import Header
+from src.core.idempotency_store import find_idempotency, write_idempotency
 
 app = FastAPI(title="AI Agent Orchestrator")
 class InboundRequest(BaseModel):
@@ -32,7 +34,15 @@ async def health():
     return {"status": "ok"}
 
 @app.post("/inbound")
-async def inbound(req: InboundRequest):
+async def inbound(req: InboundRequest, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
+
+    if idempotency_key:
+        cached = find_idempotency(idempotency_key)
+        if cached is not None:
+            # optional: you can add a flag so you know it was cached
+            cached = dict(cached)
+            cached["idempotency"] = {"hit": True, "key": idempotency_key}
+            return cached
 
     p = plan_next(user_id=req.user_id, message=req.message)
     trace_id = p.trace_id
@@ -74,15 +84,20 @@ async def inbound(req: InboundRequest):
 
         append_events(audit)
 
-        return {
+        resp = {
             "trace_id": trace_id,
             "status": "pending_approval",
             "approval_id": approval_id,
             "tool": planned_tool,
             "planned_args": planned_args,
             "audit": [a.__dict__ for a in audit],
-            "tool_call": p.tool_call.__dict__,
+            "tool_call": p.tool_call.__dict__ if hasattr(p.tool_call, "__dict__") else p.tool_call,
         }
+
+        if idempotency_key:
+            write_idempotency(idempotency_key, resp)
+
+        return resp
 
     # If no approval required, execute immediately
     result = execute(planned_tool, planned_args)
@@ -97,7 +112,7 @@ async def inbound(req: InboundRequest):
 
     append_events(audit)
 
-    return {
+    resp = {
         "trace_id": trace_id,
         "received": True,
         "user_id": req.user_id,
@@ -105,9 +120,14 @@ async def inbound(req: InboundRequest):
         "tool": planned_tool,
         "result": result.__dict__,
         "audit": [a.__dict__ for a in audit],
+        "tool_call": p.tool_call.__dict__ if hasattr(p.tool_call, "__dict__") else p.tool_call,
         "next_step": "decision_layer_llm_placeholder",
-        "tool_call": p.tool_call.__dict__,
     }
+
+    if idempotency_key:
+        write_idempotency(idempotency_key, resp)
+
+    return resp
 
 @app.post("/approve")
 async def approve(req: ApprovalRequest):
