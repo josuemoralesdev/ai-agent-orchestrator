@@ -15,8 +15,13 @@ from src.core.executor import execute_tool_call
 from typing import Any, Dict
 from fastapi import Header
 from src.core.idempotency_store import find_idempotency, write_idempotency
+from src.core.sqlite_init import init_db
 
 app = FastAPI(title="AI Agent Orchestrator")
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
 class InboundRequest(BaseModel):
     user_id: str
     message: str

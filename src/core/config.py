@@ -10,6 +10,7 @@ class Settings(BaseModel):
     env: str = os.getenv("ENV", "dev")
     audit_log_path: str = os.getenv("AUDIT_LOG_PATH", "logs/audit.ndjson")
     external_allowlist_domains: str = os.getenv("EXTERNAL_ALLOWLIST_DOMAINS", "httpbin.org")
+    sqlite_db_path: str = "logs/state.db"
 
 
 settings = Settings()
