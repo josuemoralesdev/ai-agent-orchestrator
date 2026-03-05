@@ -79,13 +79,10 @@ async def inbound(req: InboundRequest, idempotency_key: str | None = Header(defa
 
         # persist pending approval
         write_pending(
-            {
-                "approval_id": approval_id,
-                "trace_id": trace_id,
-                "tool": planned_tool,
-                "args": planned_args,
-                "status": "pending",
-            }
+            approval_id=approval_id,
+            trace_id=trace_id,
+            tool=planned_tool,
+            args=planned_args,
         )
 
         append_events(audit)

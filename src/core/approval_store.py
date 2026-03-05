@@ -1,78 +1,89 @@
+# src/core/approval_store.py
+from __future__ import annotations
+
 import json
-from pathlib import Path
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
 
-from src.core.config import ensure_log_dir
-
-import fcntl
-from src.core.file_lock import locked_open
+from src.core.db import get_conn
 
 
-PENDING_PATH = Path("logs/pending_approvals.ndjson")
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
-def write_pending(approval: Dict[str, Any]) -> None:
-    ensure_log_dir()
-    with locked_open(PENDING_PATH, "a", fcntl.LOCK_EX) as f:
-        f.write(json.dumps(approval, ensure_ascii=False) + "\n")
+def write_pending(approval_id: str, trace_id: str, tool: str, args: dict) -> None:
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO approvals
+            (approval_id, trace_id, tool, args_json, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+            """,
+            (
+                approval_id,
+                trace_id,
+                tool,
+                json.dumps(args),
+                _now(),
+                _now(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def find_pending(approval_id: str) -> Optional[Dict[str, Any]]:
-    if not PENDING_PATH.exists():
-        return None
+def find_pending(approval_id: str):
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM approvals WHERE approval_id = ?",
+            (approval_id,),
+        ).fetchone()
 
-    latest = None
-    with PENDING_PATH.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except Exception:
-                continue
-            if obj.get("approval_id") == approval_id:
-                latest = obj
+        if not row:
+            return None
 
-    return latest
-
+        return {
+            "approval_id": row["approval_id"],
+            "trace_id": row["trace_id"],
+            "tool": row["tool"],
+            "args": json.loads(row["args_json"]),
+            "status": row["status"],
+            "result": json.loads(row["result_json"]) if row["result_json"] else None,
+        }
+    finally:
+        conn.close()
 
 
 def mark_approved(approval_id: str) -> None:
-    if not PENDING_PATH.exists():
-        return
-
-    with locked_open(PENDING_PATH, "r+", fcntl.LOCK_EX) as f:
-        lines = f.read().splitlines()
-        out = []
-        for line in lines:
-            try:
-                obj = json.loads(line)
-            except Exception:
-                out.append(line)
-                continue
-            if obj.get("approval_id") == approval_id and obj.get("status") == "pending":
-                obj["status"] = "approved"
-                out.append(json.dumps(obj, ensure_ascii=False))
-            else:
-                out.append(line)
-
-        f.seek(0)
-        f.truncate(0)
-        f.write("\n".join(out) + ("\n" if out else ""))
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            UPDATE approvals
+            SET status='approved', updated_at=?
+            WHERE approval_id=? AND status='pending'
+            """,
+            (_now(), approval_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def mark_executed(approval_id: str, result: Dict[str, Any]) -> None:
-    rec = find_pending(approval_id)
-    if not rec:
-        return
-
-    record = {
-        "approval_id": approval_id,
-        "trace_id": rec.get("trace_id"),
-        "tool": rec.get("tool"),
-        "args": rec.get("args"),
-        "status": "executed",
-        "result": result,
-    }
-    write_pending(record)
+def mark_executed(approval_id: str, result: dict) -> None:
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            UPDATE approvals
+            SET status='executed', result_json=?, updated_at=?
+            WHERE approval_id=?
+            """,
+            (json.dumps(result), _now(), approval_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
