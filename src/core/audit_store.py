@@ -1,16 +1,48 @@
+from __future__ import annotations
+
 import json
-from pathlib import Path
-from typing import Iterable
+from typing import Any
 
-from src.core.config import settings, ensure_log_dir
-from src.core.models import AuditEvent
+from src.core.db import get_conn
 
-import fcntl
-from src.core.file_lock import locked_open
 
-def append_events(events: list[AuditEvent]) -> None:
+def _event_to_row(ev: Any) -> tuple[str, str, str, str]:
+    """
+    Accepts either:
+      - AuditEvent instance (with .trace_id, .event_type, .ts, .payload)
+      - dict with keys: trace_id, event_type, ts, payload
+    Returns tuple for DB insert.
+    """
+    if isinstance(ev, dict):
+        trace_id = ev["trace_id"]
+        event_type = ev["event_type"]
+        ts = ev["ts"]
+        payload = ev.get("payload", {})
+    else:
+        # AuditEvent object
+        trace_id = ev.trace_id
+        event_type = ev.event_type
+        ts = ev.ts
+        payload = getattr(ev, "payload", {}) or {}
 
-    ensure_log_dir()
-    with locked_open(Path(settings.audit_log_path), "a", fcntl.LOCK_EX) as f:
+    return trace_id, event_type, ts, json.dumps(payload)
+
+
+def append_events(events: list[Any]) -> None:
+    if not events:
+        return
+
+    conn = get_conn()
+    try:
         for ev in events:
-            f.write(json.dumps(ev.__dict__, ensure_ascii=False) + "\n") # or your json.dumps(ev.__dict__)
+            trace_id, event_type, ts, payload_json = _event_to_row(ev)
+            conn.execute(
+                """
+                INSERT INTO audit_events (trace_id, event_type, ts, payload_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (trace_id, event_type, ts, payload_json),
+            )
+        conn.commit()
+    finally:
+        conn.close()
