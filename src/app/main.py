@@ -12,7 +12,13 @@ from fastapi.responses import JSONResponse
 from src.core.executor import execute_tool_call
 from typing import Any, Dict
 from fastapi import Header
-from src.core.idempotency_store import find_idempotency, write_idempotency
+from src.core.queries import (
+    get_trace_events,
+    list_approvals,
+    list_idempotency,
+    get_approval,
+    get_stats,
+)
 from src.core.sqlite_init import init_db
 from src.core.queries import get_trace_events, list_approvals, list_idempotency
 from src.core.db import get_conn
@@ -235,3 +241,20 @@ async def health_db():
         return {"ok": True, "db": "sqlite"}
     except Exception as e:
         return {"ok": False, "db": "sqlite", "error": str(e)}
+   
+    
+@app.get("/approvals/{approval_id}")
+async def approval_detail(
+    approval_id: str,
+    _: None = Depends(require_admin),
+):
+    rec = get_approval(approval_id)
+    if not rec:
+        return {"ok": False, "error": "approval_not_found"}
+
+    return {"ok": True, "approval": rec}
+
+
+@app.get("/stats")
+async def stats(_: None = Depends(require_admin)):
+    return {"stats": get_stats()}

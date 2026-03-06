@@ -76,3 +76,53 @@ def list_idempotency(limit: int = 20) -> list[dict]:
         return [dict(row) for row in rows]
     finally:
         conn.close()
+
+def get_approval(approval_id: str):
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT approval_id, trace_id, tool, args_json,
+                   status, result_json, created_at, updated_at
+            FROM approvals
+            WHERE approval_id = ?
+            """,
+            (approval_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "approval_id": row["approval_id"],
+            "trace_id": row["trace_id"],
+            "tool": row["tool"],
+            "args": json.loads(row["args_json"]),
+            "status": row["status"],
+            "result": json.loads(row["result_json"]) if row["result_json"] else None,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+    finally:
+        conn.close()
+
+
+def get_stats():
+    conn = get_conn()
+    try:
+        return {
+            "approvals_pending": conn.execute(
+                "SELECT COUNT(*) FROM approvals WHERE status='pending'"
+            ).fetchone()[0],
+            "approvals_executed": conn.execute(
+                "SELECT COUNT(*) FROM approvals WHERE status='executed'"
+            ).fetchone()[0],
+            "idempotency_keys": conn.execute(
+                "SELECT COUNT(*) FROM idempotency"
+            ).fetchone()[0],
+            "audit_events": conn.execute(
+                "SELECT COUNT(*) FROM audit_events"
+            ).fetchone()[0],
+        }
+    finally:
+        conn.close()
