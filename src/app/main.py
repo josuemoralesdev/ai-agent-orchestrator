@@ -140,7 +140,7 @@ async def approve(req: ApprovalRequest):
     if not rec:
         return {"ok": False, "error": "approval_not_found"}
 
-    #Idempotency Gate
+    # idempotency gate
     if rec.get("status") == "executed":
         return {
             "ok": True,
@@ -148,7 +148,7 @@ async def approve(req: ApprovalRequest):
             "result": rec.get("result"),
             "already_executed": True,
         }
-    
+
     tool = rec["tool"]
     args = rec["args"]
     trace_id = rec["trace_id"]
@@ -160,14 +160,13 @@ async def approve(req: ApprovalRequest):
     ]
 
     result_dict, audit = execute_tool_call(
-    trace_id=trace_id,
-    tool=tool,
-    args=args,
-    audit=audit,
+        trace_id=trace_id,
+        tool=tool,
+        args=args,
+        audit=audit,
     )
 
     append_events(audit)
-
     mark_executed(req.approval_id, result_dict)
 
     return {"ok": True, "trace_id": trace_id, "result": result_dict}
