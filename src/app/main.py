@@ -4,9 +4,7 @@ from src.core.models import AuditEvent, new_trace_id
 from src.core.router import execute #, route
 from src.core.audit_store import append_events
 from src.core.approval_store import write_pending
-#from src.tools.registry import build_registry
 from src.core.approval_store import find_pending, mark_approved, mark_executed
-#from src.core.policy_resolver import requires_approval
 from src.core.config import settings
 from src.core.planner import plan_next
 from src.core.planner_types import Plan
@@ -16,6 +14,8 @@ from typing import Any, Dict
 from fastapi import Header
 from src.core.idempotency_store import find_idempotency, write_idempotency
 from src.core.sqlite_init import init_db
+from src.core.queries import get_trace_events, list_approvals, list_idempotency
+from src.core.db import get_conn
 
 app = FastAPI(title="AI Agent Orchestrator")
 
@@ -207,3 +207,29 @@ async def plan(req: InboundRequest):
         return JSONResponse(status_code=400, content={"ok": False, "error": "message_too_long"})
     
     return plan_next(user_id=req.user_id, message=req.message)
+
+@app.get("/traces/{trace_id}")
+async def trace_events(trace_id: str):
+    events = get_trace_events(trace_id)
+    return {"trace_id": trace_id, "events": events}
+
+
+@app.get("/approvals")
+async def approvals(status: str | None = None, limit: int = 20):
+    return {"items": list_approvals(status=status, limit=limit)}
+
+
+@app.get("/idempotency")
+async def idempotency(limit: int = 20):
+    return {"items": list_idempotency(limit=limit)}
+
+
+@app.get("/health/db")
+async def health_db():
+    try:
+        conn = get_conn()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+        return {"ok": True, "db": "sqlite"}
+    except Exception as e:
+        return {"ok": False, "db": "sqlite", "error": str(e)}
