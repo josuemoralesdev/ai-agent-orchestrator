@@ -16,6 +16,8 @@ from src.core.idempotency_store import find_idempotency, write_idempotency
 from src.core.sqlite_init import init_db
 from src.core.queries import get_trace_events, list_approvals, list_idempotency
 from src.core.db import get_conn
+from fastapi import Depends
+from src.core.auth import require_admin
 
 app = FastAPI(title="AI Agent Orchestrator")
 
@@ -135,7 +137,7 @@ async def inbound(req: InboundRequest, idempotency_key: str | None = Header(defa
     return resp
 
 @app.post("/approve")
-async def approve(req: ApprovalRequest):
+async def approve(req: ApprovalRequest, _: None = Depends(require_admin)):
     rec = find_pending(req.approval_id)
     if not rec:
         return {"ok": False, "error": "approval_not_found"}
@@ -172,7 +174,7 @@ async def approve(req: ApprovalRequest):
     return {"ok": True, "trace_id": trace_id, "result": result_dict}
 
 @app.post("/execute")
-async def execute_endpoint(req: ExecuteRequest):
+async def execute_endpoint(req: ExecuteRequest, _: None = Depends(require_admin)):
     audit = [
         AuditEvent.create(req.trace_id, "execute_requested", {"tool": req.tool}),
     ]
@@ -209,18 +211,18 @@ async def plan(req: InboundRequest):
     return plan_next(user_id=req.user_id, message=req.message)
 
 @app.get("/traces/{trace_id}")
-async def trace_events(trace_id: str):
+async def trace_events(trace_id: str, _: None = Depends(require_admin)):
     events = get_trace_events(trace_id)
     return {"trace_id": trace_id, "events": events}
 
 
 @app.get("/approvals")
-async def approvals(status: str | None = None, limit: int = 20):
+async def approvals(status: str | None = None, limit: int = 20, _: None = Depends(require_admin)):
     return {"items": list_approvals(status=status, limit=limit)}
 
 
 @app.get("/idempotency")
-async def idempotency(limit: int = 20):
+async def idempotency(limit: int = 20, _: None = Depends(require_admin)):
     return {"items": list_idempotency(limit=limit)}
 
 
