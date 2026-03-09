@@ -12,6 +12,9 @@ class Settings(BaseModel):
     external_allowlist_domains: str = os.getenv("EXTERNAL_ALLOWLIST_DOMAINS", "httpbin.org")
     sqlite_db_path: str = "logs/state.db"
     admin_api_key: str = os.getenv("ADMIN_API_KEY", "dev-admin-key")
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    planner_model: str = os.getenv("PLANNER_MODEL", "gpt-4.1-mini")
+    planner_kind: str = os.getenv("PLANNER_KIND", "rule")
 
 
 settings = Settings()

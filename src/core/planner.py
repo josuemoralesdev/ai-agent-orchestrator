@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from src.core.planner_types import Plan
 from src.core.planners import RulePlanner, LLMPlanner
+from src.core.config import settings
 
 
-def get_planner(kind: str = "rule"):
+def get_planner(kind: str | None = None):
+    kind = kind or settings.planner_kind
     """
     Planner selector.
 
@@ -18,6 +20,6 @@ def get_planner(kind: str = "rule"):
     return RulePlanner()
 
 
-def plan_next(*, user_id: str, message: str, planner_kind: str = "rule") -> Plan:
+def plan_next(*, user_id: str, message: str, planner_kind: str | None = None) -> Plan:
     planner = get_planner(planner_kind)
     return planner.plan(user_id=user_id, message=message)
