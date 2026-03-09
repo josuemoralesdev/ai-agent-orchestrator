@@ -222,9 +222,9 @@ async def trace_events(trace_id: str, _: None = Depends(require_admin)):
     return {"trace_id": trace_id, "events": events}
 
 
-@app.get("/approvals")
-async def approvals(status: str | None = None, limit: int = 20, _: None = Depends(require_admin)):
-    return {"items": list_approvals(status=status, limit=limit)}
+#@app.get("/approvals")
+#async def approvals(status: str | None = None, limit: int = 20, _: None = Depends(require_admin)):
+#    return {"items": list_approvals(status=status, limit=limit)}
 
 
 @app.get("/idempotency")
