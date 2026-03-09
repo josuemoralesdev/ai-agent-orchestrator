@@ -222,11 +222,6 @@ async def trace_events(trace_id: str, _: None = Depends(require_admin)):
     return {"trace_id": trace_id, "events": events}
 
 
-#@app.get("/approvals")
-#async def approvals(status: str | None = None, limit: int = 20, _: None = Depends(require_admin)):
-#    return {"items": list_approvals(status=status, limit=limit)}
-
-
 @app.get("/idempotency")
 async def idempotency(limit: int = 20, _: None = Depends(require_admin)):
     return {"items": list_idempotency(limit=limit)}
@@ -265,3 +260,14 @@ async def approvals(
 @app.get("/stats")
 async def stats(_: None = Depends(require_admin)):
     return {"stats": get_stats()}
+
+
+@app.get("/approvals/pending")
+async def approvals_pending(
+    limit: int = 20,
+    _: None = Depends(require_admin),
+):
+    limit = max(1, min(limit, 100))
+    return {
+        "items": list_approvals(status="pending", limit=limit)
+    }
