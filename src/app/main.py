@@ -18,6 +18,7 @@ from src.core.queries import (
     list_idempotency,
     get_approval,
     get_stats,
+    get_approval_trace,
 )
 from src.core.sqlite_init import init_db
 from src.core.queries import get_trace_events, list_approvals, list_idempotency
@@ -271,3 +272,15 @@ async def approvals_pending(
     return {
         "items": list_approvals(status="pending", limit=limit)
     }
+
+@app.get("/approvals/{approval_id}/trace")
+async def approval_trace(
+    approval_id: str,
+    _: None = Depends(require_admin),
+):
+    rec = get_approval_trace(approval_id)
+
+    if not rec:
+        return {"ok": False, "error": "approval_not_found"}
+
+    return {"ok": True, "trace": rec}

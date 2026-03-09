@@ -138,3 +138,30 @@ def get_stats():
         }
     finally:
         conn.close()
+
+def get_approval_trace(approval_id: str):
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT trace_id
+            FROM approvals
+            WHERE approval_id = ?
+            """,
+            (approval_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        trace_id = row["trace_id"]
+        events = get_trace_events(trace_id)
+
+        return {
+            "approval_id": approval_id,
+            "trace_id": trace_id,
+            "events": events,
+        }
+
+    finally:
+        conn.close()
