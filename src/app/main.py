@@ -241,18 +241,25 @@ async def health_db():
         return {"ok": True, "db": "sqlite"}
     except Exception as e:
         return {"ok": False, "db": "sqlite", "error": str(e)}
-   
-    
-@app.get("/approvals/{approval_id}")
-async def approval_detail(
-    approval_id: str,
+
+
+@app.get("/approvals")
+async def approvals(
+    status: str | None = None,
+    tool: str | None = None,
+    trace_id: str | None = None,
+    limit: int = 20,
     _: None = Depends(require_admin),
 ):
-    rec = get_approval(approval_id)
-    if not rec:
-        return {"ok": False, "error": "approval_not_found"}
-
-    return {"ok": True, "approval": rec}
+    limit = max(1, min(limit, 100))
+    return {
+        "items": list_approvals(
+            status=status,
+            tool=tool,
+            trace_id=trace_id,
+            limit=limit,
+        )
+    }
 
 
 @app.get("/stats")

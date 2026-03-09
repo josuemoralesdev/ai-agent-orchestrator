@@ -30,31 +30,43 @@ def get_trace_events(trace_id: str) -> list[dict]:
         conn.close()
 
 
-def list_approvals(status: str | None = None, limit: int = 20) -> list[dict]:
+def list_approvals(
+    status: str | None = None,
+    tool: str | None = None,
+    trace_id: str | None = None,
+    limit: int = 20,
+) -> list[dict]:
     conn = get_conn()
     try:
-        if status:
-            rows = conn.execute(
-                """
-                SELECT approval_id, trace_id, tool, status, created_at, updated_at
-                FROM approvals
-                WHERE status = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (status, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT approval_id, trace_id, tool, status, created_at, updated_at
-                FROM approvals
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+        clauses = []
+        params = []
 
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+
+        if tool:
+            clauses.append("tool = ?")
+            params.append(tool)
+
+        if trace_id:
+            clauses.append("trace_id = ?")
+            params.append(trace_id)
+
+        where_sql = ""
+        if clauses:
+            where_sql = "WHERE " + " AND ".join(clauses)
+
+        sql = f"""
+            SELECT approval_id, trace_id, tool, status, created_at, updated_at
+            FROM approvals
+            {where_sql}
+            ORDER BY created_at DESC
+            LIMIT ?
+        """
+        params.append(limit)
+
+        rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
     finally:
         conn.close()
