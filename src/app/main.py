@@ -19,6 +19,7 @@ from src.core.queries import (
     get_approval,
     get_stats,
     get_approval_trace,
+    get_approval_replay_input,
 )
 from src.core.sqlite_init import init_db
 from src.core.queries import get_trace_events, list_approvals, list_idempotency
@@ -273,6 +274,7 @@ async def approvals_pending(
         "items": list_approvals(status="pending", limit=limit)
     }
 
+
 @app.get("/approvals/{approval_id}/trace")
 async def approval_trace(
     approval_id: str,
@@ -284,3 +286,48 @@ async def approval_trace(
         return {"ok": False, "error": "approval_not_found"}
 
     return {"ok": True, "trace": rec}
+
+
+@app.post("/replay/approval/{approval_id}")
+async def replay_approval(
+    approval_id: str,
+    _: None = Depends(require_admin),
+):
+    rec = get_approval_replay_input(approval_id)
+    if not rec:
+        return {"ok": False, "error": "approval_not_found"}
+
+    replay_trace_id = new_trace_id()
+
+    audit = [
+        AuditEvent.create(
+            replay_trace_id,
+            "replay_started",
+            {
+                "source_approval_id": approval_id,
+                "source_trace_id": rec["trace_id"],
+                "tool": rec["tool"],
+            },
+        )
+    ]
+
+    result_dict, audit = execute_tool_call(
+        trace_id=replay_trace_id,
+        tool=rec["tool"],
+        args=rec["args"],
+        audit=audit,
+    )
+
+    append_events(audit)
+
+    return {
+        "ok": True,
+        "replay": {
+            "source_approval_id": approval_id,
+            "source_trace_id": rec["trace_id"],
+            "replay_trace_id": replay_trace_id,
+            "tool": rec["tool"],
+            "args": rec["args"],
+            "result": result_dict,
+        },
+    }

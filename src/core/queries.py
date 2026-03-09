@@ -165,3 +165,28 @@ def get_approval_trace(approval_id: str):
 
     finally:
         conn.close()
+
+def get_approval_replay_input(approval_id: str):
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT approval_id, trace_id, tool, args_json, status
+            FROM approvals
+            WHERE approval_id = ?
+            """,
+            (approval_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "approval_id": row["approval_id"],
+            "trace_id": row["trace_id"],
+            "tool": row["tool"],
+            "args": json.loads(row["args_json"]),
+            "status": row["status"],
+        }
+    finally:
+        conn.close()
