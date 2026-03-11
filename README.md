@@ -96,6 +96,99 @@ Every request is tracked with a trace ID to provide full lifecycle visibility.
 
 ---
 
+## Demo Scenario
+
+Kernel’s reference demo flow illustrates how an operational request moves through the full orchestration lifecycle.
+
+This scenario demonstrates the core Kernel principle:
+
+**AI plans → policies validate → humans approve when needed → tools execute deterministically → every step is traced.**
+
+---
+
+### Example Scenario: Payment Link Approval Flow
+
+A request arrives asking the system to generate a payment link for a customer order.  
+Kernel does not execute the action directly from free-form text. Instead, it converts the request into a controlled operational workflow.
+
+The system performs the following steps:
+
+1. Receive and normalize the request  
+2. Generate a structured execution plan  
+3. Validate the plan through policy rules  
+4. Pause for human approval because the action affects an external financial system  
+5. Execute the approved action through the payment adapter  
+6. Return the result and record the full execution trace
+
+Core flow:
+
+```
+Request → Plan → Validate → Approve → Execute → Trace
+```
+
+---
+
+### Example Request
+
+```json
+{
+  "message": "Generate a payment link for order #4821 for 1,250 MXN and send it back to the customer."
+}
+```
+
+---
+
+### Example Execution Plan
+
+```json
+{
+  "intent": "create_payment_link",
+  "requires_approval": true,
+  "entities": {
+    "order_id": "4821",
+    "amount": 1250,
+    "currency": "MXN"
+  }
+}
+```
+
+---
+
+### Example Tool Execution Result
+
+```json
+{
+  "status": "success",
+  "payment_url": "https://payments.example.com/pay_8FJ29KLM"
+}
+```
+
+---
+
+### Example Final Response
+
+```json
+{
+  "status": "completed",
+  "message": "Payment link generated successfully."
+}
+```
+
+---
+
+### Observability
+
+Each request is tracked through a **trace ID**, allowing the system to record:
+
+- request reception
+- plan generation
+- policy validation
+- approval events
+- tool execution
+- final response
+
+This traceability ensures the system remains **auditable, debuggable, and safe for operational use**.
+
 # Architecture Goals
 
 Kernel is designed to support real operational environments where AI systems must be:
