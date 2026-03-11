@@ -36,36 +36,96 @@ This design allows AI systems to operate safely in real business environments.
 
 ---
 
-## High-Level Architecture
+## Design Philosophy
 
+Kernel is intentionally designed as a **control layer for operational AI systems**, not as a conversational assistant.
+
+The project focuses on **safe AI orchestration**, where reasoning, validation, approval, and execution remain clearly separated.
+
+---
+
+## Non-Goals
+
+Kernel is **not intended to be**:
+
+- a chatbot framework
+- an LLM wrapper library
+- a workflow engine replacement
+- a full AI agent platform
+
+Instead, Kernel demonstrates the **core architectural pattern required to safely integrate AI into real operational systems**.
+
+---
+
+## Kernel Architecture
+
+```mermaid
+flowchart TD
+
+A[User / Channel\n(WhatsApp, Web, API)]
+B[Request Gateway\nWebhook / API]
+C[AI Planning Layer\nIntent + Plan]
+D[Policy Guardrails\nValidation Rules]
+E[Human Approval\n(if required)]
+F[Execution Engine\nTool Router]
+
+G[Payment Adapter]
+H[Provider Adapter]
+I[CRM / Database Adapter]
+
+J[Audit Log\nTrace Store]
+
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+
+F --> G
+F --> H
+F --> I
+
+F --> J
 ```
-User / Channel (WhatsApp, Web, API, etc)
-          |
-          v
-  Request Gateway (webhooks / ingestion)
-          |
-          v
-     AI Planning Layer
-   (intent + execution plan)
-          |
-          v
-    Policy Guardrails Layer
-   (rules + validation)
-          |
-          v
-     Human Approval Gate
-    (when required)
-          |
-          v
-     Execution Engine
-     (tool router)
-   |        |          |
-   v        v          v
- Payment   Provider   CRM/DB
- Adapter    Adapter    Adapter
-          |
-          v
- Audit Log / Observability / Trace Store
+
+---
+
+## Runtime Execution Flow
+
+The following sequence diagram illustrates how a request travels through the Kernel orchestration lifecycle.
+
+```mermaid
+sequenceDiagram
+
+participant Client
+participant Kernel
+participant Planner
+participant Policy
+participant Approval
+participant Executor
+participant Tools
+participant Trace
+
+Client->>Kernel: POST /plan
+Kernel->>Planner: Interpret request
+Planner-->>Kernel: Structured execution plan
+
+Kernel->>Policy: Validate plan
+Policy-->>Kernel: Plan approved / requires approval
+
+alt Requires Human Approval
+    Kernel->>Approval: Store pending action
+    Approval-->>Kernel: Approval decision
+end
+
+Kernel->>Executor: Execute validated plan
+Executor->>Tools: Call external adapter
+Tools-->>Executor: Result
+
+Executor->>Trace: Record execution lifecycle
+Trace-->>Kernel: Trace stored
+
+Kernel-->>Client: Response
 ```
 
 ---
