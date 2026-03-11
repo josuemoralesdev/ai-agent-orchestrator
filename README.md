@@ -1,3 +1,15 @@
+<p align="center">
+
+AI Agent Orchestrator — Kernel
+
+</p>
+
+<p align="center">
+
+Python • FastAPI • AI Planning • Human-in-the-Loop • MIT License
+
+</p>
+
 # Kernel — AI Orchestrator Backend
 
 Kernel is a modular AI orchestration backend that receives requests, generates structured execution plans, routes actions through tools or human approval, and records every step with full operational traceability.
