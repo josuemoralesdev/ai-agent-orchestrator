@@ -201,6 +201,35 @@ Kernel is designed to support real operational environments where AI systems mus
 
 ---
 
+## API Surface
+
+Kernel exposes a minimal API surface aligned to the orchestration lifecycle.
+
+### Endpoints
+
+- `POST /plan`  
+  Accepts an inbound request, normalizes it, assigns a trace ID, and returns a structured execution plan.
+
+- `POST /approve`  
+  Records a human decision for workflows that require approval before execution.
+
+- `POST /execute`  
+  Executes a previously planned and validated workflow through deterministic tool adapters.
+
+- `GET /trace/{trace_id}`  
+  Returns the lifecycle history, status changes, and execution trace for a specific request.
+
+- `GET /health`  
+  Provides a basic health check for service monitoring and readiness.
+
+### Example Lifecycle
+
+`POST /plan` → `POST /approve` → `POST /execute` → `GET /trace/{trace_id}`
+
+This API design keeps reasoning, approval, execution, and observability clearly separated.
+
+---
+
 # Status
 
 Initial architecture scaffold.
