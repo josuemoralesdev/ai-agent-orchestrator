@@ -1,20 +1,12 @@
-# Kernel - AI Orchestrator Backend
+# Kernel — AI Orchestrator Backend
+
 Kernel is a modular AI orchestration backend that receives requests, generates structured execution plans, routes actions through tools or human approval, and records every step with full operational traceability.
-
-Instead of behaving like a simple chatbot, Kernel acts as a control layer for operational workflows: it interprets requests, plans actions, integrates with external tools, and maintains a complete audit trail of decisions and outcomes. This design makes it suitable for real business processes where reliability, traceability, and human oversight are required.
-
----
-
-# AI Agent Orchestrator (Kernel)
-
-Kernel is a modular AI orchestration backend designed to convert incoming requests into structured execution plans, route actions through tools or human approval, and record every step with full operational traceability.
 
 Instead of behaving like a traditional chatbot, Kernel acts as a control layer for real operational workflows. The system interprets requests, plans actions, enforces safety rules, integrates with external tools, and maintains a complete audit trail of decisions and outcomes.
 
-
 ---
 
-# Why this exists
+## Why this exists
 
 Many AI “bots” fail in production because they mix free-form conversation with direct system side effects.
 
@@ -32,14 +24,13 @@ This design allows AI systems to operate safely in real business environments.
 
 ---
 
-# High-Level Architecture
-
+## High-Level Architecture
 
 ```
 User / Channel (WhatsApp, Web, API, etc)
           |
           v
-  Request Gateway (webhooks/ingestion )
+  Request Gateway (webhooks / ingestion)
           |
           v
      AI Planning Layer
@@ -65,7 +56,9 @@ User / Channel (WhatsApp, Web, API, etc)
  Audit Log / Observability / Trace Store
 ```
 
-# Core Principles
+---
+
+## Core Principles
 
 **Separation of Concerns**  
 AI decides *what should happen*, tools execute *deterministic actions*.
@@ -84,7 +77,7 @@ Every request is tracked with a trace ID to provide full lifecycle visibility.
 
 ---
 
-# Example Operational Flow
+## Example Operational Flow
 
 1. A user request arrives via webhook or API  
 2. The system normalizes the request and assigns a trace ID  
@@ -92,7 +85,7 @@ Every request is tracked with a trace ID to provide full lifecycle visibility.
 4. Policy rules validate whether the plan is allowed to proceed  
 5. If necessary, the plan is sent for human approval  
 6. The execution engine calls the required tools or services  
-7. Results are returned and the full lifecycle is recorded in the trace log  
+7. Results are returned and the full lifecycle is recorded in the trace log
 
 ---
 
@@ -104,9 +97,7 @@ This scenario demonstrates the core Kernel principle:
 
 **AI plans → policies validate → humans approve when needed → tools execute deterministically → every step is traced.**
 
----
-
-### Example Scenario: Payment Link Approval Flow
+### Example Scenario — Payment Link Approval Flow
 
 A request arrives asking the system to generate a payment link for a customer order.  
 Kernel does not execute the action directly from free-form text. Instead, it converts the request into a controlled operational workflow.
@@ -126,8 +117,6 @@ Core flow:
 Request → Plan → Validate → Approve → Execute → Trace
 ```
 
----
-
 ### Example Request
 
 ```json
@@ -135,8 +124,6 @@ Request → Plan → Validate → Approve → Execute → Trace
   "message": "Generate a payment link for order #4821 for 1,250 MXN and send it back to the customer."
 }
 ```
-
----
 
 ### Example Execution Plan
 
@@ -152,8 +139,6 @@ Request → Plan → Validate → Approve → Execute → Trace
 }
 ```
 
----
-
 ### Example Tool Execution Result
 
 ```json
@@ -163,8 +148,6 @@ Request → Plan → Validate → Approve → Execute → Trace
 }
 ```
 
----
-
 ### Example Final Response
 
 ```json
@@ -173,8 +156,6 @@ Request → Plan → Validate → Approve → Execute → Trace
   "message": "Payment link generated successfully."
 }
 ```
-
----
 
 ### Observability
 
@@ -189,7 +170,9 @@ Each request is tracked through a **trace ID**, allowing the system to record:
 
 This traceability ensures the system remains **auditable, debuggable, and safe for operational use**.
 
-# Architecture Goals
+---
+
+## Architecture Goals
 
 Kernel is designed to support real operational environments where AI systems must be:
 
@@ -224,23 +207,11 @@ Kernel exposes a minimal API surface aligned to the orchestration lifecycle.
 
 ### Example Lifecycle
 
-`POST /plan` → `POST /approve` → `POST /execute` → `GET /trace/{trace_id}`
+```
+POST /plan → POST /approve → POST /execute → GET /trace/{trace_id}
+```
 
 This API design keeps reasoning, approval, execution, and observability clearly separated.
-
----
-
-# Status
-
-Initial architecture scaffold.
-
-The project will evolve incrementally into a minimal but production-oriented reference implementation demonstrating:
-
-- AI planning layer
-- tool routing
-- approval workflows
-- execution tracing
-- external integrations
 
 ---
 
@@ -248,7 +219,7 @@ The project will evolve incrementally into a minimal but production-oriented ref
 
 The project is organized to keep reasoning, policy, execution, and observability clearly separated.
 
-```text
+```
 ai-agent-orchestrator/
 ├── src/
 │   ├── api/            # HTTP routes and request/response entrypoints
@@ -256,7 +227,7 @@ ai-agent-orchestrator/
 │   ├── planner/        # Intent detection and structured execution planning
 │   ├── policy/         # Validation rules, guardrails, and approval requirements
 │   ├── execution/      # Tool routing and deterministic action handlers
-│   ├── adapters/       # External service integrations (payments, providers, CRM, etc.)
+│   ├── adapters/       # External service integrations
 │   ├── observability/  # Trace logging, audit events, and lifecycle tracking
 │   └── main.py         # Application entrypoint
 ├── tests/              # Unit and integration tests
@@ -264,7 +235,8 @@ ai-agent-orchestrator/
 └── README.md           # Architecture, principles, and project overview
 ```
 
-This structure reflects the main Kernel principle: **AI plans, policies validate, humans approve when needed, tools execute, and every step is traced.**
+This structure reflects the main Kernel principle:  
+**AI plans → policies validate → humans approve → tools execute → everything is traced.**
 
 ---
 
@@ -305,14 +277,14 @@ The project is being built incrementally as a production-oriented reference impl
 
 ---
 
-# License
-
-MIT
-
----
-
 ## Getting Started
 
 For setup instructions and example API usage, see:
 
 [QUICKSTART.md](./QUICKSTART.md)
+
+---
+
+## License
+
+MIT
