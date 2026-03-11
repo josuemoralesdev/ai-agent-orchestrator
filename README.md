@@ -59,8 +59,10 @@ Instead, Kernel demonstrates the **core architectural pattern required to safely
 
 ## Kernel Architecture
 
+<div align="center">
+
 ```mermaid
-flowchart TD
+flowchart TB
 
 A["User / Channel<br/>(WhatsApp, Web, API)"]
 B["Request Gateway<br/>Webhook / API"]
@@ -72,7 +74,6 @@ F["Execution Engine<br/>Tool Router"]
 G["Payment Adapter"]
 H["Provider Adapter"]
 I["CRM / Database Adapter"]
-
 J["Audit Log<br/>Trace Store"]
 
 A --> B
@@ -86,6 +87,8 @@ F --> H
 F --> I
 F --> J
 ```
+
+</div>
 
 ---
 
