@@ -1,6 +1,6 @@
-from pydantic import BaseModel
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from pydantic import BaseModel
 from pathlib import Path
 
 load_dotenv()
