@@ -62,18 +62,18 @@ Instead, Kernel demonstrates the **core architectural pattern required to safely
 ```mermaid
 flowchart TD
 
-A[User / Channel\n(WhatsApp, Web, API)]
-B[Request Gateway\nWebhook / API]
-C[AI Planning Layer\nIntent + Plan]
-D[Policy Guardrails\nValidation Rules]
-E[Human Approval\n(if required)]
-F[Execution Engine\nTool Router]
+A["User / Channel<br/>(WhatsApp, Web, API)"]
+B["Request Gateway<br/>Webhook / API"]
+C["AI Planning Layer<br/>Intent + Plan"]
+D["Policy Guardrails<br/>Validation Rules"]
+E["Human Approval<br/>(if required)"]
+F["Execution Engine<br/>Tool Router"]
 
-G[Payment Adapter]
-H[Provider Adapter]
-I[CRM / Database Adapter]
+G["Payment Adapter"]
+H["Provider Adapter"]
+I["CRM / Database Adapter"]
 
-J[Audit Log\nTrace Store]
+J["Audit Log<br/>Trace Store"]
 
 A --> B
 B --> C
@@ -84,7 +84,6 @@ E --> F
 F --> G
 F --> H
 F --> I
-
 F --> J
 ```
 
