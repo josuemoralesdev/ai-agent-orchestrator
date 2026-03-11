@@ -247,3 +247,11 @@ The project will evolve incrementally into a minimal but production-oriented ref
 # License
 
 MIT
+
+---
+
+## Getting Started
+
+For setup instructions and example API usage, see:
+
+[QUICKSTART.md](./QUICKSTART.md)
