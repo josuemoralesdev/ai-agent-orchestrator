@@ -244,6 +244,67 @@ The project will evolve incrementally into a minimal but production-oriented ref
 
 ---
 
+## Project Structure
+
+The project is organized to keep reasoning, policy, execution, and observability clearly separated.
+
+```text
+ai-agent-orchestrator/
+├── src/
+│   ├── api/            # HTTP routes and request/response entrypoints
+│   ├── core/           # Configuration, shared models, and base orchestration logic
+│   ├── planner/        # Intent detection and structured execution planning
+│   ├── policy/         # Validation rules, guardrails, and approval requirements
+│   ├── execution/      # Tool routing and deterministic action handlers
+│   ├── adapters/       # External service integrations (payments, providers, CRM, etc.)
+│   ├── observability/  # Trace logging, audit events, and lifecycle tracking
+│   └── main.py         # Application entrypoint
+├── tests/              # Unit and integration tests
+├── QUICKSTART.md       # Local setup and example API usage
+└── README.md           # Architecture, principles, and project overview
+```
+
+This structure reflects the main Kernel principle: **AI plans, policies validate, humans approve when needed, tools execute, and every step is traced.**
+
+---
+
+## Development Roadmap
+
+The project is being built incrementally as a production-oriented reference implementation.
+
+### Phase 1 — Core Orchestration Foundation
+- Request normalization
+- Structured planning flow
+- Trace ID generation
+- Health endpoint
+- Minimal API scaffold
+
+### Phase 2 — Policy and Approval Layer
+- Guardrail validation
+- Approval state handling
+- Human-in-the-loop workflow support
+- Approval audit events
+
+### Phase 3 — Deterministic Execution
+- Tool router
+- Payment adapter reference implementation
+- External service abstraction layer
+- Retry and failure handling
+
+### Phase 4 — Observability and Testing
+- Full request lifecycle tracing
+- Structured logs
+- Integration tests for end-to-end flows
+- Error visibility and debugging support
+
+### Phase 5 — Production Readiness
+- Authentication and authorization
+- Persistent storage for traces and approvals
+- Rate limiting and operational safeguards
+- Deployment packaging and environment configuration
+
+---
+
 # License
 
 MIT
