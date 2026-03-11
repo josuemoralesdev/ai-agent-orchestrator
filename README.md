@@ -1,4 +1,5 @@
 # AI Agent Orchestrator
+AI orchestration backend that generates structured execution plans, routes actions through tools or human approval, and records every step with traceability.
 
 Reference architecture for building AI-driven automation systems where **reasoning is separated from execution**.
 
