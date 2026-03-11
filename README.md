@@ -1,9 +1,7 @@
 # AI Agent Orchestrator
-AI orchestration backend that generates structured execution plans, routes actions through tools or human approval, and records every step with traceability.
+Kernel is a modular AI orchestration backend that receives requests, generates structured execution plans, routes actions through tools or human approval, and records every step with full operational traceability.
 
-Reference architecture for building AI-driven automation systems where **reasoning is separated from execution**.
-
-The agent decides *what to do*; tools execute *deterministic actions*; humans approve critical operations.
+Instead of behaving like a simple chatbot, Kernel acts as a control layer for operational workflows: it interprets requests, plans actions, integrates with external tools, and maintains a complete audit trail of decisions and outcomes. This design makes it suitable for real business processes where reliability, traceability, and human oversight are required.
 
 ---
 
