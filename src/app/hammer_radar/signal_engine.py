@@ -42,6 +42,7 @@ def extract_signal(df, symbol: str, timeframe: str = "1m"):
         "fib_618": fib_levels["fib_618"],
         "fib_650": fib_levels["fib_650"],
         "fib_786": fib_levels["fib_786"],
+        "invalidation": hammer_low if is_bullish else hammer_high,
     }
 
 

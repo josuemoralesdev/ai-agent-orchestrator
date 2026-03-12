@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 from src.app.hammer_radar.hammer_detector import annotate_hammers
@@ -47,8 +48,8 @@ def run(sleep_seconds: float = 3.0) -> None:
                         if signal_key in seen_signal_keys:
                             continue
 
-                        print(f"HAMMER SIGNAL DETECTED [{timeframe_label}]")
-                        print(signal)
+                        print(_format_operator_brief(signal))
+                        print(json.dumps(signal, indent=2, sort_keys=True))
                         seen_signal_keys.add(signal_key)
             except Exception as error:
                 print(f"Hammer Radar loop error: {error}")
@@ -59,6 +60,21 @@ def run(sleep_seconds: float = 3.0) -> None:
     finally:
         reader.stop()
         print("Hammer Radar stopped")
+
+
+def _format_operator_brief(signal: dict) -> str:
+    """Return a concise terminal brief for a detected hammer signal."""
+    direction = signal["direction"]
+    invalidation_side = "below" if direction == "long" else "above"
+    golden_pocket_low = min(signal["fib_618"], signal["fib_650"])
+    golden_pocket_high = max(signal["fib_618"], signal["fib_650"])
+    return (
+        f"HAMMER SIGNAL [{signal['timeframe']}] {signal['symbol']} {direction.upper()} | "
+        f"strength={signal['hammer_strength']:.2f} | "
+        f"hammer={signal['hammer_low']:.2f}-{signal['hammer_high']:.2f} | "
+        f"golden_pocket={golden_pocket_low:.2f}-{golden_pocket_high:.2f} | "
+        f"invalidation={invalidation_side} {signal['invalidation']:.2f}"
+    )
 
 if __name__ == "__main__":
     run()
