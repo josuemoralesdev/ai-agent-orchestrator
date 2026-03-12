@@ -8,12 +8,17 @@ from src.app.hammer_radar.hammer_detector import annotate_hammers
 from src.app.hammer_radar.market_reader import MarketReader
 from src.app.hammer_radar.signal_engine import extract_signal
 
+TIMEFRAMES = (
+    ("13min", "13m"),
+    ("55min", "55m"),
+)
+
 
 def run(sleep_seconds: float = 3.0) -> None:
     """Start the reader and continuously print new hammer signals."""
     print("Hammer Radar started")
     reader = MarketReader()
-    last_signal_key = None
+    seen_signal_keys = set()
 
     try:
         reader.start()
@@ -22,18 +27,29 @@ def run(sleep_seconds: float = 3.0) -> None:
 
         while True:
             try:
-                dataframe = reader.get_dataframe()
-                annotated = annotate_hammers(dataframe)
-                signal = extract_signal(annotated, "BTCUSDT")
-
-                if signal:
-                    signal_key = (signal.get("timestamp"), signal.get("direction"))
-                    if signal_key != last_signal_key:
-                        print("HAMMER SIGNAL DETECTED")
-                        print(signal)
-                        last_signal_key = signal_key
-                elif dataframe.empty:
+                dataframe_1m = reader.get_dataframe()
+                if dataframe_1m.empty:
                     print("Waiting for market data...")
+                else:
+                    for resample_rule, timeframe_label in TIMEFRAMES:
+                        resampled = reader.get_resampled(resample_rule)
+                        annotated = annotate_hammers(resampled)
+                        signal = extract_signal(annotated, "BTCUSDT", timeframe=timeframe_label)
+
+                        if not signal:
+                            continue
+
+                        signal_key = (
+                            signal.get("timeframe"),
+                            signal.get("timestamp"),
+                            signal.get("direction"),
+                        )
+                        if signal_key in seen_signal_keys:
+                            continue
+
+                        print(f"HAMMER SIGNAL DETECTED [{timeframe_label}]")
+                        print(signal)
+                        seen_signal_keys.add(signal_key)
             except Exception as error:
                 print(f"Hammer Radar loop error: {error}")
 

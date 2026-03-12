@@ -11,7 +11,7 @@ except ModuleNotFoundError:  # pragma: no cover - depends on runtime environment
 REQUIRED_COLUMNS = ("high", "low", "bullish_hammer", "bearish_hammer", "hammer_strength")
 
 
-def extract_signal(df, symbol: str):
+def extract_signal(df, symbol: str, timeframe: str = "1m"):
     """Return a signal dictionary for the latest hammer candle or ``None``."""
     _require_pandas()
     missing = [column for column in REQUIRED_COLUMNS if column not in df.columns]
@@ -33,7 +33,7 @@ def extract_signal(df, symbol: str):
     return {
         "symbol": symbol,
         "timestamp": _extract_timestamp(latest),
-        "timeframe": "1m",
+        "timeframe": timeframe,
         "direction": "long" if is_bullish else "short",
         "hammer_strength": float(latest["hammer_strength"]),
         "hammer_high": hammer_high,
