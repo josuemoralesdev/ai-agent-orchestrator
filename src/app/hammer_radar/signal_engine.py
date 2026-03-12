@@ -9,6 +9,7 @@ except ModuleNotFoundError:  # pragma: no cover - depends on runtime environment
 
 
 REQUIRED_COLUMNS = ("high", "low", "bullish_hammer", "bearish_hammer", "hammer_strength")
+BIAS_REQUIRED_COLUMNS = ("close",)
 
 
 def extract_signal(df, symbol: str, timeframe: str = "1m"):
@@ -44,6 +45,38 @@ def extract_signal(df, symbol: str, timeframe: str = "1m"):
         "fib_786": fib_levels["fib_786"],
         "invalidation": hammer_low if is_bullish else hammer_high,
     }
+
+
+def compute_bias_direction(df) -> str:
+    """Classify simple 4H trend bias from the last two closes."""
+    _require_pandas()
+    missing = [column for column in BIAS_REQUIRED_COLUMNS if column not in df.columns]
+    if missing:
+        raise ValueError(f"compute_bias_direction requires columns: {', '.join(BIAS_REQUIRED_COLUMNS)}")
+    if len(df.index) < 2:
+        return "neutral"
+
+    previous_close = float(df["close"].iloc[-2])
+    latest_close = float(df["close"].iloc[-1])
+    if latest_close > previous_close:
+        return "bullish"
+    if latest_close < previous_close:
+        return "bearish"
+    return "neutral"
+
+
+def attach_bias(signal: dict, bias_direction: str, bias_timeframe: str = "4H") -> dict:
+    """Return a signal copy enriched with higher-timeframe bias metadata."""
+    direction = signal["direction"]
+    bias_aligned = (
+        (direction == "long" and bias_direction == "bullish")
+        or (direction == "short" and bias_direction == "bearish")
+    )
+    enriched = signal.copy()
+    enriched["bias_timeframe"] = bias_timeframe
+    enriched["bias_direction"] = bias_direction
+    enriched["bias_aligned"] = bool(bias_aligned)
+    return enriched
 
 
 def _compute_fibonacci_levels(hammer_high: float, hammer_low: float, bullish: bool) -> dict[str, float]:
