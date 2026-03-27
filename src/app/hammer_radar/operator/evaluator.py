@@ -7,26 +7,35 @@ from typing import Any
 
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 
+DEFAULT_ENTRY_MODES = ("fib_618", "fib_650", "market_close")
 
-def evaluate_signal_on_next_candle(signal: SignalRecord, next_candle: dict[str, Any]) -> OutcomeRecord | None:
+
+def evaluate_signal_on_next_candle(
+    signal: SignalRecord,
+    next_candle: dict[str, Any],
+    signal_candle: dict[str, Any] | None = None,
+    entry_mode: str = "fib_618",
+) -> OutcomeRecord | None:
     """Evaluate a 13m signal using the immediately following closed candle."""
     if signal.timeframe != "13m":
         return None
 
-    entry_price = float(signal.fib_618)
+    entry_price = _resolve_entry_price(signal, signal_candle=signal_candle, entry_mode=entry_mode)
+    if entry_price is None:
+        return None
     high_price = float(next_candle["high"])
     low_price = float(next_candle["low"])
     close_price = float(next_candle["close"])
 
     if signal.direction == "long":
-        filled = low_price <= entry_price
+        filled = True if entry_mode == "market_close" else low_price <= entry_price
         stop_hit = low_price < signal.invalidation
         mae_pct = _pct_move(entry_price, min(low_price, entry_price), direction="long", favorable=False)
         mfe_pct = _pct_move(entry_price, max(high_price, entry_price), direction="long", favorable=True)
         exit_price = signal.invalidation if stop_hit and filled else close_price if filled else None
         pnl_pct = _signed_pnl_pct(entry_price, exit_price, direction="long") if exit_price is not None else 0.0
     else:
-        filled = high_price >= entry_price
+        filled = True if entry_mode == "market_close" else high_price >= entry_price
         stop_hit = high_price > signal.invalidation
         mae_pct = _pct_move(entry_price, max(high_price, entry_price), direction="short", favorable=False)
         mfe_pct = _pct_move(entry_price, min(low_price, entry_price), direction="short", favorable=True)
@@ -60,7 +69,28 @@ def evaluate_signal_on_next_candle(signal: SignalRecord, next_candle: dict[str, 
         pnl_pct=round(pnl_pct, 4),
         stop_hit=bool(stop_hit and filled),
         evaluated_at=datetime.now(timezone.utc).isoformat(),
+        entry_mode=entry_mode,
     )
+
+
+def evaluate_signal_all_entry_modes(
+    signal: SignalRecord,
+    next_candle: dict[str, Any],
+    signal_candle: dict[str, Any] | None = None,
+    entry_modes: list[str] | tuple[str, ...] | None = None,
+) -> list[OutcomeRecord]:
+    modes = tuple(entry_modes or DEFAULT_ENTRY_MODES)
+    outcomes: list[OutcomeRecord] = []
+    for entry_mode in modes:
+        outcome = evaluate_signal_on_next_candle(
+            signal,
+            next_candle,
+            signal_candle=signal_candle,
+            entry_mode=entry_mode,
+        )
+        if outcome is not None:
+            outcomes.append(outcome)
+    return outcomes
 
 
 def _signed_pnl_pct(entry_price: float, exit_price: float, direction: str) -> float:
@@ -81,3 +111,19 @@ def _pct_move(entry_price: float, probe_price: float, direction: str, favorable:
     if favorable:
         return max(delta, 0.0) / entry_price * 100.0
     return max(-delta, 0.0) / entry_price * 100.0
+
+
+def _resolve_entry_price(
+    signal: SignalRecord,
+    signal_candle: dict[str, Any] | None,
+    entry_mode: str,
+) -> float | None:
+    if entry_mode == "fib_618":
+        return float(signal.fib_618)
+    if entry_mode == "fib_650":
+        return float(signal.fib_650)
+    if entry_mode == "market_close":
+        if signal_candle is None or "close" not in signal_candle:
+            return None
+        return float(signal_candle["close"])
+    raise ValueError(f"unsupported entry_mode: {entry_mode}")

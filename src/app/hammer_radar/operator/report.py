@@ -20,7 +20,7 @@ def format_outcome_line(outcome: OutcomeRecord) -> str:
     exit_text = "na" if outcome.exit_price is None else f"{outcome.exit_price:.2f}"
     return (
         f"OPERATOR OUTCOME [{outcome.timeframe}] {outcome.symbol} {outcome.direction.upper()} "
-        f"signal={outcome.signal_id} fill={outcome.fill_status} outcome={outcome.outcome} "
+        f"signal={outcome.signal_id} entry={outcome.entry_mode} fill={outcome.fill_status} outcome={outcome.outcome} "
         f"entry={outcome.entry_price:.2f} exit={exit_text} pnl={_format_pct(outcome.pnl_pct)} "
         f"mae={_format_pct(outcome.mae_pct)} mfe={_format_pct(outcome.mfe_pct)}"
     )
@@ -38,6 +38,7 @@ def format_stats_summary(summary_rows: list[dict], top_n: int = 10, label: str =
                     f"{row['timeframe']} {row['direction'].upper()}",
                     f"bias={'Y' if row['bias_aligned'] else 'N'}",
                     f"strength={row['strength_band']}",
+                    f"entry={row['entry_mode']}",
                     f"samples={row['samples']}",
                     f"fills={row['fills']} ({_format_pct(row['fill_rate'], digits=2)})",
                     f"wins={row['wins']}",

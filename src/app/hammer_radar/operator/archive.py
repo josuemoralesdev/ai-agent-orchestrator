@@ -36,6 +36,10 @@ def load_evaluated_signal_ids() -> set[str]:
     return {record.signal_id for record in load_outcomes()}
 
 
+def load_evaluated_outcome_keys() -> set[tuple[str, str]]:
+    return {(record.signal_id, record.entry_mode) for record in load_outcomes()}
+
+
 def _append_record(path: Path, payload: dict) -> None:
     _ensure_log_dir()
     with path.open("a", encoding="utf-8") as handle:

@@ -96,6 +96,7 @@ class OutcomeRecord:
     pnl_pct: float
     stop_hit: bool
     evaluated_at: str
+    entry_mode: str = "fib_618"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -117,4 +118,5 @@ class OutcomeRecord:
             pnl_pct=float(payload.get("pnl_pct", 0.0)),
             stop_hit=_to_bool(payload.get("stop_hit")),
             evaluated_at=str(payload["evaluated_at"]),
+            entry_mode=str(payload.get("entry_mode", "fib_618")),
         )

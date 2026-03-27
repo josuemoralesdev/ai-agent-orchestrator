@@ -34,12 +34,14 @@ def build_setup_summary(
             signal.direction,
             signal.bias_aligned,
             _strength_band(signal.hammer_strength),
+            outcome.entry_mode,
         )
         bucket = buckets[bucket_key]
         bucket["timeframe"] = signal.timeframe
         bucket["direction"] = signal.direction
         bucket["bias_aligned"] = signal.bias_aligned
         bucket["strength_band"] = _strength_band(signal.hammer_strength)
+        bucket["entry_mode"] = outcome.entry_mode
         bucket["samples"] += 1
 
         if outcome.fill_status == "filled":
@@ -64,6 +66,7 @@ def build_setup_summary(
                 "direction": bucket["direction"],
                 "bias_aligned": bucket["bias_aligned"],
                 "strength_band": bucket["strength_band"],
+                "entry_mode": bucket["entry_mode"],
                 "samples": samples,
                 "fills": fills,
                 "fill_rate": round((fills / samples) * 100.0, 2) if samples else 0.0,
@@ -103,6 +106,7 @@ def _new_bucket() -> dict:
         "direction": "",
         "bias_aligned": False,
         "strength_band": "",
+        "entry_mode": "",
         "samples": 0,
         "fills": 0,
         "wins": 0,

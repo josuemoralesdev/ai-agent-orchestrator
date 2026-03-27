@@ -15,11 +15,11 @@ from src.app.hammer_radar.operator import (
     append_signal,
     build_setup_summary,
     decide_trade_candidate,
-    evaluate_signal_on_next_candle,
+    evaluate_signal_all_entry_modes,
     format_outcome_line,
     format_signal_operator_line,
     format_stats_summary,
-    load_evaluated_signal_ids,
+    load_evaluated_outcome_keys,
     load_outcomes,
     load_signals,
 )
@@ -43,12 +43,12 @@ def run(sleep_seconds: float = 3.0) -> None:
         for signal in historical_signals
     }
     historical_outcomes = load_outcomes()
-    evaluated_signal_ids = load_evaluated_signal_ids()
+    evaluated_outcome_keys = load_evaluated_outcome_keys()
     recent_signals = deque(historical_signals[-RECENT_SIGNALS_LIMIT:], maxlen=RECENT_SIGNALS_LIMIT)
     pending_signals = {
         signal.signal_id: signal
         for signal in recent_signals
-        if signal.timeframe == "13m" and signal.signal_id not in evaluated_signal_ids
+        if signal.timeframe == "13m"
     }
     last_stats_printed_at = 0.0
     last_stats_block: str | None = None
@@ -88,7 +88,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                         append_signal(signal_record)
                         recent_signals.append(signal_record)
                         historical_signals.append(signal_record)
-                        if signal_record.timeframe == "13m" and signal_record.signal_id not in evaluated_signal_ids:
+                        if signal_record.timeframe == "13m":
                             pending_signals[signal_record.signal_id] = signal_record
 
                         print(format_signal_operator_line(signal_record))
@@ -98,7 +98,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                     newly_evaluated = _evaluate_pending_signals(
                         pending_signals=pending_signals,
                         resampled_13m=resampled_frames.get("13m"),
-                        evaluated_signal_ids=evaluated_signal_ids,
+                        evaluated_outcome_keys=evaluated_outcome_keys,
                     )
                     for outcome in newly_evaluated:
                         append_outcome(outcome)
@@ -179,27 +179,35 @@ def _build_signal_id(signal: dict) -> str:
     return f"{signal['symbol']}|{signal['timeframe']}|{signal['direction']}|{signal['timestamp']}"
 
 
-def _evaluate_pending_signals(pending_signals: dict[str, SignalRecord], resampled_13m, evaluated_signal_ids: set[str]):
+def _evaluate_pending_signals(
+    pending_signals: dict[str, SignalRecord],
+    resampled_13m,
+    evaluated_outcome_keys: set[tuple[str, str]],
+):
     if resampled_13m is None or getattr(resampled_13m, "empty", True):
         return []
 
     next_candle_by_signal_time = _build_next_candle_lookup(resampled_13m)
+    signal_candle_by_time = _build_signal_candle_lookup(resampled_13m)
     newly_evaluated = []
     completed_signal_ids = []
 
     for signal_id, signal in pending_signals.items():
-        if signal_id in evaluated_signal_ids:
-            completed_signal_ids.append(signal_id)
-            continue
         next_candle = next_candle_by_signal_time.get(signal.timestamp)
         if next_candle is None:
             continue
-        outcome = evaluate_signal_on_next_candle(signal, next_candle)
-        if outcome is None:
-            completed_signal_ids.append(signal_id)
-            continue
-        evaluated_signal_ids.add(signal_id)
-        newly_evaluated.append(outcome)
+        signal_candle = signal_candle_by_time.get(signal.timestamp)
+        outcomes = evaluate_signal_all_entry_modes(
+            signal,
+            next_candle,
+            signal_candle=signal_candle,
+        )
+        for outcome in outcomes:
+            outcome_key = (outcome.signal_id, outcome.entry_mode)
+            if outcome_key in evaluated_outcome_keys:
+                continue
+            evaluated_outcome_keys.add(outcome_key)
+            newly_evaluated.append(outcome)
         completed_signal_ids.append(signal_id)
 
     for signal_id in completed_signal_ids:
@@ -226,6 +234,26 @@ def _build_next_candle_lookup(resampled_13m) -> dict[str, dict]:
             "low": float(next_row["low"]),
             "close": float(next_row["close"]),
             "timestamp": next_timestamp,
+        }
+    return lookup
+
+
+def _build_signal_candle_lookup(resampled_13m) -> dict[str, dict]:
+    lookup: dict[str, dict] = {}
+    if getattr(resampled_13m, "empty", True):
+        return lookup
+
+    for index in range(len(resampled_13m.index)):
+        row = resampled_13m.iloc[index]
+        timestamp = _format_timestamp(row.get("close_time", row.get("open_time")))
+        if timestamp is None:
+            continue
+        lookup[timestamp] = {
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "timestamp": timestamp,
         }
     return lookup
 
