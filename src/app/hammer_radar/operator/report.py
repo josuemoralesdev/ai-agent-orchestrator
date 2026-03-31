@@ -17,11 +17,17 @@ def format_signal_operator_line(signal: SignalRecord) -> str:
 
 
 def format_outcome_line(outcome: OutcomeRecord) -> str:
+    entry_text = "na" if outcome.entry_price is None else f"{outcome.entry_price:.2f}"
     exit_text = "na" if outcome.exit_price is None else f"{outcome.exit_price:.2f}"
+    size_text = (
+        ""
+        if outcome.filled_size_fraction is None
+        else f" size={outcome.filled_size_fraction:.2f}"
+    )
     return (
         f"OPERATOR OUTCOME [{outcome.timeframe}] {outcome.symbol} {outcome.direction.upper()} "
-        f"signal={outcome.signal_id} entry={outcome.entry_mode} fill={outcome.fill_status} outcome={outcome.outcome} "
-        f"entry={outcome.entry_price:.2f} exit={exit_text} pnl={_format_pct(outcome.pnl_pct)} "
+        f"signal={outcome.signal_id} entry={outcome.entry_mode}{size_text} fill={outcome.fill_status} outcome={outcome.outcome} "
+        f"entry={entry_text} exit={exit_text} pnl={_format_pct(outcome.pnl_pct)} "
         f"mae={_format_pct(outcome.mae_pct)} mfe={_format_pct(outcome.mfe_pct)}"
     )
 

@@ -44,7 +44,7 @@ def build_setup_summary(
         bucket["entry_mode"] = outcome.entry_mode
         bucket["samples"] += 1
 
-        if outcome.fill_status == "filled":
+        if outcome.fill_status in {"filled", "partial"}:
             bucket["fills"] += 1
             if outcome.pnl_pct > 0.0:
                 bucket["wins"] += 1

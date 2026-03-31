@@ -28,6 +28,14 @@ def _to_bool(value: Any) -> bool:
     return bool(value)
 
 
+def _to_bool_dict(value: Any) -> dict[str, bool] | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, dict):
+        return None
+    return {str(key): _to_bool(item) for key, item in value.items()}
+
+
 @dataclass(slots=True)
 class SignalRecord:
     signal_id: str
@@ -87,7 +95,7 @@ class OutcomeRecord:
     timeframe: str
     direction: str
     timestamp: str
-    entry_price: float
+    entry_price: float | None
     exit_price: float | None
     fill_status: str
     outcome: str
@@ -97,6 +105,8 @@ class OutcomeRecord:
     stop_hit: bool
     evaluated_at: str
     entry_mode: str = "fib_618"
+    filled_size_fraction: float | None = None
+    tranche_fills: dict[str, bool] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -109,7 +119,7 @@ class OutcomeRecord:
             timeframe=str(payload["timeframe"]),
             direction=str(payload["direction"]),
             timestamp=str(payload["timestamp"]),
-            entry_price=float(payload["entry_price"]),
+            entry_price=_to_float(payload.get("entry_price")),
             exit_price=_to_float(payload.get("exit_price")),
             fill_status=str(payload["fill_status"]),
             outcome=str(payload["outcome"]),
@@ -119,4 +129,6 @@ class OutcomeRecord:
             stop_hit=_to_bool(payload.get("stop_hit")),
             evaluated_at=str(payload["evaluated_at"]),
             entry_mode=str(payload.get("entry_mode", "fib_618")),
+            filled_size_fraction=_to_float(payload.get("filled_size_fraction")),
+            tranche_fills=_to_bool_dict(payload.get("tranche_fills")),
         )
