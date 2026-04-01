@@ -7,12 +7,31 @@ from typing import Any
 
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 
-DEFAULT_ENTRY_MODES = ("fib_618", "fib_650", "market_close", "ladder_22_44_22")
-LADDER_22_44_22_WEIGHTS = (
-    ("fib_50", 0.22),
-    ("fib_618", 0.44),
-    ("fib_650", 0.22),
+DEFAULT_ENTRY_MODES = (
+    "fib_618",
+    "fib_650",
+    "market_close",
+    "ladder_22_44_22",
+    "ladder_close_50_618",
+    "ladder_382_50_618",
 )
+LADDER_DEFINITIONS = {
+    "ladder_22_44_22": (
+        ("fib_50", 0.22),
+        ("fib_618", 0.44),
+        ("fib_650", 0.22),
+    ),
+    "ladder_close_50_618": (
+        ("signal_close", 0.34),
+        ("fib_50", 0.33),
+        ("fib_618", 0.21),
+    ),
+    "ladder_382_50_618": (
+        ("fib_382", 0.22),
+        ("fib_50", 0.44),
+        ("fib_618", 0.22),
+    ),
+}
 
 
 def evaluate_signal_on_next_candle(
@@ -24,8 +43,13 @@ def evaluate_signal_on_next_candle(
     """Evaluate a 13m signal using the immediately following closed candle."""
     if signal.timeframe != "13m":
         return None
-    if entry_mode == "ladder_22_44_22":
-        return _evaluate_ladder_22_44_22(signal, next_candle)
+    if entry_mode in LADDER_DEFINITIONS:
+        return _evaluate_ladder_mode(
+            signal,
+            next_candle,
+            signal_candle=signal_candle,
+            entry_mode=entry_mode,
+        )
 
     entry_price = _resolve_entry_price(signal, signal_candle=signal_candle, entry_mode=entry_mode)
     if entry_price is None:
@@ -81,15 +105,28 @@ def _pct_move(entry_price: float, probe_price: float, direction: str, favorable:
     return max(-delta, 0.0) / entry_price * 100.0
 
 
-def _evaluate_ladder_22_44_22(signal: SignalRecord, next_candle: dict[str, Any]) -> OutcomeRecord:
-    tranche_prices = {level: float(getattr(signal, level)) for level, _weight in LADDER_22_44_22_WEIGHTS}
+def _evaluate_ladder_mode(
+    signal: SignalRecord,
+    next_candle: dict[str, Any],
+    signal_candle: dict[str, Any] | None,
+    entry_mode: str,
+) -> OutcomeRecord | None:
+    ladder_definition = LADDER_DEFINITIONS[entry_mode]
+    tranche_prices = _resolve_ladder_tranche_prices(
+        signal,
+        signal_candle=signal_candle,
+        ladder_definition=ladder_definition,
+    )
+    if tranche_prices is None:
+        return None
+
     tranche_fills = {
         level: _is_price_filled(signal.direction, next_candle, price)
         for level, price in tranche_prices.items()
     }
     filled_weights = [
         weight
-        for level, weight in LADDER_22_44_22_WEIGHTS
+        for level, weight in ladder_definition
         if tranche_fills[level]
     ]
     total_filled_weight = sum(filled_weights)
@@ -101,24 +138,24 @@ def _evaluate_ladder_22_44_22(signal: SignalRecord, next_candle: dict[str, Any])
             entry_price=None,
             filled=False,
             fill_status="no_fill",
-            entry_mode="ladder_22_44_22",
+            entry_mode=entry_mode,
             tranche_fills=tranche_fills,
             filled_size_fraction=None,
         )
 
     effective_entry = sum(
         tranche_prices[level] * weight
-        for level, weight in LADDER_22_44_22_WEIGHTS
+        for level, weight in ladder_definition
         if tranche_fills[level]
     ) / total_filled_weight
-    fill_status = "filled" if len(filled_weights) == len(LADDER_22_44_22_WEIGHTS) else "partial"
+    fill_status = "filled" if len(filled_weights) == len(ladder_definition) else "partial"
     return _build_outcome_record(
         signal,
         next_candle=next_candle,
         entry_price=effective_entry,
         filled=True,
         fill_status=fill_status,
-        entry_mode="ladder_22_44_22",
+        entry_mode=entry_mode,
         tranche_fills=tranche_fills,
         filled_size_fraction=round(total_filled_weight, 2),
     )
@@ -138,6 +175,43 @@ def _resolve_entry_price(
             return None
         return float(signal_candle["close"])
     raise ValueError(f"unsupported entry_mode: {entry_mode}")
+
+
+def _resolve_ladder_tranche_prices(
+    signal: SignalRecord,
+    signal_candle: dict[str, Any] | None,
+    ladder_definition: tuple[tuple[str, float], ...],
+) -> dict[str, float] | None:
+    tranche_prices: dict[str, float] = {}
+    for level, _weight in ladder_definition:
+        price = _resolve_tranche_price(signal, signal_candle=signal_candle, level=level)
+        if price is None:
+            return None
+        tranche_prices[level] = price
+    return tranche_prices
+
+
+def _resolve_tranche_price(
+    signal: SignalRecord,
+    signal_candle: dict[str, Any] | None,
+    level: str,
+) -> float | None:
+    if level == "signal_close":
+        if signal_candle is None or "close" not in signal_candle:
+            return None
+        return float(signal_candle["close"])
+    if level == "fib_382":
+        return _derive_fib_382(signal)
+    if hasattr(signal, level):
+        return float(getattr(signal, level))
+    raise ValueError(f"unsupported tranche level: {level}")
+
+
+def _derive_fib_382(signal: SignalRecord) -> float:
+    price_range = max(float(signal.hammer_high) - float(signal.hammer_low), 0.0)
+    if signal.direction == "long":
+        return float(signal.hammer_high) - (price_range * 0.382)
+    return float(signal.hammer_low) + (price_range * 0.382)
 
 
 def _is_price_filled(direction: str, candle: dict[str, Any], price: float) -> bool:
