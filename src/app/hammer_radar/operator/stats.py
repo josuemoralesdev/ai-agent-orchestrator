@@ -18,9 +18,11 @@ def build_setup_summary(
     signals: list[SignalRecord],
     outcomes: list[OutcomeRecord],
     tradable_only: bool = False,
+    filters: dict[str, object] | None = None,
 ) -> list[dict]:
     signal_by_id = {signal.signal_id: signal for signal in signals}
-    buckets: dict[tuple[str, str, bool, str], dict] = defaultdict(_new_bucket)
+    buckets: dict[tuple[object, ...], dict] = defaultdict(_new_bucket)
+    filters = filters or {}
 
     for outcome in outcomes:
         signal = signal_by_id.get(outcome.signal_id)
@@ -28,12 +30,17 @@ def build_setup_summary(
             continue
         if tradable_only and not signal.tradable:
             continue
+        if not _matches_filters(signal, filters):
+            continue
 
         bucket_key = (
             signal.timeframe,
             signal.direction,
             signal.bias_aligned,
             _strength_band(signal.hammer_strength),
+            signal.trend_direction or "",
+            trend_strength_band(signal.trend_strength_score),
+            price_vs_ema_band(signal.price_vs_ema_4h_pct),
             outcome.entry_mode,
         )
         bucket = buckets[bucket_key]
@@ -42,6 +49,9 @@ def build_setup_summary(
         bucket["bias_aligned"] = signal.bias_aligned
         bucket["strength_band"] = _strength_band(signal.hammer_strength)
         bucket["entry_mode"] = outcome.entry_mode
+        bucket["trend_direction"] = signal.trend_direction or ""
+        bucket["trend_strength_band"] = trend_strength_band(signal.trend_strength_score)
+        bucket["price_vs_ema_4h_pct_band"] = price_vs_ema_band(signal.price_vs_ema_4h_pct)
         bucket["samples"] += 1
 
         if outcome.fill_status in {"filled", "partial"}:
@@ -67,6 +77,9 @@ def build_setup_summary(
                 "bias_aligned": bucket["bias_aligned"],
                 "strength_band": bucket["strength_band"],
                 "entry_mode": bucket["entry_mode"],
+                "trend_direction": bucket["trend_direction"],
+                "trend_strength_band": bucket["trend_strength_band"],
+                "price_vs_ema_4h_pct_band": bucket["price_vs_ema_4h_pct_band"],
                 "samples": samples,
                 "fills": fills,
                 "fill_rate": round((fills / samples) * 100.0, 2) if samples else 0.0,
@@ -100,6 +113,47 @@ def _strength_band(strength: float) -> str:
     return f">{STRENGTH_BANDS[-1][1]}"
 
 
+def trend_strength_band(score: float | None) -> str:
+    if score is None:
+        return ""
+    magnitude = abs(float(score))
+    if magnitude < 0.2:
+        return "weak"
+    if magnitude < 0.5:
+        return "medium"
+    return "strong"
+
+
+def price_vs_ema_band(value: float | None) -> str:
+    if value is None:
+        return ""
+    if value <= -0.5:
+        return "below_-0.5"
+    if value >= 0.5:
+        return "above_0.5"
+    return "near_zero"
+
+
+def _matches_filters(signal: SignalRecord, filters: dict[str, object]) -> bool:
+    timeframe = filters.get("timeframe")
+    if timeframe is not None and signal.timeframe != timeframe:
+        return False
+
+    trend_direction = filters.get("trend_direction")
+    if trend_direction is not None and (signal.trend_direction or "") != trend_direction:
+        return False
+
+    trend_band = filters.get("trend_strength_band")
+    if trend_band is not None and trend_strength_band(signal.trend_strength_score) != trend_band:
+        return False
+
+    ema_band = filters.get("price_vs_ema_4h_pct_band")
+    if ema_band is not None and price_vs_ema_band(signal.price_vs_ema_4h_pct) != ema_band:
+        return False
+
+    return True
+
+
 def _new_bucket() -> dict:
     return {
         "timeframe": "",
@@ -107,6 +161,9 @@ def _new_bucket() -> dict:
         "bias_aligned": False,
         "strength_band": "",
         "entry_mode": "",
+        "trend_direction": "",
+        "trend_strength_band": "",
+        "price_vs_ema_4h_pct_band": "",
         "samples": 0,
         "fills": 0,
         "wins": 0,

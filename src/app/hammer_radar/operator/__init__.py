@@ -20,7 +20,11 @@ from src.app.hammer_radar.operator.report import (
     format_signal_operator_line,
     format_stats_summary,
 )
-from src.app.hammer_radar.operator.stats import build_setup_summary
+from src.app.hammer_radar.operator.stats import (
+    build_setup_summary,
+    price_vs_ema_band,
+    trend_strength_band,
+)
 
 __all__ = [
     "OutcomeRecord",
@@ -39,4 +43,6 @@ __all__ = [
     "load_evaluated_signal_ids",
     "load_outcomes",
     "load_signals",
+    "price_vs_ema_band",
+    "trend_strength_band",
 ]

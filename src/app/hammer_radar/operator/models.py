@@ -58,6 +58,12 @@ class SignalRecord:
     opposite_direction_streak: int
     tradable: bool
     reject_reason: str | None = None
+    trend_direction: str | None = None
+    trend_strength_score: float | None = None
+    trend_lookback_candles: int | None = None
+    ema_4h_20: float | None = None
+    price_vs_ema_4h_pct: float | None = None
+    signal_close: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -85,6 +91,16 @@ class SignalRecord:
             opposite_direction_streak=_to_int(payload.get("opposite_direction_streak")),
             tradable=_to_bool(payload.get("tradable")),
             reject_reason=payload.get("reject_reason"),
+            trend_direction=payload.get("trend_direction"),
+            trend_strength_score=_to_float(payload.get("trend_strength_score")),
+            trend_lookback_candles=(
+                None
+                if payload.get("trend_lookback_candles") in (None, "")
+                else int(payload["trend_lookback_candles"])
+            ),
+            ema_4h_20=_to_float(payload.get("ema_4h_20")),
+            price_vs_ema_4h_pct=_to_float(payload.get("price_vs_ema_4h_pct")),
+            signal_close=_to_float(payload.get("signal_close")),
         )
 
 

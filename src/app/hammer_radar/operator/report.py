@@ -8,11 +8,18 @@ from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 def format_signal_operator_line(signal: SignalRecord) -> str:
     status = "TRADE" if signal.tradable else f"SKIP:{signal.reject_reason}"
     bias_tag = "aligned" if signal.bias_aligned else signal.bias_direction
+    trend_text = ""
+    if signal.trend_direction:
+        trend_band = _display_trend_strength_band(signal.trend_strength_score)
+        trend_text = f" trend={signal.trend_direction}/{trend_band}" if trend_band else f" trend={signal.trend_direction}"
+    ema_text = ""
+    if signal.price_vs_ema_4h_pct is not None:
+        ema_text = f" ema4h={_format_pct(signal.price_vs_ema_4h_pct, digits=2)}"
     return (
         f"OPERATOR SIGNAL [{signal.timeframe}] {signal.symbol} {signal.direction.upper()} "
         f"t={signal.timestamp} strength={signal.hammer_strength:.2f} "
         f"bias={signal.bias_timeframe}:{bias_tag} streaks={signal.same_direction_streak}/{signal.opposite_direction_streak} "
-        f"entry={signal.fib_618:.2f} invalidation={signal.invalidation:.2f} {status}"
+        f"entry={signal.fib_618:.2f} invalidation={signal.invalidation:.2f}{trend_text}{ema_text} {status}"
     )
 
 
@@ -44,6 +51,16 @@ def format_stats_summary(summary_rows: list[dict], top_n: int = 10, label: str =
                     f"{row['timeframe']} {row['direction'].upper()}",
                     f"bias={'Y' if row['bias_aligned'] else 'N'}",
                     f"strength={row['strength_band']}",
+                    *(
+                        [f"trend={row['trend_direction']}/{row['trend_strength_band']}"]
+                        if row.get("trend_direction")
+                        else []
+                    ),
+                    *(
+                        [f"ema4h={row['price_vs_ema_4h_pct_band']}"]
+                        if row.get("price_vs_ema_4h_pct_band")
+                        else []
+                    ),
                     f"entry={row['entry_mode']}",
                     f"samples={row['samples']}",
                     f"fills={row['fills']} ({_format_pct(row['fill_rate'], digits=2)})",
@@ -63,3 +80,14 @@ def _format_pct(value: float, digits: int = 4) -> str:
     if rounded == 0.0:
         rounded = 0.0
     return f"{rounded:.{digits}f}%"
+
+
+def _display_trend_strength_band(score: float | None) -> str:
+    if score is None:
+        return ""
+    magnitude = abs(float(score))
+    if magnitude < 0.2:
+        return "weak"
+    if magnitude < 0.5:
+        return "medium"
+    return "strong"

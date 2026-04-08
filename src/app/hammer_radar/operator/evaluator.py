@@ -40,9 +40,7 @@ def evaluate_signal_on_next_candle(
     signal_candle: dict[str, Any] | None = None,
     entry_mode: str = "fib_618",
 ) -> OutcomeRecord | None:
-    """Evaluate a 13m signal using the immediately following closed candle."""
-    if signal.timeframe != "13m":
-        return None
+    """Evaluate a signal using the immediately following closed candle."""
     if entry_mode in LADDER_DEFINITIONS:
         return _evaluate_ladder_mode(
             signal,

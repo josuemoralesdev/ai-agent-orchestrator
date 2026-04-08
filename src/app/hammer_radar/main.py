@@ -9,6 +9,12 @@ import time
 
 from src.app.hammer_radar.hammer_detector import annotate_hammers
 from src.app.hammer_radar.market_reader import MarketReader
+from src.app.hammer_radar.operator.context import (
+    compute_ema,
+    compute_price_vs_ema_pct,
+    compute_trend_direction,
+    compute_trend_strength_score,
+)
 from src.app.hammer_radar.operator import (
     SignalRecord,
     append_outcome,
@@ -28,9 +34,12 @@ from src.app.hammer_radar.signal_engine import attach_bias, compute_bias_directi
 TIMEFRAMES = (
     ("13min", "13m"),
     ("55min", "55m"),
+    ("4h", "4H"),
+    ("666min", "666m"),
 )
 RECENT_SIGNALS_LIMIT = 256
 STATS_PRINT_INTERVAL_SECONDS = 300.0
+TREND_LOOKBACK_CANDLES = 3
 
 
 def run(sleep_seconds: float = 3.0) -> None:
@@ -48,7 +57,7 @@ def run(sleep_seconds: float = 3.0) -> None:
     pending_signals = {
         signal.signal_id: signal
         for signal in recent_signals
-        if signal.timeframe == "13m"
+        if signal.timeframe in {timeframe_label for _, timeframe_label in TIMEFRAMES}
     }
     last_stats_printed_at = 0.0
     last_stats_block: str | None = None
@@ -65,10 +74,12 @@ def run(sleep_seconds: float = 3.0) -> None:
                     print("Waiting for market data...")
                 else:
                     bias_direction = compute_bias_direction(reader.get_resampled("4h"))
-                    resampled_frames: dict[str, object] = {}
-                    for resample_rule, timeframe_label in TIMEFRAMES:
-                        resampled = reader.get_resampled(resample_rule)
-                        resampled_frames[timeframe_label] = resampled
+                    resampled_frames: dict[str, object] = {
+                        timeframe_label: reader.get_resampled(resample_rule)
+                        for resample_rule, timeframe_label in TIMEFRAMES
+                    }
+                    for _resample_rule, timeframe_label in TIMEFRAMES:
+                        resampled = resampled_frames[timeframe_label]
                         annotated = annotate_hammers(resampled)
                         signal = extract_signal(annotated, "BTCUSDT", timeframe=timeframe_label)
 
@@ -84,11 +95,17 @@ def run(sleep_seconds: float = 3.0) -> None:
                         if signal_key in seen_signal_keys:
                             continue
 
-                        signal_record = _build_signal_record(signal, list(recent_signals))
+                        signal_record = _build_signal_record(
+                            signal,
+                            recent_signals=list(recent_signals),
+                            signal_frame=resampled,
+                            ema_4h_frame=resampled_frames.get("4H"),
+                            trend_lookback_candles=TREND_LOOKBACK_CANDLES,
+                        )
                         append_signal(signal_record)
                         recent_signals.append(signal_record)
                         historical_signals.append(signal_record)
-                        if signal_record.timeframe == "13m":
+                        if signal_record.timeframe in resampled_frames:
                             pending_signals[signal_record.signal_id] = signal_record
 
                         print(format_signal_operator_line(signal_record))
@@ -97,7 +114,7 @@ def run(sleep_seconds: float = 3.0) -> None:
 
                     newly_evaluated = _evaluate_pending_signals(
                         pending_signals=pending_signals,
-                        resampled_13m=resampled_frames.get("13m"),
+                        resampled_frames=resampled_frames,
                         evaluated_outcome_keys=evaluated_outcome_keys,
                     )
                     for outcome in newly_evaluated:
@@ -124,8 +141,16 @@ def run(sleep_seconds: float = 3.0) -> None:
         print("Hammer Radar stopped")
 
 
-def _build_signal_record(signal: dict, recent_signals: list[SignalRecord]) -> SignalRecord:
+def _build_signal_record(
+    signal: dict,
+    recent_signals: list[SignalRecord],
+    signal_frame,
+    ema_4h_frame,
+    trend_lookback_candles: int,
+) -> SignalRecord:
     same_direction_streak, opposite_direction_streak = _compute_streaks(signal, recent_signals)
+    signal_close = _extract_signal_close(signal_frame, str(signal["timestamp"]))
+    ema_4h_20 = _extract_relevant_ema_4h(ema_4h_frame, str(signal["timestamp"]))
     signal_record = SignalRecord(
         signal_id=_build_signal_id(signal),
         symbol=str(signal["symbol"]),
@@ -147,6 +172,12 @@ def _build_signal_record(signal: dict, recent_signals: list[SignalRecord]) -> Si
         opposite_direction_streak=opposite_direction_streak,
         tradable=False,
         reject_reason=None,
+        trend_direction=_safe_compute_trend_direction(signal_frame, trend_lookback_candles),
+        trend_strength_score=compute_trend_strength_score(signal_frame, lookback=trend_lookback_candles),
+        trend_lookback_candles=trend_lookback_candles,
+        ema_4h_20=ema_4h_20,
+        price_vs_ema_4h_pct=compute_price_vs_ema_pct(signal_close, ema_4h_20),
+        signal_close=signal_close,
     )
     tradable, reject_reason = decide_trade_candidate(signal_record, recent_signals)
     signal_record.tradable = tradable
@@ -181,22 +212,27 @@ def _build_signal_id(signal: dict) -> str:
 
 def _evaluate_pending_signals(
     pending_signals: dict[str, SignalRecord],
-    resampled_13m,
+    resampled_frames: dict[str, object],
     evaluated_outcome_keys: set[tuple[str, str]],
 ):
-    if resampled_13m is None or getattr(resampled_13m, "empty", True):
-        return []
+    next_candle_by_timeframe = {
+        timeframe: _build_next_candle_lookup(frame)
+        for timeframe, frame in resampled_frames.items()
+    }
+    signal_candle_by_timeframe = {
+        timeframe: _build_signal_candle_lookup(frame)
+        for timeframe, frame in resampled_frames.items()
+    }
 
-    next_candle_by_signal_time = _build_next_candle_lookup(resampled_13m)
-    signal_candle_by_time = _build_signal_candle_lookup(resampled_13m)
     newly_evaluated = []
     completed_signal_ids = []
 
     for signal_id, signal in pending_signals.items():
+        next_candle_by_signal_time = next_candle_by_timeframe.get(signal.timeframe, {})
         next_candle = next_candle_by_signal_time.get(signal.timestamp)
         if next_candle is None:
             continue
-        signal_candle = signal_candle_by_time.get(signal.timestamp)
+        signal_candle = signal_candle_by_timeframe.get(signal.timeframe, {}).get(signal.timestamp)
         outcomes = evaluate_signal_all_entry_modes(
             signal,
             next_candle,
@@ -216,14 +252,16 @@ def _evaluate_pending_signals(
     return newly_evaluated
 
 
-def _build_next_candle_lookup(resampled_13m) -> dict[str, dict]:
+def _build_next_candle_lookup(resampled_frame) -> dict[str, dict]:
     lookup: dict[str, dict] = {}
-    if len(resampled_13m.index) < 2:
+    if resampled_frame is None or getattr(resampled_frame, "empty", True):
+        return lookup
+    if len(resampled_frame.index) < 2:
         return lookup
 
-    for index in range(len(resampled_13m.index) - 1):
-        current_row = resampled_13m.iloc[index]
-        next_row = resampled_13m.iloc[index + 1]
+    for index in range(len(resampled_frame.index) - 1):
+        current_row = resampled_frame.iloc[index]
+        next_row = resampled_frame.iloc[index + 1]
         current_timestamp = _format_timestamp(current_row.get("close_time", current_row.get("open_time")))
         next_timestamp = _format_timestamp(next_row.get("close_time", next_row.get("open_time")))
         if current_timestamp is None or next_timestamp is None:
@@ -238,13 +276,13 @@ def _build_next_candle_lookup(resampled_13m) -> dict[str, dict]:
     return lookup
 
 
-def _build_signal_candle_lookup(resampled_13m) -> dict[str, dict]:
+def _build_signal_candle_lookup(resampled_frame) -> dict[str, dict]:
     lookup: dict[str, dict] = {}
-    if getattr(resampled_13m, "empty", True):
+    if resampled_frame is None or getattr(resampled_frame, "empty", True):
         return lookup
 
-    for index in range(len(resampled_13m.index)):
-        row = resampled_13m.iloc[index]
+    for index in range(len(resampled_frame.index)):
+        row = resampled_frame.iloc[index]
         timestamp = _format_timestamp(row.get("close_time", row.get("open_time")))
         if timestamp is None:
             continue
@@ -278,6 +316,46 @@ def _build_stats_block(signals: list[SignalRecord], outcomes: list) -> str:
             format_stats_summary(tradable_summary, top_n=5, label="tradable_only_signals"),
         ]
     )
+
+
+def _safe_compute_trend_direction(signal_frame, lookback: int) -> str | None:
+    if signal_frame is None or getattr(signal_frame, "empty", True):
+        return None
+    if len(signal_frame.index) < (max(lookback, 1) + 1):
+        return None
+    return compute_trend_direction(signal_frame, lookback=lookback)
+
+
+def _extract_signal_close(signal_frame, signal_timestamp: str) -> float | None:
+    signal_candle = _build_signal_candle_lookup(signal_frame).get(signal_timestamp)
+    if signal_candle is None:
+        return None
+    return float(signal_candle["close"])
+
+
+def _extract_relevant_ema_4h(ema_4h_frame, signal_timestamp: str) -> float | None:
+    if ema_4h_frame is None or getattr(ema_4h_frame, "empty", True):
+        return None
+    if len(ema_4h_frame.index) < 20:
+        return None
+    ema_series = compute_ema(ema_4h_frame["close"], span=20)
+    if getattr(ema_series, "empty", True):
+        return None
+    signal_time = datetime.fromisoformat(signal_timestamp)
+    relevant_index = None
+    for index in range(len(ema_4h_frame.index)):
+        row = ema_4h_frame.iloc[index]
+        row_timestamp = _format_timestamp(row.get("close_time", row.get("open_time")))
+        if row_timestamp is None:
+            continue
+        row_time = datetime.fromisoformat(row_timestamp)
+        if row_time <= signal_time:
+            relevant_index = index
+        else:
+            break
+    if relevant_index is None:
+        return None
+    return round(float(ema_series.iloc[relevant_index]), 4)
 
 if __name__ == "__main__":
     run()
