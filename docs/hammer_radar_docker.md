@@ -92,3 +92,14 @@ Hammer Radar now has an execution adapter boundary under `src/app/hammer_radar/e
 
 - live trading is still disabled
 - future Binance live integration requires a separate approval phase
+
+## Truth Commands
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.truth summary
+.venv/bin/python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-entry-mode
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth tradable-only
+```

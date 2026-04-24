@@ -420,6 +420,17 @@ Safety/readiness check:
 
 Live trading is still disabled. Supported execution modes remain `paper` and `binance_stub`, and any future Binance live integration requires a separate approval phase.
 
+Truth commands:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.truth summary
+.venv/bin/python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-entry-mode
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth tradable-only
+```
+
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 
 ---
