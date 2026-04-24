@@ -34,14 +34,10 @@ from src.app.hammer_radar.operator import (
     load_outcomes,
     load_signals,
 )
+from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_CONFIGS, load_strategy_config
 from src.app.hammer_radar.signal_engine import attach_bias, compute_bias_direction, extract_signal
 
-TIMEFRAMES = (
-    ("13min", "13m"),
-    ("55min", "55m"),
-    ("4h", "4H"),
-    ("666min", "666m"),
-)
+TIMEFRAMES = TIMEFRAME_CONFIGS
 RECENT_SIGNALS_LIMIT = 256
 STATS_PRINT_INTERVAL_SECONDS = 300.0
 TREND_LOOKBACK_CANDLES = 3
@@ -52,6 +48,7 @@ def run(sleep_seconds: float = 3.0) -> None:
     print("Hammer Radar started")
     reader = MarketReader()
     execution_adapter = get_execution_adapter(get_execution_mode())
+    strategy_config = load_strategy_config()
     historical_signals = load_signals()
     seen_signal_keys = {
         (signal.timeframe, signal.timestamp, signal.direction)
@@ -117,7 +114,7 @@ def run(sleep_seconds: float = 3.0) -> None:
 
                         print(format_signal_operator_line(signal_record))
                         print(json.dumps(signal_record.to_dict(), indent=2, sort_keys=True))
-                        if signal_record.tradable:
+                        if signal_record.tradable and strategy_config.paper_enabled:
                             order_result = execution_adapter.place_order(signal_record)
                             paper_position = order_result.position
                             if paper_position is not None:

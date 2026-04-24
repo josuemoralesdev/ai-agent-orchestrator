@@ -101,5 +101,13 @@ Hammer Radar now has an execution adapter boundary under `src/app/hammer_radar/e
 .venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
 .venv/bin/python -m src.app.hammer_radar.operator.truth by-entry-mode
 .venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth strategy-eligible
 .venv/bin/python -m src.app.hammer_radar.operator.truth tradable-only
 ```
+
+## Strategy Config
+
+- supported strategy timeframes are `13m`, `55m`, `666m`, `4H`, `13H`, and `13D`
+- strategy filtering is controlled by `src/app/hammer_radar/operator/strategy_config.py`
+- defaults remain conservative but are not `13m`-only
+- paper execution remains enabled by default and live trading is still disabled

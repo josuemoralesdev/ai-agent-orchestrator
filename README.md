@@ -428,8 +428,11 @@ Truth commands:
 .venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
 .venv/bin/python -m src.app.hammer_radar.operator.truth by-entry-mode
 .venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth strategy-eligible
 .venv/bin/python -m src.app.hammer_radar.operator.truth tradable-only
 ```
+
+Supported strategy timeframes are `13m`, `55m`, `666m`, `4H`, `13H`, and `13D`. Strategy filtering is config-driven via `src.app.hammer_radar.operator.strategy_config`, defaults remain conservative, and the system is still paper-only.
 
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 

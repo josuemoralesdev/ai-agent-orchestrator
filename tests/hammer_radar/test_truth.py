@@ -89,6 +89,12 @@ class TruthReportTestCase(unittest.TestCase):
         self.assertIn("fib_618", output)
         self.assertIn("market_close", output)
 
+    def test_strategy_eligible_smoke(self) -> None:
+        output = truth.build_strategy_eligible_text(limit=10, min_samples=3)
+
+        self.assertIn("HAMMER RADAR STRATEGY ELIGIBLE", output)
+        self.assertIn("entry=fib_618", output)
+
     def _seed_setup(
         self,
         *,

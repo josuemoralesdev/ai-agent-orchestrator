@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from src.app.hammer_radar.operator.archive import load_outcomes, load_signals
+from src.app.hammer_radar.operator.strategy_config import filter_summary_rows_for_strategy
 from src.app.hammer_radar.operator.stats import build_setup_summary
 
 
@@ -78,6 +79,20 @@ def build_grouped_truth_text(group_key: str, *, tradable_only: bool = False) -> 
     return _format_group_rows(title, grouped)
 
 
+def build_strategy_eligible_text(*, limit: int, min_samples: int) -> str:
+    rows = filter_summary_rows_for_strategy(_load_summary_rows(tradable_only=False))
+    rows = _filter_by_min_samples(rows, min_samples=min_samples)
+    ranked = sorted(
+        rows,
+        key=lambda row: (
+            -row["win_rate_on_filled"],
+            -row["avg_pnl_pct"],
+            -row["samples"],
+        ),
+    )
+    return _format_summary_rows("HAMMER RADAR STRATEGY ELIGIBLE", ranked, limit=limit, min_samples=min_samples)
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -92,6 +107,8 @@ def main() -> int:
         print(build_grouped_truth_text("entry_mode"))
     elif args.command == "by-timeframe":
         print(build_grouped_truth_text("timeframe"))
+    elif args.command == "strategy-eligible":
+        print(build_strategy_eligible_text(limit=args.limit, min_samples=args.min_samples))
     elif args.command == "tradable-only":
         print(build_truth_summary_text(tradable_only=True))
         print()
@@ -117,6 +134,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("by-entry-mode")
     subparsers.add_parser("by-timeframe")
+
+    strategy_parser = subparsers.add_parser("strategy-eligible")
+    strategy_parser.add_argument("--limit", type=int, default=10)
+    strategy_parser.add_argument("--min-samples", type=int, default=3)
 
     tradable_parser = subparsers.add_parser("tradable-only")
     tradable_parser.add_argument("--limit", type=int, default=10)

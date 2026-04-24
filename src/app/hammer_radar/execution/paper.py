@@ -11,6 +11,7 @@ from src.app.hammer_radar.operator.positions import (
     create_paper_position,
     load_open_positions,
 )
+from src.app.hammer_radar.operator.strategy_config import is_entry_mode_allowed, load_strategy_config
 
 
 class PaperExecutionAdapter:
@@ -33,6 +34,27 @@ class PaperExecutionAdapter:
         return load_open_positions()
 
     def place_order(self, signal: SignalRecord) -> OrderResult:
+        strategy_config = load_strategy_config()
+        if not strategy_config.paper_enabled:
+            return OrderResult(
+                adapter_name=self.name,
+                mode=self.mode,
+                accepted=False,
+                position=None,
+                status="rejected",
+                message="Paper execution is disabled by strategy config.",
+                details={"signal_id": signal.signal_id},
+            )
+        if not is_entry_mode_allowed(DEFAULT_ENTRY_MODE, strategy_config):
+            return OrderResult(
+                adapter_name=self.name,
+                mode=self.mode,
+                accepted=False,
+                position=None,
+                status="rejected",
+                message="Default paper entry mode is blocked by strategy config.",
+                details={"signal_id": signal.signal_id, "entry_mode": DEFAULT_ENTRY_MODE},
+            )
         position = create_paper_position(
             signal,
             entry_mode=DEFAULT_ENTRY_MODE,

@@ -1,0 +1,150 @@
+# Radar Phase R7 — Strategy Filter Refinement and Timeframe Expansion
+
+## Goal
+
+Refine Hammer Radar strategy selection using configurable filters and expand evaluated/scanned strategic timeframes to include:
+
+- 13m
+- 55m
+- 666m
+- 4H
+- 13H
+- 13D
+
+This phase must remain paper-only and research-focused.
+
+## Current Context
+
+R6 added truth reports showing that the machine works, but the edge is not proven yet.
+
+Current code already includes:
+- 13m
+- 55m
+- 4H
+- 666m
+
+R7 should add:
+- 13H
+- 13D
+
+## Non-Goals
+
+Do not:
+- add Binance keys
+- add live trading
+- place real orders
+- add leverage
+- expose public APIs
+- add dashboards
+- replace NDJSON storage
+- remove existing truth reports
+- blindly hardcode profitable-looking combinations as final truth
+
+## Required Deliverables
+
+Add configurable strategy filter support.
+
+Create or update:
+
+src/app/hammer_radar/operator/strategy_config.py
+
+It should define safe strategy config with defaults:
+- enabled_timeframes: 13m, 55m, 666m, 4H, 13H, 13D
+- minimum_hammer_strength
+- require_bias_alignment
+- allowed_entry_modes
+- blocked_entry_modes
+- max_recent_same_direction_gap
+- paper_enabled default true
+
+Default config should be conservative but not 13m-only.
+
+## Timeframe Expansion
+
+Update scanner/resampling config so Radar can evaluate:
+- 13m
+- 55m
+- 666m
+- 4H
+- 13H
+- 13D
+
+Use pandas-compatible resampling rules where appropriate:
+- 13min -> 13m label
+- 55min -> 55m label
+- 666min -> 666m label
+- 4h -> 4H label
+- 13h -> 13H label
+- 13D -> 13D label
+
+Preserve existing labels as much as possible.
+
+## Gate Refinement
+
+Update candidate gating so it reads strategy config instead of being hardcoded to only 13m.
+
+Gating should support:
+- timeframe enabled check
+- minimum strength check
+- optional bias alignment requirement
+- same-direction recent signal suppression
+- blocked entry modes should affect paper/truth filtering where practical
+
+Do not overfit to current logs.
+
+## Truth Integration
+
+Update truth CLI to optionally show:
+- strategy-eligible setups
+- all-timeframe breakdown
+- timeframe comparison including 13H and 13D if data exists
+
+Add command if clean:
+python -m src.app.hammer_radar.operator.truth strategy-eligible
+
+## Tests
+
+Add focused tests for:
+- 55m can be strategy-eligible when config allows it
+- 666m can be strategy-eligible when config allows it
+- 4H can be strategy-eligible when config allows it
+- 13H and 13D labels are recognized
+- disabled timeframe is rejected
+- minimum strength is enforced
+- bias requirement is enforced
+- existing 13m behavior still works
+
+## Docs
+
+Update README.md and/or docs/hammer_radar_docker.md with:
+- supported strategy timeframes
+- strategy config behavior
+- reminder that this is still paper-only
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+If safe, also run:
+
+timeout 30s docker compose -f docker-compose.radar.yml up hammer-radar
+
+Timeout exit code 124 is acceptable because scanner is long-running.
+
+## Expected Final Response
+
+Report:
+- files changed
+- timeframes now supported
+- strategy filter behavior
+- validation results
+- confirmation that live trading remains impossible
+
+Do not commit, merge, or tag.
