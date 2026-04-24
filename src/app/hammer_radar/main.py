@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 import time
 
+from src.app.hammer_radar.execution import get_execution_adapter, get_execution_mode
 from src.app.hammer_radar.hammer_detector import annotate_hammers
 from src.app.hammer_radar.market_reader import MarketReader
 from src.app.hammer_radar.operator.context import (
@@ -20,7 +21,6 @@ from src.app.hammer_radar.operator import (
     append_outcome,
     append_signal,
     build_setup_summary,
-    create_paper_position,
     decide_trade_candidate,
     evaluate_open_positions,
     evaluate_signal_all_entry_modes,
@@ -51,6 +51,7 @@ def run(sleep_seconds: float = 3.0) -> None:
     """Start the reader and continuously print new hammer signals."""
     print("Hammer Radar started")
     reader = MarketReader()
+    execution_adapter = get_execution_adapter(get_execution_mode())
     historical_signals = load_signals()
     seen_signal_keys = {
         (signal.timeframe, signal.timestamp, signal.direction)
@@ -117,7 +118,8 @@ def run(sleep_seconds: float = 3.0) -> None:
                         print(format_signal_operator_line(signal_record))
                         print(json.dumps(signal_record.to_dict(), indent=2, sort_keys=True))
                         if signal_record.tradable:
-                            paper_position = create_paper_position(signal_record)
+                            order_result = execution_adapter.place_order(signal_record)
+                            paper_position = order_result.position
                             if paper_position is not None:
                                 open_positions[paper_position.position_id] = paper_position
                                 print(format_paper_open_line(paper_position))

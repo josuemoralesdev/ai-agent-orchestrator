@@ -74,3 +74,12 @@ Paper execution is paper-only in this phase. There is no live Binance trading, n
 .venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status closed
 .venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
 ```
+
+## Execution Adapters
+
+Hammer Radar now has an execution adapter boundary under `src/app/hammer_radar/execution/`.
+
+- default mode is `paper`
+- supported modes are `paper` and `binance_stub`
+- `binance_stub` is only a dry boundary for future integration
+- no live Binance trading or real order placement exists in this phase

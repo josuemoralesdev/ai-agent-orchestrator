@@ -113,6 +113,21 @@ def close_position(
     return closed_position
 
 
+def close_paper_position(
+    position: PaperPosition,
+    *,
+    exit_price: float,
+    close_reason: str,
+    closed_at: str,
+) -> PaperPosition:
+    return close_position(
+        position,
+        exit_price=exit_price,
+        close_reason=close_reason,
+        closed_at=closed_at,
+    )
+
+
 def load_positions_by_signal_entry() -> dict[tuple[str, str], PaperPosition]:
     return {
         (position.signal_id, position.entry_mode): position

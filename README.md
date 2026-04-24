@@ -410,6 +410,8 @@ Inspection commands:
 .venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
 ```
 
+Execution adapters now exist under `src.app.hammer_radar.execution`. The current execution mode defaults to `paper`, the `binance_stub` adapter is only a non-trading boundary for future work, and no live Binance trading or real order placement exists yet.
+
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 
 ---

@@ -1,0 +1,96 @@
+# Radar Phase R4 — Binance Adapter Boundary
+
+## Goal
+
+Prepare Hammer Radar for future Binance integration by adding a clean execution adapter boundary, without enabling live trading or placing real orders.
+
+## Non-Goals
+
+Do not:
+- add real Binance API keys
+- place live orders
+- add leverage
+- add take-profit logic
+- expose public APIs
+- replace paper ledger
+- change strategy logic
+- remove Docker/systemd-compatible workflows
+
+## Required Deliverables
+
+Create:
+
+src/app/hammer_radar/execution/
+  __init__.py
+  base.py
+  paper.py
+  binance_stub.py
+
+## Adapter Interface
+
+Define an ExecutionAdapter protocol/base class with:
+
+- name
+- mode
+- get_account_snapshot()
+- get_open_positions()
+- place_order()
+- close_position()
+- cancel_order()
+
+## Paper Adapter
+
+Implement PaperExecutionAdapter as a wrapper around the current paper-position behavior where practical.
+
+It must remain deterministic and local-only.
+
+## Binance Stub Adapter
+
+Implement BinanceStubAdapter that:
+- has the same interface
+- never places orders
+- raises NotImplementedError or returns safe dry-run responses
+- makes it explicit that live trading is disabled
+
+## Config
+
+Add safe config helpers or constants:
+- EXECUTION_MODE defaults to paper
+- supported modes: paper, binance_stub
+- unknown modes must fail closed
+
+No secrets.
+
+## Tests
+
+Add focused tests proving:
+- paper adapter loads safely
+- binance_stub cannot place live orders
+- unknown execution mode fails closed
+
+## Docs
+
+Update README.md or docs/hammer_radar_docker.md explaining:
+- execution adapters now exist
+- current mode is paper only
+- Binance adapter is only a stub boundary
+- no live trading exists yet
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+## Expected Final Response
+
+Report:
+- files changed
+- adapter boundary added
+- tests and validation
+- confirmation that no live trading was added
+
+Do not commit, merge, or tag.
