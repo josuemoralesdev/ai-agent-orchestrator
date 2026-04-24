@@ -1,0 +1,142 @@
+# Radar Phase R1 — Scanner Dockerization
+
+## Goal
+
+Dockerize the existing Hammer Radar scanner so it can run reproducibly as a containerized service while preserving the current direct Python/systemd workflow.
+
+This phase is about standardization and future parallel development. It is not about changing strategy logic or adding live Binance trading.
+
+## Current Context
+
+The active repo is:
+
+~/workspace/kernel/ai-agent-orchestrator
+
+The active Radar code is under:
+
+src/app/hammer_radar/
+
+Known current behavior:
+- main runtime module: src.app.hammer_radar.main
+- scanner reads Binance Futures BTCUSDT 1m candles
+- websocket first, REST fallback
+- resamples into 13m, 55m, 4H, and 666m frames
+- detects hammer / shooting-star signals
+- enriches with bias, trend context, EMA context
+- appends operator signal records to logs/hammer_radar/signals.ndjson
+- appends evaluated outcomes to logs/hammer_radar/outcomes.ndjson
+- prints operator lines and stats to console
+- current runtime is already handled by systemd outside Docker
+
+## Non-Goals
+
+Do not:
+- add live Binance trading
+- add Binance API keys
+- add order execution
+- change strategy gates
+- replace or remove systemd
+- convert NDJSON storage to SQLite
+- add dashboards
+- add paper position ledger
+- restructure the whole app
+
+Those belong to later phases.
+
+## Required Deliverables
+
+Create:
+
+1. Dockerfile.radar
+   - Python 3.12 compatible image
+   - install requirements.txt
+   - set working directory to /app
+   - copy repo files needed to run Hammer Radar
+   - default command should run:
+     python -m src.app.hammer_radar.main
+
+2. docker-compose.radar.yml
+   - service name: hammer-radar
+   - build using Dockerfile.radar
+   - restart unless-stopped
+   - mount ./logs:/app/logs
+   - set PYTHONUNBUFFERED=1
+   - do not expose public ports unless needed
+   - no secrets
+   - no Binance API credentials
+
+3. .dockerignore
+   - exclude .git
+   - exclude .venv
+   - exclude __pycache__
+   - exclude .pytest_cache
+   - exclude local cache/temp files
+   - do NOT exclude required source/docs/config files
+
+4. docs/hammer_radar_docker.md
+   Include:
+   - how to build
+   - how to start
+   - how to stop
+   - how to view logs
+   - how to confirm persisted NDJSON logs
+   - warning that systemd currently exists and should not be removed in this phase
+
+5. README.md update
+   Add a short Hammer Radar Docker section with the same essential commands.
+
+6. run_radar.sh review
+   Preserve existing behavior.
+   If needed, make it safer without changing its purpose.
+   Do not make it Docker-only.
+
+## Suggested Commands For Users After Implementation
+
+Build/run:
+
+docker compose -f docker-compose.radar.yml up --build
+
+Detached run:
+
+docker compose -f docker-compose.radar.yml up -d --build
+
+Logs:
+
+docker compose -f docker-compose.radar.yml logs -f hammer-radar
+
+Stop:
+
+docker compose -f docker-compose.radar.yml down
+
+Check persisted files:
+
+ls -lah logs/hammer_radar
+tail -n 5 logs/hammer_radar/signals.ndjson
+tail -n 5 logs/hammer_radar/outcomes.ndjson
+
+## Validation Required
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+
+Then validate Docker:
+
+docker compose -f docker-compose.radar.yml config
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+If safe to briefly run:
+
+timeout 30s docker compose -f docker-compose.radar.yml up hammer-radar
+
+If timeout returns non-zero only because the long-running scanner was stopped by timeout, explain that clearly.
+
+## Expected Final Response
+
+Report:
+- files changed
+- exact Docker commands validated
+- whether existing systemd workflow was preserved
+- any risks or follow-up recommendations
+
+Do not commit, merge, or tag.

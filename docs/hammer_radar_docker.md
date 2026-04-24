@@ -1,0 +1,56 @@
+# Hammer Radar Docker
+
+Hammer Radar can now run as a containerized service without replacing the existing direct Python and systemd workflow.
+
+## Warning
+
+The current systemd-based runtime still exists and should not be removed or replaced in this phase.
+
+## Build
+
+```bash
+docker compose -f docker-compose.radar.yml build hammer-radar
+```
+
+## Start
+
+Foreground:
+
+```bash
+docker compose -f docker-compose.radar.yml up --build
+```
+
+Detached:
+
+```bash
+docker compose -f docker-compose.radar.yml up -d --build
+```
+
+## Stop
+
+```bash
+docker compose -f docker-compose.radar.yml down
+```
+
+## View Logs
+
+Container logs:
+
+```bash
+docker compose -f docker-compose.radar.yml logs -f hammer-radar
+```
+
+Persisted NDJSON files:
+
+```bash
+ls -lah logs/hammer_radar
+tail -n 5 logs/hammer_radar/signals.ndjson
+tail -n 5 logs/hammer_radar/outcomes.ndjson
+```
+
+## Confirm Persistence
+
+The compose file mounts `./logs` to `/app/logs`, so Hammer Radar writes persist on the host at:
+
+- `logs/hammer_radar/signals.ndjson`
+- `logs/hammer_radar/outcomes.ndjson`

@@ -359,6 +359,46 @@ For setup instructions and example API usage, see:
 
 ---
 
+## Hammer Radar Docker
+
+Hammer Radar can also run in Docker without replacing the existing direct Python and systemd workflow used in this repo.
+
+Build and run:
+
+```bash
+docker compose -f docker-compose.radar.yml up --build
+```
+
+Detached run:
+
+```bash
+docker compose -f docker-compose.radar.yml up -d --build
+```
+
+Logs:
+
+```bash
+docker compose -f docker-compose.radar.yml logs -f hammer-radar
+```
+
+Stop:
+
+```bash
+docker compose -f docker-compose.radar.yml down
+```
+
+Persisted NDJSON files:
+
+```bash
+ls -lah logs/hammer_radar
+tail -n 5 logs/hammer_radar/signals.ndjson
+tail -n 5 logs/hammer_radar/outcomes.ndjson
+```
+
+Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
+
+---
+
 ## License
 
 MIT
