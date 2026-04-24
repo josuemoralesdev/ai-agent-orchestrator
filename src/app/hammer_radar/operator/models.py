@@ -148,3 +148,71 @@ class OutcomeRecord:
             filled_size_fraction=_to_float(payload.get("filled_size_fraction")),
             tranche_fills=_to_bool_dict(payload.get("tranche_fills")),
         )
+
+
+@dataclass(slots=True)
+class PaperPosition:
+    position_id: str
+    signal_id: str
+    symbol: str
+    timeframe: str
+    direction: str
+    entry_mode: str
+    entry_price: float
+    size_usd: float
+    stop_price: float
+    status: str
+    opened_at: str
+    closed_at: str | None = None
+    exit_price: float | None = None
+    pnl_pct: float | None = None
+    pnl_usd: float | None = None
+    close_reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PaperPosition":
+        return cls(
+            position_id=str(payload["position_id"]),
+            signal_id=str(payload["signal_id"]),
+            symbol=str(payload["symbol"]),
+            timeframe=str(payload["timeframe"]),
+            direction=str(payload["direction"]),
+            entry_mode=str(payload.get("entry_mode", "fib_618")),
+            entry_price=float(payload["entry_price"]),
+            size_usd=float(payload["size_usd"]),
+            stop_price=float(payload["stop_price"]),
+            status=str(payload["status"]),
+            opened_at=str(payload["opened_at"]),
+            closed_at=payload.get("closed_at"),
+            exit_price=_to_float(payload.get("exit_price")),
+            pnl_pct=_to_float(payload.get("pnl_pct")),
+            pnl_usd=_to_float(payload.get("pnl_usd")),
+            close_reason=payload.get("close_reason"),
+        )
+
+
+@dataclass(slots=True)
+class PositionEvent:
+    event_id: str
+    position_id: str
+    signal_id: str
+    event_type: str
+    timestamp: str
+    payload: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "PositionEvent":
+        return cls(
+            event_id=str(payload["event_id"]),
+            position_id=str(payload["position_id"]),
+            signal_id=str(payload["signal_id"]),
+            event_type=str(payload["event_type"]),
+            timestamp=str(payload["timestamp"]),
+            payload=dict(payload.get("payload", {})),
+        )

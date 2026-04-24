@@ -1,0 +1,162 @@
+# Radar Phase R2 — Strategy Ledger + Paper Execution
+
+## Goal
+
+Add a deterministic paper execution layer to Hammer Radar so accepted tradable signals can become inspectable paper positions with lifecycle events.
+
+This phase turns Radar from a scanner/evaluator into a strategy-measurement system.
+
+## Current Context
+
+Hammer Radar already:
+- detects BTCUSDT hammer/shooting-star signals
+- enriches signals with bias, trend, EMA context
+- gates tradable candidates
+- persists signals to logs/hammer_radar/signals.ndjson
+- persists next-candle outcomes to logs/hammer_radar/outcomes.ndjson
+- runs inside Docker from Phase R1
+
+## Non-Goals
+
+Do not:
+- add Binance API keys
+- add live trading
+- place real orders
+- expose public HTTP APIs
+- add dashboards
+- replace NDJSON with SQLite
+- remove current signal/outcome evaluator
+- remove Docker or systemd compatibility
+
+## Required Deliverables
+
+Create a paper execution layer using append-only NDJSON storage.
+
+Add:
+
+src/app/hammer_radar/operator/positions.py
+
+It should support:
+- creating a paper position from a tradable SignalRecord
+- appending position events
+- loading open positions
+- loading closed positions
+- avoiding duplicate positions for the same signal_id and entry_mode
+
+Persist:
+
+logs/hammer_radar/positions.ndjson
+logs/hammer_radar/position_events.ndjson
+
+## Position Model
+
+Add dataclasses either in models.py or a new position model module:
+
+PaperPosition:
+- position_id
+- signal_id
+- symbol
+- timeframe
+- direction
+- entry_mode
+- entry_price
+- size_usd
+- stop_price
+- status: open / closed
+- opened_at
+- closed_at
+- exit_price
+- pnl_pct
+- pnl_usd
+- close_reason
+
+PositionEvent:
+- event_id
+- position_id
+- signal_id
+- event_type
+- timestamp
+- payload
+
+## Execution Rules
+
+For this phase, keep it deterministic and simple:
+
+- Only create paper positions for signal.tradable == True
+- Default entry mode: fib_618
+- Default paper size: 100 USD
+- Stop price: signal.invalidation
+- Entry price: signal.fib_618
+- Position opens immediately when a tradable signal is accepted
+- Do not simulate Binance fills yet
+- Do not add leverage yet
+
+## Lifecycle Rules
+
+On each scanner loop:
+- after signal creation and tradable decision
+- if signal.tradable is true
+- create one paper position unless it already exists
+
+Then evaluate open positions against the latest relevant resampled candle:
+- long stops if candle low <= stop_price
+- short stops if candle high >= stop_price
+- otherwise remain open
+- if stopped, close position at stop_price
+- record pnl_pct and pnl_usd
+- append a close event
+
+No take-profit yet. That belongs later.
+
+## Reporting
+
+Print compact operator lines when:
+- a paper position opens
+- a paper position closes
+
+Example:
+
+PAPER OPEN [13m] BTCUSDT LONG entry=fib_618 price=123.45 size=100.00 stop=120.00 signal=<signal_id>
+
+PAPER CLOSE [13m] BTCUSDT LONG reason=stop exit=120.00 pnl=-2.79% usd=-2.79 signal=<signal_id>
+
+## Tests / Validation
+
+Add focused tests if this repo has tests already.
+
+If not, add lightweight unit tests under tests/hammer_radar/ or provide direct validation scripts using .venv.
+
+Required validation:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+
+Run any focused tests added.
+
+Run Docker build validation:
+
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+Run bounded scanner startup:
+
+timeout 30s docker compose -f docker-compose.radar.yml up hammer-radar
+
+It is acceptable if timeout returns 124 because the scanner is long-running.
+
+## README / Docs
+
+Update docs/hammer_radar_docker.md or README.md with a short section explaining:
+- paper positions are stored in logs/hammer_radar/positions.ndjson
+- position events are stored in logs/hammer_radar/position_events.ndjson
+- this is paper-only
+- no live Binance trading exists yet
+
+## Expected Final Response
+
+Report:
+- files changed
+- model/storage added
+- paper execution behavior
+- validation commands and results
+- risks/follow-ups
+
+Do not commit, merge, or tag.

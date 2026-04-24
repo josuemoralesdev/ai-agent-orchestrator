@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
+from src.app.hammer_radar.operator.models import OutcomeRecord, PaperPosition, SignalRecord
 
 
 def format_signal_operator_line(signal: SignalRecord) -> str:
@@ -73,6 +73,26 @@ def format_stats_summary(summary_rows: list[dict], top_n: int = 10, label: str =
             )
         )
     return "\n".join(lines)
+
+
+def format_paper_open_line(position: PaperPosition) -> str:
+    return (
+        f"PAPER OPEN [{position.timeframe}] {position.symbol} {position.direction.upper()} "
+        f"entry={position.entry_mode} price={position.entry_price:.2f} "
+        f"size={position.size_usd:.2f} stop={position.stop_price:.2f} signal={position.signal_id}"
+    )
+
+
+def format_paper_close_line(position: PaperPosition) -> str:
+    exit_text = "na" if position.exit_price is None else f"{position.exit_price:.2f}"
+    pnl_pct = 0.0 if position.pnl_pct is None else position.pnl_pct
+    pnl_usd = 0.0 if position.pnl_usd is None else position.pnl_usd
+    reason = position.close_reason or "unknown"
+    return (
+        f"PAPER CLOSE [{position.timeframe}] {position.symbol} {position.direction.upper()} "
+        f"reason={reason} exit={exit_text} pnl={_format_pct(pnl_pct, digits=2)} "
+        f"usd={pnl_usd:.2f} signal={position.signal_id}"
+    )
 
 
 def _format_pct(value: float, digits: int = 4) -> str:

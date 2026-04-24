@@ -54,3 +54,12 @@ The compose file mounts `./logs` to `/app/logs`, so Hammer Radar writes persist 
 
 - `logs/hammer_radar/signals.ndjson`
 - `logs/hammer_radar/outcomes.ndjson`
+- `logs/hammer_radar/positions.ndjson`
+- `logs/hammer_radar/position_events.ndjson`
+
+## Paper Execution
+
+Paper execution is paper-only in this phase. There is no live Binance trading, no API key usage, and no real order placement.
+
+- Tradable signals can open deterministic paper positions in `logs/hammer_radar/positions.ndjson`
+- Paper lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`

@@ -393,7 +393,11 @@ Persisted NDJSON files:
 ls -lah logs/hammer_radar
 tail -n 5 logs/hammer_radar/signals.ndjson
 tail -n 5 logs/hammer_radar/outcomes.ndjson
+tail -n 5 logs/hammer_radar/positions.ndjson
+tail -n 5 logs/hammer_radar/position_events.ndjson
 ```
+
+Paper execution is paper-only in this phase. Paper positions are stored in `logs/hammer_radar/positions.ndjson`, lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`, and no live Binance trading exists yet.
 
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 

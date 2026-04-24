@@ -20,11 +20,16 @@ from src.app.hammer_radar.operator import (
     append_outcome,
     append_signal,
     build_setup_summary,
+    create_paper_position,
     decide_trade_candidate,
+    evaluate_open_positions,
     evaluate_signal_all_entry_modes,
     format_outcome_line,
+    format_paper_close_line,
+    format_paper_open_line,
     format_signal_operator_line,
     format_stats_summary,
+    load_open_positions,
     load_evaluated_outcome_keys,
     load_outcomes,
     load_signals,
@@ -53,6 +58,7 @@ def run(sleep_seconds: float = 3.0) -> None:
     }
     historical_outcomes = load_outcomes()
     evaluated_outcome_keys = load_evaluated_outcome_keys()
+    open_positions = {position.position_id: position for position in load_open_positions()}
     recent_signals = deque(historical_signals[-RECENT_SIGNALS_LIMIT:], maxlen=RECENT_SIGNALS_LIMIT)
     pending_signals = {
         signal.signal_id: signal
@@ -110,6 +116,11 @@ def run(sleep_seconds: float = 3.0) -> None:
 
                         print(format_signal_operator_line(signal_record))
                         print(json.dumps(signal_record.to_dict(), indent=2, sort_keys=True))
+                        if signal_record.tradable:
+                            paper_position = create_paper_position(signal_record)
+                            if paper_position is not None:
+                                open_positions[paper_position.position_id] = paper_position
+                                print(format_paper_open_line(paper_position))
                         seen_signal_keys.add(signal_key)
 
                     newly_evaluated = _evaluate_pending_signals(
@@ -121,6 +132,15 @@ def run(sleep_seconds: float = 3.0) -> None:
                         append_outcome(outcome)
                         historical_outcomes.append(outcome)
                         print(format_outcome_line(outcome))
+
+                    latest_candles_by_timeframe = _build_latest_candle_lookup(resampled_frames)
+                    closed_positions = evaluate_open_positions(
+                        list(open_positions.values()),
+                        latest_candles_by_timeframe=latest_candles_by_timeframe,
+                    )
+                    for position in closed_positions:
+                        open_positions.pop(position.position_id, None)
+                        print(format_paper_close_line(position))
 
                     stats_block = _build_stats_block(historical_signals, historical_outcomes)
                     should_check_stats = bool(newly_evaluated) or (
@@ -274,6 +294,25 @@ def _build_next_candle_lookup(resampled_frame) -> dict[str, dict]:
             "timestamp": next_timestamp,
         }
     return lookup
+
+
+def _build_latest_candle_lookup(resampled_frames: dict[str, object]) -> dict[str, dict]:
+    latest: dict[str, dict] = {}
+    for timeframe, frame in resampled_frames.items():
+        if frame is None or getattr(frame, "empty", True):
+            continue
+        row = frame.iloc[-1]
+        timestamp = _format_timestamp(row.get("close_time", row.get("open_time")))
+        if timestamp is None:
+            continue
+        latest[timeframe] = {
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "timestamp": timestamp,
+        }
+    return latest
 
 
 def _build_signal_candle_lookup(resampled_frame) -> dict[str, dict]:
