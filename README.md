@@ -399,6 +399,17 @@ tail -n 5 logs/hammer_radar/position_events.ndjson
 
 Paper execution is paper-only in this phase. Paper positions are stored in `logs/hammer_radar/positions.ndjson`, lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`, and no live Binance trading exists yet.
 
+Inspection commands:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+.venv/bin/python -m src.app.hammer_radar.operator.inspect signals --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect outcomes --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status open
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status closed
+.venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
+```
+
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 
 ---

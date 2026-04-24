@@ -63,3 +63,14 @@ Paper execution is paper-only in this phase. There is no live Binance trading, n
 
 - Tradable signals can open deterministic paper positions in `logs/hammer_radar/positions.ndjson`
 - Paper lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`
+
+## Inspection Commands
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+.venv/bin/python -m src.app.hammer_radar.operator.inspect signals --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect outcomes --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status open
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status closed
+.venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
+```
