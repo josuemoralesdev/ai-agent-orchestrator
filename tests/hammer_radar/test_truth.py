@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.app.hammer_radar.operator import archive, truth
+from src.app.hammer_radar.operator import archive, truth, positions
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 
 
@@ -15,9 +15,15 @@ class TruthReportTestCase(unittest.TestCase):
         self.original_archive_log_dir = archive.LOG_DIR
         self.original_signals_path = archive.SIGNALS_PATH
         self.original_outcomes_path = archive.OUTCOMES_PATH
+        self.original_positions_log_dir = positions.LOG_DIR
+        self.original_positions_path = positions.POSITIONS_PATH
+        self.original_position_events_path = positions.POSITION_EVENTS_PATH
         archive.LOG_DIR = log_dir
         archive.SIGNALS_PATH = log_dir / "signals.ndjson"
         archive.OUTCOMES_PATH = log_dir / "outcomes.ndjson"
+        positions.LOG_DIR = log_dir
+        positions.POSITIONS_PATH = log_dir / "positions.ndjson"
+        positions.POSITION_EVENTS_PATH = log_dir / "position_events.ndjson"
 
         self._seed_setup(
             signal_id_prefix="good",
@@ -54,6 +60,9 @@ class TruthReportTestCase(unittest.TestCase):
         archive.LOG_DIR = self.original_archive_log_dir
         archive.SIGNALS_PATH = self.original_signals_path
         archive.OUTCOMES_PATH = self.original_outcomes_path
+        positions.LOG_DIR = self.original_positions_log_dir
+        positions.POSITIONS_PATH = self.original_positions_path
+        positions.POSITION_EVENTS_PATH = self.original_position_events_path
         self.temp_dir.cleanup()
 
     def test_summary_calculates_group_and_totals(self) -> None:
@@ -94,6 +103,44 @@ class TruthReportTestCase(unittest.TestCase):
 
         self.assertIn("HAMMER RADAR STRATEGY ELIGIBLE", output)
         self.assertIn("entry=fib_618", output)
+
+    def test_paper_exits_smoke(self) -> None:
+        signal = SignalRecord(
+            signal_id="paper-exit",
+            symbol="BTCUSDT",
+            timeframe="13m",
+            direction="long",
+            timestamp="2026-04-24T16:27:59.999000+00:00",
+            hammer_strength=95.0,
+            hammer_high=101.0,
+            hammer_low=94.0,
+            fib_50=100.5,
+            fib_618=100.0,
+            fib_650=99.5,
+            fib_786=98.5,
+            invalidation=95.0,
+            bias_timeframe="4H",
+            bias_direction="bullish",
+            bias_aligned=True,
+            same_direction_streak=0,
+            opposite_direction_streak=0,
+            tradable=True,
+            reject_reason=None,
+            trend_direction="bullish",
+            trend_strength_score=0.4,
+            trend_lookback_candles=3,
+            ema_4h_20=100.0,
+            price_vs_ema_4h_pct=0.1,
+            signal_close=100.0,
+        )
+        position = positions.create_paper_position(signal)
+        assert position is not None
+        positions.close_position(position, exit_price=110.0, close_reason="take_profit", closed_at="2026-04-24T16:42:59.999000+00:00")
+
+        output = truth.build_paper_exits_text()
+
+        self.assertIn("HAMMER RADAR PAPER EXITS", output)
+        self.assertIn("reason=take_profit", output)
 
     def _seed_setup(
         self,

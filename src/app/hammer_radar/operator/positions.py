@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from src.app.hammer_radar.operator.models import PaperPosition, PositionEvent, SignalRecord
+from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_MINUTES, load_strategy_config
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 LOG_DIR = ROOT_DIR / "logs" / "hammer_radar"
@@ -42,8 +43,10 @@ def create_paper_position(
         entry_price=float(signal.fib_618),
         size_usd=float(size_usd),
         stop_price=float(signal.invalidation),
+        take_profit_price=_calculate_take_profit_price(signal),
         status="open",
         opened_at=signal.timestamp,
+        opened_candle_timestamp=signal.timestamp,
     )
     append_position(position)
     append_position_event(
@@ -58,6 +61,7 @@ def create_paper_position(
                 "entry_price": position.entry_price,
                 "size_usd": position.size_usd,
                 "stop_price": position.stop_price,
+                "take_profit_price": position.take_profit_price,
             },
         )
     )
@@ -81,9 +85,13 @@ def close_position(
         entry_price=position.entry_price,
         size_usd=position.size_usd,
         stop_price=position.stop_price,
+        take_profit_price=position.take_profit_price,
         status="closed",
         opened_at=position.opened_at,
+        opened_candle_timestamp=position.opened_candle_timestamp,
         closed_at=closed_at,
+        closed_candle_timestamp=closed_at,
+        held_candles=position.held_candles,
         exit_price=float(exit_price),
         pnl_pct=_calculate_pnl_pct(position.direction, position.entry_price, float(exit_price)),
         pnl_usd=_calculate_pnl_usd(
@@ -166,6 +174,7 @@ def evaluate_open_positions(
     open_positions: list[PaperPosition],
     latest_candles_by_timeframe: dict[str, dict[str, Any]],
 ) -> list[PaperPosition]:
+    strategy_config = load_strategy_config()
     closed_positions: list[PaperPosition] = []
 
     for position in open_positions:
@@ -175,8 +184,18 @@ def evaluate_open_positions(
         candle_timestamp = str(candle.get("timestamp", ""))
         if not candle_timestamp or candle_timestamp <= _signal_timestamp_from_id(position.signal_id):
             continue
+        held_candles = _calculate_held_candles(position, candle_timestamp)
+        position = _position_with_held_candles(position, held_candles)
 
-        if position.direction == "long" and float(candle["low"]) <= position.stop_price:
+        stop_hit = strategy_config.exit_on_stop and _is_stop_hit(position, candle)
+        take_profit_hit = strategy_config.exit_on_take_profit and _is_take_profit_hit(position, candle)
+        max_hold_hit = (
+            strategy_config.exit_on_max_hold
+            and strategy_config.max_hold_candles > 0
+            and held_candles >= strategy_config.max_hold_candles
+        )
+
+        if stop_hit:
             closed_positions.append(
                 close_position(
                     position,
@@ -185,12 +204,23 @@ def evaluate_open_positions(
                     closed_at=candle_timestamp,
                 )
             )
-        elif position.direction == "short" and float(candle["high"]) >= position.stop_price:
+            continue
+        if take_profit_hit and position.take_profit_price is not None:
             closed_positions.append(
                 close_position(
                     position,
-                    exit_price=position.stop_price,
-                    close_reason="stop",
+                    exit_price=position.take_profit_price,
+                    close_reason="take_profit",
+                    closed_at=candle_timestamp,
+                )
+            )
+            continue
+        if max_hold_hit:
+            closed_positions.append(
+                close_position(
+                    position,
+                    exit_price=float(candle["close"]),
+                    close_reason="max_hold",
                     closed_at=candle_timestamp,
                 )
             )
@@ -235,6 +265,79 @@ def _signal_timestamp_from_id(signal_id: str) -> str:
     if len(parts) == 4:
         return parts[3]
     return ""
+
+
+def _calculate_take_profit_price(signal: SignalRecord) -> float | None:
+    strategy_config = load_strategy_config()
+    risk = abs(float(signal.fib_618) - float(signal.invalidation))
+    if risk <= 0.0:
+        return None
+    if signal.direction == "short":
+        return round(float(signal.fib_618) - (risk * strategy_config.take_profit_r_multiple), 4)
+    return round(float(signal.fib_618) + (risk * strategy_config.take_profit_r_multiple), 4)
+
+
+def _calculate_held_candles(position: PaperPosition, candle_timestamp: str) -> int:
+    timeframe_minutes = TIMEFRAME_MINUTES.get(position.timeframe)
+    opened_candle_timestamp = position.opened_candle_timestamp or position.opened_at
+    if timeframe_minutes is None:
+        return position.held_candles
+    signal_time = _parse_timestamp(opened_candle_timestamp)
+    candle_time = _parse_timestamp(candle_timestamp)
+    if signal_time is None or candle_time is None or candle_time <= signal_time:
+        return position.held_candles
+    candle_gap = int((candle_time - signal_time).total_seconds() / (timeframe_minutes * 60.0))
+    return max(position.held_candles, candle_gap)
+
+
+def _position_with_held_candles(position: PaperPosition, held_candles: int) -> PaperPosition:
+    if held_candles == position.held_candles:
+        return position
+    return PaperPosition(
+        position_id=position.position_id,
+        signal_id=position.signal_id,
+        symbol=position.symbol,
+        timeframe=position.timeframe,
+        direction=position.direction,
+        entry_mode=position.entry_mode,
+        entry_price=position.entry_price,
+        size_usd=position.size_usd,
+        stop_price=position.stop_price,
+        take_profit_price=position.take_profit_price,
+        status=position.status,
+        opened_at=position.opened_at,
+        opened_candle_timestamp=position.opened_candle_timestamp,
+        closed_at=position.closed_at,
+        closed_candle_timestamp=position.closed_candle_timestamp,
+        held_candles=held_candles,
+        exit_price=position.exit_price,
+        pnl_pct=position.pnl_pct,
+        pnl_usd=position.pnl_usd,
+        close_reason=position.close_reason,
+    )
+
+
+def _is_stop_hit(position: PaperPosition, candle: dict[str, Any]) -> bool:
+    if position.direction == "short":
+        return float(candle["high"]) >= position.stop_price
+    return float(candle["low"]) <= position.stop_price
+
+
+def _is_take_profit_hit(position: PaperPosition, candle: dict[str, Any]) -> bool:
+    if position.take_profit_price is None:
+        return False
+    if position.direction == "short":
+        return float(candle["low"]) <= position.take_profit_price
+    return float(candle["high"]) >= position.take_profit_price
+
+
+def _parse_timestamp(value: str) -> Any:
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _calculate_pnl_pct(direction: str, entry_price: float, exit_price: float) -> float:

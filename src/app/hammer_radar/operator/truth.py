@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from src.app.hammer_radar.operator.archive import load_outcomes, load_signals
+from src.app.hammer_radar.operator.positions import load_closed_positions
 from src.app.hammer_radar.operator.strategy_config import filter_summary_rows_for_strategy
 from src.app.hammer_radar.operator.stats import build_setup_summary
 
@@ -93,6 +94,52 @@ def build_strategy_eligible_text(*, limit: int, min_samples: int) -> str:
     return _format_summary_rows("HAMMER RADAR STRATEGY ELIGIBLE", ranked, limit=limit, min_samples=min_samples)
 
 
+def build_paper_exits_text() -> str:
+    positions = load_closed_positions()
+    grouped: dict[tuple[str, str, str], dict[str, float | int | str]] = {}
+    for position in positions:
+        key = (position.timeframe, position.direction, position.close_reason or "unknown")
+        bucket = grouped.setdefault(
+            key,
+            {
+                "timeframe": position.timeframe,
+                "direction": position.direction,
+                "close_reason": position.close_reason or "unknown",
+                "samples": 0,
+                "pnl_usd_total": 0.0,
+                "pnl_pct_total": 0.0,
+            },
+        )
+        bucket["samples"] += 1
+        bucket["pnl_usd_total"] += float(position.pnl_usd or 0.0)
+        bucket["pnl_pct_total"] += float(position.pnl_pct or 0.0)
+
+    if not grouped:
+        return "HAMMER RADAR PAPER EXITS\nno closed paper positions"
+
+    rows = sorted(
+        grouped.values(),
+        key=lambda row: (-int(row["samples"]), str(row["timeframe"]), str(row["close_reason"])),
+    )
+    lines = ["HAMMER RADAR PAPER EXITS"]
+    for row in rows:
+        samples = int(row["samples"])
+        avg_pnl_usd = float(row["pnl_usd_total"]) / samples if samples else 0.0
+        avg_pnl_pct = float(row["pnl_pct_total"]) / samples if samples else 0.0
+        lines.append(
+            " | ".join(
+                [
+                    f"{row['timeframe']} {str(row['direction']).upper()}",
+                    f"reason={row['close_reason']}",
+                    f"samples={samples}",
+                    f"avg_pnl_usd={avg_pnl_usd:.4f}",
+                    f"avg_pnl_pct={avg_pnl_pct:.4f}%",
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -109,6 +156,8 @@ def main() -> int:
         print(build_grouped_truth_text("timeframe"))
     elif args.command == "strategy-eligible":
         print(build_strategy_eligible_text(limit=args.limit, min_samples=args.min_samples))
+    elif args.command == "paper-exits":
+        print(build_paper_exits_text())
     elif args.command == "tradable-only":
         print(build_truth_summary_text(tradable_only=True))
         print()
@@ -138,6 +187,8 @@ def _build_parser() -> argparse.ArgumentParser:
     strategy_parser = subparsers.add_parser("strategy-eligible")
     strategy_parser.add_argument("--limit", type=int, default=10)
     strategy_parser.add_argument("--min-samples", type=int, default=3)
+
+    subparsers.add_parser("paper-exits")
 
     tradable_parser = subparsers.add_parser("tradable-only")
     tradable_parser.add_argument("--limit", type=int, default=10)

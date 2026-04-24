@@ -62,6 +62,101 @@ class PaperPositionsTestCase(unittest.TestCase):
         self.assertEqual(1, len(positions.load_closed_positions()))
         self.assertEqual(2, len(positions.load_position_events()))
 
+    def test_long_position_closes_on_take_profit(self) -> None:
+        signal = self._build_signal(direction="long", tradable=True, fib_618=100.0, invalidation=95.0)
+        position = positions.create_paper_position(signal)
+        assert position is not None
+
+        closed = positions.evaluate_open_positions(
+            [position],
+            {
+                "13m": {
+                    "high": 111.0,
+                    "low": 99.0,
+                    "open": 100.5,
+                    "close": 110.5,
+                    "timestamp": "2026-04-24T16:42:59.999000+00:00",
+                }
+            },
+        )
+
+        self.assertEqual(1, len(closed))
+        self.assertEqual("take_profit", closed[0].close_reason)
+        self.assertAlmostEqual(110.0, closed[0].exit_price)
+
+    def test_short_position_closes_on_take_profit(self) -> None:
+        signal = self._build_signal(
+            direction="short",
+            tradable=True,
+            fib_618=100.0,
+            invalidation=105.0,
+            signal_id="BTCUSDT|13m|short|2026-04-24T16:27:59.999000+00:00",
+        )
+        position = positions.create_paper_position(signal)
+        assert position is not None
+
+        closed = positions.evaluate_open_positions(
+            [position],
+            {
+                "13m": {
+                    "high": 101.0,
+                    "low": 89.0,
+                    "open": 99.5,
+                    "close": 90.0,
+                    "timestamp": "2026-04-24T16:42:59.999000+00:00",
+                }
+            },
+        )
+
+        self.assertEqual(1, len(closed))
+        self.assertEqual("take_profit", closed[0].close_reason)
+        self.assertAlmostEqual(90.0, closed[0].exit_price)
+
+    def test_stop_wins_over_take_profit_when_both_hit_same_candle(self) -> None:
+        signal = self._build_signal(direction="long", tradable=True, fib_618=100.0, invalidation=95.0)
+        position = positions.create_paper_position(signal)
+        assert position is not None
+
+        closed = positions.evaluate_open_positions(
+            [position],
+            {
+                "13m": {
+                    "high": 111.0,
+                    "low": 94.0,
+                    "open": 100.5,
+                    "close": 106.0,
+                    "timestamp": "2026-04-24T16:42:59.999000+00:00",
+                }
+            },
+        )
+
+        self.assertEqual(1, len(closed))
+        self.assertEqual("stop", closed[0].close_reason)
+        self.assertAlmostEqual(95.0, closed[0].exit_price)
+
+    def test_max_hold_close(self) -> None:
+        signal = self._build_signal(direction="long", tradable=True, fib_618=100.0, invalidation=95.0)
+        position = positions.create_paper_position(signal)
+        assert position is not None
+
+        closed = positions.evaluate_open_positions(
+            [position],
+            {
+                "13m": {
+                    "high": 104.0,
+                    "low": 99.0,
+                    "open": 100.0,
+                    "close": 103.0,
+                    "timestamp": "2026-04-24T17:06:59.999000+00:00",
+                }
+            },
+        )
+
+        self.assertEqual(1, len(closed))
+        self.assertEqual("max_hold", closed[0].close_reason)
+        self.assertAlmostEqual(103.0, closed[0].exit_price)
+        self.assertEqual(3, closed[0].held_candles)
+
     def test_short_position_stays_open_until_stop_is_hit(self) -> None:
         signal = self._build_signal(
             direction="short",
@@ -89,6 +184,31 @@ class PaperPositionsTestCase(unittest.TestCase):
 
         self.assertEqual([], still_open)
         self.assertEqual(1, len(positions.load_open_positions()))
+
+    def test_backward_compatibility_without_take_profit_fields(self) -> None:
+        positions.append_position(
+            positions.PaperPosition.from_dict(
+                {
+                    "position_id": "legacy|fib_618",
+                    "signal_id": "legacy",
+                    "symbol": "BTCUSDT",
+                    "timeframe": "13m",
+                    "direction": "long",
+                    "entry_mode": "fib_618",
+                    "entry_price": 100.0,
+                    "size_usd": 100.0,
+                    "stop_price": 95.0,
+                    "status": "open",
+                    "opened_at": "2026-04-24T16:27:59.999000+00:00",
+                }
+            )
+        )
+
+        loaded = positions.load_open_positions()
+
+        self.assertEqual(1, len(loaded))
+        self.assertIsNone(loaded[0].take_profit_price)
+        self.assertEqual(0, loaded[0].held_candles)
 
     @staticmethod
     def _build_signal(

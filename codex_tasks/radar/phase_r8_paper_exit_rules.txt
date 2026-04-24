@@ -1,0 +1,156 @@
+# Radar Phase R8 — Paper Exit Rules
+
+## Goal
+
+Add configurable paper-only exit rules so Hammer Radar positions can close by take-profit, stop-loss, or max-hold logic instead of only stop-loss.
+
+This phase improves strategy evaluation without adding live trading.
+
+## Current Context
+
+R1 dockerized scanner.
+R2 added paper position ledger.
+R3 added operator inspection.
+R4 added execution adapter boundary.
+R5 added safety guardrails.
+R6 added truth reports.
+R7 added config-driven strategy filters and expanded strategy timeframes:
+- 13m
+- 55m
+- 666m
+- 4H
+- 13H
+- 13D
+
+## Non-Goals
+
+Do not:
+- add Binance keys
+- add live trading
+- place real orders
+- add leverage
+- expose public APIs
+- add dashboards
+- replace NDJSON storage
+- change scanner source
+- remove safety guardrails
+- overfit strategy to current logs
+
+## Required Deliverables
+
+Extend paper execution to support configurable exits:
+
+1. stop-loss
+2. take-profit by R multiple
+3. max-hold candles
+
+Add or update config in:
+
+src/app/hammer_radar/operator/strategy_config.py
+
+Include defaults:
+- take_profit_r_multiple default 2.0
+- max_hold_candles default 3
+- exit_on_stop default true
+- exit_on_take_profit default true
+- exit_on_max_hold default true
+
+## Position Model Updates
+
+Extend PaperPosition if needed with:
+- take_profit_price
+- opened_candle_timestamp
+- closed_candle_timestamp
+- held_candles
+- close_reason values:
+  - stop
+  - take_profit
+  - max_hold
+
+Preserve backward compatibility with existing NDJSON records.
+
+## Exit Logic
+
+For open paper positions:
+- long stop if candle low <= stop_price
+- short stop if candle high >= stop_price
+- long take-profit if candle high >= take_profit_price
+- short take-profit if candle low <= take_profit_price
+- max-hold closes after configured candle count if neither stop nor TP occurs
+
+If stop and take-profit both occur in same candle:
+- fail conservative
+- close by stop first
+- document this
+
+## Reporting
+
+Update PAPER OPEN line to include TP if available:
+
+PAPER OPEN [13m] BTCUSDT LONG entry=fib_618 price=123.45 size=100.00 stop=120.00 tp=130.00 signal=<signal_id>
+
+Update PAPER CLOSE line to include close reason:
+- stop
+- take_profit
+- max_hold
+
+## Truth Integration
+
+Add truth breakdown by close reason if practical.
+
+Add CLI command if clean:
+
+python -m src.app.hammer_radar.operator.truth paper-exits
+
+It should summarize paper position closes by:
+- timeframe
+- direction
+- close_reason
+- samples
+- avg pnl usd
+- avg pnl pct
+
+## Tests
+
+Add focused tests for:
+- long take-profit close
+- short take-profit close
+- stop wins over TP when both hit same candle
+- max-hold close
+- backward compatibility with older position records without TP fields
+- close reason reporting
+
+## Docs
+
+Update README.md and docs/hammer_radar_docker.md with:
+- paper exit rules
+- conservative same-candle stop-first rule
+- paper-only warning
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth paper-exits
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+If safe, also run:
+
+timeout 30s docker compose -f docker-compose.radar.yml up hammer-radar
+
+Timeout exit code 124 is acceptable because scanner is long-running.
+
+## Expected Final Response
+
+Report:
+- files changed
+- exit rules added
+- tests/validation results
+- any early paper-exit observations
+- confirmation live trading remains impossible
+
+Do not commit, merge, or tag.

@@ -111,3 +111,9 @@ Hammer Radar now has an execution adapter boundary under `src/app/hammer_radar/e
 - strategy filtering is controlled by `src/app/hammer_radar/operator/strategy_config.py`
 - defaults remain conservative but are not `13m`-only
 - paper execution remains enabled by default and live trading is still disabled
+
+## Paper Exit Rules
+
+- paper exits now support stop-loss, take-profit by R multiple, and max-hold candles
+- if stop and take-profit both hit in the same candle, the paper engine closes by stop first
+- this remains paper-only and does not enable live trading

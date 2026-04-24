@@ -28,6 +28,11 @@ DEFAULT_MINIMUM_HAMMER_STRENGTH = 85.0
 DEFAULT_REQUIRE_BIAS_ALIGNMENT = True
 DEFAULT_MAX_RECENT_SAME_DIRECTION_GAP = 2
 DEFAULT_PAPER_ENABLED = True
+DEFAULT_TAKE_PROFIT_R_MULTIPLE = 2.0
+DEFAULT_MAX_HOLD_CANDLES = 3
+DEFAULT_EXIT_ON_STOP = True
+DEFAULT_EXIT_ON_TAKE_PROFIT = True
+DEFAULT_EXIT_ON_MAX_HOLD = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +44,11 @@ class StrategyConfig:
     blocked_entry_modes: tuple[str, ...]
     max_recent_same_direction_gap: int
     paper_enabled: bool
+    take_profit_r_multiple: float
+    max_hold_candles: int
+    exit_on_stop: bool
+    exit_on_take_profit: bool
+    exit_on_max_hold: bool
 
 
 def load_strategy_config() -> StrategyConfig:
@@ -80,6 +90,26 @@ def load_strategy_config() -> StrategyConfig:
             os.getenv("HAMMER_RADAR_PAPER_ENABLED"),
             default=DEFAULT_PAPER_ENABLED,
         ),
+        take_profit_r_multiple=_parse_float(
+            os.getenv("HAMMER_RADAR_TAKE_PROFIT_R_MULTIPLE"),
+            default=DEFAULT_TAKE_PROFIT_R_MULTIPLE,
+        ),
+        max_hold_candles=_parse_int(
+            os.getenv("HAMMER_RADAR_MAX_HOLD_CANDLES"),
+            default=DEFAULT_MAX_HOLD_CANDLES,
+        ),
+        exit_on_stop=_parse_bool(
+            os.getenv("HAMMER_RADAR_EXIT_ON_STOP"),
+            default=DEFAULT_EXIT_ON_STOP,
+        ),
+        exit_on_take_profit=_parse_bool(
+            os.getenv("HAMMER_RADAR_EXIT_ON_TAKE_PROFIT"),
+            default=DEFAULT_EXIT_ON_TAKE_PROFIT,
+        ),
+        exit_on_max_hold=_parse_bool(
+            os.getenv("HAMMER_RADAR_EXIT_ON_MAX_HOLD"),
+            default=DEFAULT_EXIT_ON_MAX_HOLD,
+        ),
     )
     _validate_strategy_config(config)
     return config
@@ -118,6 +148,10 @@ def _validate_strategy_config(config: StrategyConfig) -> None:
         raise ValueError("minimum_hammer_strength must be between 0 and 100")
     if config.max_recent_same_direction_gap < 0:
         raise ValueError("max_recent_same_direction_gap must be zero or greater")
+    if config.take_profit_r_multiple <= 0.0:
+        raise ValueError("take_profit_r_multiple must be greater than zero")
+    if config.max_hold_candles < 0:
+        raise ValueError("max_hold_candles must be zero or greater")
     unknown_allowed = set(config.allowed_entry_modes) - set(DEFAULT_ENTRY_MODES)
     if unknown_allowed:
         raise ValueError(f"allowed_entry_modes contains unsupported values: {sorted(unknown_allowed)}")

@@ -82,6 +82,8 @@ def build_positions_text(status: str) -> str:
             f"{position.entry_mode} | entry={position.entry_price:.2f} | stop={position.stop_price:.2f} | "
             f"size={position.size_usd:.2f} | status={position.status}"
         )
+        if position.take_profit_price is not None:
+            line += f" | tp={position.take_profit_price:.2f}"
         if position.status == "closed":
             pnl_usd = 0.0 if position.pnl_usd is None else position.pnl_usd
             close_reason = position.close_reason or "n/a"

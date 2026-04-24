@@ -76,10 +76,11 @@ def format_stats_summary(summary_rows: list[dict], top_n: int = 10, label: str =
 
 
 def format_paper_open_line(position: PaperPosition) -> str:
+    tp_text = "na" if position.take_profit_price is None else f"{position.take_profit_price:.2f}"
     return (
         f"PAPER OPEN [{position.timeframe}] {position.symbol} {position.direction.upper()} "
         f"entry={position.entry_mode} price={position.entry_price:.2f} "
-        f"size={position.size_usd:.2f} stop={position.stop_price:.2f} signal={position.signal_id}"
+        f"size={position.size_usd:.2f} stop={position.stop_price:.2f} tp={tp_text} signal={position.signal_id}"
     )
 
 

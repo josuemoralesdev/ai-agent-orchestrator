@@ -163,7 +163,11 @@ class PaperPosition:
     stop_price: float
     status: str
     opened_at: str
+    take_profit_price: float | None = None
+    opened_candle_timestamp: str | None = None
     closed_at: str | None = None
+    closed_candle_timestamp: str | None = None
+    held_candles: int = 0
     exit_price: float | None = None
     pnl_pct: float | None = None
     pnl_usd: float | None = None
@@ -184,9 +188,13 @@ class PaperPosition:
             entry_price=float(payload["entry_price"]),
             size_usd=float(payload["size_usd"]),
             stop_price=float(payload["stop_price"]),
+            take_profit_price=_to_float(payload.get("take_profit_price")),
             status=str(payload["status"]),
             opened_at=str(payload["opened_at"]),
+            opened_candle_timestamp=payload.get("opened_candle_timestamp", payload.get("opened_at")),
             closed_at=payload.get("closed_at"),
+            closed_candle_timestamp=payload.get("closed_candle_timestamp", payload.get("closed_at")),
+            held_candles=_to_int(payload.get("held_candles")),
             exit_price=_to_float(payload.get("exit_price")),
             pnl_pct=_to_float(payload.get("pnl_pct")),
             pnl_usd=_to_float(payload.get("pnl_usd")),
