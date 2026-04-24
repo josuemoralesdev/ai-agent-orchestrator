@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from src.app.hammer_radar.execution.base import AccountSnapshot, ExecutionAdapter, OrderResult
 from src.app.hammer_radar.execution.binance_stub import BinanceStubAdapter
 from src.app.hammer_radar.execution.paper import PaperExecutionAdapter
@@ -14,12 +12,9 @@ SUPPORTED_EXECUTION_MODES = ("paper", "binance_stub")
 
 
 def get_execution_mode() -> str:
-    mode = os.getenv(EXECUTION_MODE_ENV_VAR, DEFAULT_EXECUTION_MODE).strip().lower()
-    if mode not in SUPPORTED_EXECUTION_MODES:
-        raise ValueError(
-            f"Unsupported execution mode: {mode}. Supported modes: {', '.join(SUPPORTED_EXECUTION_MODES)}"
-        )
-    return mode
+    from src.app.hammer_radar.execution.safety import load_execution_safety_config
+
+    return load_execution_safety_config().execution_mode
 
 
 def get_execution_adapter(mode: str | None = None) -> ExecutionAdapter:

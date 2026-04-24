@@ -1,0 +1,102 @@
+# Radar Phase R5 — Live Readiness Guardrails
+
+## Goal
+
+Prepare Hammer Radar for future live Binance integration by adding safety guardrails, runtime configuration validation, and explicit live-readiness checks.
+
+This phase must not place real trades.
+
+## Non-Goals
+
+Do not:
+- add real Binance API keys
+- place live orders
+- enable live trading
+- add leverage
+- add take-profit logic
+- expose public APIs
+- add dashboards
+- replace NDJSON storage
+- change strategy logic
+
+## Required Deliverables
+
+Add a live-readiness/safety module:
+
+src/app/hammer_radar/execution/safety.py
+
+It should define safe config for:
+- execution_mode
+- live_trading_enabled default false
+- max_risk_usd default 0
+- max_position_size_usd default 100
+- max_open_positions default 1
+- allowed_symbols default BTCUSDT only
+- require_operator_approval default true
+
+Unknown or unsafe config must fail closed.
+
+## Readiness Check
+
+Add CLI command:
+
+python -m src.app.hammer_radar.execution.safety check
+
+It should print:
+- execution mode
+- whether live trading is enabled
+- allowed symbols
+- max position size
+- max open positions
+- whether operator approval is required
+- final readiness verdict
+
+Verdict rules:
+- paper mode is READY_FOR_PAPER
+- binance_stub is READY_FOR_STUB_ONLY
+- any live mode must be NOT_READY unless all required safety flags are explicit and valid
+- no live order capability should exist yet
+
+## Integration
+
+Wire safety config into adapter selection without changing current behavior:
+- default remains paper
+- binance_stub remains non-trading
+- unknown modes still fail closed
+
+## Tests
+
+Add focused tests proving:
+- defaults are safe
+- paper mode readiness passes
+- binance_stub readiness is stub-only
+- unsafe live config fails closed
+- unknown mode fails closed
+
+## Docs
+
+Update README.md and/or docs/hammer_radar_docker.md with:
+- safety command
+- current supported modes
+- explicit note that live trading is still disabled
+- future Binance integration requires separate approval phase
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+## Expected Final Response
+
+Report:
+- files changed
+- safety/readiness behavior
+- validation results
+- confirmation that live trading is still impossible
+
+Do not commit, merge, or tag.

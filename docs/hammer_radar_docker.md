@@ -83,3 +83,12 @@ Hammer Radar now has an execution adapter boundary under `src/app/hammer_radar/e
 - supported modes are `paper` and `binance_stub`
 - `binance_stub` is only a dry boundary for future integration
 - no live Binance trading or real order placement exists in this phase
+
+## Safety Check
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+```
+
+- live trading is still disabled
+- future Binance live integration requires a separate approval phase

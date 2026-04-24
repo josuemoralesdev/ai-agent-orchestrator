@@ -412,6 +412,14 @@ Inspection commands:
 
 Execution adapters now exist under `src.app.hammer_radar.execution`. The current execution mode defaults to `paper`, the `binance_stub` adapter is only a non-trading boundary for future work, and no live Binance trading or real order placement exists yet.
 
+Safety/readiness check:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+```
+
+Live trading is still disabled. Supported execution modes remain `paper` and `binance_stub`, and any future Binance live integration requires a separate approval phase.
+
 Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
 
 ---
