@@ -6,6 +6,7 @@ import argparse
 import os
 from dataclasses import dataclass
 
+RUNTIME_MODE_ENV_VAR = "HAMMER_RADAR_MODE"
 EXECUTION_MODE_ENV_VAR = "HAMMER_RADAR_EXECUTION_MODE"
 LIVE_TRADING_ENABLED_ENV_VAR = "HAMMER_RADAR_LIVE_TRADING_ENABLED"
 MAX_RISK_USD_ENV_VAR = "HAMMER_RADAR_MAX_RISK_USD"
@@ -43,7 +44,7 @@ class ReadinessResult:
 
 
 def load_execution_safety_config() -> ExecutionSafetyConfig:
-    execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR, DEFAULT_EXECUTION_MODE).strip().lower()
+    execution_mode = _resolve_execution_mode()
     if execution_mode not in SUPPORTED_EXECUTION_MODES and execution_mode not in PLANNED_LIVE_MODES:
         raise ValueError(f"Unsupported execution mode: {execution_mode}")
 
@@ -80,6 +81,25 @@ def load_execution_safety_config() -> ExecutionSafetyConfig:
     )
     _validate_execution_safety_config(config)
     return config
+
+
+def _resolve_execution_mode() -> str:
+    runtime_mode = os.getenv(RUNTIME_MODE_ENV_VAR)
+    execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR)
+    selected = execution_mode if execution_mode not in (None, "") else runtime_mode
+    if selected in (None, ""):
+        selected = DEFAULT_EXECUTION_MODE
+    normalized = str(selected).strip().lower()
+    if (
+        runtime_mode not in (None, "")
+        and execution_mode not in (None, "")
+        and str(runtime_mode).strip().lower() != str(execution_mode).strip().lower()
+    ):
+        raise ValueError(
+            f"{RUNTIME_MODE_ENV_VAR} and {EXECUTION_MODE_ENV_VAR} disagree: "
+            f"{runtime_mode!r} != {execution_mode!r}"
+        )
+    return normalized
 
 
 def evaluate_live_readiness(config: ExecutionSafetyConfig) -> ReadinessResult:

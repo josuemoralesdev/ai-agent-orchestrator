@@ -34,6 +34,7 @@ from src.app.hammer_radar.operator import (
     load_outcomes,
     load_signals,
 )
+from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_CONFIGS, load_strategy_config
 from src.app.hammer_radar.signal_engine import attach_bias, compute_bias_direction, extract_signal
 
@@ -45,18 +46,21 @@ TREND_LOOKBACK_CANDLES = 3
 
 def run(sleep_seconds: float = 3.0) -> None:
     """Start the reader and continuously print new hammer signals."""
+    log_dir = get_log_dir(use_env=True)
     print("Hammer Radar started")
+    print(f"Hammer Radar archive_log_dir={log_dir}")
     reader = MarketReader()
-    execution_adapter = get_execution_adapter(get_execution_mode())
+    execution_adapter = get_execution_adapter(get_execution_mode(), log_dir=log_dir)
+    print(f"Hammer Radar execution_mode={execution_adapter.mode} paper_only=true")
     strategy_config = load_strategy_config()
-    historical_signals = load_signals()
+    historical_signals = load_signals(log_dir)
     seen_signal_keys = {
         (signal.timeframe, signal.timestamp, signal.direction)
         for signal in historical_signals
     }
-    historical_outcomes = load_outcomes()
-    evaluated_outcome_keys = load_evaluated_outcome_keys()
-    open_positions = {position.position_id: position for position in load_open_positions()}
+    historical_outcomes = load_outcomes(log_dir)
+    evaluated_outcome_keys = load_evaluated_outcome_keys(log_dir)
+    open_positions = {position.position_id: position for position in load_open_positions(log_dir)}
     recent_signals = deque(historical_signals[-RECENT_SIGNALS_LIMIT:], maxlen=RECENT_SIGNALS_LIMIT)
     pending_signals = {
         signal.signal_id: signal
@@ -106,7 +110,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                             ema_4h_frame=resampled_frames.get("4H"),
                             trend_lookback_candles=TREND_LOOKBACK_CANDLES,
                         )
-                        append_signal(signal_record)
+                        append_signal(signal_record, log_dir=log_dir)
                         recent_signals.append(signal_record)
                         historical_signals.append(signal_record)
                         if signal_record.timeframe in resampled_frames:
@@ -128,7 +132,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                         evaluated_outcome_keys=evaluated_outcome_keys,
                     )
                     for outcome in newly_evaluated:
-                        append_outcome(outcome)
+                        append_outcome(outcome, log_dir=log_dir)
                         historical_outcomes.append(outcome)
                         print(format_outcome_line(outcome))
 
@@ -136,6 +140,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                     closed_positions = evaluate_open_positions(
                         list(open_positions.values()),
                         latest_candles_by_timeframe=latest_candles_by_timeframe,
+                        log_dir=log_dir,
                     )
                     for position in closed_positions:
                         open_positions.pop(position.position_id, None)

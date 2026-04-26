@@ -158,6 +158,71 @@ class InspectCliTestCase(unittest.TestCase):
         self.assertIn(f"archive_log_dir: {alternate_dir}", output)
         self.assertIn("total_signals: 1", output)
 
+    def test_runtime_archive_path_resolves_from_env_without_mutating_other_archive(self) -> None:
+        runtime_dir = Path(self.temp_dir.name) / "runtime-output"
+        old_archive_dir = Path(self.temp_dir.name) / "old-archive"
+        archive.append_signal(self._build_signal(signal_id="old|1"), log_dir=old_archive_dir)
+
+        with patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(runtime_dir)}):
+            resolved = archive.get_log_dir(use_env=True)
+            output = inspect.build_summary_text()
+
+        self.assertEqual(runtime_dir, resolved)
+        self.assertIn(f"archive_log_dir: {runtime_dir}", output)
+        self.assertIn("total_signals: 0", output)
+        self.assertFalse(runtime_dir.exists())
+        self.assertTrue((old_archive_dir / "signals.ndjson").exists())
+
+    def test_r9_coverage_empty_archive(self) -> None:
+        empty_dir = Path(self.temp_dir.name) / "empty-r9"
+
+        output = inspect.build_r9_coverage_text(log_dir=empty_dir)
+
+        self.assertIn(f"archive_log_dir: {empty_dir}", output)
+        self.assertIn("total_signals: 0", output)
+        self.assertIn("signals_missing_r9_metadata: 0", output)
+        self.assertIn("r9_metadata_coverage_pct: 0.00%", output)
+        self.assertFalse(empty_dir.exists())
+
+    def test_r9_coverage_pre_r9_records_report_missing_metadata(self) -> None:
+        pre_r9_dir = Path(self.temp_dir.name) / "pre-r9"
+        archive.append_signal(self._build_signal(signal_id="pre-r9|1"), log_dir=pre_r9_dir)
+
+        output = inspect.build_r9_coverage_text(log_dir=pre_r9_dir)
+
+        self.assertIn("total_signals: 1", output)
+        self.assertIn("signals_with_rsi: 0", output)
+        self.assertIn("signals_with_divergence: 0", output)
+        self.assertIn("signals_with_trigger_fields: 0", output)
+        self.assertIn("signals_missing_r9_metadata: 1", output)
+        self.assertIn("r9_metadata_coverage_pct: 0.00%", output)
+
+    def test_r9_coverage_r9_aware_records_report_coverage(self) -> None:
+        r9_dir = Path(self.temp_dir.name) / "r9-aware"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="r9-aware|1",
+                rsi_value=21.5,
+                rsi_state="oversold",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+                extreme_trigger=True,
+                critical_trigger=True,
+                micro_scalp_candidate=True,
+                requires_human_approval=True,
+            ),
+            log_dir=r9_dir,
+        )
+
+        output = inspect.build_r9_coverage_text(log_dir=r9_dir)
+
+        self.assertIn("total_signals: 1", output)
+        self.assertIn("signals_with_rsi: 1", output)
+        self.assertIn("signals_with_divergence: 1", output)
+        self.assertIn("signals_with_trigger_fields: 1", output)
+        self.assertIn("signals_missing_r9_metadata: 0", output)
+        self.assertIn("r9_metadata_coverage_pct: 100.00%", output)
+
     def test_signals_view_includes_r9_metadata_when_present(self) -> None:
         archive.append_signal(
             self._build_signal(

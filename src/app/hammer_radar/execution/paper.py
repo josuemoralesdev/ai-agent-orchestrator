@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.app.hammer_radar.execution.base import AccountSnapshot, OrderResult
 from src.app.hammer_radar.operator.models import PaperPosition, SignalRecord
 from src.app.hammer_radar.operator.positions import (
@@ -18,6 +20,9 @@ class PaperExecutionAdapter:
     name = "paper"
     mode = "paper"
 
+    def __init__(self, log_dir: str | Path | None = None) -> None:
+        self.log_dir = log_dir
+
     def get_account_snapshot(self) -> AccountSnapshot:
         return AccountSnapshot(
             adapter_name=self.name,
@@ -31,7 +36,7 @@ class PaperExecutionAdapter:
         )
 
     def get_open_positions(self) -> list[PaperPosition]:
-        return load_open_positions()
+        return load_open_positions(self.log_dir)
 
     def place_order(self, signal: SignalRecord) -> OrderResult:
         strategy_config = load_strategy_config()
@@ -59,6 +64,7 @@ class PaperExecutionAdapter:
             signal,
             entry_mode=DEFAULT_ENTRY_MODE,
             size_usd=DEFAULT_POSITION_SIZE_USD,
+            log_dir=self.log_dir,
         )
         if position is None:
             return OrderResult(
@@ -93,6 +99,7 @@ class PaperExecutionAdapter:
             exit_price=exit_price,
             close_reason=close_reason,
             closed_at=closed_at,
+            log_dir=self.log_dir,
         )
         return OrderResult(
             adapter_name=self.name,

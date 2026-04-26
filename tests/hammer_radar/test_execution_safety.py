@@ -17,6 +17,7 @@ class ExecutionSafetyTestCase(unittest.TestCase):
         self.original_env = {
             key: os.environ.get(key)
             for key in (
+                "HAMMER_RADAR_MODE",
                 "HAMMER_RADAR_EXECUTION_MODE",
                 "HAMMER_RADAR_LIVE_TRADING_ENABLED",
                 "HAMMER_RADAR_MAX_RISK_USD",
@@ -52,6 +53,22 @@ class ExecutionSafetyTestCase(unittest.TestCase):
 
         self.assertEqual("READY_FOR_PAPER", readiness.verdict)
         self.assertEqual((), readiness.reasons)
+
+    def test_runtime_mode_paper_alias_selects_safe_paper_mode(self) -> None:
+        os.environ["HAMMER_RADAR_MODE"] = "paper"
+
+        config = load_execution_safety_config()
+        readiness = evaluate_live_readiness(config)
+
+        self.assertEqual("paper", config.execution_mode)
+        self.assertEqual("READY_FOR_PAPER", readiness.verdict)
+
+    def test_conflicting_runtime_and_execution_modes_fail_closed(self) -> None:
+        os.environ["HAMMER_RADAR_MODE"] = "paper"
+        os.environ["HAMMER_RADAR_EXECUTION_MODE"] = "binance_stub"
+
+        with self.assertRaises(ValueError):
+            load_execution_safety_config()
 
     def test_binance_stub_readiness_is_stub_only(self) -> None:
         os.environ["HAMMER_RADAR_EXECUTION_MODE"] = "binance_stub"

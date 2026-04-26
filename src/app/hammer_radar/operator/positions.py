@@ -49,11 +49,12 @@ def create_paper_position(
     *,
     entry_mode: str = DEFAULT_ENTRY_MODE,
     size_usd: float = DEFAULT_POSITION_SIZE_USD,
+    log_dir: str | Path | None = None,
 ) -> PaperPosition | None:
     if not signal.tradable:
         return None
 
-    existing = load_positions_by_signal_entry().get((signal.signal_id, entry_mode))
+    existing = load_positions_by_signal_entry(log_dir).get((signal.signal_id, entry_mode))
     if existing is not None:
         return None
 
@@ -72,7 +73,7 @@ def create_paper_position(
         opened_at=signal.timestamp,
         opened_candle_timestamp=signal.timestamp,
     )
-    append_position(position)
+    append_position(position, log_dir=log_dir)
     append_position_event(
         PositionEvent(
             event_id=_build_event_id(position.position_id, "open", position.opened_at),
@@ -87,7 +88,8 @@ def create_paper_position(
                 "stop_price": position.stop_price,
                 "take_profit_price": position.take_profit_price,
             },
-        )
+        ),
+        log_dir=log_dir,
     )
     return position
 
@@ -98,6 +100,7 @@ def close_position(
     exit_price: float,
     close_reason: str,
     closed_at: str,
+    log_dir: str | Path | None = None,
 ) -> PaperPosition:
     closed_position = PaperPosition(
         position_id=position.position_id,
@@ -126,7 +129,7 @@ def close_position(
         ),
         close_reason=close_reason,
     )
-    append_position(closed_position)
+    append_position(closed_position, log_dir=log_dir)
     append_position_event(
         PositionEvent(
             event_id=_build_event_id(position.position_id, "close", closed_at),
@@ -140,7 +143,8 @@ def close_position(
                 "pnl_pct": closed_position.pnl_pct,
                 "pnl_usd": closed_position.pnl_usd,
             },
-        )
+        ),
+        log_dir=log_dir,
     )
     return closed_position
 
@@ -151,12 +155,14 @@ def close_paper_position(
     exit_price: float,
     close_reason: str,
     closed_at: str,
+    log_dir: str | Path | None = None,
 ) -> PaperPosition:
     return close_position(
         position,
         exit_price=exit_price,
         close_reason=close_reason,
         closed_at=closed_at,
+        log_dir=log_dir,
     )
 
 
@@ -186,17 +192,18 @@ def load_position_events(log_dir: str | Path | None = None) -> list[PositionEven
     return _load_records(get_position_events_path(log_dir), PositionEvent.from_dict)
 
 
-def append_position(position: PaperPosition) -> None:
-    _append_record(POSITIONS_PATH, position.to_dict())
+def append_position(position: PaperPosition, log_dir: str | Path | None = None) -> None:
+    _append_record(get_positions_path(log_dir), position.to_dict())
 
 
-def append_position_event(event: PositionEvent) -> None:
-    _append_record(POSITION_EVENTS_PATH, event.to_dict())
+def append_position_event(event: PositionEvent, log_dir: str | Path | None = None) -> None:
+    _append_record(get_position_events_path(log_dir), event.to_dict())
 
 
 def evaluate_open_positions(
     open_positions: list[PaperPosition],
     latest_candles_by_timeframe: dict[str, dict[str, Any]],
+    log_dir: str | Path | None = None,
 ) -> list[PaperPosition]:
     strategy_config = load_strategy_config()
     closed_positions: list[PaperPosition] = []
@@ -226,6 +233,7 @@ def evaluate_open_positions(
                     exit_price=position.stop_price,
                     close_reason="stop",
                     closed_at=candle_timestamp,
+                    log_dir=log_dir,
                 )
             )
             continue
@@ -236,6 +244,7 @@ def evaluate_open_positions(
                     exit_price=position.take_profit_price,
                     close_reason="take_profit",
                     closed_at=candle_timestamp,
+                    log_dir=log_dir,
                 )
             )
             continue
@@ -246,6 +255,7 @@ def evaluate_open_positions(
                     exit_price=float(candle["close"]),
                     close_reason="max_hold",
                     closed_at=candle_timestamp,
+                    log_dir=log_dir,
                 )
             )
 

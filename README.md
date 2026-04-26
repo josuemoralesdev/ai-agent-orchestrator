@@ -399,6 +399,16 @@ tail -n 5 logs/hammer_radar/position_events.ndjson
 
 Paper execution is paper-only in this phase. Paper positions are stored in `logs/hammer_radar/positions.ndjson`, lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`, and no live Binance trading exists yet.
 
+Safe forward paper evidence can be captured into a separate archive directory without touching the default or historical archives:
+
+```bash
+HAMMER_RADAR_LOG_DIR=/tmp/hammer_radar_forward \
+HAMMER_RADAR_MODE=paper \
+timeout 60s .venv/bin/python -m src.app.hammer_radar.main
+```
+
+`HAMMER_RADAR_MODE=paper` is an alias for the safe paper execution mode. The runtime prints the selected `archive_log_dir` and `execution_mode`, uses the paper adapter only, and writes signal/outcome/paper NDJSON files to `HAMMER_RADAR_LOG_DIR` when provided.
+
 Inspection commands:
 
 ```bash
@@ -408,6 +418,7 @@ Inspection commands:
 .venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status open
 .venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status closed
 .venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
+.venv/bin/python -m src.app.hammer_radar.operator.inspect r9-coverage
 ```
 
 Execution adapters now exist under `src.app.hammer_radar.execution`. The current execution mode defaults to `paper`, the `binance_stub` adapter is only a non-trading boundary for future work, and no live Binance trading or real order placement exists yet.
