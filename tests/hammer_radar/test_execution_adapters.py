@@ -19,6 +19,7 @@ class ExecutionAdapterBoundaryTestCase(unittest.TestCase):
         self.original_positions_path = positions.POSITIONS_PATH
         self.original_position_events_path = positions.POSITION_EVENTS_PATH
         self.original_execution_mode = os.environ.get("HAMMER_RADAR_EXECUTION_MODE")
+        self.original_runtime_mode = os.environ.get("HAMMER_RADAR_MODE")
         positions.LOG_DIR = Path(self.temp_dir.name)
         positions.POSITIONS_PATH = positions.LOG_DIR / "positions.ndjson"
         positions.POSITION_EVENTS_PATH = positions.LOG_DIR / "position_events.ndjson"
@@ -31,6 +32,10 @@ class ExecutionAdapterBoundaryTestCase(unittest.TestCase):
             os.environ.pop("HAMMER_RADAR_EXECUTION_MODE", None)
         else:
             os.environ["HAMMER_RADAR_EXECUTION_MODE"] = self.original_execution_mode
+        if self.original_runtime_mode is None:
+            os.environ.pop("HAMMER_RADAR_MODE", None)
+        else:
+            os.environ["HAMMER_RADAR_MODE"] = self.original_runtime_mode
         self.temp_dir.cleanup()
 
     def test_paper_adapter_loads_safely_and_opens_local_position(self) -> None:
@@ -50,6 +55,25 @@ class ExecutionAdapterBoundaryTestCase(unittest.TestCase):
         self.assertIsInstance(adapter, BinanceStubAdapter)
         with self.assertRaises(NotImplementedError):
             adapter.place_order(self._build_signal())
+
+    def test_safe_runtime_mode_selects_paper_adapter_only(self) -> None:
+        os.environ["HAMMER_RADAR_MODE"] = "paper"
+
+        adapter = get_execution_adapter(get_execution_mode())
+
+        self.assertIsInstance(adapter, PaperExecutionAdapter)
+        self.assertEqual("paper", adapter.mode)
+
+    def test_paper_adapter_writes_positions_to_explicit_log_dir(self) -> None:
+        explicit_log_dir = Path(self.temp_dir.name) / "explicit"
+        adapter = get_execution_adapter("paper", log_dir=explicit_log_dir)
+
+        result = adapter.place_order(self._build_signal())
+
+        self.assertTrue(result.accepted)
+        self.assertTrue((explicit_log_dir / "positions.ndjson").exists())
+        self.assertTrue((explicit_log_dir / "position_events.ndjson").exists())
+        self.assertFalse((positions.LOG_DIR / "positions.ndjson").exists())
 
     def test_unknown_execution_mode_fails_closed(self) -> None:
         os.environ["HAMMER_RADAR_EXECUTION_MODE"] = "definitely_not_valid"

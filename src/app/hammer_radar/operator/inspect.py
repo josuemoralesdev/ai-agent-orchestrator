@@ -110,6 +110,43 @@ def build_events_text(limit: int, log_dir: str | Path | None = None) -> str:
     return _format_rows("HAMMER RADAR EVENTS", rows, limit=limit)
 
 
+def build_r9_coverage_text(log_dir: str | Path | None = None) -> str:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    signals = load_signals(resolved_log_dir)
+    total = len(signals)
+    with_rsi = sum(1 for signal in signals if signal.rsi_value is not None or signal.rsi_state is not None)
+    with_divergence = sum(
+        1
+        for signal in signals
+        if signal.divergence_type is not None or signal.divergence_confirmed
+    )
+    with_triggers = sum(
+        1
+        for signal in signals
+        if signal.extreme_trigger
+        or signal.critical_trigger
+        or signal.micro_scalp_candidate
+        or signal.requires_human_approval
+    )
+    with_any_r9 = sum(1 for signal in signals if _has_any_r9_metadata(signal))
+    missing_r9 = total - with_any_r9
+    coverage_pct = (with_any_r9 / total) * 100.0 if total else 0.0
+    last_signal_timestamp = signals[-1].timestamp if signals else "n/a"
+
+    lines = [
+        "HAMMER RADAR R9 COVERAGE",
+        f"archive_log_dir: {resolved_log_dir}",
+        f"total_signals: {total}",
+        f"signals_with_rsi: {with_rsi}",
+        f"signals_with_divergence: {with_divergence}",
+        f"signals_with_trigger_fields: {with_triggers}",
+        f"signals_missing_r9_metadata: {missing_r9}",
+        f"r9_metadata_coverage_pct: {coverage_pct:.2f}%",
+        f"last_signal_timestamp: {last_signal_timestamp}",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -124,6 +161,8 @@ def main() -> int:
         print(build_positions_text(status=args.status, log_dir=args.log_dir))
     elif args.command == "events":
         print(build_events_text(limit=args.limit, log_dir=args.log_dir))
+    elif args.command == "r9-coverage":
+        print(build_r9_coverage_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -154,7 +193,24 @@ def _build_parser() -> argparse.ArgumentParser:
     events_parser = subparsers.add_parser("events", parents=[parent])
     events_parser.add_argument("--limit", type=int, default=20)
 
+    subparsers.add_parser("r9-coverage", parents=[parent])
+
     return parser
+
+
+def _has_any_r9_metadata(signal: object) -> bool:
+    return any(
+        [
+            getattr(signal, "rsi_value", None) is not None,
+            getattr(signal, "rsi_state", None) is not None,
+            getattr(signal, "divergence_type", None) is not None,
+            bool(getattr(signal, "divergence_confirmed", False)),
+            bool(getattr(signal, "extreme_trigger", False)),
+            bool(getattr(signal, "critical_trigger", False)),
+            bool(getattr(signal, "micro_scalp_candidate", False)),
+            bool(getattr(signal, "requires_human_approval", False)),
+        ]
+    )
 
 
 def _format_r9_metadata(signal: object) -> str:

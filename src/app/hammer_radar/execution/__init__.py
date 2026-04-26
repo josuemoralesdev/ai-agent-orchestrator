@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.app.hammer_radar.execution.base import AccountSnapshot, ExecutionAdapter, OrderResult
 from src.app.hammer_radar.execution.binance_stub import BinanceStubAdapter
 from src.app.hammer_radar.execution.paper import PaperExecutionAdapter
@@ -17,10 +19,10 @@ def get_execution_mode() -> str:
     return load_execution_safety_config().execution_mode
 
 
-def get_execution_adapter(mode: str | None = None) -> ExecutionAdapter:
+def get_execution_adapter(mode: str | None = None, *, log_dir: str | Path | None = None) -> ExecutionAdapter:
     selected_mode = DEFAULT_EXECUTION_MODE if mode is None else mode.strip().lower()
     if selected_mode == "paper":
-        return PaperExecutionAdapter()
+        return PaperExecutionAdapter(log_dir=log_dir)
     if selected_mode == "binance_stub":
         return BinanceStubAdapter()
     raise ValueError(
