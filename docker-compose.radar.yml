@@ -1,0 +1,10 @@
+services:
+  hammer-radar:
+    build:
+      context: .
+      dockerfile: Dockerfile.radar
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./logs:/app/logs

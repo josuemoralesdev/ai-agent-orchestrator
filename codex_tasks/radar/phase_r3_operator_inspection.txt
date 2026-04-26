@@ -1,0 +1,92 @@
+# Radar Phase R3 — Operator Inspection
+
+## Goal
+
+Add simple local operator inspection commands/views for Hammer Radar so the user can quickly see scanner, signal, outcome, and paper position state without digging through NDJSON manually.
+
+## Non-Goals
+
+Do not:
+- add live Binance trading
+- add Binance API keys
+- add public internet exposure
+- add authentication
+- add a React dashboard
+- replace NDJSON storage
+- alter strategy logic
+- alter paper execution rules
+
+## Required Deliverables
+
+Add a CLI-style inspection module:
+
+src/app/hammer_radar/operator/inspect.py
+
+It must support commands similar to:
+
+python -m src.app.hammer_radar.operator.inspect summary
+python -m src.app.hammer_radar.operator.inspect signals --limit 10
+python -m src.app.hammer_radar.operator.inspect outcomes --limit 10
+python -m src.app.hammer_radar.operator.inspect positions --status open
+python -m src.app.hammer_radar.operator.inspect positions --status closed
+python -m src.app.hammer_radar.operator.inspect events --limit 20
+
+## Output Requirements
+
+Keep output human-readable and compact.
+
+Summary should include:
+- total signals
+- tradable signals
+- total outcomes
+- total paper positions
+- open paper positions
+- closed paper positions
+- total closed PnL USD
+- total closed PnL %
+- last signal timestamp if available
+- last position event timestamp if available
+
+Positions view should show:
+- position_id
+- symbol
+- timeframe
+- direction
+- entry_mode
+- entry_price
+- stop_price
+- size_usd
+- status
+- pnl_usd if closed
+- close_reason if closed
+
+## Docs
+
+Update README.md or docs/hammer_radar_docker.md with the inspection commands.
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+
+Also run at least:
+
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+.venv/bin/python -m src.app.hammer_radar.operator.inspect signals --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status open
+
+Docker build must still pass:
+
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+## Expected Final Response
+
+Report:
+- files changed
+- commands added
+- validation output
+- whether existing scanner and paper execution remained unchanged
+
+Do not commit, merge, or tag.

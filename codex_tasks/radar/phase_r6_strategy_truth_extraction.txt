@@ -1,0 +1,129 @@
+# Radar Phase R6 — Strategy Truth Extraction
+
+## Goal
+
+Add strategy truth/reporting tools so Hammer Radar can identify which combinations of timeframe, direction, bias, strength band, trend, EMA band, and entry mode are actually performing best.
+
+This phase turns logged signals/outcomes/paper positions into decision-grade reports.
+
+## Current Context
+
+R1 dockerized the scanner.
+R2 added paper position ledger.
+R3 added operator inspection CLI.
+R4 added execution adapter boundary.
+R5 added live-readiness guardrails.
+
+Current safety verdict remains paper-only / no live trading.
+
+## Non-Goals
+
+Do not:
+- add Binance keys
+- add live trading
+- place real orders
+- add leverage
+- add take-profit logic
+- expose public APIs
+- add dashboards
+- replace NDJSON storage
+- change strategy logic
+- change paper execution behavior
+
+## Required Deliverables
+
+Create:
+
+src/app/hammer_radar/operator/truth.py
+
+Add CLI commands, either in existing inspect.py or a new module:
+
+python -m src.app.hammer_radar.operator.truth summary
+python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
+python -m src.app.hammer_radar.operator.truth by-entry-mode
+python -m src.app.hammer_radar.operator.truth by-timeframe
+python -m src.app.hammer_radar.operator.truth tradable-only
+
+## Report Requirements
+
+Use existing signals.ndjson and outcomes.ndjson.
+
+Reports should include:
+- samples
+- fills
+- fill rate
+- wins
+- losses
+- stops
+- win rate on filled
+- average pnl pct
+- average mae pct
+- average mfe pct
+
+Group by meaningful strategy dimensions:
+- timeframe
+- direction
+- bias aligned
+- strength band
+- trend direction
+- trend strength band
+- price vs EMA band
+- entry mode
+
+## Ranking Rules
+
+top-setups should sort by:
+1. minimum sample threshold
+2. win rate
+3. average pnl pct
+4. sample count
+
+weak-setups should sort by:
+1. minimum sample threshold
+2. lowest average pnl pct
+3. lowest win rate
+
+Default minimum samples: 3
+Allow --min-samples override.
+
+## Output
+
+Compact human-readable table text.
+
+Do not require pandas.
+
+## Tests
+
+Add focused tests for:
+- grouping and summary calculations
+- top setup ranking
+- weak setup ranking
+- min sample filtering
+- CLI smoke behavior if practical
+
+## Docs
+
+Update README.md or docs/hammer_radar_docker.md with truth commands.
+
+## Validation
+
+Run:
+
+.venv/bin/python -m compileall src/app/hammer_radar
+.venv/bin/python -m unittest discover -s tests/hammer_radar -p 'test_*.py'
+.venv/bin/python -m src.app.hammer_radar.operator.truth summary
+.venv/bin/python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
+docker compose -f docker-compose.radar.yml build hammer-radar
+
+## Expected Final Response
+
+Report:
+- files changed
+- truth reports added
+- validation results
+- any early observations from current logs
+- confirmation that live trading remains impossible
+
+Do not commit, merge, or tag.

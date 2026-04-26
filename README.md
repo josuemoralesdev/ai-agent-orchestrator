@@ -359,6 +359,87 @@ For setup instructions and example API usage, see:
 
 ---
 
+## Hammer Radar Docker
+
+Hammer Radar can also run in Docker without replacing the existing direct Python and systemd workflow used in this repo.
+
+Build and run:
+
+```bash
+docker compose -f docker-compose.radar.yml up --build
+```
+
+Detached run:
+
+```bash
+docker compose -f docker-compose.radar.yml up -d --build
+```
+
+Logs:
+
+```bash
+docker compose -f docker-compose.radar.yml logs -f hammer-radar
+```
+
+Stop:
+
+```bash
+docker compose -f docker-compose.radar.yml down
+```
+
+Persisted NDJSON files:
+
+```bash
+ls -lah logs/hammer_radar
+tail -n 5 logs/hammer_radar/signals.ndjson
+tail -n 5 logs/hammer_radar/outcomes.ndjson
+tail -n 5 logs/hammer_radar/positions.ndjson
+tail -n 5 logs/hammer_radar/position_events.ndjson
+```
+
+Paper execution is paper-only in this phase. Paper positions are stored in `logs/hammer_radar/positions.ndjson`, lifecycle events are stored in `logs/hammer_radar/position_events.ndjson`, and no live Binance trading exists yet.
+
+Inspection commands:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.inspect summary
+.venv/bin/python -m src.app.hammer_radar.operator.inspect signals --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect outcomes --limit 5
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status open
+.venv/bin/python -m src.app.hammer_radar.operator.inspect positions --status closed
+.venv/bin/python -m src.app.hammer_radar.operator.inspect events --limit 20
+```
+
+Execution adapters now exist under `src.app.hammer_radar.execution`. The current execution mode defaults to `paper`, the `binance_stub` adapter is only a non-trading boundary for future work, and no live Binance trading or real order placement exists yet.
+
+Safety/readiness check:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.execution.safety check
+```
+
+Live trading is still disabled. Supported execution modes remain `paper` and `binance_stub`, and any future Binance live integration requires a separate approval phase.
+
+Truth commands:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.truth summary
+.venv/bin/python -m src.app.hammer_radar.operator.truth top-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth weak-setups --limit 10
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-entry-mode
+.venv/bin/python -m src.app.hammer_radar.operator.truth by-timeframe
+.venv/bin/python -m src.app.hammer_radar.operator.truth strategy-eligible
+.venv/bin/python -m src.app.hammer_radar.operator.truth tradable-only
+```
+
+Supported strategy timeframes are `13m`, `55m`, `666m`, `4H`, `13H`, and `13D`. Strategy filtering is config-driven via `src.app.hammer_radar.operator.strategy_config`, defaults remain conservative, and the system is still paper-only.
+
+Paper exit rules now support stop-loss, take-profit by R multiple, and max-hold candles. Conservative same-candle behavior is stop-first if both stop and TP are touched, and all of this remains paper-only.
+
+Additional Docker notes for Hammer Radar are in [docs/hammer_radar_docker.md](./docs/hammer_radar_docker.md).
+
+---
+
 ## License
 
 MIT
