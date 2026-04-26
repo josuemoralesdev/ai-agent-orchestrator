@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from src.app.hammer_radar.operator.models import PaperPosition, PositionEvent, SignalRecord
+from src.app.hammer_radar.operator.paths import DEFAULT_LOG_DIR, resolve_log_dir
 from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_MINUTES, load_strategy_config
 
-ROOT_DIR = Path(__file__).resolve().parents[4]
-LOG_DIR = ROOT_DIR / "logs" / "hammer_radar"
+LOG_DIR = DEFAULT_LOG_DIR
 POSITIONS_PATH = LOG_DIR / "positions.ndjson"
 POSITION_EVENTS_PATH = LOG_DIR / "position_events.ndjson"
 
@@ -18,6 +18,30 @@ DEFAULT_ENTRY_MODE = "fib_618"
 DEFAULT_POSITION_SIZE_USD = 100.0
 
 RecordT = TypeVar("RecordT", PaperPosition, PositionEvent)
+
+
+def get_log_dir(log_dir: str | Path | None = None, *, use_env: bool = False) -> Path:
+    if log_dir is None and not use_env:
+        return LOG_DIR
+    return resolve_log_dir(log_dir, default=LOG_DIR)
+
+
+def get_positions_path(log_dir: str | Path | None = None) -> Path:
+    if log_dir is None:
+        resolved_log_dir = get_log_dir()
+        if resolved_log_dir == LOG_DIR:
+            return POSITIONS_PATH
+        return resolved_log_dir / "positions.ndjson"
+    return get_log_dir(log_dir) / "positions.ndjson"
+
+
+def get_position_events_path(log_dir: str | Path | None = None) -> Path:
+    if log_dir is None:
+        resolved_log_dir = get_log_dir()
+        if resolved_log_dir == LOG_DIR:
+            return POSITION_EVENTS_PATH
+        return resolved_log_dir / "position_events.ndjson"
+    return get_log_dir(log_dir) / "position_events.ndjson"
 
 
 def create_paper_position(
@@ -136,30 +160,30 @@ def close_paper_position(
     )
 
 
-def load_positions_by_signal_entry() -> dict[tuple[str, str], PaperPosition]:
+def load_positions_by_signal_entry(log_dir: str | Path | None = None) -> dict[tuple[str, str], PaperPosition]:
     return {
         (position.signal_id, position.entry_mode): position
-        for position in load_positions()
+        for position in load_positions(log_dir)
     }
 
 
-def load_positions() -> list[PaperPosition]:
+def load_positions(log_dir: str | Path | None = None) -> list[PaperPosition]:
     positions_by_id: dict[str, PaperPosition] = {}
-    for position in _load_records(POSITIONS_PATH, PaperPosition.from_dict):
+    for position in _load_records(get_positions_path(log_dir), PaperPosition.from_dict):
         positions_by_id[position.position_id] = position
     return list(positions_by_id.values())
 
 
-def load_open_positions() -> list[PaperPosition]:
-    return [position for position in load_positions() if position.status == "open"]
+def load_open_positions(log_dir: str | Path | None = None) -> list[PaperPosition]:
+    return [position for position in load_positions(log_dir) if position.status == "open"]
 
 
-def load_closed_positions() -> list[PaperPosition]:
-    return [position for position in load_positions() if position.status == "closed"]
+def load_closed_positions(log_dir: str | Path | None = None) -> list[PaperPosition]:
+    return [position for position in load_positions(log_dir) if position.status == "closed"]
 
 
-def load_position_events() -> list[PositionEvent]:
-    return _load_records(POSITION_EVENTS_PATH, PositionEvent.from_dict)
+def load_position_events(log_dir: str | Path | None = None) -> list[PositionEvent]:
+    return _load_records(get_position_events_path(log_dir), PositionEvent.from_dict)
 
 
 def append_position(position: PaperPosition) -> None:
@@ -229,7 +253,7 @@ def evaluate_open_positions(
 
 
 def _append_record(path: Path, payload: dict[str, Any]) -> None:
-    _ensure_log_dir()
+    _ensure_log_dir(path.parent)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
@@ -248,8 +272,8 @@ def _load_records(path: Path, factory: Callable[[dict[str, Any]], RecordT]) -> l
     return records
 
 
-def _ensure_log_dir() -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+def _ensure_log_dir(log_dir: Path = LOG_DIR) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _build_position_id(signal_id: str, entry_mode: str) -> str:

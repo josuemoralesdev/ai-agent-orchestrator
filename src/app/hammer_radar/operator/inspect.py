@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
-from src.app.hammer_radar.operator.archive import load_outcomes, load_signals
+from src.app.hammer_radar.operator.archive import get_log_dir, load_outcomes, load_signals
 from src.app.hammer_radar.operator.positions import (
     load_closed_positions,
     load_open_positions,
@@ -13,13 +14,14 @@ from src.app.hammer_radar.operator.positions import (
 )
 
 
-def build_summary_text() -> str:
-    signals = load_signals()
-    outcomes = load_outcomes()
-    positions = load_positions()
+def build_summary_text(log_dir: str | Path | None = None) -> str:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    signals = load_signals(resolved_log_dir)
+    outcomes = load_outcomes(resolved_log_dir)
+    positions = load_positions(resolved_log_dir)
     open_positions = [position for position in positions if position.status == "open"]
     closed_positions = [position for position in positions if position.status == "closed"]
-    events = load_position_events()
+    events = load_position_events(resolved_log_dir)
     closed_pnl_usd = round(sum(position.pnl_usd or 0.0 for position in closed_positions), 4)
     closed_pnl_pct = round(sum(position.pnl_pct or 0.0 for position in closed_positions), 4)
     last_signal_timestamp = signals[-1].timestamp if signals else "n/a"
@@ -27,6 +29,7 @@ def build_summary_text() -> str:
 
     lines = [
         "HAMMER RADAR SUMMARY",
+        f"archive_log_dir: {resolved_log_dir}",
         f"total_signals: {len(signals)}",
         f"tradable_signals: {sum(1 for signal in signals if signal.tradable)}",
         f"total_outcomes: {len(outcomes)}",
@@ -41,21 +44,22 @@ def build_summary_text() -> str:
     return "\n".join(lines)
 
 
-def build_signals_text(limit: int) -> str:
-    signals = load_signals()
+def build_signals_text(limit: int, log_dir: str | Path | None = None) -> str:
+    signals = load_signals(get_log_dir(log_dir, use_env=True))
     rows = [
         (
             signal.timestamp,
             f"{signal.signal_id} | {signal.symbol} | {signal.timeframe} | {signal.direction.upper()} | "
             f"tradable={'Y' if signal.tradable else 'N'} | entry={signal.fib_618:.2f} | stop={signal.invalidation:.2f}"
+            f"{_format_r9_metadata(signal)}"
         )
         for signal in signals
     ]
     return _format_rows("HAMMER RADAR SIGNALS", rows, limit=limit)
 
 
-def build_outcomes_text(limit: int) -> str:
-    outcomes = load_outcomes()
+def build_outcomes_text(limit: int, log_dir: str | Path | None = None) -> str:
+    outcomes = load_outcomes(get_log_dir(log_dir, use_env=True))
     rows = [
         (
             outcome.evaluated_at,
@@ -67,13 +71,14 @@ def build_outcomes_text(limit: int) -> str:
     return _format_rows("HAMMER RADAR OUTCOMES", rows, limit=limit)
 
 
-def build_positions_text(status: str) -> str:
+def build_positions_text(status: str, log_dir: str | Path | None = None) -> str:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
     if status == "open":
-        positions = load_open_positions()
+        positions = load_open_positions(resolved_log_dir)
     elif status == "closed":
-        positions = load_closed_positions()
+        positions = load_closed_positions(resolved_log_dir)
     else:
-        positions = load_positions()
+        positions = load_positions(resolved_log_dir)
 
     rows: list[tuple[str, str]] = []
     for position in positions:
@@ -93,8 +98,8 @@ def build_positions_text(status: str) -> str:
     return _format_rows(f"HAMMER RADAR POSITIONS [{status}]", rows, limit=None)
 
 
-def build_events_text(limit: int) -> str:
-    events = load_position_events()
+def build_events_text(limit: int, log_dir: str | Path | None = None) -> str:
+    events = load_position_events(get_log_dir(log_dir, use_env=True))
     rows = [
         (
             event.timestamp,
@@ -110,15 +115,15 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "summary":
-        print(build_summary_text())
+        print(build_summary_text(log_dir=args.log_dir))
     elif args.command == "signals":
-        print(build_signals_text(limit=args.limit))
+        print(build_signals_text(limit=args.limit, log_dir=args.log_dir))
     elif args.command == "outcomes":
-        print(build_outcomes_text(limit=args.limit))
+        print(build_outcomes_text(limit=args.limit, log_dir=args.log_dir))
     elif args.command == "positions":
-        print(build_positions_text(status=args.status))
+        print(build_positions_text(status=args.status, log_dir=args.log_dir))
     elif args.command == "events":
-        print(build_events_text(limit=args.limit))
+        print(build_events_text(limit=args.limit, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -126,23 +131,48 @@ def main() -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m src.app.hammer_radar.operator.inspect")
+    parser.add_argument("--log-dir", default=None, help="Read Hammer Radar NDJSON files from this directory.")
+    parent = argparse.ArgumentParser(add_help=False)
+    parent.add_argument(
+        "--log-dir",
+        default=argparse.SUPPRESS,
+        help="Read Hammer Radar NDJSON files from this directory.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("summary")
+    subparsers.add_parser("summary", parents=[parent])
 
-    signals_parser = subparsers.add_parser("signals")
+    signals_parser = subparsers.add_parser("signals", parents=[parent])
     signals_parser.add_argument("--limit", type=int, default=10)
 
-    outcomes_parser = subparsers.add_parser("outcomes")
+    outcomes_parser = subparsers.add_parser("outcomes", parents=[parent])
     outcomes_parser.add_argument("--limit", type=int, default=10)
 
-    positions_parser = subparsers.add_parser("positions")
+    positions_parser = subparsers.add_parser("positions", parents=[parent])
     positions_parser.add_argument("--status", choices=("open", "closed", "all"), default="all")
 
-    events_parser = subparsers.add_parser("events")
+    events_parser = subparsers.add_parser("events", parents=[parent])
     events_parser.add_argument("--limit", type=int, default=20)
 
     return parser
+
+
+def _format_r9_metadata(signal: object) -> str:
+    rsi_value = getattr(signal, "rsi_value", None)
+    rsi_text = "missing" if rsi_value is None else f"{float(rsi_value):.2f}"
+    rsi_state = getattr(signal, "rsi_state", None) or "missing"
+    divergence_type = getattr(signal, "divergence_type", None) or "missing"
+    divergence_confirmed = "Y" if getattr(signal, "divergence_confirmed", False) else "N"
+    extreme_trigger = "Y" if getattr(signal, "extreme_trigger", False) else "N"
+    critical_trigger = "Y" if getattr(signal, "critical_trigger", False) else "N"
+    micro_scalp_candidate = "Y" if getattr(signal, "micro_scalp_candidate", False) else "N"
+    requires_human_approval = "Y" if getattr(signal, "requires_human_approval", False) else "N"
+    return (
+        f" | rsi={rsi_text} | rsi_state={rsi_state} | div={divergence_type}"
+        f" | div_confirmed={divergence_confirmed} | extreme={extreme_trigger}"
+        f" | critical={critical_trigger} | micro_scalp={micro_scalp_candidate}"
+        f" | human_approval={requires_human_approval}"
+    )
 
 
 def _format_rows(title: str, rows: list[tuple[str, str]], *, limit: int | None) -> str:

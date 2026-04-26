@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.app.hammer_radar.operator import archive, truth, positions
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
+from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
 
 class TruthReportTestCase(unittest.TestCase):
@@ -98,6 +100,119 @@ class TruthReportTestCase(unittest.TestCase):
         self.assertIn("fib_618", output)
         self.assertIn("market_close", output)
 
+    def test_truth_reads_alternate_log_dir_fixture(self) -> None:
+        alternate_dir = Path(self.temp_dir.name) / "truth-alternate"
+        self._seed_setup(
+            signal_id_prefix="alternate",
+            direction="long",
+            timeframe="13m",
+            entry_mode="fib_618",
+            pnl_values=(1.0,),
+            trend_direction="bullish",
+            trend_strength_score=0.6,
+            price_vs_ema_4h_pct=0.7,
+            log_dir=alternate_dir,
+        )
+
+        output = truth.build_truth_summary_text(log_dir=alternate_dir)
+
+        self.assertIn("signals: 1", output)
+        self.assertIn("outcomes: 1", output)
+        self.assertIn("samples: 1", output)
+
+    def test_truth_env_log_dir_override_reads_alternate_fixture(self) -> None:
+        alternate_dir = Path(self.temp_dir.name) / "truth-env-alternate"
+        self._seed_setup(
+            signal_id_prefix="env-alternate",
+            direction="long",
+            timeframe="13m",
+            entry_mode="fib_618",
+            pnl_values=(1.0,),
+            trend_direction="bullish",
+            trend_strength_score=0.6,
+            price_vs_ema_4h_pct=0.7,
+            log_dir=alternate_dir,
+        )
+
+        with patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(alternate_dir)}):
+            output = truth.build_truth_summary_text()
+
+        self.assertIn("signals: 1", output)
+        self.assertIn("outcomes: 1", output)
+
+    def test_missing_r9_metadata_does_not_crash_group_reports(self) -> None:
+        rsi_output = truth.build_rsi_state_truth_text()
+        divergence_output = truth.build_divergence_truth_text()
+        trigger_output = truth.build_trigger_truth_text()
+
+        self.assertIn("missing", rsi_output)
+        self.assertIn("missing", divergence_output)
+        self.assertIn("missing", trigger_output)
+
+    def test_grouping_by_rsi_state_works(self) -> None:
+        self._seed_setup(
+            signal_id_prefix="rsi-oversold",
+            direction="long",
+            timeframe="13m",
+            entry_mode="fib_618",
+            pnl_values=(2.0, -1.0),
+            trend_direction="bullish",
+            trend_strength_score=0.6,
+            price_vs_ema_4h_pct=0.7,
+            rsi_value=24.0,
+            rsi_state="oversold",
+        )
+
+        output = truth.build_rsi_state_truth_text()
+
+        self.assertIn("HAMMER RADAR TRUTH BY RSI_STATE", output)
+        self.assertIn("oversold", output)
+        self.assertIn("samples=2", output)
+
+    def test_grouping_by_divergence_works(self) -> None:
+        self._seed_setup(
+            signal_id_prefix="div-bull",
+            direction="long",
+            timeframe="13m",
+            entry_mode="fib_618",
+            pnl_values=(2.0,),
+            trend_direction="bullish",
+            trend_strength_score=0.6,
+            price_vs_ema_4h_pct=0.7,
+            rsi_value=28.0,
+            rsi_state="oversold",
+            divergence_type="bullish",
+            divergence_confirmed=True,
+        )
+
+        output = truth.build_divergence_truth_text()
+
+        self.assertIn("HAMMER RADAR TRUTH BY DIVERGENCE", output)
+        self.assertIn("type=bullish confirmed=Y", output)
+
+    def test_grouping_by_trigger_flags_works(self) -> None:
+        self._seed_setup(
+            signal_id_prefix="trigger-extreme",
+            direction="long",
+            timeframe="13m",
+            entry_mode="fib_618",
+            pnl_values=(2.0,),
+            trend_direction="bullish",
+            trend_strength_score=0.6,
+            price_vs_ema_4h_pct=0.7,
+            rsi_value=18.0,
+            rsi_state="extreme_oversold",
+            extreme_trigger=True,
+            critical_trigger=True,
+            micro_scalp_candidate=True,
+            requires_human_approval=True,
+        )
+
+        output = truth.build_trigger_truth_text()
+
+        self.assertIn("HAMMER RADAR TRUTH BY TRIGGER", output)
+        self.assertIn("extreme=Y critical=Y micro_scalp=Y human_approval=Y", output)
+
     def test_strategy_eligible_smoke(self) -> None:
         output = truth.build_strategy_eligible_text(limit=10, min_samples=3)
 
@@ -153,6 +268,15 @@ class TruthReportTestCase(unittest.TestCase):
         trend_direction: str,
         trend_strength_score: float,
         price_vs_ema_4h_pct: float,
+        log_dir: Path | None = None,
+        rsi_value: float | None = None,
+        rsi_state: str | None = None,
+        divergence_type: str | None = None,
+        divergence_confirmed: bool = False,
+        extreme_trigger: bool = False,
+        critical_trigger: bool = False,
+        micro_scalp_candidate: bool = False,
+        requires_human_approval: bool = False,
     ) -> None:
         for index, pnl_pct in enumerate(pnl_values, start=1):
             signal_id = f"{signal_id_prefix}|{index}"
@@ -184,8 +308,16 @@ class TruthReportTestCase(unittest.TestCase):
                 ema_4h_20=100.0,
                 price_vs_ema_4h_pct=price_vs_ema_4h_pct,
                 signal_close=100.0,
+                rsi_value=rsi_value,
+                rsi_state=rsi_state,
+                divergence_type=divergence_type,
+                divergence_confirmed=divergence_confirmed,
+                extreme_trigger=extreme_trigger,
+                critical_trigger=critical_trigger,
+                micro_scalp_candidate=micro_scalp_candidate,
+                requires_human_approval=requires_human_approval,
             )
-            archive.append_signal(signal)
+            archive.append_signal(signal, log_dir=log_dir)
             archive.append_outcome(
                 OutcomeRecord(
                     signal_id=signal.signal_id,
@@ -203,7 +335,8 @@ class TruthReportTestCase(unittest.TestCase):
                     stop_hit=pnl_pct < 0,
                     evaluated_at=timestamp,
                     entry_mode=entry_mode,
-                )
+                ),
+                log_dir=log_dir,
             )
 
 
