@@ -36,6 +36,14 @@ def _to_bool_dict(value: Any) -> dict[str, bool] | None:
     return {str(key): _to_bool(item) for key, item in value.items()}
 
 
+def _to_dict(value: Any) -> dict[str, Any] | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, dict):
+        return None
+    return dict(value)
+
+
 @dataclass(slots=True)
 class SignalRecord:
     signal_id: str
@@ -64,12 +72,53 @@ class SignalRecord:
     ema_4h_20: float | None = None
     price_vs_ema_4h_pct: float | None = None
     signal_close: float | None = None
+    rsi_length: int | None = None
+    rsi_value: float | None = None
+    rsi_state: str | None = None
+    divergence_type: str | None = None
+    divergence_confirmed: bool = False
+    divergence_price_pivot_1: float | None = None
+    divergence_price_pivot_2: float | None = None
+    divergence_rsi_pivot_1: float | None = None
+    divergence_rsi_pivot_2: float | None = None
+    extreme_trigger: bool = False
+    critical_trigger: bool = False
+    micro_scalp_candidate: bool = False
+    requires_human_approval: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        for key in (
+            "rsi_length",
+            "rsi_value",
+            "rsi_state",
+            "divergence_type",
+            "divergence_confirmed",
+            "divergence_price_pivot_1",
+            "divergence_price_pivot_2",
+            "divergence_rsi_pivot_1",
+            "divergence_rsi_pivot_2",
+        ):
+            payload.pop(key, None)
+        payload["rsi"] = {
+            "length": self.rsi_length,
+            "value": self.rsi_value,
+            "state": self.rsi_state,
+        }
+        payload["divergence"] = {
+            "type": self.divergence_type,
+            "confirmed": self.divergence_confirmed,
+            "price_pivot_1": self.divergence_price_pivot_1,
+            "price_pivot_2": self.divergence_price_pivot_2,
+            "rsi_pivot_1": self.divergence_rsi_pivot_1,
+            "rsi_pivot_2": self.divergence_rsi_pivot_2,
+        }
+        return payload
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "SignalRecord":
+        rsi_payload = _to_dict(payload.get("rsi")) or {}
+        divergence_payload = _to_dict(payload.get("divergence")) or {}
         return cls(
             signal_id=str(payload["signal_id"]),
             symbol=str(payload["symbol"]),
@@ -101,6 +150,41 @@ class SignalRecord:
             ema_4h_20=_to_float(payload.get("ema_4h_20")),
             price_vs_ema_4h_pct=_to_float(payload.get("price_vs_ema_4h_pct")),
             signal_close=_to_float(payload.get("signal_close")),
+            rsi_length=(
+                None
+                if rsi_payload.get("length", payload.get("rsi_length")) in (None, "")
+                else int(rsi_payload.get("length", payload.get("rsi_length")))
+            ),
+            rsi_value=_to_float(rsi_payload.get("value", payload.get("rsi_value"))),
+            rsi_state=(
+                None
+                if rsi_payload.get("state", payload.get("rsi_state")) in (None, "")
+                else str(rsi_payload.get("state", payload.get("rsi_state")))
+            ),
+            divergence_type=(
+                None
+                if divergence_payload.get("type", payload.get("divergence_type")) in (None, "")
+                else str(divergence_payload.get("type", payload.get("divergence_type")))
+            ),
+            divergence_confirmed=_to_bool(
+                divergence_payload.get("confirmed", payload.get("divergence_confirmed"))
+            ),
+            divergence_price_pivot_1=_to_float(
+                divergence_payload.get("price_pivot_1", payload.get("divergence_price_pivot_1"))
+            ),
+            divergence_price_pivot_2=_to_float(
+                divergence_payload.get("price_pivot_2", payload.get("divergence_price_pivot_2"))
+            ),
+            divergence_rsi_pivot_1=_to_float(
+                divergence_payload.get("rsi_pivot_1", payload.get("divergence_rsi_pivot_1"))
+            ),
+            divergence_rsi_pivot_2=_to_float(
+                divergence_payload.get("rsi_pivot_2", payload.get("divergence_rsi_pivot_2"))
+            ),
+            extreme_trigger=_to_bool(payload.get("extreme_trigger")),
+            critical_trigger=_to_bool(payload.get("critical_trigger")),
+            micro_scalp_candidate=_to_bool(payload.get("micro_scalp_candidate")),
+            requires_human_approval=_to_bool(payload.get("requires_human_approval")),
         )
 
 

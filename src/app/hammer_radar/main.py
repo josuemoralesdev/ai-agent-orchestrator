@@ -197,6 +197,19 @@ def _build_signal_record(
         ema_4h_20=ema_4h_20,
         price_vs_ema_4h_pct=compute_price_vs_ema_pct(signal_close, ema_4h_20),
         signal_close=signal_close,
+        rsi_length=_extract_nested_value(signal, "rsi", "length"),
+        rsi_value=_extract_nested_value(signal, "rsi", "value"),
+        rsi_state=_extract_nested_value(signal, "rsi", "state"),
+        divergence_type=_extract_nested_value(signal, "divergence", "type"),
+        divergence_confirmed=bool(_extract_nested_value(signal, "divergence", "confirmed")),
+        divergence_price_pivot_1=_extract_nested_value(signal, "divergence", "price_pivot_1"),
+        divergence_price_pivot_2=_extract_nested_value(signal, "divergence", "price_pivot_2"),
+        divergence_rsi_pivot_1=_extract_nested_value(signal, "divergence", "rsi_pivot_1"),
+        divergence_rsi_pivot_2=_extract_nested_value(signal, "divergence", "rsi_pivot_2"),
+        extreme_trigger=bool(signal.get("extreme_trigger")),
+        critical_trigger=bool(signal.get("critical_trigger")),
+        micro_scalp_candidate=bool(signal.get("micro_scalp_candidate")),
+        requires_human_approval=bool(signal.get("requires_human_approval")),
     )
     tradable, reject_reason = decide_trade_candidate(signal_record, recent_signals)
     signal_record.tradable = tradable
@@ -227,6 +240,13 @@ def _compute_streaks(signal: dict, recent_signals: list[SignalRecord]) -> tuple[
 
 def _build_signal_id(signal: dict) -> str:
     return f"{signal['symbol']}|{signal['timeframe']}|{signal['direction']}|{signal['timestamp']}"
+
+
+def _extract_nested_value(signal: dict, section: str, key: str):
+    container = signal.get(section)
+    if not isinstance(container, dict):
+        return None
+    return container.get(key)
 
 
 def _evaluate_pending_signals(

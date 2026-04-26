@@ -8,18 +8,34 @@ from dataclasses import dataclass
 from src.app.hammer_radar.operator.evaluator import DEFAULT_ENTRY_MODES
 
 TIMEFRAME_CONFIGS = (
+    ("4min", "4m"),
+    ("8min", "8m"),
     ("13min", "13m"),
+    ("22min", "22m"),
+    ("44min", "44m"),
     ("55min", "55m"),
+    ("88min", "88m"),
+    ("222min", "222m"),
+    ("444min", "444m"),
     ("666min", "666m"),
+    ("888min", "888m"),
     ("4h", "4H"),
     ("13h", "13H"),
     ("13D", "13D"),
 )
 SUPPORTED_TIMEFRAME_LABELS = tuple(label for _rule, label in TIMEFRAME_CONFIGS)
 TIMEFRAME_MINUTES = {
+    "4m": 4,
+    "8m": 8,
     "13m": 13,
+    "22m": 22,
+    "44m": 44,
     "55m": 55,
+    "88m": 88,
+    "222m": 222,
+    "444m": 444,
     "666m": 666,
+    "888m": 888,
     "4H": 240,
     "13H": 780,
     "13D": 18720,

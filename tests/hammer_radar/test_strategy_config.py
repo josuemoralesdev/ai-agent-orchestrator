@@ -49,6 +49,13 @@ class StrategyConfigTestCase(unittest.TestCase):
         self.assertTrue(tradable)
         self.assertIsNone(reject_reason)
 
+    def test_new_intraday_timeframes_are_enabled_by_default(self) -> None:
+        config = load_strategy_config()
+
+        for label in ("4m", "8m", "22m", "44m", "88m", "222m", "444m", "888m"):
+            self.assertIn(label, SUPPORTED_TIMEFRAME_LABELS)
+            self.assertIn(label, config.enabled_timeframes)
+
     def test_666m_can_be_strategy_eligible_when_config_allows_it(self) -> None:
         tradable, reject_reason = decide_trade_candidate(self._build_signal(timeframe="666m"), [])
 
@@ -66,6 +73,8 @@ class StrategyConfigTestCase(unittest.TestCase):
 
         self.assertIn("13H", SUPPORTED_TIMEFRAME_LABELS)
         self.assertIn("13D", SUPPORTED_TIMEFRAME_LABELS)
+        self.assertIn(("4min", "4m"), TIMEFRAME_CONFIGS)
+        self.assertIn(("888min", "888m"), TIMEFRAME_CONFIGS)
         self.assertIn(("13h", "13H"), TIMEFRAME_CONFIGS)
         self.assertIn(("13D", "13D"), TIMEFRAME_CONFIGS)
         self.assertIn("13H", config.enabled_timeframes)
