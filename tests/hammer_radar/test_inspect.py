@@ -250,12 +250,131 @@ class InspectCliTestCase(unittest.TestCase):
         self.assertIn("micro_scalp=Y", output)
         self.assertIn("human_approval=Y", output)
 
+    def test_daily_report_works_on_empty_archive(self) -> None:
+        empty_dir = Path(self.temp_dir.name) / "empty-daily"
+
+        output = inspect.build_daily_report_text(log_dir=empty_dir)
+
+        self.assertIn("HAMMER RADAR DAILY TRADE CANDIDATE REPORT", output)
+        self.assertIn(f"archive_log_dir: {empty_dir}", output)
+        self.assertIn("total_signals_in_window: 0", output)
+        self.assertIn("no candidates in window", output)
+        self.assertIn("This is paper/operator guidance only.", output)
+        self.assertFalse(empty_dir.exists())
+
+    def test_daily_report_works_with_fixture_records(self) -> None:
+        output = inspect.build_daily_report_text(since_hours=10000)
+
+        self.assertIn("1. HEADER", output)
+        self.assertIn("2. MARKET/STRATEGY SUMMARY", output)
+        self.assertIn("3. PERFORMANCE SUMMARY", output)
+        self.assertIn("4. CANDIDATE RANKING", output)
+        self.assertIn("5. SAFETY/RISK OUTPUT", output)
+        self.assertIn("total_signals_in_window: 1", output)
+        self.assertIn("total_outcomes_in_window: 1", output)
+        self.assertIn("closed_paper_positions: 1", output)
+        self.assertIn("fill_rate: 100.00%", output)
+
+    def test_daily_report_ranks_tradable_bullish_divergence_above_rejected_no_divergence(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "daily-ranking"
+        good = self._build_signal(
+            signal_id="good|1",
+            timestamp="2026-04-27T12:00:00+00:00",
+            rsi_value=48.0,
+            rsi_state="neutral",
+            divergence_type="bullish",
+            divergence_confirmed=True,
+        )
+        rejected = self._build_signal(
+            signal_id="rejected|1",
+            timestamp="2026-04-27T12:01:00+00:00",
+            tradable=False,
+            reject_reason="bias_not_aligned",
+            bias_aligned=False,
+            divergence_type=None,
+            divergence_confirmed=False,
+            hammer_strength=84.0,
+        )
+        archive.append_signal(good, log_dir=report_dir)
+        archive.append_signal(rejected, log_dir=report_dir)
+
+        output = inspect.build_daily_report_text(log_dir=report_dir, since_hours=10000, limit=2)
+
+        self.assertLess(output.index("signal_id: good|1"), output.index("signal_id: rejected|1"))
+        self.assertIn("tier: ACTIONABLE_PAPER_CANDIDATE", output)
+        self.assertIn("signal_id: good|1", output)
+        self.assertIn("signal_id: rejected|1", output)
+
+    def test_daily_report_penalizes_oversold_without_confirmation(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "daily-oversold"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="oversold|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=21.0,
+                rsi_state="oversold",
+                divergence_type="bullish",
+                divergence_confirmed=False,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_daily_report_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("score: 55", output)
+        self.assertIn("tier: CONTEXT_ONLY", output)
+        self.assertIn("Avoid for now: oversold bucket has weak forward performance without confirmation.", output)
+
+    def test_daily_report_includes_r9_metadata(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "daily-r9"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="r9-daily|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=51.25,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+                extreme_trigger=True,
+                critical_trigger=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_daily_report_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("r9_metadata_coverage_pct: 100.00%", output)
+        self.assertIn("total_candidates_with_rsi: 1", output)
+        self.assertIn("total_candidates_with_confirmed_divergence: 1", output)
+        self.assertIn("total_candidates_with_extreme_or_critical_triggers: 1", output)
+        self.assertIn("rsi: 51.2500 state=neutral", output)
+        self.assertIn("divergence: type=bullish confirmed=True", output)
+
+    def test_daily_report_respects_env_log_dir(self) -> None:
+        env_dir = Path(self.temp_dir.name) / "daily-env"
+        archive.append_signal(
+            self._build_signal(signal_id="env-daily|1", timestamp="2026-04-27T12:00:00+00:00"),
+            log_dir=env_dir,
+        )
+
+        with patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(env_dir)}):
+            output = inspect.build_daily_report_text(since_hours=10000)
+
+        self.assertIn(f"archive_log_dir: {env_dir}", output)
+        self.assertIn("signal_id: env-daily|1", output)
+
     @staticmethod
     def _build_signal(
         *,
         signal_id: str = "BTCUSDT|13m|long|2026-04-24T16:27:59.999000+00:00",
+        symbol: str = "BTCUSDT",
+        timeframe: str = "13m",
         direction: str = "long",
         timestamp: str = "2026-04-24T16:27:59.999000+00:00",
+        hammer_strength: float = 95.0,
+        bias_aligned: bool = True,
+        tradable: bool = True,
+        reject_reason: str | None = None,
         rsi_value: float | None = None,
         rsi_state: str | None = None,
         divergence_type: str | None = None,
@@ -267,11 +386,11 @@ class InspectCliTestCase(unittest.TestCase):
     ) -> SignalRecord:
         return SignalRecord(
             signal_id=signal_id,
-            symbol="BTCUSDT",
-            timeframe="13m",
+            symbol=symbol,
+            timeframe=timeframe,
             direction=direction,
             timestamp=timestamp,
-            hammer_strength=95.0,
+            hammer_strength=hammer_strength,
             hammer_high=101.0,
             hammer_low=94.0,
             fib_50=100.5,
@@ -281,11 +400,11 @@ class InspectCliTestCase(unittest.TestCase):
             invalidation=95.0,
             bias_timeframe="4H",
             bias_direction="bullish",
-            bias_aligned=True,
+            bias_aligned=bias_aligned,
             same_direction_streak=0,
             opposite_direction_streak=0,
-            tradable=True,
-            reject_reason=None,
+            tradable=tradable,
+            reject_reason=reject_reason,
             trend_direction="bullish",
             trend_strength_score=0.4,
             trend_lookback_candles=3,
