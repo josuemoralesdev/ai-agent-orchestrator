@@ -35,6 +35,21 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual("hammer_radar_approval_api", payload["service"])
         self.assertFalse(payload["live_execution_enabled"])
 
+    def test_ui_returns_html_with_safety_text_and_buttons(self) -> None:
+        for path in ("/", "/ui"):
+            response = self.client.get(path)
+
+            self.assertEqual(200, response.status_code)
+            self.assertIn("text/html", response.headers["content-type"])
+            html = response.text
+            self.assertIn("live_execution_enabled=false", html)
+            self.assertIn("Record Decision", html)
+            self.assertIn("Watch", html)
+            self.assertIn("Reject", html)
+            self.assertIn("Paper Only", html)
+            self.assertIn("Approve Manual Live", html)
+            self.assertIn("No order placement", html)
+
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)
 

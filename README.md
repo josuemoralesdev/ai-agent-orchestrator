@@ -191,6 +191,22 @@ Core flow:
 Request → Plan → Validate → Approve → Execute → Trace
 ```
 
+## Hammer Radar Local Approval UI
+
+Hammer Radar includes a localhost-only approval console for recording operator intent:
+
+```bash
+systemctl status hammer-approval-api.service --no-pager
+```
+
+Open:
+
+```text
+http://127.0.0.1:8015/ui
+```
+
+The UI records decisions only through the local Approval API. It does not place orders, does not call Binance, and keeps `live_execution_enabled=false` / `order_placed=false`.
+
 ### Example Request
 
 ```json
