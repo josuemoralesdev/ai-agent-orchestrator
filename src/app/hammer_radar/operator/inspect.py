@@ -19,6 +19,9 @@ from src.app.hammer_radar.operator.positions import (
 
 DAILY_EXECUTION_TIMEFRAMES = {"4m", "8m", "13m", "22m"}
 HIGH_TIMEFRAMES = {"444m", "888m"}
+LIVE_DECISION_ELIGIBLE = "ELIGIBLE_TINY_LIVE"
+LIVE_DECISION_PAPER_ONLY = "PAPER_ONLY"
+LIVE_DECISION_FORBIDDEN = "FORBIDDEN"
 
 
 def build_summary_text(log_dir: str | Path | None = None) -> str:
@@ -256,6 +259,107 @@ def build_daily_report_text(
     return "\n".join(lines)
 
 
+def build_live_checklist_text(
+    *,
+    limit: int = 10,
+    since_hours: int = 24,
+    min_score: int = 90,
+    symbol: str | None = None,
+    allow_short: bool = False,
+    allow_oversold: bool = False,
+    allow_trigger_flags: bool = False,
+    max_risk_usd: float = 5.0,
+    max_leverage: float = 3.0,
+    log_dir: str | Path | None = None,
+) -> str:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    generated_at = datetime.now(UTC)
+    signals = _filter_symbol(load_signals(resolved_log_dir), symbol)
+    outcomes = _filter_symbol(load_outcomes(resolved_log_dir), symbol)
+    positions = _filter_symbol(load_positions(resolved_log_dir), symbol)
+    closed_positions = [position for position in positions if position.status == "closed"]
+    positions_by_signal = _positions_by_signal(closed_positions)
+    signal_window_start = generated_at - timedelta(hours=max(since_hours, 0))
+    window_signals = [
+        signal
+        for signal in signals
+        if _timestamp_in_window(signal.timestamp, signal_window_start, generated_at)
+    ]
+    performance = _performance_summary(outcomes)
+    ranked = [
+        _rank_candidate(signal, positions_by_signal.get(signal.signal_id, []))
+        for signal in window_signals
+    ]
+    ranked.sort(key=lambda candidate: (candidate.score, candidate.signal.timestamp), reverse=True)
+    ranked = ranked[: max(limit, 0)]
+    checks = [
+        _build_live_check(
+            candidate,
+            min_score=min_score,
+            allow_short=allow_short,
+            allow_oversold=allow_oversold,
+            allow_trigger_flags=allow_trigger_flags,
+            max_risk_usd=max_risk_usd,
+            max_leverage=max_leverage,
+        )
+        for candidate in ranked
+    ]
+    decisions = [check.decision for check in checks]
+
+    lines = [
+        "HAMMER RADAR MANUAL TINY-LIVE CHECKLIST",
+        "",
+        "1. HEADER",
+        f"archive_log_dir: {resolved_log_dir}",
+        f"generated_at: {generated_at.isoformat()}",
+        f"symbol: {symbol or 'all'}",
+        f"signal_window: last_{max(since_hours, 0)}h ({signal_window_start.isoformat()} to {generated_at.isoformat()})",
+        f"min_score: {min_score}",
+        f"max_risk_usd: {float(max_risk_usd):.2f}",
+        f"max_leverage: {float(max_leverage):.2f}",
+        f"allow_short: {allow_short}",
+        f"allow_oversold: {allow_oversold}",
+        f"allow_trigger_flags: {allow_trigger_flags}",
+        "live_execution_enabled: false",
+        "",
+        "2. CURRENT EVIDENCE SUMMARY",
+        f"total_signals_in_window: {len(window_signals)}",
+        f"tradable_signals_in_window: {sum(1 for signal in window_signals if signal.tradable)}",
+        f"r9_metadata_coverage_pct: {_r9_coverage(signals):.2f}%",
+        f"win_rate_on_filled: {performance['win_rate_on_filled']:.2f}%",
+        f"avg_pnl_pct: {performance['avg_pnl_pct']:.4f}%",
+        f"best_rsi_state: {_best_grouping(signals, outcomes, 'rsi_state')}",
+        f"best_divergence_bucket: {_best_grouping(signals, outcomes, 'divergence')}",
+        f"best_timeframe: {_best_grouping(signals, outcomes, 'timeframe')}",
+        f"best_entry_mode: {_best_outcome_grouping(outcomes, 'entry_mode')}",
+        "",
+        "3. LIVE ELIGIBILITY SUMMARY",
+        f"eligible_tiny_live_count: {decisions.count(LIVE_DECISION_ELIGIBLE)}",
+        f"paper_only_count: {decisions.count(LIVE_DECISION_PAPER_ONLY)}",
+        f"forbidden_count: {decisions.count(LIVE_DECISION_FORBIDDEN)}",
+        "",
+        "4. CANDIDATE CHECKLIST",
+    ]
+    if checks:
+        for index, check in enumerate(checks, start=1):
+            lines.extend(_format_live_check_lines(index, check))
+    else:
+        lines.append("no candidates in window")
+
+    lines.extend(
+        [
+            "",
+            "5. SAFETY OUTPUT",
+            "No live order was placed.",
+            "This is a manual checklist only.",
+            "Live exchange execution remains disabled.",
+            "If manually trading, use isolated margin and predefined stop.",
+            "This is not financial advice.",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -279,6 +383,21 @@ def main() -> int:
                 since_hours=args.since_hours,
                 tradable_only=args.tradable_only,
                 symbol=args.symbol,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "live-checklist":
+        print(
+            build_live_checklist_text(
+                limit=args.limit,
+                since_hours=args.since_hours,
+                min_score=args.min_score,
+                symbol=args.symbol,
+                allow_short=args.allow_short,
+                allow_oversold=args.allow_oversold,
+                allow_trigger_flags=args.allow_trigger_flags,
+                max_risk_usd=args.max_risk_usd,
+                max_leverage=args.max_leverage,
                 log_dir=args.log_dir,
             )
         )
@@ -320,6 +439,17 @@ def _build_parser() -> argparse.ArgumentParser:
     daily_parser.add_argument("--tradable-only", action="store_true")
     daily_parser.add_argument("--symbol", default=None)
 
+    live_parser = subparsers.add_parser("live-checklist", parents=[parent])
+    live_parser.add_argument("--limit", type=int, default=10)
+    live_parser.add_argument("--since-hours", type=int, default=24)
+    live_parser.add_argument("--min-score", type=int, default=90)
+    live_parser.add_argument("--symbol", default=None)
+    live_parser.add_argument("--allow-short", action="store_true")
+    live_parser.add_argument("--allow-oversold", action="store_true")
+    live_parser.add_argument("--allow-trigger-flags", action="store_true")
+    live_parser.add_argument("--max-risk-usd", type=float, default=5.0)
+    live_parser.add_argument("--max-leverage", type=float, default=3.0)
+
     return parser
 
 
@@ -329,6 +459,19 @@ class RankedCandidate:
     score: int
     tier: str
     note: str
+
+
+@dataclass(frozen=True)
+class LiveCandidateCheck:
+    candidate: RankedCandidate
+    decision: str
+    reason: str
+    entry: float | None
+    stop: float | None
+    take_profit: float | None
+    risk_distance_pct: float | None
+    max_position_usd: float | None
+    max_leverage: float
 
 
 def _has_any_r9_metadata(signal: object) -> bool:
@@ -586,13 +729,155 @@ def _format_candidate_lines(index: int, candidate: RankedCandidate) -> list[str]
     ]
 
 
+def _build_live_check(
+    candidate: RankedCandidate,
+    *,
+    min_score: int,
+    allow_short: bool,
+    allow_oversold: bool,
+    allow_trigger_flags: bool,
+    max_risk_usd: float,
+    max_leverage: float,
+) -> LiveCandidateCheck:
+    signal = candidate.signal
+    entry = _positive_float_or_none(signal.fib_618)
+    stop = _positive_float_or_none(signal.invalidation)
+    take_profit = _calculate_report_take_profit(signal)
+    risk_distance_pct = _risk_distance_pct(entry, stop)
+    max_position_usd = (
+        max_risk_usd / (risk_distance_pct / 100.0)
+        if risk_distance_pct is not None and risk_distance_pct > 0.0
+        else None
+    )
+
+    decision, reason = _live_decision_reason(
+        candidate,
+        entry=entry,
+        stop=stop,
+        take_profit=take_profit,
+        risk_distance_pct=risk_distance_pct,
+        min_score=min_score,
+        allow_short=allow_short,
+        allow_oversold=allow_oversold,
+        allow_trigger_flags=allow_trigger_flags,
+    )
+    return LiveCandidateCheck(
+        candidate=candidate,
+        decision=decision,
+        reason=reason,
+        entry=entry,
+        stop=stop,
+        take_profit=take_profit,
+        risk_distance_pct=risk_distance_pct,
+        max_position_usd=max_position_usd,
+        max_leverage=max_leverage,
+    )
+
+
+def _live_decision_reason(
+    candidate: RankedCandidate,
+    *,
+    entry: float | None,
+    stop: float | None,
+    take_profit: float | None,
+    risk_distance_pct: float | None,
+    min_score: int,
+    allow_short: bool,
+    allow_oversold: bool,
+    allow_trigger_flags: bool,
+) -> tuple[str, str]:
+    signal = candidate.signal
+    if not signal.tradable:
+        return LIVE_DECISION_FORBIDDEN, "not tradable"
+    if signal.reject_reason:
+        return LIVE_DECISION_FORBIDDEN, f"reject_reason present: {signal.reject_reason}"
+    if not signal.bias_aligned:
+        return LIVE_DECISION_FORBIDDEN, "bias not aligned"
+    if not _has_any_r9_metadata(signal):
+        return LIVE_DECISION_FORBIDDEN, "missing R9 metadata"
+    if entry is None:
+        return LIVE_DECISION_FORBIDDEN, "missing entry"
+    if stop is None:
+        return LIVE_DECISION_FORBIDDEN, "missing stop/invalidation"
+    if risk_distance_pct is None or risk_distance_pct <= 0.0:
+        return LIVE_DECISION_FORBIDDEN, "no clear invalidation risk distance"
+    if take_profit is None:
+        return LIVE_DECISION_FORBIDDEN, "missing take_profit"
+    if candidate.tier != "ACTIONABLE_PAPER_CANDIDATE":
+        return LIVE_DECISION_PAPER_ONLY, f"candidate tier is {candidate.tier}"
+    if candidate.score < min_score:
+        return LIVE_DECISION_PAPER_ONLY, f"score below min_score {min_score}"
+    if signal.direction == "short" and not allow_short:
+        return LIVE_DECISION_PAPER_ONLY, "short candidate requires --allow-short"
+    if signal.direction != "long" and signal.direction != "short":
+        return LIVE_DECISION_FORBIDDEN, f"unsupported direction: {signal.direction}"
+    if signal.rsi_state == "oversold":
+        if not allow_oversold:
+            return LIVE_DECISION_PAPER_ONLY, "oversold candidate requires --allow-oversold"
+        if not (signal.direction == "long" and signal.divergence_type == "bullish" and signal.divergence_confirmed):
+            return LIVE_DECISION_PAPER_ONLY, "oversold candidate lacks confirmed bullish divergence"
+    elif signal.rsi_state != "neutral":
+        return LIVE_DECISION_PAPER_ONLY, f"RSI state {signal.rsi_state or 'missing'} is not neutral"
+    if (
+        signal.extreme_trigger
+        or signal.critical_trigger
+        or signal.micro_scalp_candidate
+        or signal.requires_human_approval
+    ) and not allow_trigger_flags:
+        return LIVE_DECISION_PAPER_ONLY, "trigger flags require explicit override"
+    return LIVE_DECISION_ELIGIBLE, "passes conservative manual tiny-live checklist"
+
+
+def _format_live_check_lines(index: int, check: LiveCandidateCheck) -> list[str]:
+    signal = check.candidate.signal
+    return [
+        f"rank: {index}",
+        f"decision: {check.decision}",
+        f"reason: {check.reason}",
+        f"signal_id: {signal.signal_id}",
+        f"score: {check.candidate.score}",
+        f"tier: {check.candidate.tier}",
+        f"direction/timeframe: {signal.direction}/{signal.timeframe}",
+        f"entry: {_format_optional_float(check.entry)}",
+        f"stop: {_format_optional_float(check.stop)}",
+        f"take_profit: {_format_optional_float(check.take_profit)}",
+        f"estimated_risk_distance_pct: {_format_optional_float(check.risk_distance_pct)}%",
+        f"suggested_max_position_size_usd: {_format_optional_float(check.max_position_usd)}",
+        f"suggested_max_leverage_cap: {check.max_leverage:.2f}",
+        "required_manual_checklist: isolated margin; set stop before or immediately after entry; set take profit; confirm max daily loss not breached; screenshot entry; write reason before entry; review after exit",
+        "",
+    ]
+
+
 def _calculate_report_take_profit(signal: SignalRecord) -> float | None:
-    risk = abs(signal.fib_618 - signal.invalidation)
+    entry = _positive_float_or_none(signal.fib_618)
+    stop = _positive_float_or_none(signal.invalidation)
+    if entry is None or stop is None:
+        return None
+    risk = abs(entry - stop)
     if risk <= 0.0:
         return None
     if signal.direction == "short":
-        return round(signal.fib_618 - risk, 4)
-    return round(signal.fib_618 + risk, 4)
+        return round(entry - risk, 4)
+    return round(entry + risk, 4)
+
+
+def _positive_float_or_none(value: float | None) -> float | None:
+    if value is None:
+        return None
+    value = float(value)
+    if value <= 0.0:
+        return None
+    return value
+
+
+def _risk_distance_pct(entry: float | None, stop: float | None) -> float | None:
+    if entry is None or stop is None or entry <= 0.0:
+        return None
+    risk_distance_pct = abs(entry - stop) / entry * 100.0
+    if risk_distance_pct <= 0.0:
+        return None
+    return risk_distance_pct
 
 
 def _format_optional_float(value: float | None) -> str:

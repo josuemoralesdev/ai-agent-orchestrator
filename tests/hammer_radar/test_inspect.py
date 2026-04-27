@@ -363,6 +363,163 @@ class InspectCliTestCase(unittest.TestCase):
         self.assertIn(f"archive_log_dir: {env_dir}", output)
         self.assertIn("signal_id: env-daily|1", output)
 
+    def test_live_checklist_works_on_empty_archive(self) -> None:
+        empty_dir = Path(self.temp_dir.name) / "empty-live"
+
+        output = inspect.build_live_checklist_text(log_dir=empty_dir)
+
+        self.assertIn("HAMMER RADAR MANUAL TINY-LIVE CHECKLIST", output)
+        self.assertIn(f"archive_log_dir: {empty_dir}", output)
+        self.assertIn("live_execution_enabled: false", output)
+        self.assertIn("eligible_tiny_live_count: 0", output)
+        self.assertIn("no candidates in window", output)
+        self.assertIn("No live order was placed.", output)
+        self.assertFalse(empty_dir.exists())
+
+    def test_live_checklist_allows_long_tradable_bullish_neutral_candidate(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-long"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-long|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("decision: ELIGIBLE_TINY_LIVE", output)
+        self.assertIn("reason: passes conservative manual tiny-live checklist", output)
+        self.assertIn("eligible_tiny_live_count: 1", output)
+        self.assertIn("live_execution_enabled: false", output)
+
+    def test_live_checklist_keeps_short_paper_only_by_default_unless_allowed(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-short"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-short|1",
+                direction="short",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bearish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        default_output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+        allowed_output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            allow_short=True,
+        )
+
+        self.assertIn("decision: PAPER_ONLY", default_output)
+        self.assertIn("reason: short candidate requires --allow-short", default_output)
+        self.assertIn("decision: ELIGIBLE_TINY_LIVE", allowed_output)
+
+    def test_live_checklist_keeps_oversold_paper_only_by_default_unless_allowed(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-oversold"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-oversold|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=21.0,
+                rsi_state="oversold",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        default_output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+        allowed_output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            allow_oversold=True,
+        )
+
+        self.assertIn("decision: PAPER_ONLY", default_output)
+        self.assertIn("reason: oversold candidate requires --allow-oversold", default_output)
+        self.assertIn("decision: ELIGIBLE_TINY_LIVE", allowed_output)
+
+    def test_live_checklist_forbids_rejected_non_tradable_signal(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-rejected"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-rejected|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                tradable=False,
+                reject_reason="strength_below_minimum",
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("decision: FORBIDDEN", output)
+        self.assertIn("reason: not tradable", output)
+
+    def test_live_checklist_forbids_missing_r9_metadata(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-missing-r9"
+        archive.append_signal(
+            self._build_signal(signal_id="live-missing-r9|1", timestamp="2026-04-27T12:00:00+00:00"),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("decision: FORBIDDEN", output)
+        self.assertIn("reason: missing R9 metadata", output)
+
+    def test_live_checklist_forbids_missing_stop(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-missing-stop"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-missing-stop|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                invalidation=0.0,
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("decision: FORBIDDEN", output)
+        self.assertIn("reason: missing stop/invalidation", output)
+
+    def test_live_checklist_calculates_risk_distance_and_position_size(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-risk"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-risk|1",
+                timestamp="2026-04-27T12:00:00+00:00",
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000, max_risk_usd=5)
+
+        self.assertIn("estimated_risk_distance_pct: 5.0000%", output)
+        self.assertIn("suggested_max_position_size_usd: 100.0000", output)
+
     @staticmethod
     def _build_signal(
         *,
@@ -372,6 +529,7 @@ class InspectCliTestCase(unittest.TestCase):
         direction: str = "long",
         timestamp: str = "2026-04-24T16:27:59.999000+00:00",
         hammer_strength: float = 95.0,
+        invalidation: float = 95.0,
         bias_aligned: bool = True,
         tradable: bool = True,
         reject_reason: str | None = None,
@@ -397,7 +555,7 @@ class InspectCliTestCase(unittest.TestCase):
             fib_618=100.0,
             fib_650=99.5,
             fib_786=98.5,
-            invalidation=95.0,
+            invalidation=invalidation,
             bias_timeframe="4H",
             bias_direction="bullish",
             bias_aligned=bias_aligned,
