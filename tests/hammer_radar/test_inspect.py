@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -381,7 +382,7 @@ class InspectCliTestCase(unittest.TestCase):
         archive.append_signal(
             self._build_signal(
                 signal_id="live-long|1",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 rsi_value=50.0,
                 rsi_state="neutral",
                 divergence_type="bullish",
@@ -403,7 +404,7 @@ class InspectCliTestCase(unittest.TestCase):
             self._build_signal(
                 signal_id="live-short|1",
                 direction="short",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 rsi_value=50.0,
                 rsi_state="neutral",
                 divergence_type="bearish",
@@ -428,7 +429,7 @@ class InspectCliTestCase(unittest.TestCase):
         archive.append_signal(
             self._build_signal(
                 signal_id="live-oversold|1",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 rsi_value=21.0,
                 rsi_state="oversold",
                 divergence_type="bullish",
@@ -453,7 +454,7 @@ class InspectCliTestCase(unittest.TestCase):
         archive.append_signal(
             self._build_signal(
                 signal_id="live-rejected|1",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 tradable=False,
                 reject_reason="strength_below_minimum",
                 rsi_value=50.0,
@@ -472,7 +473,7 @@ class InspectCliTestCase(unittest.TestCase):
     def test_live_checklist_forbids_missing_r9_metadata(self) -> None:
         report_dir = Path(self.temp_dir.name) / "live-missing-r9"
         archive.append_signal(
-            self._build_signal(signal_id="live-missing-r9|1", timestamp="2026-04-27T12:00:00+00:00"),
+            self._build_signal(signal_id="live-missing-r9|1", timestamp=self._recent_timestamp()),
             log_dir=report_dir,
         )
 
@@ -486,7 +487,7 @@ class InspectCliTestCase(unittest.TestCase):
         archive.append_signal(
             self._build_signal(
                 signal_id="live-missing-stop|1",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 invalidation=0.0,
                 rsi_value=50.0,
                 rsi_state="neutral",
@@ -506,7 +507,7 @@ class InspectCliTestCase(unittest.TestCase):
         archive.append_signal(
             self._build_signal(
                 signal_id="live-risk|1",
-                timestamp="2026-04-27T12:00:00+00:00",
+                timestamp=self._recent_timestamp(),
                 rsi_value=50.0,
                 rsi_state="neutral",
                 divergence_type="bullish",
@@ -518,7 +519,128 @@ class InspectCliTestCase(unittest.TestCase):
         output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000, max_risk_usd=5)
 
         self.assertIn("estimated_risk_distance_pct: 5.0000%", output)
-        self.assertIn("suggested_max_position_size_usd: 100.0000", output)
+        self.assertIn("theoretical_max_position_size_usd: 100.0000", output)
+        self.assertIn("capped_max_position_size_usd: 44.0000", output)
+        self.assertIn("suggested_max_position_size_usd: 44.0000", output)
+
+    def test_live_checklist_expired_otherwise_eligible_candidate_is_not_eligible(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-expired"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-expired|1",
+                timestamp=self._recent_timestamp(minutes_ago=90),
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(log_dir=report_dir, since_hours=10000, fresh_minutes=30)
+
+        self.assertIn("decision: PAPER_ONLY", output)
+        self.assertIn("reason: candidate expired by freshness gate", output)
+        self.assertIn("freshness_status: expired", output)
+        self.assertIn("eligible_tiny_live_count: 0", output)
+
+    def test_live_checklist_allow_expired_permits_expired_candidate(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-allow-expired"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-allow-expired|1",
+                timestamp=self._recent_timestamp(minutes_ago=90),
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            fresh_minutes=30,
+            allow_expired=True,
+        )
+
+        self.assertIn("decision: ELIGIBLE_TINY_LIVE", output)
+        self.assertIn("freshness_status: expired", output)
+
+    def test_live_checklist_max_position_size_is_capped_by_flag(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-position-cap"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-position-cap|1",
+                timestamp=self._recent_timestamp(),
+                invalidation=99.9,
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            max_risk_usd=5,
+            max_position_usd=44,
+        )
+
+        self.assertIn("theoretical_max_position_size_usd: 5000.0000", output)
+        self.assertIn("capped_max_position_size_usd: 44.0000", output)
+        self.assertIn("max_position_cap_usd: 44.00", output)
+
+    def test_live_checklist_suggested_leverage_respects_max_leverage(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-leverage"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="live-leverage|1",
+                timestamp=self._recent_timestamp(),
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            max_leverage=1.5,
+        )
+
+        self.assertIn("suggested_leverage: 1.50", output)
+
+    def test_live_checklist_latest_only_prioritizes_recent_candidates(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "live-latest-only"
+        for index in range(6):
+            archive.append_signal(
+                self._build_signal(
+                    signal_id=f"live-latest|{index}",
+                    timestamp=self._recent_timestamp(minutes_ago=60 - index),
+                    rsi_value=50.0,
+                    rsi_state="neutral",
+                    divergence_type="bullish",
+                    divergence_confirmed=True,
+                ),
+                log_dir=report_dir,
+            )
+
+        output = inspect.build_live_checklist_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            latest_only=True,
+            allow_expired=True,
+        )
+
+        self.assertNotIn("signal_id: live-latest|0", output)
+        self.assertIn("signal_id: live-latest|5", output)
+        self.assertEqual(5, output.count("signal_id: live-latest|"))
 
     @staticmethod
     def _build_signal(
@@ -578,6 +700,10 @@ class InspectCliTestCase(unittest.TestCase):
             micro_scalp_candidate=micro_scalp_candidate,
             requires_human_approval=requires_human_approval,
         )
+
+    @staticmethod
+    def _recent_timestamp(*, minutes_ago: int = 5) -> str:
+        return (datetime.now(UTC) - timedelta(minutes=minutes_ago)).isoformat()
 
 
 if __name__ == "__main__":
