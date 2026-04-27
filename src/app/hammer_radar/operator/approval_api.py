@@ -279,28 +279,50 @@ def _operator_ui_html() -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hammer Radar Approval Console</title>
   <style>
-    :root { color-scheme: light; font-family: Arial, sans-serif; background: #f7f7f5; color: #202124; }
+    :root { color-scheme: light; font-family: Arial, sans-serif; background: #f5f6f3; color: #202124; }
     body { margin: 0; }
-    header { padding: 18px 24px; background: #1f2933; color: white; }
-    main { max-width: 1180px; margin: 0 auto; padding: 20px; }
-    .status, .candidate, .decision { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    header { padding: 18px 24px; background: #18212f; color: white; }
+    main { max-width: 1240px; margin: 0 auto; padding: 20px; }
+    .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
+    .status, .controls, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
     .value { font-weight: 700; overflow-wrap: anywhere; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
     .danger { color: #9f1d1d; font-weight: 700; }
     .safe { color: #12613a; font-weight: 700; }
-    button { margin: 6px 6px 0 0; padding: 8px 10px; border: 1px solid #aeb7ad; border-radius: 6px; background: #f2f5ef; cursor: pointer; }
+    .badge { display: inline-block; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 800; letter-spacing: 0; }
+    .badge-eligible { background: #dcfce7; border: 1px solid #86efac; color: #14532d; }
+    .badge-paper { background: #fef3c7; border: 1px solid #fcd34d; color: #78350f; }
+    .badge-forbidden { background: #fee2e2; border: 1px solid #fca5a5; color: #7f1d1d; }
+    .candidate { border-left: 6px solid #9ca3af; }
+    .candidate-eligible { border-left-color: #16a34a; }
+    .candidate-paper { border-left-color: #d97706; }
+    .candidate-forbidden { border-left-color: #dc2626; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    button { padding: 8px 10px; border: 1px solid #aeb7ad; border-radius: 6px; background: #f2f5ef; cursor: pointer; font-weight: 700; }
     button:hover { background: #e6ece2; }
-    input { min-width: 260px; padding: 8px; border: 1px solid #b8c0b6; border-radius: 6px; }
+    button:disabled { color: #7a8178; background: #ecefeb; cursor: not-allowed; }
+    .approve { background: #e9f8ee; border-color: #86efac; color: #14532d; }
+    .reject { background: #fff1f2; border-color: #fecdd3; color: #7f1d1d; }
+    input[type="text"], input[type="number"] { min-width: 180px; padding: 8px; border: 1px solid #b8c0b6; border-radius: 6px; }
+    input.notes { width: min(560px, 100%); }
     pre { white-space: pre-wrap; background: #111827; color: #f9fafb; padding: 12px; border-radius: 6px; }
+    .success { border-color: #86efac; background: #f0fdf4; color: #14532d; }
+    .error { border-color: #fca5a5; background: #fef2f2; color: #7f1d1d; }
+    .muted { color: #667085; }
     h2 { margin-top: 28px; }
   </style>
 </head>
 <body>
   <header>
     <h1>Hammer Radar Approval Console</h1>
-    <div>Record Decision only. No order placement. live_execution_enabled=false.</div>
+    <div>Record Decision only. No order placement. live_execution_enabled=false. order_placed=false.</div>
   </header>
+  <div class="banner">
+    LOCAL PAPER/MANUAL INTENT ONLY | No live order placement. | live_execution_enabled=false | order_placed=false
+  </div>
   <main>
     <section class="status">
       <div class="grid">
@@ -310,7 +332,18 @@ def _operator_ui_html() -> str:
         <div><div class="label">Archive</div><div id="archive" class="value">loading</div></div>
         <div><div class="label">Generated</div><div id="generated" class="value">loading</div></div>
       </div>
-      <button onclick="refreshAll()">Refresh</button>
+    </section>
+
+    <section class="controls">
+      <div class="controls-grid">
+        <label><input id="latestOnly" type="checkbox" checked> Latest only</label>
+        <label><input id="eligibleOnly" type="checkbox"> Eligible only</label>
+        <label><input id="includeForbidden" type="checkbox" checked> Include forbidden</label>
+        <label><input id="allowShort" type="checkbox"> Allow short</label>
+        <label>Limit <input id="limit" type="number" min="1" max="100" value="10"></label>
+        <label>Operator <input id="operator" type="text" value="josue"></label>
+        <button onclick="refreshAll()">Refresh</button>
+      </div>
     </section>
 
     <h2>Candidates</h2>
@@ -320,10 +353,10 @@ def _operator_ui_html() -> str:
     <div id="decisions">loading</div>
 
     <h2>Last Action</h2>
-    <pre id="message">No action yet.</pre>
+    <section id="message" class="feedback">No action yet. order_placed=false.</section>
   </main>
 <script>
-const operatorName = "josue";
+let currentCandidates = [];
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -343,25 +376,50 @@ async function loadHealth() {
 }
 
 async function loadCandidates() {
-  const res = await fetch('/candidates?latest_only=true');
+  const params = new URLSearchParams({
+    latest_only: document.getElementById('latestOnly').checked ? 'true' : 'false',
+    allow_short: document.getElementById('allowShort').checked ? 'true' : 'false',
+    limit: document.getElementById('limit').value || '10'
+  });
+  const res = await fetch('/candidates?' + params.toString());
   const data = await res.json();
   document.getElementById('archive').textContent = data.archive_log_dir || 'n/a';
   document.getElementById('generated').textContent = data.generated_at || 'n/a';
   document.getElementById('live').textContent = String(data.live_execution_enabled);
   document.getElementById('order').textContent = String(data.order_placed);
+  currentCandidates = data.candidates || [];
+  const eligibleOnly = document.getElementById('eligibleOnly').checked;
+  const includeForbidden = document.getElementById('includeForbidden').checked;
+  const visible = currentCandidates.filter(c => {
+    if (eligibleOnly && c.decision !== 'ELIGIBLE_TINY_LIVE') return false;
+    if (!includeForbidden && c.decision === 'FORBIDDEN') return false;
+    return true;
+  });
   const root = document.getElementById('candidates');
-  if (!data.candidates || data.candidates.length === 0) {
+  if (visible.length === 0) {
     root.innerHTML = '<div class="candidate">No candidates returned.</div>';
     return;
   }
-  root.innerHTML = data.candidates.map(renderCandidate).join('');
+  root.innerHTML = visible.map(c => renderCandidate(c, currentCandidates.indexOf(c))).join('');
 }
 
-function renderCandidate(c) {
-  const id = esc(c.signal_id);
-  return `<section class="candidate">
+function decisionClass(decision) {
+  if (decision === 'ELIGIBLE_TINY_LIVE') return 'eligible';
+  if (decision === 'PAPER_ONLY') return 'paper';
+  if (decision === 'FORBIDDEN') return 'forbidden';
+  return 'paper';
+}
+
+function renderCandidate(c, index) {
+  const cls = decisionClass(c.decision);
+  const canApprove = c.decision === 'ELIGIBLE_TINY_LIVE';
+  const disabledText = c.decision === 'FORBIDDEN'
+    ? 'Blocked: candidate is FORBIDDEN'
+    : 'Blocked: candidate is PAPER_ONLY';
+  return `<section class="candidate candidate-${cls}">
+    <div><span class="badge badge-${cls}">${esc(c.decision)}</span></div>
     <div class="grid">
-      <div><div class="label">signal_id</div><div class="value">${id}</div></div>
+      <div><div class="label">signal_id</div><div class="value mono">${esc(c.signal_id)}</div></div>
       <div><div class="label">decision</div><div class="value">${esc(c.decision)}</div></div>
       <div><div class="label">reason</div><div class="value">${esc(c.reason)}</div></div>
       <div><div class="label">direction/timeframe</div><div class="value">${esc(c.direction)}/${esc(c.timeframe)}</div></div>
@@ -376,20 +434,27 @@ function renderCandidate(c) {
       <div><div class="label">live_execution_enabled</div><div class="value danger">${esc(c.live_execution_enabled)}</div></div>
       <div><div class="label">order_placed</div><div class="value danger">${esc(c.order_placed)}</div></div>
     </div>
-    <p><input id="notes-${id}" placeholder="notes"></p>
-    <button onclick="recordDecision('${id}', 'watch')">Watch</button>
-    <button onclick="recordDecision('${id}', 'reject')">Reject</button>
-    <button onclick="recordDecision('${id}', 'paper_only')">Paper Only</button>
-    <button onclick="recordDecision('${id}', 'approve_manual_live')">Approve Manual Live</button>
+    <p><input id="notes-${index}" class="notes" placeholder="notes"></p>
+    <div class="button-row">
+      <button onclick="recordDecision(${index}, 'watch')">Watch</button>
+      <button class="reject" onclick="recordDecision(${index}, 'reject')">Reject</button>
+      <button onclick="recordDecision(${index}, 'paper_only')">Paper Only</button>
+      <button class="approve" onclick="recordDecision(${index}, 'approve_manual_live')" ${canApprove ? '' : 'disabled'} title="${canApprove ? 'Record approval intent only' : disabledText}">Log Manual-Live Intent</button>
+    </div>
+    ${canApprove ? '' : `<div class="muted">${disabledText}. Watch / Reject / Paper Only remain available.</div>`}
   </section>`;
 }
 
-async function recordDecision(signalId, decision) {
-  const notesInput = document.getElementById(`notes-${signalId}`);
+async function recordDecision(index, decision) {
+  const candidate = currentCandidates[index];
+  if (!candidate) return;
+  const signalId = candidate.signal_id;
+  const notesInput = document.getElementById(`notes-${index}`);
+  const operatorInput = document.getElementById('operator');
   const body = {
     signal_id: signalId,
     decision,
-    operator: operatorName,
+    operator: operatorInput ? operatorInput.value || 'josue' : 'josue',
     notes: notesInput ? notesInput.value : '',
     intended_position_usd: decision === 'approve_manual_live' ? 44 : 0,
     intended_leverage: decision === 'approve_manual_live' ? 2 : 0
@@ -400,10 +465,14 @@ async function recordDecision(signalId, decision) {
     body: JSON.stringify(body)
   });
   const data = await res.json();
-  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  const message = document.getElementById('message');
   document.getElementById('order').textContent = String(data.order_placed === true);
   if (!res.ok) {
-    document.getElementById('message').textContent = `API error ${res.status}: ` + JSON.stringify(data, null, 2);
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback success';
+    message.innerHTML = `<strong>Decision recorded:</strong> ${esc(data.decision)} | signal_id=${esc(data.signal_id)} | order_placed=${esc(data.order_placed)}`;
   }
   await loadDecisions();
 }
@@ -419,7 +488,7 @@ async function loadDecisions() {
   root.innerHTML = data.decisions.map(d => `<div class="decision">
     <div class="grid">
       <div><div class="label">created_at</div><div class="value">${esc(d.created_at)}</div></div>
-      <div><div class="label">signal_id</div><div class="value">${esc(d.signal_id)}</div></div>
+      <div><div class="label">signal_id</div><div class="value mono">${esc(d.signal_id)}</div></div>
       <div><div class="label">decision</div><div class="value">${esc(d.decision)}</div></div>
       <div><div class="label">operator</div><div class="value">${esc(d.operator)}</div></div>
       <div><div class="label">order_placed</div><div class="value danger">${esc(d.order_placed)}</div></div>
@@ -430,6 +499,11 @@ async function loadDecisions() {
 }
 
 refreshAll();
+['latestOnly', 'eligibleOnly', 'includeForbidden', 'allowShort', 'limit'].forEach(id => {
+  document.addEventListener('change', event => {
+    if (event.target && event.target.id === id) loadCandidates();
+  });
+});
 setInterval(refreshAll, 30000);
 </script>
 </body>

@@ -42,12 +42,19 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertEqual(200, response.status_code)
             self.assertIn("text/html", response.headers["content-type"])
             html = response.text
+            self.assertIn("LOCAL PAPER/MANUAL INTENT ONLY", html)
             self.assertIn("live_execution_enabled=false", html)
+            self.assertIn("order_placed=false", html)
             self.assertIn("Record Decision", html)
+            self.assertIn("Latest only", html)
+            self.assertIn("Eligible only", html)
+            self.assertIn("Allow short", html)
+            self.assertIn("Recent Decisions", html)
             self.assertIn("Watch", html)
             self.assertIn("Reject", html)
             self.assertIn("Paper Only", html)
-            self.assertIn("Approve Manual Live", html)
+            self.assertIn("Log Manual-Live Intent", html)
+            self.assertIn("Blocked: candidate is FORBIDDEN", html)
             self.assertIn("No order placement", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
