@@ -22,6 +22,10 @@ HIGH_TIMEFRAMES = {"444m", "888m"}
 LIVE_DECISION_ELIGIBLE = "ELIGIBLE_TINY_LIVE"
 LIVE_DECISION_PAPER_ONLY = "PAPER_ONLY"
 LIVE_DECISION_FORBIDDEN = "FORBIDDEN"
+BETRAYAL_STRONG = "STRONG_BETRAYAL_WATCH"
+BETRAYAL_WATCH = "BETRAYAL_WATCH"
+BETRAYAL_WEAK = "WEAK_BETRAYAL_CONTEXT"
+BETRAYAL_IGNORE = "IGNORE"
 
 
 def build_summary_text(log_dir: str | Path | None = None) -> str:
@@ -398,6 +402,85 @@ def build_live_checklist_text(
     return "\n".join(lines)
 
 
+def build_betrayal_report_text(
+    *,
+    limit: int = 20,
+    since_hours: int = 24,
+    symbol: str | None = None,
+    min_betrayal_score: int = 50,
+    latest_only: bool = False,
+    log_dir: str | Path | None = None,
+) -> str:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    generated_at = datetime.now(UTC)
+    signals = _filter_symbol(load_signals(resolved_log_dir), symbol)
+    outcomes = _filter_symbol(load_outcomes(resolved_log_dir), symbol)
+    signal_window_start = generated_at - timedelta(hours=max(since_hours, 0))
+    window_signals = [
+        signal
+        for signal in signals
+        if _timestamp_in_window(signal.timestamp, signal_window_start, generated_at)
+    ]
+    if latest_only:
+        window_signals = sorted(window_signals, key=lambda signal: signal.timestamp, reverse=True)[:5]
+
+    outcome_by_signal = _outcomes_by_signal(outcomes)
+    candidates = [
+        _build_betrayal_candidate(signal, generated_at=generated_at, outcomes=outcome_by_signal.get(signal.signal_id, []))
+        for signal in window_signals
+    ]
+    candidates = [candidate for candidate in candidates if candidate.score >= min_betrayal_score]
+    candidates.sort(key=lambda candidate: (candidate.score, candidate.signal.timestamp), reverse=True)
+    if not latest_only:
+        candidates = candidates[: max(limit, 0)]
+
+    scores = [candidate.score for candidate in candidates]
+    fresh_count = sum(1 for candidate in candidates if candidate.age_minutes is not None and candidate.age_minutes <= 30)
+
+    lines = [
+        "HAMMER RADAR BETRAYAL SHADOW REPORT",
+        "",
+        "1. HEADER",
+        f"archive_log_dir: {resolved_log_dir}",
+        f"generated_at: {generated_at.isoformat()}",
+        f"signal_window: last_{max(since_hours, 0)}h ({signal_window_start.isoformat()} to {generated_at.isoformat()})",
+        f"symbol: {symbol or 'all'}",
+        f"total_signals_in_window: {len(window_signals)}",
+        f"total_betrayal_candidates: {len(candidates)}",
+        "live_execution_enabled: false",
+        "betrayal_mode: shadow_only",
+        "",
+        "2. BETRAYAL SUMMARY",
+        f"long_signal_betrayal_count: {sum(1 for candidate in candidates if candidate.signal.direction == 'long')}",
+        f"short_signal_betrayal_count: {sum(1 for candidate in candidates if candidate.signal.direction == 'short')}",
+        f"avg_betrayal_score: {_average(scores):.2f}",
+        f"highest_betrayal_score: {max(scores) if scores else 0}",
+        f"fresh_within_30m_count: {fresh_count}",
+        "",
+        "3. BETRAYAL CANDIDATES",
+    ]
+    if candidates:
+        for index, candidate in enumerate(candidates, start=1):
+            lines.extend(_format_betrayal_candidate_lines(index, candidate))
+    else:
+        lines.append("no betrayal candidates")
+
+    lines.extend(
+        [
+            "",
+            "4. SHADOW OUTCOME EVALUATION",
+            "Opposite-direction outcomes are not available unless separately archived; this report does not fabricate shadow outcomes.",
+            "",
+            "5. SAFETY OUTPUT",
+            "Betrayal mode is shadow-only.",
+            "No live order was placed.",
+            "This report does not affect live-checklist eligibility.",
+            "Betrayal candidates require separate forward evidence before trading.",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -439,6 +522,17 @@ def main() -> int:
                 max_position_usd=args.max_position_usd,
                 fresh_minutes=args.fresh_minutes,
                 allow_expired=args.allow_expired,
+                latest_only=args.latest_only,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "betrayal-report":
+        print(
+            build_betrayal_report_text(
+                limit=args.limit,
+                since_hours=args.since_hours,
+                symbol=args.symbol,
+                min_betrayal_score=args.min_betrayal_score,
                 latest_only=args.latest_only,
                 log_dir=args.log_dir,
             )
@@ -496,6 +590,13 @@ def _build_parser() -> argparse.ArgumentParser:
     live_parser.add_argument("--allow-expired", action="store_true")
     live_parser.add_argument("--latest-only", action="store_true")
 
+    betrayal_parser = subparsers.add_parser("betrayal-report", parents=[parent])
+    betrayal_parser.add_argument("--limit", type=int, default=20)
+    betrayal_parser.add_argument("--since-hours", type=int, default=24)
+    betrayal_parser.add_argument("--symbol", default=None)
+    betrayal_parser.add_argument("--min-betrayal-score", type=int, default=50)
+    betrayal_parser.add_argument("--latest-only", action="store_true")
+
     return parser
 
 
@@ -524,6 +625,17 @@ class LiveCandidateCheck:
     max_position_cap_usd: float
     max_leverage: float
     suggested_leverage: float
+
+
+@dataclass(frozen=True)
+class BetrayalCandidate:
+    signal: SignalRecord
+    score: int
+    tier: str
+    shadow_direction: str
+    age_minutes: float | None
+    reasons: list[str]
+    original_outcome_summary: str
 
 
 def _has_any_r9_metadata(signal: object) -> bool:
@@ -931,6 +1043,162 @@ def _format_live_check_lines(index: int, check: LiveCandidateCheck) -> list[str]
         "required_manual_checklist: isolated margin; set stop before or immediately after entry; set take profit; confirm max daily loss not breached; screenshot entry; write reason before entry; review after exit",
         "",
     ]
+
+
+def _build_betrayal_candidate(
+    signal: SignalRecord,
+    *,
+    generated_at: datetime,
+    outcomes: list[OutcomeRecord],
+) -> BetrayalCandidate:
+    score = 0
+    reasons: list[str] = []
+    opposite_direction = _opposite_direction(signal.direction)
+
+    if not signal.bias_aligned:
+        score += 25
+        reasons.append("bias_aligned=false")
+    if signal.direction == "long" and signal.bias_direction == "bearish":
+        score += 20
+        reasons.append("long signal against bearish bias")
+    if signal.direction == "short" and signal.bias_direction == "bullish":
+        score += 20
+        reasons.append("short signal against bullish bias")
+    if _trend_opposes_signal(signal):
+        score += 15
+        reasons.append(f"trend_direction opposes signal: {signal.trend_direction}")
+    if signal.divergence_type is None or not signal.divergence_confirmed:
+        score += 15
+        reasons.append("divergence missing or not confirmed")
+    if signal.rsi_value is None and signal.rsi_state is None:
+        score += 5
+        reasons.append("RSI missing")
+    if signal.hammer_strength < 85:
+        score += 10
+        reasons.append("hammer_strength below 85")
+    if signal.reject_reason:
+        score += 10
+        reasons.append(f"reject_reason present: {signal.reject_reason}")
+    if signal.reject_reason == "strength_below_minimum":
+        score += 10
+        reasons.append("reject_reason is strength_below_minimum")
+    if not signal.tradable:
+        score += 10
+        reasons.append("signal was not tradable")
+
+    if signal.tradable:
+        score -= 20
+    if signal.bias_aligned:
+        score -= 15
+    if _divergence_confirms_signal(signal):
+        score -= 10
+    if signal.hammer_strength >= 95:
+        score -= 10
+
+    clamped_score = max(0, min(100, score))
+    if not reasons:
+        reasons.append("original signal is strong and aligned")
+
+    return BetrayalCandidate(
+        signal=signal,
+        score=clamped_score,
+        tier=_betrayal_tier(clamped_score),
+        shadow_direction=opposite_direction,
+        age_minutes=_candidate_age_minutes(signal, generated_at),
+        reasons=reasons,
+        original_outcome_summary=_format_original_outcome_summary(outcomes),
+    )
+
+
+def _betrayal_tier(score: int) -> str:
+    if score >= 80:
+        return BETRAYAL_STRONG
+    if score >= 60:
+        return BETRAYAL_WATCH
+    if score >= 40:
+        return BETRAYAL_WEAK
+    return BETRAYAL_IGNORE
+
+
+def _opposite_direction(direction: str) -> str:
+    if direction == "long":
+        return "short"
+    if direction == "short":
+        return "long"
+    return "unknown"
+
+
+def _trend_opposes_signal(signal: SignalRecord) -> bool:
+    return (
+        (signal.direction == "long" and signal.trend_direction == "bearish")
+        or (signal.direction == "short" and signal.trend_direction == "bullish")
+    )
+
+
+def _divergence_confirms_signal(signal: SignalRecord) -> bool:
+    return (
+        (signal.direction == "long" and signal.divergence_type == "bullish" and signal.divergence_confirmed)
+        or (signal.direction == "short" and signal.divergence_type == "bearish" and signal.divergence_confirmed)
+    )
+
+
+def _outcomes_by_signal(outcomes: list[OutcomeRecord]) -> dict[str, list[OutcomeRecord]]:
+    grouped: dict[str, list[OutcomeRecord]] = defaultdict(list)
+    for outcome in outcomes:
+        grouped[outcome.signal_id].append(outcome)
+    return dict(grouped)
+
+
+def _format_original_outcome_summary(outcomes: list[OutcomeRecord]) -> str:
+    if not outcomes:
+        return "original outcome not available; opposite outcome not available yet"
+    filled = [outcome for outcome in outcomes if _is_filled_outcome(outcome)]
+    wins = [outcome for outcome in filled if outcome.pnl_pct > 0.0]
+    return (
+        f"original samples={len(outcomes)} fills={len(filled)} wins={len(wins)} "
+        f"avg_pnl={_average([outcome.pnl_pct for outcome in filled]):.4f}%; "
+        "opposite outcome not available yet"
+    )
+
+
+def _format_betrayal_candidate_lines(index: int, candidate: BetrayalCandidate) -> list[str]:
+    signal = candidate.signal
+    take_profit = _calculate_report_take_profit(signal)
+    return [
+        f"rank: {index}",
+        f"betrayal_tier: {candidate.tier}",
+        f"betrayal_score: {candidate.score}",
+        f"signal_id: {signal.signal_id}",
+        f"timestamp: {signal.timestamp}",
+        f"age_minutes: {_format_optional_float(candidate.age_minutes)}",
+        f"original_direction/timeframe: {signal.direction}/{signal.timeframe}",
+        f"shadow_direction: {candidate.shadow_direction}",
+        f"tradable_original_signal: {'yes' if signal.tradable else 'no'}",
+        f"reject_reason: {signal.reject_reason or 'n/a'}",
+        f"bias: direction={signal.bias_direction} aligned={signal.bias_aligned}",
+        f"trend_direction: {signal.trend_direction or 'missing'}",
+        f"rsi: {_format_optional_float(signal.rsi_value)} state={signal.rsi_state or 'missing'}",
+        f"divergence: type={signal.divergence_type or 'missing'} confirmed={signal.divergence_confirmed}",
+        f"hammer_strength: {signal.hammer_strength:.2f}",
+        f"entry: {signal.fib_618:.4f}",
+        f"stop/invalidation: {signal.invalidation:.4f}",
+        f"take_profit: {_format_optional_float(take_profit)}",
+        f"betrayal_reasons: {', '.join(candidate.reasons)}",
+        f"shadow_outcome_evaluation: {candidate.original_outcome_summary}",
+        f"operator_note: {_betrayal_operator_note(candidate)}",
+        "",
+    ]
+
+
+def _betrayal_operator_note(candidate: BetrayalCandidate) -> str:
+    signal = candidate.signal
+    if candidate.tier == BETRAYAL_IGNORE:
+        return "Ignore: original signal is strong and aligned."
+    if candidate.shadow_direction == "short":
+        return f"Shadow short watch: {', '.join(candidate.reasons[:3])}."
+    if candidate.shadow_direction == "long":
+        return f"Shadow long watch: {', '.join(candidate.reasons[:3])}."
+    return "Shadow watch: contradiction detected, but direction is unknown."
 
 
 def _calculate_report_take_profit(signal: SignalRecord) -> float | None:

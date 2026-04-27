@@ -642,6 +642,137 @@ class InspectCliTestCase(unittest.TestCase):
         self.assertIn("signal_id: live-latest|5", output)
         self.assertEqual(5, output.count("signal_id: live-latest|"))
 
+    def test_betrayal_report_works_on_empty_archive(self) -> None:
+        empty_dir = Path(self.temp_dir.name) / "empty-betrayal"
+
+        output = inspect.build_betrayal_report_text(log_dir=empty_dir)
+
+        self.assertIn("HAMMER RADAR BETRAYAL SHADOW REPORT", output)
+        self.assertIn(f"archive_log_dir: {empty_dir}", output)
+        self.assertIn("total_signals_in_window: 0", output)
+        self.assertIn("total_betrayal_candidates: 0", output)
+        self.assertIn("betrayal_mode: shadow_only", output)
+        self.assertIn("Betrayal mode is shadow-only.", output)
+        self.assertFalse(empty_dir.exists())
+
+    def test_betrayal_report_bias_contradiction_creates_candidate(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-bias"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-bias|1",
+                timestamp=self._recent_timestamp(),
+                direction="long",
+                bias_direction="bearish",
+                bias_aligned=False,
+                trend_direction="bearish",
+                tradable=False,
+                reject_reason="bias_not_aligned",
+                hammer_strength=80.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_betrayal_report_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("signal_id: betrayal-bias|1", output)
+        self.assertIn("shadow_direction: short", output)
+        self.assertIn("betrayal_tier: STRONG_BETRAYAL_WATCH", output)
+        self.assertIn("long signal against bearish bias", output)
+
+    def test_betrayal_report_strong_aligned_tradable_signal_is_not_candidate(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-ignore"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-ignore|1",
+                timestamp=self._recent_timestamp(),
+                rsi_value=50.0,
+                rsi_state="neutral",
+                divergence_type="bullish",
+                divergence_confirmed=True,
+                hammer_strength=100.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_betrayal_report_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("total_betrayal_candidates: 0", output)
+        self.assertNotIn("signal_id: betrayal-ignore|1", output)
+
+    def test_betrayal_report_non_tradable_rejected_signal_gets_points(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-rejected"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-rejected|1",
+                timestamp=self._recent_timestamp(),
+                tradable=False,
+                reject_reason="strength_below_minimum",
+                hammer_strength=70.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_betrayal_report_text(log_dir=report_dir, since_hours=10000, min_betrayal_score=0)
+
+        self.assertIn("signal_id: betrayal-rejected|1", output)
+        self.assertIn("reject_reason is strength_below_minimum", output)
+        self.assertIn("signal was not tradable", output)
+
+    def test_betrayal_report_score_is_clamped_to_100(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-clamp"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-clamp|1",
+                timestamp=self._recent_timestamp(),
+                direction="long",
+                bias_direction="bearish",
+                bias_aligned=False,
+                trend_direction="bearish",
+                tradable=False,
+                reject_reason="strength_below_minimum",
+                hammer_strength=60.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        output = inspect.build_betrayal_report_text(log_dir=report_dir, since_hours=10000)
+
+        self.assertIn("betrayal_score: 100", output)
+
+    def test_betrayal_report_latest_only_prioritizes_recent_candidates(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-latest-only"
+        for index in range(6):
+            archive.append_signal(
+                self._build_signal(
+                    signal_id=f"betrayal-latest|{index}",
+                    timestamp=self._recent_timestamp(minutes_ago=60 - index),
+                    direction="long",
+                    bias_direction="bearish",
+                    bias_aligned=False,
+                    tradable=False,
+                    reject_reason="bias_not_aligned",
+                    hammer_strength=80.0,
+                ),
+                log_dir=report_dir,
+            )
+
+        output = inspect.build_betrayal_report_text(
+            log_dir=report_dir,
+            since_hours=10000,
+            latest_only=True,
+            min_betrayal_score=0,
+        )
+
+        self.assertNotIn("signal_id: betrayal-latest|0", output)
+        self.assertIn("signal_id: betrayal-latest|5", output)
+        self.assertEqual(5, output.count("signal_id: betrayal-latest|"))
+
+    def test_betrayal_report_includes_shadow_only_safety_warning(self) -> None:
+        output = inspect.build_betrayal_report_text(since_hours=10000)
+
+        self.assertIn("betrayal_mode: shadow_only", output)
+        self.assertIn("This report does not affect live-checklist eligibility.", output)
+
     @staticmethod
     def _build_signal(
         *,
@@ -652,9 +783,11 @@ class InspectCliTestCase(unittest.TestCase):
         timestamp: str = "2026-04-24T16:27:59.999000+00:00",
         hammer_strength: float = 95.0,
         invalidation: float = 95.0,
+        bias_direction: str = "bullish",
         bias_aligned: bool = True,
         tradable: bool = True,
         reject_reason: str | None = None,
+        trend_direction: str | None = "bullish",
         rsi_value: float | None = None,
         rsi_state: str | None = None,
         divergence_type: str | None = None,
@@ -679,13 +812,13 @@ class InspectCliTestCase(unittest.TestCase):
             fib_786=98.5,
             invalidation=invalidation,
             bias_timeframe="4H",
-            bias_direction="bullish",
+            bias_direction=bias_direction,
             bias_aligned=bias_aligned,
             same_direction_streak=0,
             opposite_direction_streak=0,
             tradable=tradable,
             reject_reason=reject_reason,
-            trend_direction="bullish",
+            trend_direction=trend_direction,
             trend_strength_score=0.4,
             trend_lookback_candles=3,
             ema_4h_20=100.0,
