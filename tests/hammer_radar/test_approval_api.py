@@ -49,6 +49,11 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Latest only", html)
             self.assertIn("Eligible only", html)
             self.assertIn("Allow short", html)
+            self.assertIn("Friday Readiness", html)
+            self.assertIn("44 USDT", html)
+            self.assertIn("2x preferred", html)
+            self.assertIn("3x max", html)
+            self.assertIn("isolated margin", html)
             self.assertIn("Recent Decisions", html)
             self.assertIn("Watch", html)
             self.assertIn("Reject", html)
@@ -68,6 +73,85 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["order_placed"])
         self.assertEqual("ELIGIBLE_TINY_LIVE", payload["candidates"][0]["decision"])
         self.assertFalse(payload["candidates"][0]["order_placed"])
+
+    def test_readiness_returns_safety_fields_and_not_ready_empty_archive(self) -> None:
+        response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertFalse(payload["allowed_now"])
+        self.assertIn("no fresh ELIGIBLE_TINY_LIVE", payload["reason_summary"])
+
+    def test_readiness_ready_with_fresh_eligible_candidate_and_no_manual_outcomes(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|ready"), log_dir=self.log_dir)
+
+        response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("READY", payload["readiness_status"])
+        self.assertTrue(payload["allowed_now"])
+        self.assertEqual(1, payload["current_state"]["fresh_eligible_count"])
+        self.assertEqual(0, payload["current_state"]["manual_outcomes_today"])
+
+    def test_readiness_not_ready_when_candidate_is_expired(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="eligible|expired",
+                timestamp=(datetime.now(UTC) - timedelta(minutes=90)).isoformat(),
+            ),
+            log_dir=self.log_dir,
+        )
+
+        response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertFalse(payload["allowed_now"])
+        self.assertIn("expired", payload["reason_summary"])
+
+    def test_readiness_not_ready_when_manual_outcome_exists_today(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|used"), log_dir=self.log_dir)
+        self.client.post(
+            "/manual-outcomes",
+            json={
+                "signal_id": "eligible|used",
+                "result": "skipped",
+                "notes": "already reviewed today",
+            },
+        )
+
+        response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertEqual(1, payload["current_state"]["manual_outcomes_today"])
+        self.assertIn("manual outcome already logged today", payload["blockers"])
+
+    def test_readiness_not_ready_when_loss_exists_today(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|loss"), log_dir=self.log_dir)
+        self.client.post(
+            "/manual-outcomes",
+            json={
+                "signal_id": "eligible|loss",
+                "result": "loss",
+                "pnl_usd": -1.25,
+                "notes": "loss today",
+            },
+        )
+
+        response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertEqual(1, payload["current_state"]["losses_today"])
+        self.assertIn("at least one manual loss logged today", payload["blockers"])
 
     def test_approve_manual_live_records_decision_for_eligible_candidate(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|approve"), log_dir=self.log_dir)
@@ -274,13 +358,14 @@ class ApprovalApiTestCase(unittest.TestCase):
         tradable: bool = True,
         reject_reason: str | None = None,
         hammer_strength: float = 100.0,
+        timestamp: str | None = None,
     ) -> SignalRecord:
         return SignalRecord(
             signal_id=signal_id,
             symbol="BTCUSDT",
             timeframe="13m",
             direction="long",
-            timestamp=(datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+            timestamp=timestamp or (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
             hammer_strength=hammer_strength,
             hammer_high=101.0,
             hammer_low=94.0,

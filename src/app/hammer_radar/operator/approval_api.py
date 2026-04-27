@@ -27,6 +27,7 @@ from src.app.hammer_radar.operator.manual_outcomes import (
     append_manual_outcome,
     load_manual_outcomes,
 )
+from src.app.hammer_radar.operator.readiness import build_readiness_payload
 
 SERVICE_NAME = "hammer_radar_approval_api"
 DECISIONS_FILENAME = "manual_decisions.ndjson"
@@ -76,6 +77,11 @@ def health() -> dict:
         "service": SERVICE_NAME,
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
     }
+
+
+@app.get("/readiness")
+def readiness() -> dict:
+    return build_readiness_payload(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/candidates")
@@ -330,7 +336,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -357,6 +363,8 @@ def _operator_ui_html() -> str:
     pre { white-space: pre-wrap; background: #111827; color: #f9fafb; padding: 12px; border-radius: 6px; }
     .success { border-color: #86efac; background: #f0fdf4; color: #14532d; }
     .error { border-color: #fca5a5; background: #fef2f2; color: #7f1d1d; }
+    .ready { border-left: 6px solid #16a34a; }
+    .not-ready { border-left: 6px solid #dc2626; }
     .muted { color: #667085; }
     h2 { margin-top: 28px; }
   </style>
@@ -378,6 +386,25 @@ def _operator_ui_html() -> str:
         <div><div class="label">Archive</div><div id="archive" class="value">loading</div></div>
         <div><div class="label">Generated</div><div id="generated" class="value">loading</div></div>
       </div>
+    </section>
+
+    <h2>Friday Readiness</h2>
+    <section id="readiness" class="readiness not-ready">
+      <div class="grid">
+        <div><div class="label">readiness_status</div><div id="readyStatus" class="value danger">loading</div></div>
+        <div><div class="label">allowed_now</div><div id="allowedNow" class="value danger">false</div></div>
+        <div><div class="label">fresh eligible count</div><div id="freshEligible" class="value">loading</div></div>
+        <div><div class="label">manual outcomes today</div><div id="outcomesToday" class="value">loading</div></div>
+        <div><div class="label">losses today</div><div id="lossesToday" class="value">loading</div></div>
+        <div><div class="label">pnl today</div><div id="pnlToday" class="value">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="readinessLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="readinessOrder" class="value danger">false</div></div>
+      </div>
+      <p><strong>Protocol:</strong> 44 USDT max, 2x preferred, 3x max, isolated margin, max 1 manual tiny-live trade per day, stop after 1 loss or -5 USDT.</p>
+      <p id="readinessReason">loading</p>
+      <p><strong>Blockers:</strong> <span id="readinessBlockers">loading</span></p>
+      <p><strong>Next required action:</strong> <span id="nextAction">loading</span></p>
+      <p class="muted">If NOT_READY, manual live trade should not be taken now. If READY: Log decision before manual exchange action. App does not place orders.</p>
     </section>
 
     <section class="controls">
@@ -410,6 +437,7 @@ function esc(value) {
 
 async function refreshAll() {
   await loadHealth();
+  await loadReadiness();
   await loadCandidates();
   await loadDecisions();
 }
@@ -419,6 +447,31 @@ async function loadHealth() {
   const data = await res.json();
   document.getElementById('health').textContent = data.ok ? 'ok' : 'not ok';
   document.getElementById('live').textContent = String(data.live_execution_enabled);
+}
+
+async function loadReadiness() {
+  const res = await fetch('/readiness');
+  const data = await res.json();
+  const state = data.current_state || {};
+  const root = document.getElementById('readiness');
+  const isReady = data.readiness_status === 'READY';
+  root.className = 'readiness ' + (isReady ? 'ready' : 'not-ready');
+  document.getElementById('readyStatus').textContent = data.readiness_status || 'UNKNOWN';
+  document.getElementById('readyStatus').className = 'value ' + (isReady ? 'safe' : 'danger');
+  document.getElementById('allowedNow').textContent = String(data.allowed_now === true);
+  document.getElementById('allowedNow').className = 'value ' + (data.allowed_now === true ? 'safe' : 'danger');
+  document.getElementById('freshEligible').textContent = String(state.fresh_eligible_count ?? 0);
+  document.getElementById('outcomesToday').textContent = String(state.manual_outcomes_today ?? 0);
+  document.getElementById('lossesToday').textContent = String(state.losses_today ?? 0);
+  document.getElementById('pnlToday').textContent = String(state.pnl_usd_today ?? 0);
+  document.getElementById('readinessLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('readinessOrder').textContent = String(data.order_placed);
+  document.getElementById('readinessReason').textContent = data.reason_summary || '';
+  document.getElementById('readinessBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
+  document.getElementById('nextAction').textContent = data.next_required_action || '';
+  if (!isReady) {
+    document.getElementById('readinessReason').textContent = (data.reason_summary || '') + ' Manual live trade should not be taken now.';
+  }
 }
 
 async function loadCandidates() {

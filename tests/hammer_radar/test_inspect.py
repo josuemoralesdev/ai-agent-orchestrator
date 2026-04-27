@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.app.hammer_radar.operator import archive, inspect, manual_outcomes, positions
+from src.app.hammer_radar.operator import archive, inspect, manual_outcomes, positions, readiness
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -188,6 +188,15 @@ class InspectCliTestCase(unittest.TestCase):
                 result="invalid",
                 log_dir=Path(self.temp_dir.name) / "manual-invalid",
             )
+
+    def test_readiness_cli_text_works(self) -> None:
+        output = readiness.build_readiness_text(log_dir=Path(self.temp_dir.name) / "readiness-empty")
+
+        self.assertIn("HAMMER RADAR FRIDAY READINESS", output)
+        self.assertIn("live_execution_enabled: false", output)
+        self.assertIn("order_placed: false", output)
+        self.assertIn("readiness_status: NOT_READY", output)
+        self.assertIn("today_timezone: UTC", output)
 
     def test_readme_references_manual_tiny_live_protocol(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
