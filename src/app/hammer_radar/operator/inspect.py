@@ -280,45 +280,30 @@ def build_live_checklist_text(
     latest_only: bool = False,
     log_dir: str | Path | None = None,
 ) -> str:
-    resolved_log_dir = get_log_dir(log_dir, use_env=True)
-    generated_at = datetime.now(UTC)
-    signals = _filter_symbol(load_signals(resolved_log_dir), symbol)
-    outcomes = _filter_symbol(load_outcomes(resolved_log_dir), symbol)
-    positions = _filter_symbol(load_positions(resolved_log_dir), symbol)
-    closed_positions = [position for position in positions if position.status == "closed"]
-    positions_by_signal = _positions_by_signal(closed_positions)
-    signal_window_start = generated_at - timedelta(hours=max(since_hours, 0))
-    window_signals = [
-        signal
-        for signal in signals
-        if _timestamp_in_window(signal.timestamp, signal_window_start, generated_at)
-    ]
-    if latest_only:
-        window_signals = sorted(window_signals, key=lambda signal: signal.timestamp, reverse=True)[:5]
-    performance = _performance_summary(outcomes)
-    ranked = [
-        _rank_candidate(signal, positions_by_signal.get(signal.signal_id, []))
-        for signal in window_signals
-    ]
-    ranked.sort(key=lambda candidate: (candidate.score, candidate.signal.timestamp), reverse=True)
-    if not latest_only:
-        ranked = ranked[: max(limit, 0)]
-    checks = [
-        _build_live_check(
-            candidate,
-            generated_at=generated_at,
-            min_score=min_score,
-            allow_short=allow_short,
-            allow_oversold=allow_oversold,
-            allow_trigger_flags=allow_trigger_flags,
-            allow_expired=allow_expired,
-            max_risk_usd=max_risk_usd,
-            max_leverage=max_leverage,
-            max_position_usd=max_position_usd,
-            fresh_minutes=fresh_minutes,
-        )
-        for candidate in ranked
-    ]
+    snapshot = build_live_candidate_snapshot(
+        limit=limit,
+        since_hours=since_hours,
+        min_score=min_score,
+        symbol=symbol,
+        allow_short=allow_short,
+        allow_oversold=allow_oversold,
+        allow_trigger_flags=allow_trigger_flags,
+        max_risk_usd=max_risk_usd,
+        max_leverage=max_leverage,
+        max_position_usd=max_position_usd,
+        fresh_minutes=fresh_minutes,
+        allow_expired=allow_expired,
+        latest_only=latest_only,
+        log_dir=log_dir,
+    )
+    resolved_log_dir = snapshot["archive_log_dir"]
+    generated_at = snapshot["generated_at"]
+    signal_window_start = snapshot["signal_window_start"]
+    window_signals = snapshot["window_signals"]
+    signals = snapshot["signals"]
+    outcomes = snapshot["outcomes"]
+    performance = snapshot["performance"]
+    checks = snapshot["checks"]
     decisions = [check.decision for check in checks]
     current_eligible_count = sum(
         1
@@ -400,6 +385,73 @@ def build_live_checklist_text(
         ]
     )
     return "\n".join(lines)
+
+
+def build_live_candidate_snapshot(
+    *,
+    limit: int = 10,
+    since_hours: int = 24,
+    min_score: int = 90,
+    symbol: str | None = None,
+    allow_short: bool = False,
+    allow_oversold: bool = False,
+    allow_trigger_flags: bool = False,
+    max_risk_usd: float = 5.0,
+    max_leverage: float = 3.0,
+    max_position_usd: float = 44.0,
+    fresh_minutes: int = 30,
+    allow_expired: bool = False,
+    latest_only: bool = False,
+    log_dir: str | Path | None = None,
+) -> dict:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    generated_at = datetime.now(UTC)
+    signals = _filter_symbol(load_signals(resolved_log_dir), symbol)
+    outcomes = _filter_symbol(load_outcomes(resolved_log_dir), symbol)
+    positions = _filter_symbol(load_positions(resolved_log_dir), symbol)
+    closed_positions = [position for position in positions if position.status == "closed"]
+    positions_by_signal = _positions_by_signal(closed_positions)
+    signal_window_start = generated_at - timedelta(hours=max(since_hours, 0))
+    window_signals = [
+        signal
+        for signal in signals
+        if _timestamp_in_window(signal.timestamp, signal_window_start, generated_at)
+    ]
+    if latest_only:
+        window_signals = sorted(window_signals, key=lambda signal: signal.timestamp, reverse=True)[:5]
+    ranked = [
+        _rank_candidate(signal, positions_by_signal.get(signal.signal_id, []))
+        for signal in window_signals
+    ]
+    ranked.sort(key=lambda candidate: (candidate.score, candidate.signal.timestamp), reverse=True)
+    if not latest_only:
+        ranked = ranked[: max(limit, 0)]
+    checks = [
+        _build_live_check(
+            candidate,
+            generated_at=generated_at,
+            min_score=min_score,
+            allow_short=allow_short,
+            allow_oversold=allow_oversold,
+            allow_trigger_flags=allow_trigger_flags,
+            allow_expired=allow_expired,
+            max_risk_usd=max_risk_usd,
+            max_leverage=max_leverage,
+            max_position_usd=max_position_usd,
+            fresh_minutes=fresh_minutes,
+        )
+        for candidate in ranked
+    ]
+    return {
+        "archive_log_dir": resolved_log_dir,
+        "generated_at": generated_at,
+        "signal_window_start": signal_window_start,
+        "window_signals": window_signals,
+        "signals": signals,
+        "outcomes": outcomes,
+        "checks": checks,
+        "performance": _performance_summary(outcomes),
+    }
 
 
 def build_betrayal_report_text(
@@ -537,6 +589,10 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "decisions":
+        from src.app.hammer_radar.operator.approval_api import build_decisions_text
+
+        print(build_decisions_text(limit=args.limit, signal_id=args.signal_id, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -596,6 +652,10 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_parser.add_argument("--symbol", default=None)
     betrayal_parser.add_argument("--min-betrayal-score", type=int, default=50)
     betrayal_parser.add_argument("--latest-only", action="store_true")
+
+    decisions_parser = subparsers.add_parser("decisions", parents=[parent])
+    decisions_parser.add_argument("--limit", type=int, default=50)
+    decisions_parser.add_argument("--signal-id", default=None)
 
     return parser
 
