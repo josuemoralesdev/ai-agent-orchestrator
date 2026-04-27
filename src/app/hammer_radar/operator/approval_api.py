@@ -23,6 +23,10 @@ from src.app.hammer_radar.operator.inspect import (
     LiveCandidateCheck,
     build_live_candidate_snapshot,
 )
+from src.app.hammer_radar.operator.manual_outcomes import (
+    append_manual_outcome,
+    load_manual_outcomes,
+)
 
 SERVICE_NAME = "hammer_radar_approval_api"
 DECISIONS_FILENAME = "manual_decisions.ndjson"
@@ -32,6 +36,7 @@ DEFAULT_MAX_POSITION_USD = 44.0
 DEFAULT_MAX_LEVERAGE = 3.0
 
 DecisionValue = Literal["approve_manual_live", "reject", "paper_only", "watch"]
+ManualOutcomeResult = Literal["win", "loss", "breakeven", "skipped"]
 
 app = FastAPI(title="Hammer Radar Approval API")
 
@@ -44,6 +49,18 @@ class DecisionRequest(BaseModel):
     intended_position_usd: float | None = None
     intended_leverage: float | None = None
     override_reason: str | None = None
+
+
+class ManualOutcomeRequest(BaseModel):
+    signal_id: str = Field(min_length=1)
+    result: ManualOutcomeResult
+    entry_price: float | None = None
+    exit_price: float | None = None
+    position_usd: float | None = None
+    leverage: float | None = None
+    pnl_usd: float | None = None
+    pnl_pct: float | None = None
+    notes: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -140,6 +157,35 @@ def decision_by_id(decision_id: str) -> dict:
             record["order_placed"] = ORDER_PLACED
             return record
     raise HTTPException(status_code=404, detail="decision not found")
+
+
+@app.post("/manual-outcomes")
+def create_manual_outcome(request: ManualOutcomeRequest) -> dict:
+    record = append_manual_outcome(
+        signal_id=request.signal_id,
+        result=request.result,
+        entry_price=request.entry_price,
+        exit_price=request.exit_price,
+        position_usd=request.position_usd,
+        leverage=request.leverage,
+        pnl_usd=request.pnl_usd,
+        pnl_pct=request.pnl_pct,
+        notes=request.notes,
+        log_dir=get_log_dir(use_env=True),
+    )
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["order_placed"] = ORDER_PLACED
+    return record
+
+
+@app.get("/manual-outcomes")
+def manual_outcomes(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    records = load_manual_outcomes(limit=limit, signal_id=signal_id, log_dir=get_log_dir(use_env=True))
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "manual_outcomes": records,
+    }
 
 
 def build_decisions_text(

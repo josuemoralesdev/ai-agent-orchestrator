@@ -593,6 +593,31 @@ def main() -> int:
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
         print(build_decisions_text(limit=args.limit, signal_id=args.signal_id, log_dir=args.log_dir))
+    elif args.command == "log-manual-outcome":
+        from src.app.hammer_radar.operator.manual_outcomes import append_manual_outcome
+
+        record = append_manual_outcome(
+            signal_id=args.signal_id,
+            result=args.result,
+            entry_price=args.entry_price,
+            exit_price=args.exit_price,
+            position_usd=args.position_usd,
+            leverage=args.leverage,
+            pnl_usd=args.pnl_usd,
+            pnl_pct=args.pnl_pct,
+            notes=args.notes,
+            log_dir=args.log_dir,
+        )
+        print("HAMMER RADAR MANUAL OUTCOME LOGGED")
+        print(f"outcome_id: {record['outcome_id']}")
+        print(f"signal_id: {record['signal_id']}")
+        print(f"result: {record['result']}")
+        print("live_execution_enabled: false")
+        print("order_placed: false")
+    elif args.command == "manual-outcomes":
+        from src.app.hammer_radar.operator.manual_outcomes import build_manual_outcomes_text
+
+        print(build_manual_outcomes_text(limit=args.limit, signal_id=args.signal_id, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -656,6 +681,21 @@ def _build_parser() -> argparse.ArgumentParser:
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
     decisions_parser.add_argument("--signal-id", default=None)
+
+    log_manual_outcome_parser = subparsers.add_parser("log-manual-outcome", parents=[parent])
+    log_manual_outcome_parser.add_argument("--signal-id", required=True)
+    log_manual_outcome_parser.add_argument("--result", choices=("win", "loss", "breakeven", "skipped"), required=True)
+    log_manual_outcome_parser.add_argument("--entry-price", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--exit-price", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--position-usd", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--leverage", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--pnl-usd", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--pnl-pct", type=float, default=None)
+    log_manual_outcome_parser.add_argument("--notes", default="")
+
+    manual_outcomes_parser = subparsers.add_parser("manual-outcomes", parents=[parent])
+    manual_outcomes_parser.add_argument("--limit", type=int, default=50)
+    manual_outcomes_parser.add_argument("--signal-id", default=None)
 
     return parser
 

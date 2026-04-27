@@ -207,6 +207,39 @@ http://127.0.0.1:8015/ui
 
 The UI records decisions only through the local Approval API. It does not place orders, does not call Binance, and keeps `live_execution_enabled=false` / `order_placed=false`.
 
+## Hammer Radar Friday Manual Tiny-Live Protocol
+
+The first manual tiny-live workflow is documented in:
+
+```text
+docs/hammer_radar_manual_tiny_live_protocol.md
+```
+
+Use the local approval UI first:
+
+```text
+http://127.0.0.1:8015/ui
+```
+
+Log the decision before any manual exchange action. After exit, record the manual result:
+
+```bash
+HAMMER_RADAR_LOG_DIR=/home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward \
+  .venv/bin/python -m src.app.hammer_radar.operator.inspect log-manual-outcome \
+  --signal-id "..." \
+  --result skipped \
+  --notes "manual review"
+```
+
+Review manual outcomes:
+
+```bash
+HAMMER_RADAR_LOG_DIR=/home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward \
+  .venv/bin/python -m src.app.hammer_radar.operator.inspect manual-outcomes
+```
+
+The app records intent and outcomes only. It does not place orders, does not call Binance, and keeps `live_execution_enabled=false` / `order_placed=false`.
+
 ### Example Request
 
 ```json
