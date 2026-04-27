@@ -13,6 +13,7 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.app.hammer_radar.operator.archive import get_log_dir
@@ -43,6 +44,12 @@ class DecisionRequest(BaseModel):
     intended_position_usd: float | None = None
     intended_leverage: float | None = None
     override_reason: str | None = None
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/ui", response_class=HTMLResponse)
+def operator_ui() -> str:
+    return _operator_ui_html()
 
 
 @app.get("/health")
@@ -262,6 +269,171 @@ def _append_decision(record: dict, *, log_dir: Path) -> None:
 
 def _decisions_path(log_dir: Path) -> Path:
     return log_dir / DECISIONS_FILENAME
+
+
+def _operator_ui_html() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hammer Radar Approval Console</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; background: #f7f7f5; color: #202124; }
+    body { margin: 0; }
+    header { padding: 18px 24px; background: #1f2933; color: white; }
+    main { max-width: 1180px; margin: 0 auto; padding: 20px; }
+    .status, .candidate, .decision { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
+    .value { font-weight: 700; overflow-wrap: anywhere; }
+    .danger { color: #9f1d1d; font-weight: 700; }
+    .safe { color: #12613a; font-weight: 700; }
+    button { margin: 6px 6px 0 0; padding: 8px 10px; border: 1px solid #aeb7ad; border-radius: 6px; background: #f2f5ef; cursor: pointer; }
+    button:hover { background: #e6ece2; }
+    input { min-width: 260px; padding: 8px; border: 1px solid #b8c0b6; border-radius: 6px; }
+    pre { white-space: pre-wrap; background: #111827; color: #f9fafb; padding: 12px; border-radius: 6px; }
+    h2 { margin-top: 28px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hammer Radar Approval Console</h1>
+    <div>Record Decision only. No order placement. live_execution_enabled=false.</div>
+  </header>
+  <main>
+    <section class="status">
+      <div class="grid">
+        <div><div class="label">Health</div><div id="health" class="value">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="live" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="order" class="value danger">false</div></div>
+        <div><div class="label">Archive</div><div id="archive" class="value">loading</div></div>
+        <div><div class="label">Generated</div><div id="generated" class="value">loading</div></div>
+      </div>
+      <button onclick="refreshAll()">Refresh</button>
+    </section>
+
+    <h2>Candidates</h2>
+    <div id="candidates">loading</div>
+
+    <h2>Recent Decisions</h2>
+    <div id="decisions">loading</div>
+
+    <h2>Last Action</h2>
+    <pre id="message">No action yet.</pre>
+  </main>
+<script>
+const operatorName = "josue";
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function refreshAll() {
+  await loadHealth();
+  await loadCandidates();
+  await loadDecisions();
+}
+
+async function loadHealth() {
+  const res = await fetch('/health');
+  const data = await res.json();
+  document.getElementById('health').textContent = data.ok ? 'ok' : 'not ok';
+  document.getElementById('live').textContent = String(data.live_execution_enabled);
+}
+
+async function loadCandidates() {
+  const res = await fetch('/candidates?latest_only=true');
+  const data = await res.json();
+  document.getElementById('archive').textContent = data.archive_log_dir || 'n/a';
+  document.getElementById('generated').textContent = data.generated_at || 'n/a';
+  document.getElementById('live').textContent = String(data.live_execution_enabled);
+  document.getElementById('order').textContent = String(data.order_placed);
+  const root = document.getElementById('candidates');
+  if (!data.candidates || data.candidates.length === 0) {
+    root.innerHTML = '<div class="candidate">No candidates returned.</div>';
+    return;
+  }
+  root.innerHTML = data.candidates.map(renderCandidate).join('');
+}
+
+function renderCandidate(c) {
+  const id = esc(c.signal_id);
+  return `<section class="candidate">
+    <div class="grid">
+      <div><div class="label">signal_id</div><div class="value">${id}</div></div>
+      <div><div class="label">decision</div><div class="value">${esc(c.decision)}</div></div>
+      <div><div class="label">reason</div><div class="value">${esc(c.reason)}</div></div>
+      <div><div class="label">direction/timeframe</div><div class="value">${esc(c.direction)}/${esc(c.timeframe)}</div></div>
+      <div><div class="label">entry</div><div class="value">${esc(c.entry)}</div></div>
+      <div><div class="label">stop</div><div class="value">${esc(c.stop)}</div></div>
+      <div><div class="label">take_profit</div><div class="value">${esc(c.take_profit)}</div></div>
+      <div><div class="label">age_minutes</div><div class="value">${esc(c.age_minutes)}</div></div>
+      <div><div class="label">freshness_status</div><div class="value">${esc(c.freshness_status)}</div></div>
+      <div><div class="label">capped_max_position_size_usd</div><div class="value">${esc(c.capped_max_position_size_usd)}</div></div>
+      <div><div class="label">suggested_leverage</div><div class="value">${esc(c.suggested_leverage)}</div></div>
+      <div><div class="label">score/tier</div><div class="value">${esc(c.score)} / ${esc(c.tier)}</div></div>
+      <div><div class="label">live_execution_enabled</div><div class="value danger">${esc(c.live_execution_enabled)}</div></div>
+      <div><div class="label">order_placed</div><div class="value danger">${esc(c.order_placed)}</div></div>
+    </div>
+    <p><input id="notes-${id}" placeholder="notes"></p>
+    <button onclick="recordDecision('${id}', 'watch')">Watch</button>
+    <button onclick="recordDecision('${id}', 'reject')">Reject</button>
+    <button onclick="recordDecision('${id}', 'paper_only')">Paper Only</button>
+    <button onclick="recordDecision('${id}', 'approve_manual_live')">Approve Manual Live</button>
+  </section>`;
+}
+
+async function recordDecision(signalId, decision) {
+  const notesInput = document.getElementById(`notes-${signalId}`);
+  const body = {
+    signal_id: signalId,
+    decision,
+    operator: operatorName,
+    notes: notesInput ? notesInput.value : '',
+    intended_position_usd: decision === 'approve_manual_live' ? 44 : 0,
+    intended_leverage: decision === 'approve_manual_live' ? 2 : 0
+  };
+  const res = await fetch('/decisions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  document.getElementById('order').textContent = String(data.order_placed === true);
+  if (!res.ok) {
+    document.getElementById('message').textContent = `API error ${res.status}: ` + JSON.stringify(data, null, 2);
+  }
+  await loadDecisions();
+}
+
+async function loadDecisions() {
+  const res = await fetch('/decisions?limit=10');
+  const data = await res.json();
+  const root = document.getElementById('decisions');
+  if (!data.decisions || data.decisions.length === 0) {
+    root.innerHTML = '<div class="decision">No decisions logged.</div>';
+    return;
+  }
+  root.innerHTML = data.decisions.map(d => `<div class="decision">
+    <div class="grid">
+      <div><div class="label">created_at</div><div class="value">${esc(d.created_at)}</div></div>
+      <div><div class="label">signal_id</div><div class="value">${esc(d.signal_id)}</div></div>
+      <div><div class="label">decision</div><div class="value">${esc(d.decision)}</div></div>
+      <div><div class="label">operator</div><div class="value">${esc(d.operator)}</div></div>
+      <div><div class="label">order_placed</div><div class="value danger">${esc(d.order_placed)}</div></div>
+      <div><div class="label">live_execution_enabled</div><div class="value danger">${esc(d.live_execution_enabled)}</div></div>
+    </div>
+    <div>${esc(d.notes)}</div>
+  </div>`).join('');
+}
+
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>"""
 
 
 def main() -> int:
