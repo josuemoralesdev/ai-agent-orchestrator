@@ -270,6 +270,10 @@ def build_live_checklist_text(
     allow_trigger_flags: bool = False,
     max_risk_usd: float = 5.0,
     max_leverage: float = 3.0,
+    max_position_usd: float = 44.0,
+    fresh_minutes: int = 30,
+    allow_expired: bool = False,
+    latest_only: bool = False,
     log_dir: str | Path | None = None,
 ) -> str:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
@@ -285,29 +289,59 @@ def build_live_checklist_text(
         for signal in signals
         if _timestamp_in_window(signal.timestamp, signal_window_start, generated_at)
     ]
+    if latest_only:
+        window_signals = sorted(window_signals, key=lambda signal: signal.timestamp, reverse=True)[:5]
     performance = _performance_summary(outcomes)
     ranked = [
         _rank_candidate(signal, positions_by_signal.get(signal.signal_id, []))
         for signal in window_signals
     ]
     ranked.sort(key=lambda candidate: (candidate.score, candidate.signal.timestamp), reverse=True)
-    ranked = ranked[: max(limit, 0)]
+    if not latest_only:
+        ranked = ranked[: max(limit, 0)]
     checks = [
         _build_live_check(
             candidate,
+            generated_at=generated_at,
             min_score=min_score,
             allow_short=allow_short,
             allow_oversold=allow_oversold,
             allow_trigger_flags=allow_trigger_flags,
+            allow_expired=allow_expired,
             max_risk_usd=max_risk_usd,
             max_leverage=max_leverage,
+            max_position_usd=max_position_usd,
+            fresh_minutes=fresh_minutes,
         )
         for candidate in ranked
     ]
     decisions = [check.decision for check in checks]
+    current_eligible_count = sum(
+        1
+        for check in checks
+        if check.decision == LIVE_DECISION_ELIGIBLE and check.freshness_status == "fresh"
+    )
+    expired_eligible_count = sum(
+        1
+        for check in checks
+        if (
+            check.decision == LIVE_DECISION_ELIGIBLE
+            and check.freshness_status == "expired"
+        )
+        or "freshness gate" in check.reason
+    )
+    freshest_candidate = _freshest_signal(window_signals)
+    freshest_age_minutes = _candidate_age_minutes(freshest_candidate, generated_at) if freshest_candidate else None
 
     lines = [
         "HAMMER RADAR MANUAL TINY-LIVE CHECKLIST",
+        "CURRENT ACTION SUMMARY",
+        f"current_eligible_count: {current_eligible_count}",
+        f"expired_eligible_count: {expired_eligible_count}",
+        f"paper_only_count: {decisions.count(LIVE_DECISION_PAPER_ONLY)}",
+        f"forbidden_count: {decisions.count(LIVE_DECISION_FORBIDDEN)}",
+        f"freshest_candidate_timestamp: {freshest_candidate.timestamp if freshest_candidate else 'n/a'}",
+        f"freshest_candidate_age_minutes: {_format_optional_float(freshest_age_minutes)}",
         "",
         "1. HEADER",
         f"archive_log_dir: {resolved_log_dir}",
@@ -317,8 +351,12 @@ def build_live_checklist_text(
         f"min_score: {min_score}",
         f"max_risk_usd: {float(max_risk_usd):.2f}",
         f"max_leverage: {float(max_leverage):.2f}",
+        f"max_position_usd: {float(max_position_usd):.2f}",
+        f"fresh_minutes: {max(fresh_minutes, 0)}",
         f"allow_short: {allow_short}",
         f"allow_oversold: {allow_oversold}",
+        f"allow_expired: {allow_expired}",
+        f"latest_only: {latest_only}",
         f"allow_trigger_flags: {allow_trigger_flags}",
         "live_execution_enabled: false",
         "",
@@ -398,6 +436,10 @@ def main() -> int:
                 allow_trigger_flags=args.allow_trigger_flags,
                 max_risk_usd=args.max_risk_usd,
                 max_leverage=args.max_leverage,
+                max_position_usd=args.max_position_usd,
+                fresh_minutes=args.fresh_minutes,
+                allow_expired=args.allow_expired,
+                latest_only=args.latest_only,
                 log_dir=args.log_dir,
             )
         )
@@ -449,6 +491,10 @@ def _build_parser() -> argparse.ArgumentParser:
     live_parser.add_argument("--allow-trigger-flags", action="store_true")
     live_parser.add_argument("--max-risk-usd", type=float, default=5.0)
     live_parser.add_argument("--max-leverage", type=float, default=3.0)
+    live_parser.add_argument("--max-position-usd", type=float, default=44.0)
+    live_parser.add_argument("--fresh-minutes", type=int, default=30)
+    live_parser.add_argument("--allow-expired", action="store_true")
+    live_parser.add_argument("--latest-only", action="store_true")
 
     return parser
 
@@ -469,9 +515,15 @@ class LiveCandidateCheck:
     entry: float | None
     stop: float | None
     take_profit: float | None
+    age_minutes: float | None
+    fresh_minutes: int
+    freshness_status: str
     risk_distance_pct: float | None
-    max_position_usd: float | None
+    theoretical_max_position_usd: float | None
+    capped_max_position_usd: float | None
+    max_position_cap_usd: float
     max_leverage: float
+    suggested_leverage: float
 
 
 def _has_any_r9_metadata(signal: object) -> bool:
@@ -732,21 +784,33 @@ def _format_candidate_lines(index: int, candidate: RankedCandidate) -> list[str]
 def _build_live_check(
     candidate: RankedCandidate,
     *,
+    generated_at: datetime,
     min_score: int,
     allow_short: bool,
     allow_oversold: bool,
     allow_trigger_flags: bool,
+    allow_expired: bool,
     max_risk_usd: float,
     max_leverage: float,
+    max_position_usd: float,
+    fresh_minutes: int,
 ) -> LiveCandidateCheck:
     signal = candidate.signal
     entry = _positive_float_or_none(signal.fib_618)
     stop = _positive_float_or_none(signal.invalidation)
     take_profit = _calculate_report_take_profit(signal)
+    age_minutes = _candidate_age_minutes(signal, generated_at)
+    fresh_gate_minutes = max(fresh_minutes, 0)
+    freshness_status = _freshness_status(age_minutes, fresh_gate_minutes)
     risk_distance_pct = _risk_distance_pct(entry, stop)
-    max_position_usd = (
+    theoretical_max_position_usd = (
         max_risk_usd / (risk_distance_pct / 100.0)
         if risk_distance_pct is not None and risk_distance_pct > 0.0
+        else None
+    )
+    capped_max_position_usd = (
+        min(theoretical_max_position_usd, float(max_position_usd))
+        if theoretical_max_position_usd is not None
         else None
     )
 
@@ -755,12 +819,15 @@ def _build_live_check(
         entry=entry,
         stop=stop,
         take_profit=take_profit,
+        freshness_status=freshness_status,
         risk_distance_pct=risk_distance_pct,
         min_score=min_score,
         allow_short=allow_short,
         allow_oversold=allow_oversold,
         allow_trigger_flags=allow_trigger_flags,
+        allow_expired=allow_expired,
     )
+    suggested_leverage = _suggested_leverage(candidate.score, decision=decision, max_leverage=max_leverage)
     return LiveCandidateCheck(
         candidate=candidate,
         decision=decision,
@@ -768,9 +835,15 @@ def _build_live_check(
         entry=entry,
         stop=stop,
         take_profit=take_profit,
+        age_minutes=age_minutes,
+        fresh_minutes=fresh_gate_minutes,
+        freshness_status=freshness_status,
         risk_distance_pct=risk_distance_pct,
-        max_position_usd=max_position_usd,
+        theoretical_max_position_usd=theoretical_max_position_usd,
+        capped_max_position_usd=capped_max_position_usd,
+        max_position_cap_usd=float(max_position_usd),
         max_leverage=max_leverage,
+        suggested_leverage=suggested_leverage,
     )
 
 
@@ -780,11 +853,13 @@ def _live_decision_reason(
     entry: float | None,
     stop: float | None,
     take_profit: float | None,
+    freshness_status: str,
     risk_distance_pct: float | None,
     min_score: int,
     allow_short: bool,
     allow_oversold: bool,
     allow_trigger_flags: bool,
+    allow_expired: bool,
 ) -> tuple[str, str]:
     signal = candidate.signal
     if not signal.tradable:
@@ -825,6 +900,8 @@ def _live_decision_reason(
         or signal.requires_human_approval
     ) and not allow_trigger_flags:
         return LIVE_DECISION_PAPER_ONLY, "trigger flags require explicit override"
+    if freshness_status == "expired" and not allow_expired:
+        return LIVE_DECISION_PAPER_ONLY, "candidate expired by freshness gate"
     return LIVE_DECISION_ELIGIBLE, "passes conservative manual tiny-live checklist"
 
 
@@ -838,12 +915,19 @@ def _format_live_check_lines(index: int, check: LiveCandidateCheck) -> list[str]
         f"score: {check.candidate.score}",
         f"tier: {check.candidate.tier}",
         f"direction/timeframe: {signal.direction}/{signal.timeframe}",
+        f"age_minutes: {_format_optional_float(check.age_minutes)}",
+        f"fresh_gate_minutes: {check.fresh_minutes}",
+        f"freshness_status: {check.freshness_status}",
         f"entry: {_format_optional_float(check.entry)}",
         f"stop: {_format_optional_float(check.stop)}",
         f"take_profit: {_format_optional_float(check.take_profit)}",
         f"estimated_risk_distance_pct: {_format_optional_float(check.risk_distance_pct)}%",
-        f"suggested_max_position_size_usd: {_format_optional_float(check.max_position_usd)}",
+        f"theoretical_max_position_size_usd: {_format_optional_float(check.theoretical_max_position_usd)}",
+        f"capped_max_position_size_usd: {_format_optional_float(check.capped_max_position_usd)}",
+        f"suggested_max_position_size_usd: {_format_optional_float(check.capped_max_position_usd)}",
+        f"max_position_cap_usd: {check.max_position_cap_usd:.2f}",
         f"suggested_max_leverage_cap: {check.max_leverage:.2f}",
+        f"suggested_leverage: {check.suggested_leverage:.2f}",
         "required_manual_checklist: isolated margin; set stop before or immediately after entry; set take profit; confirm max daily loss not breached; screenshot entry; write reason before entry; review after exit",
         "",
     ]
@@ -878,6 +962,39 @@ def _risk_distance_pct(entry: float | None, stop: float | None) -> float | None:
     if risk_distance_pct <= 0.0:
         return None
     return risk_distance_pct
+
+
+def _freshest_signal(signals: list[SignalRecord]) -> SignalRecord | None:
+    if not signals:
+        return None
+    return max(signals, key=lambda signal: signal.timestamp)
+
+
+def _candidate_age_minutes(signal: SignalRecord | None, generated_at: datetime) -> float | None:
+    if signal is None:
+        return None
+    timestamp = _parse_timestamp(signal.timestamp)
+    if timestamp is None:
+        return None
+    age_seconds = (generated_at - timestamp).total_seconds()
+    return max(age_seconds / 60.0, 0.0)
+
+
+def _freshness_status(age_minutes: float | None, fresh_minutes: int) -> str:
+    if age_minutes is None:
+        return "expired"
+    return "fresh" if age_minutes <= fresh_minutes else "expired"
+
+
+def _suggested_leverage(score: int, *, decision: str, max_leverage: float) -> float:
+    if decision != LIVE_DECISION_ELIGIBLE:
+        return 0.0
+    leverage_cap = max(float(max_leverage), 0.0)
+    if score >= 120:
+        return min(5.0, leverage_cap)
+    if score >= 100:
+        return min(3.0, leverage_cap)
+    return min(2.0, leverage_cap)
 
 
 def _format_optional_float(value: float | None) -> str:
