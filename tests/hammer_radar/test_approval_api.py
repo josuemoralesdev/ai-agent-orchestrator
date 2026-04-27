@@ -232,6 +232,41 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
 
+    def test_manual_outcome_api_writes_and_lists_records(self) -> None:
+        response = self.client.post(
+            "/manual-outcomes",
+            json={
+                "signal_id": "manual-api|1",
+                "result": "skipped",
+                "notes": "api unit test",
+            },
+        )
+        list_response = self.client.get("/manual-outcomes")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("manual-api|1", payload["signal_id"])
+        self.assertEqual("skipped", payload["result"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual(200, list_response.status_code)
+        listed = list_response.json()
+        self.assertFalse(listed["live_execution_enabled"])
+        self.assertFalse(listed["order_placed"])
+        self.assertEqual(1, len(listed["manual_outcomes"]))
+        self.assertTrue((self.log_dir / "manual_outcomes.ndjson").exists())
+
+    def test_manual_outcome_api_rejects_invalid_result(self) -> None:
+        response = self.client.post(
+            "/manual-outcomes",
+            json={
+                "signal_id": "manual-api|bad",
+                "result": "invalid",
+            },
+        )
+
+        self.assertEqual(422, response.status_code)
+
     @staticmethod
     def _eligible_signal(
         *,

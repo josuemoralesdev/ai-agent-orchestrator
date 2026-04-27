@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.app.hammer_radar.operator import archive, inspect, positions
+from src.app.hammer_radar.operator import archive, inspect, manual_outcomes, positions
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -158,6 +158,48 @@ class InspectCliTestCase(unittest.TestCase):
 
         self.assertIn(f"archive_log_dir: {alternate_dir}", output)
         self.assertIn("total_signals: 1", output)
+
+    def test_manual_outcome_logging_writes_selected_log_dir(self) -> None:
+        alternate_dir = Path(self.temp_dir.name) / "manual-outcomes"
+
+        record = manual_outcomes.append_manual_outcome(
+            signal_id="manual|1",
+            result="skipped",
+            notes="unit test only",
+            log_dir=alternate_dir,
+        )
+        output = manual_outcomes.build_manual_outcomes_text(log_dir=alternate_dir)
+
+        self.assertEqual("manual|1", record["signal_id"])
+        self.assertEqual("skipped", record["result"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+        self.assertTrue((alternate_dir / "manual_outcomes.ndjson").exists())
+        self.assertIn("HAMMER RADAR MANUAL OUTCOMES", output)
+        self.assertIn("signal=manual|1", output)
+        self.assertIn("result=skipped", output)
+        self.assertIn("live_execution_enabled: false", output)
+        self.assertIn("order_placed: false", output)
+
+    def test_manual_outcome_invalid_result_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            manual_outcomes.append_manual_outcome(
+                signal_id="manual|bad",
+                result="invalid",
+                log_dir=Path(self.temp_dir.name) / "manual-invalid",
+            )
+
+    def test_readme_references_manual_tiny_live_protocol(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        protocol_path = repo_root / "docs" / "hammer_radar_manual_tiny_live_protocol.md"
+        readme = (repo_root / "README.md").read_text(encoding="utf-8")
+        protocol = protocol_path.read_text(encoding="utf-8")
+
+        self.assertTrue(protocol_path.exists())
+        self.assertIn("docs/hammer_radar_manual_tiny_live_protocol.md", readme)
+        self.assertIn("Manual tiny-live testing only", protocol)
+        self.assertIn("Max initial position: 44 USDT notional", protocol)
+        self.assertIn("No automatic exchange execution", protocol)
 
     def test_runtime_archive_path_resolves_from_env_without_mutating_other_archive(self) -> None:
         runtime_dir = Path(self.temp_dir.name) / "runtime-output"
