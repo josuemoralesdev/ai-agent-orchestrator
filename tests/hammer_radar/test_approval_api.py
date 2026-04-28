@@ -58,6 +58,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("This records approval intent only", html)
             self.assertIn("Paper execution only", html)
             self.assertIn("Paper Executions", html)
+            self.assertIn("Exchange Dry Run", html)
+            self.assertIn("No order was sent", html)
+            self.assertIn("No API key used", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -601,6 +604,143 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("PAPER_OPEN", result.stdout)
         self.assertIn("paper_order_placed=True", result.stdout)
 
+    def test_exchange_dry_run_blocks_when_trade_ticket_is_blocked(self) -> None:
+        response = self.client.get("/exchange-dry-run")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertEqual("BLOCKED", payload["validation_status"])
+        self.assertIn("ticket_status must be PROPOSED", "; ".join(payload["blockers"]))
+
+    def test_exchange_dry_run_validates_proposed_btcusdt_long_ticket(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|dry-run-long"), log_dir=self.log_dir)
+
+        response = self.client.get("/exchange-dry-run")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("VALID", payload["validation_status"])
+        self.assertEqual("binance_futures_dry_run", payload["exchange"])
+        self.assertEqual("BTCUSDT", payload["symbol"])
+        self.assertEqual("BUY", payload["side"])
+        self.assertEqual("LONG", payload["position_side"])
+        self.assertEqual(44.0, payload["notional_usd"])
+        self.assertEqual(0.44, payload["quantity"])
+        self.assertEqual(0.44, payload["quantity_rounded"])
+        self.assertEqual(100.0, payload["entry_price_rounded"])
+        self.assertEqual(95.0, payload["stop_price_rounded"])
+        self.assertEqual(105.0, payload["take_profit_price_rounded"])
+        self.assertEqual(2.0, payload["leverage"])
+        self.assertEqual("isolated", payload["margin_mode"])
+        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["exchange_order_payload_preview"]["sent"])
+
+    def test_exchange_dry_run_validates_proposed_btcusdt_short_ticket_if_provided(self) -> None:
+        ticket = self._ticket_snapshot(direction="short")
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("VALID", payload["validation_status"])
+        self.assertEqual("SELL", payload["side"])
+        self.assertEqual("SHORT", payload["position_side"])
+
+    def test_exchange_dry_run_blocks_unknown_symbol(self) -> None:
+        ticket = self._ticket_snapshot(symbol="ETHUSDT")
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["validation_status"])
+        self.assertIn("unknown symbol", payload["blockers"])
+
+    def test_exchange_dry_run_blocks_notional_below_minimum(self) -> None:
+        ticket = self._ticket_snapshot(suggested_position_usd=4.0)
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual("BLOCKED", response.json()["validation_status"])
+        self.assertIn("notional below min_notional_usd", "; ".join(response.json()["blockers"]))
+
+    def test_exchange_dry_run_blocks_leverage_above_max(self) -> None:
+        ticket = self._ticket_snapshot(suggested_leverage=4.0)
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual("BLOCKED", response.json()["validation_status"])
+        self.assertIn("leverage above max", "; ".join(response.json()["blockers"]))
+
+    def test_exchange_dry_run_blocks_missing_stop(self) -> None:
+        ticket = self._ticket_snapshot(stop=None)
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual("BLOCKED", response.json()["validation_status"])
+        self.assertIn("missing stop", response.json()["blockers"])
+
+    def test_exchange_dry_run_blocks_missing_take_profit(self) -> None:
+        ticket = self._ticket_snapshot(take_profit=None)
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+
+        self.assertEqual("BLOCKED", response.json()["validation_status"])
+        self.assertIn("missing take_profit", response.json()["blockers"])
+
+    def test_exchange_dry_run_rounding_follows_step_and_tick_size(self) -> None:
+        ticket = self._ticket_snapshot(
+            entry=100.07,
+            stop=95.09,
+            take_profit=105.19,
+            suggested_position_usd=44.0,
+        )
+
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": ticket})
+        payload = response.json()
+
+        self.assertEqual(0.439, payload["quantity_rounded"])
+        self.assertEqual(100.0, payload["entry_price_rounded"])
+        self.assertEqual(95.0, payload["stop_price_rounded"])
+        self.assertEqual(105.1, payload["take_profit_price_rounded"])
+
+    def test_exchange_dry_run_from_ticket_validates_fixture_ticket(self) -> None:
+        response = self.client.post("/exchange-dry-run/from-ticket", json={"ticket": self._ticket_snapshot()})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("VALID", payload["validation_status"])
+        self.assertTrue(payload["dry_run"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_cli_exchange_dry_run_works(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|cli-dry-run"), log_dir=self.log_dir)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "exchange-dry-run",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR EXCHANGE DRY RUN", result.stdout)
+        self.assertIn("validation_status: VALID", result.stdout)
+        self.assertIn("dry_run: true", result.stdout)
+
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)
 
@@ -623,6 +763,38 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("HAMMER RADAR MACHINE TRADE TICKET", result.stdout)
         self.assertIn("ticket_status: PROPOSED", result.stdout)
         self.assertIn("live_execution_enabled: false", result.stdout)
+
+    @staticmethod
+    def _ticket_snapshot(
+        *,
+        symbol: str = "BTCUSDT",
+        direction: str = "long",
+        entry: float = 100.0,
+        stop: float | None = 95.0,
+        take_profit: float | None = 105.0,
+        suggested_position_usd: float = 44.0,
+        suggested_leverage: float = 2.0,
+        margin_mode: str = "isolated",
+        ticket_status: str = "PROPOSED",
+    ) -> dict:
+        return {
+            "ticket_id": "tt_fixture",
+            "created_at": datetime.now(UTC).isoformat(),
+            "signal_id": "fixture|ticket",
+            "symbol": symbol,
+            "direction": direction,
+            "timeframe": "13m",
+            "entry": entry,
+            "stop": stop,
+            "take_profit": take_profit,
+            "suggested_position_usd": suggested_position_usd,
+            "suggested_leverage": suggested_leverage,
+            "margin_mode": margin_mode,
+            "ticket_status": ticket_status,
+            "blockers": [],
+            "live_execution_enabled": False,
+            "order_placed": False,
+        }
 
     @staticmethod
     def _eligible_signal(
