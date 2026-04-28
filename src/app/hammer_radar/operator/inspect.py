@@ -664,6 +664,10 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "live-safety":
+        from src.app.hammer_radar.operator.live_safety import build_live_safety_text
+
+        print(build_live_safety_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -766,6 +770,8 @@ def _build_parser() -> argparse.ArgumentParser:
     exchange_dry_run_parser.add_argument("--signal-id", default=None)
     exchange_dry_run_parser.add_argument("--max-position-usd", type=float, default=44.0)
     exchange_dry_run_parser.add_argument("--max-leverage", type=float, default=3.0)
+
+    subparsers.add_parser("live-safety", parents=[parent])
 
     return parser
 

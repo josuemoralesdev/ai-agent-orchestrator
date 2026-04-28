@@ -61,6 +61,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Exchange Dry Run", html)
             self.assertIn("No order was sent", html)
             self.assertIn("No API key used", html)
+            self.assertIn("Live Safety Envelope", html)
+            self.assertIn("Kill switch is active by default", html)
+            self.assertIn("No live order can be placed", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -741,6 +744,118 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("validation_status: VALID", result.stdout)
         self.assertIn("dry_run: true", result.stdout)
 
+    def test_live_safety_returns_blocked_by_default(self) -> None:
+        response = self.client.get("/live-safety")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertTrue(payload["kill_switch_active"])
+        self.assertFalse(payload["allow_live_orders"])
+
+    def test_live_safety_blocks_not_ready_ticket_and_dry_run(self) -> None:
+        payload = self.client.get("/live-safety").json()
+
+        self.assertIn("readiness_status", payload["failed_gates"])
+        self.assertIn("ticket_status", payload["failed_gates"])
+        self.assertIn("exchange_dry_run_valid", payload["failed_gates"])
+
+    def test_live_safety_blocks_without_human_approval(self) -> None:
+        payload = self._evaluate_live_safety(decisions=[], paper_executions=[self._paper_execution_snapshot()])
+
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertIn("human_approval", payload["failed_gates"])
+
+    def test_live_safety_blocks_without_paper_execution_when_required(self) -> None:
+        payload = self._evaluate_live_safety(decisions=[self._approval_snapshot()], paper_executions=[])
+
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertIn("paper_execution_first", payload["failed_gates"])
+
+    def test_live_safety_blocks_manual_loss_today(self) -> None:
+        payload = self._evaluate_live_safety(
+            manual_outcomes=[{"created_at": datetime.now(UTC).isoformat(), "result": "loss", "pnl_usd": -1.0}]
+        )
+
+        self.assertIn("no_losses_today", payload["failed_gates"])
+
+    def test_live_safety_blocks_max_daily_loss_exceeded(self) -> None:
+        payload = self._evaluate_live_safety(
+            manual_outcomes=[{"created_at": datetime.now(UTC).isoformat(), "result": "skipped", "pnl_usd": -5.01}]
+        )
+
+        self.assertIn("daily_loss_limit", payload["failed_gates"])
+
+    def test_live_safety_blocks_position_above_cap(self) -> None:
+        ticket = self._ticket_snapshot(suggested_position_usd=45.0)
+        payload = self._evaluate_live_safety(ticket=ticket)
+
+        self.assertIn("position_cap", payload["failed_gates"])
+
+    def test_live_safety_blocks_leverage_above_cap(self) -> None:
+        ticket = self._ticket_snapshot(suggested_leverage=4.0)
+        payload = self._evaluate_live_safety(ticket=ticket)
+
+        self.assertIn("leverage_cap", payload["failed_gates"])
+
+    def test_live_safety_blocks_non_isolated_margin(self) -> None:
+        ticket = self._ticket_snapshot(margin_mode="cross")
+        payload = self._evaluate_live_safety(ticket=ticket)
+
+        self.assertIn("isolated_margin", payload["failed_gates"])
+
+    def test_live_safety_all_gates_passing_but_live_disabled_is_blocked(self) -> None:
+        payload = self._evaluate_live_safety(config_override={"global_kill_switch": False, "allow_live_orders": True})
+
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertIn("live_execution_enabled", payload["failed_gates"])
+
+    def test_live_safety_all_gates_passing_with_explicit_override_would_be_allowed(self) -> None:
+        payload = self._evaluate_live_safety(
+            config_override={
+                "live_execution_enabled": True,
+                "global_kill_switch": False,
+                "allow_live_orders": True,
+            }
+        )
+
+        self.assertEqual("WOULD_BE_ALLOWED_IF_LIVE_ENABLED", payload["live_safety_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual([], payload["failed_gates"])
+
+    def test_live_safety_evaluate_endpoint_works_with_fixture_snapshots(self) -> None:
+        response = self.client.post("/live-safety/evaluate", json=self._live_safety_request())
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_cli_live_safety_works(self) -> None:
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-safety",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR LIVE SAFETY ENVELOPE", result.stdout)
+        self.assertIn("live_safety_status: BLOCKED", result.stdout)
+        self.assertIn("order_placed: false", result.stdout)
+
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)
 
@@ -763,6 +878,105 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("HAMMER RADAR MACHINE TRADE TICKET", result.stdout)
         self.assertIn("ticket_status: PROPOSED", result.stdout)
         self.assertIn("live_execution_enabled: false", result.stdout)
+
+    def _evaluate_live_safety(
+        self,
+        *,
+        readiness: dict | None = None,
+        ticket: dict | None = None,
+        exchange_dry_run: dict | None = None,
+        decisions: list[dict] | None = None,
+        paper_executions: list[dict] | None = None,
+        manual_outcomes: list[dict] | None = None,
+        config_override: dict | None = None,
+    ) -> dict:
+        response = self.client.post(
+            "/live-safety/evaluate",
+            json=self._live_safety_request(
+                readiness=readiness,
+                ticket=ticket,
+                exchange_dry_run=exchange_dry_run,
+                decisions=decisions,
+                paper_executions=paper_executions,
+                manual_outcomes=manual_outcomes,
+                config_override=config_override,
+            ),
+        )
+        self.assertEqual(200, response.status_code)
+        return response.json()
+
+    def _live_safety_request(
+        self,
+        *,
+        readiness: dict | None = None,
+        ticket: dict | None = None,
+        exchange_dry_run: dict | None = None,
+        decisions: list[dict] | None = None,
+        paper_executions: list[dict] | None = None,
+        manual_outcomes: list[dict] | None = None,
+        config_override: dict | None = None,
+    ) -> dict:
+        ticket = ticket or self._ticket_snapshot()
+        return {
+            "readiness": readiness or self._readiness_snapshot(),
+            "ticket": ticket,
+            "exchange_dry_run": exchange_dry_run or self._exchange_dry_run_snapshot(ticket=ticket),
+            "decisions": decisions if decisions is not None else [self._approval_snapshot(ticket=ticket)],
+            "paper_executions": (
+                paper_executions if paper_executions is not None else [self._paper_execution_snapshot(ticket=ticket)]
+            ),
+            "manual_outcomes": manual_outcomes if manual_outcomes is not None else [],
+            "config_override": config_override or {},
+        }
+
+    @staticmethod
+    def _readiness_snapshot() -> dict:
+        return {
+            "readiness_status": "READY",
+            "allowed_now": True,
+            "current_state": {
+                "manual_outcomes_today": 0,
+                "losses_today": 0,
+                "pnl_usd_today": 0.0,
+            },
+        }
+
+    @staticmethod
+    def _exchange_dry_run_snapshot(*, ticket: dict | None = None, validation_status: str = "VALID") -> dict:
+        ticket = ticket or ApprovalApiTestCase._ticket_snapshot()
+        return {
+            "validation_status": validation_status,
+            "dry_run": True,
+            "order_placed": False,
+            "live_execution_enabled": False,
+            "symbol": ticket["symbol"],
+            "notional_usd": ticket["suggested_position_usd"],
+            "leverage": ticket["suggested_leverage"],
+            "margin_mode": ticket["margin_mode"],
+        }
+
+    @staticmethod
+    def _approval_snapshot(*, ticket: dict | None = None) -> dict:
+        ticket = ticket or ApprovalApiTestCase._ticket_snapshot()
+        return {
+            "record_id": "approval-fixture",
+            "action": "approve_paper_ticket",
+            "ticket": ticket,
+            "operator": "josue",
+        }
+
+    @staticmethod
+    def _paper_execution_snapshot(*, ticket: dict | None = None) -> dict:
+        ticket = ticket or ApprovalApiTestCase._ticket_snapshot()
+        return {
+            "paper_execution_id": "paper-fixture",
+            "ticket_id": ticket["ticket_id"],
+            "signal_id": ticket["signal_id"],
+            "status": "PAPER_OPEN",
+            "paper_order_placed": True,
+            "order_placed": False,
+            "live_execution_enabled": False,
+        }
 
     @staticmethod
     def _ticket_snapshot(

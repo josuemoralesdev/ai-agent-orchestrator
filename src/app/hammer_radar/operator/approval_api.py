@@ -21,6 +21,10 @@ from src.app.hammer_radar.operator.exchange_dry_run import (
     build_current_exchange_dry_run,
     build_exchange_dry_run,
 )
+from src.app.hammer_radar.operator.live_safety import (
+    build_current_live_safety,
+    evaluate_live_safety,
+)
 from src.app.hammer_radar.operator.inspect import (
     LIVE_DECISION_ELIGIBLE,
     LIVE_DECISION_FORBIDDEN,
@@ -92,6 +96,16 @@ class ExecutePaperTicketRequest(BaseModel):
 
 class ExchangeDryRunRequest(BaseModel):
     ticket: dict
+
+
+class LiveSafetyEvaluateRequest(BaseModel):
+    readiness: dict | None = None
+    ticket: dict | None = None
+    exchange_dry_run: dict | None = None
+    decisions: list[dict] | None = None
+    paper_executions: list[dict] | None = None
+    manual_outcomes: list[dict] | None = None
+    config_override: dict | None = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -217,6 +231,37 @@ def exchange_dry_run(
 @app.post("/exchange-dry-run/from-ticket")
 def exchange_dry_run_from_ticket(request: ExchangeDryRunRequest) -> dict:
     return build_exchange_dry_run(request.ticket)
+
+
+@app.get("/live-safety")
+def live_safety(
+    signal_id: str | None = None,
+    allow_short: bool = False,
+    max_position_usd: float = Query(default=DEFAULT_MAX_POSITION_USD, gt=0),
+    max_leverage: float = Query(default=DEFAULT_MAX_LEVERAGE, gt=0),
+    fresh_minutes: int = Query(default=30, ge=0),
+) -> dict:
+    return build_current_live_safety(
+        signal_id=signal_id,
+        allow_short=allow_short,
+        max_position_usd=max_position_usd,
+        max_leverage=max_leverage,
+        fresh_minutes=fresh_minutes,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-safety/evaluate")
+def live_safety_evaluate(request: LiveSafetyEvaluateRequest) -> dict:
+    return evaluate_live_safety(
+        readiness=request.readiness,
+        ticket=request.ticket,
+        exchange_dry_run=request.exchange_dry_run,
+        decisions=request.decisions,
+        paper_executions=request.paper_executions,
+        manual_outcomes=request.manual_outcomes,
+        config_override=request.config_override,
+    )
 
 
 @app.get("/candidates")
@@ -471,7 +516,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -599,6 +644,23 @@ def _operator_ui_html() -> str:
       <p class="muted">Exchange dry run only. No order was sent. No API key used. No Binance order placement exists.</p>
     </section>
 
+    <h2>Live Safety Envelope</h2>
+    <section id="liveSafety" class="live-safety blocked">
+      <div class="grid">
+        <div><div class="label">live_safety_status</div><div id="liveSafetyStatus" class="value danger">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="liveSafetyEnabled" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="liveSafetyOrder" class="value danger">false</div></div>
+        <div><div class="label">kill_switch_active</div><div id="liveSafetyKill" class="value danger">true</div></div>
+        <div><div class="label">allow_live_orders</div><div id="liveSafetyAllow" class="value danger">false</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="liveSafetyBlockers">loading</span></p>
+      <p><strong>Failed gates:</strong> <span id="liveSafetyFailed">loading</span></p>
+      <p><strong>Passed gates:</strong> <span id="liveSafetyPassed">loading</span></p>
+      <p><strong>Next required action:</strong> <span id="liveSafetyNext">loading</span></p>
+      <p><strong>Protocol:</strong> <span id="liveSafetyProtocol">44 USDT max, 2x preferred, 3x max, isolated margin, 1 trade/day, stop after -5 USDT or 1 loss.</span></p>
+      <p class="muted">Live execution is disabled. Kill switch is active by default. No live order can be placed from this system in the current mode. This panel is a safety pre-check only.</p>
+    </section>
+
     <h2>Paper Executions</h2>
     <div id="paperExecutions">loading</div>
 
@@ -636,6 +698,7 @@ async function refreshAll() {
   await loadReadiness();
   await loadTradeTicket();
   await loadExchangeDryRun();
+  await loadLiveSafety();
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
@@ -735,6 +798,29 @@ async function loadExchangeDryRun() {
   document.getElementById('dryRunOrder').textContent = String(data.order_placed);
   document.getElementById('dryRunFlag').textContent = String(data.dry_run === true);
   document.getElementById('dryRunBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
+}
+
+async function loadLiveSafety() {
+  const params = new URLSearchParams({
+    allow_short: document.getElementById('allowShort')?.checked ? 'true' : 'false'
+  });
+  const res = await fetch('/live-safety?' + params.toString());
+  const data = await res.json();
+  const allowed = data.live_safety_status === 'WOULD_BE_ALLOWED_IF_LIVE_ENABLED';
+  const root = document.getElementById('liveSafety');
+  root.className = 'live-safety ' + (allowed ? 'proposed' : 'blocked');
+  document.getElementById('liveSafetyStatus').textContent = data.live_safety_status || 'BLOCKED';
+  document.getElementById('liveSafetyStatus').className = 'value ' + (allowed ? 'safe' : 'danger');
+  document.getElementById('liveSafetyEnabled').textContent = String(data.live_execution_enabled);
+  document.getElementById('liveSafetyOrder').textContent = String(data.order_placed);
+  document.getElementById('liveSafetyKill').textContent = String(data.kill_switch_active);
+  document.getElementById('liveSafetyAllow').textContent = String(data.allow_live_orders);
+  document.getElementById('liveSafetyBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
+  document.getElementById('liveSafetyFailed').textContent = (data.failed_gates || []).length ? data.failed_gates.join(', ') : 'none';
+  document.getElementById('liveSafetyPassed').textContent = (data.passed_gates || []).length ? data.passed_gates.join(', ') : 'none';
+  document.getElementById('liveSafetyNext').textContent = data.next_required_action || '';
+  const protocol = data.protocol || {};
+  document.getElementById('liveSafetyProtocol').textContent = `${protocol.max_position_usd ?? 44} USDT max, ${protocol.preferred_leverage ?? 2}x preferred, ${protocol.max_leverage ?? 3}x max, ${protocol.margin_mode || 'isolated'} margin, ${protocol.max_trades_per_day ?? 1} trade/day, ${protocol.hard_daily_stop || 'stop after -5 USDT or 1 loss'}.`;
 }
 
 async function loadCandidates() {
@@ -947,6 +1033,7 @@ refreshAll();
     if (event.target && event.target.id === id) {
       loadTradeTicket();
       loadExchangeDryRun();
+      loadLiveSafety();
       loadCandidates();
     }
   });
