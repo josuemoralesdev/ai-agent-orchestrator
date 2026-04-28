@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from subprocess import run
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -50,6 +51,10 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Eligible only", html)
             self.assertIn("Allow short", html)
             self.assertIn("Friday Readiness", html)
+            self.assertIn("Machine Trade Ticket", html)
+            self.assertIn("Approve Paper Ticket", html)
+            self.assertIn("No order will be placed", html)
+            self.assertIn("This records approval intent only", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -351,20 +356,178 @@ class ApprovalApiTestCase(unittest.TestCase):
 
         self.assertEqual(422, response.status_code)
 
+    def test_trade_ticket_returns_blocked_when_readiness_not_ready(self) -> None:
+        response = self.client.get("/trade-ticket")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["ticket_status"])
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertFalse(payload["allowed_now"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_trade_ticket_returns_proposed_with_fresh_eligible_candidate(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|ticket"), log_dir=self.log_dir)
+
+        response = self.client.get("/trade-ticket")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("PROPOSED", payload["ticket_status"])
+        self.assertEqual("eligible|ticket", payload["signal_id"])
+        self.assertEqual("BTCUSDT", payload["symbol"])
+        self.assertEqual("long", payload["direction"])
+        self.assertEqual("13m", payload["timeframe"])
+        self.assertEqual(100.0, payload["entry"])
+        self.assertEqual(95.0, payload["stop"])
+        self.assertEqual(105.0, payload["take_profit"])
+        self.assertEqual(44.0, payload["suggested_position_usd"])
+        self.assertEqual(2.0, payload["suggested_leverage"])
+        self.assertEqual("isolated", payload["margin_mode"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_trade_ticket_respects_max_position_usd_cap(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|position-cap"), log_dir=self.log_dir)
+
+        response = self.client.get("/trade-ticket?max_position_usd=12")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(12.0, response.json()["suggested_position_usd"])
+
+    def test_trade_ticket_respects_max_leverage_cap(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|leverage-cap"), log_dir=self.log_dir)
+
+        response = self.client.get("/trade-ticket?max_leverage=1")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(1.0, response.json()["suggested_leverage"])
+
+    def test_trade_ticket_blocks_missing_stop_or_take_profit(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(signal_id="missing|stop", invalidation=0.0),
+            log_dir=self.log_dir,
+        )
+
+        response = self.client.get("/trade-ticket?signal_id=missing%7Cstop")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["ticket_status"])
+        self.assertIn("missing stop", payload["blockers"])
+        self.assertIn("missing take_profit", payload["blockers"])
+
+    def test_trade_ticket_blocks_expired_candidate(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="eligible|expired-ticket",
+                timestamp=(datetime.now(UTC) - timedelta(minutes=90)).isoformat(),
+            ),
+            log_dir=self.log_dir,
+        )
+
+        response = self.client.get("/trade-ticket?signal_id=eligible%7Cexpired-ticket")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertIn(payload["ticket_status"], {"BLOCKED", "EXPIRED"})
+        self.assertIn("candidate expired by freshness gate", payload["blockers"])
+
+    def test_trade_ticket_blocks_non_btcusdt(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(signal_id="eligible|eth", symbol="ETHUSDT"),
+            log_dir=self.log_dir,
+        )
+
+        response = self.client.get("/trade-ticket?signal_id=eligible%7Ceth")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["ticket_status"])
+        self.assertIn("signal_id not found in current BTCUSDT live-checklist window", "; ".join(payload["blockers"]))
+
+    def test_approve_paper_trade_ticket_records_without_order_placement(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|approve-ticket"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+
+        response = self.client.post(
+            "/trade-ticket/approve-paper",
+            json={
+                "ticket_id": ticket["ticket_id"],
+                "operator": "josue",
+                "notes": "paper approval intent only",
+                "ticket_snapshot": ticket,
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("approve_paper_ticket", payload["action"])
+        self.assertEqual(ticket["ticket_id"], payload["ticket"]["ticket_id"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["paper_execution_enabled"])
+        self.assertFalse(payload["paper_order_placed"])
+        self.assertTrue((self.log_dir / "trade_tickets.ndjson").exists())
+
+    def test_trade_tickets_lists_records(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|list-ticket"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+        self.client.post(
+            "/trade-ticket/approve-paper",
+            json={"ticket_id": ticket["ticket_id"], "operator": "josue", "ticket_snapshot": ticket},
+        )
+
+        response = self.client.get("/trade-tickets")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual(1, len(payload["trade_tickets"]))
+
+    def test_cli_inspect_trade_ticket_works(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "trade-ticket",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR MACHINE TRADE TICKET", result.stdout)
+        self.assertIn("ticket_status: PROPOSED", result.stdout)
+        self.assertIn("live_execution_enabled: false", result.stdout)
+
     @staticmethod
     def _eligible_signal(
         *,
         signal_id: str,
+        symbol: str = "BTCUSDT",
+        direction: str = "long",
         tradable: bool = True,
         reject_reason: str | None = None,
         hammer_strength: float = 100.0,
         timestamp: str | None = None,
+        invalidation: float = 95.0,
+        rsi_state: str = "neutral",
     ) -> SignalRecord:
         return SignalRecord(
             signal_id=signal_id,
-            symbol="BTCUSDT",
+            symbol=symbol,
             timeframe="13m",
-            direction="long",
+            direction=direction,
             timestamp=timestamp or (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
             hammer_strength=hammer_strength,
             hammer_high=101.0,
@@ -373,7 +536,7 @@ class ApprovalApiTestCase(unittest.TestCase):
             fib_618=100.0,
             fib_650=99.5,
             fib_786=98.5,
-            invalidation=95.0,
+            invalidation=invalidation,
             bias_timeframe="4H",
             bias_direction="bullish",
             bias_aligned=True,
@@ -388,7 +551,7 @@ class ApprovalApiTestCase(unittest.TestCase):
             price_vs_ema_4h_pct=0.1,
             signal_close=100.0,
             rsi_value=50.0,
-            rsi_state="neutral",
+            rsi_state=rsi_state,
             divergence_type="bullish",
             divergence_confirmed=True,
         )
