@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator import archive
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.live_connector_stub import submit_live_order_stub
 from src.app.hammer_radar.operator.models import SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -64,6 +65,10 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Live Safety Envelope", html)
             self.assertIn("Kill switch is active by default", html)
             self.assertIn("No live order can be placed", html)
+            self.assertIn("Live Connector Stub", html)
+            self.assertIn("Test Live Connector Stub", html)
+            self.assertIn("No real order can be placed", html)
+            self.assertIn("No API key is used", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -855,6 +860,131 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("HAMMER RADAR LIVE SAFETY ENVELOPE", result.stdout)
         self.assertIn("live_safety_status: BLOCKED", result.stdout)
         self.assertIn("order_placed: false", result.stdout)
+
+    def test_live_connector_stub_submit_always_returns_no_order_fields(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|stub-submit"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+
+        response = self.client.post(
+            "/live-connector/stub-submit",
+            json={"ticket_id": ticket["ticket_id"], "operator": "josue", "notes": "stub only"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("stub_no_order", payload["connector_mode"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertTrue(payload["rejected"])
+        self.assertEqual("BLOCKED", payload["live_safety_status"])
+        self.assertTrue((self.log_dir / "live_attempts.ndjson").exists())
+
+    def test_live_connector_stub_submit_rejects_when_live_safety_blocked(self) -> None:
+        response = self.client.post(
+            "/live-connector/stub-submit",
+            json={"ticket_id": "blocked-ticket", "operator": "josue"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["rejected"])
+        self.assertIn("live_execution_enabled is false", payload["rejection_reason"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_live_connector_stub_rejects_even_if_simulated_safety_would_be_allowed(self) -> None:
+        ticket = self._ticket_snapshot()
+        record = submit_live_order_stub(
+            ticket_id=ticket["ticket_id"],
+            operator="josue",
+            notes="simulation",
+            log_dir=self.log_dir,
+            ticket_snapshot=ticket,
+            dry_run_snapshot=self._exchange_dry_run_snapshot(ticket=ticket),
+            safety_snapshot={
+                "live_safety_status": "WOULD_BE_ALLOWED_IF_LIVE_ENABLED",
+                "blockers": [],
+                "kill_switch_active": False,
+                "allow_live_orders": True,
+                "live_execution_enabled": False,
+                "order_placed": False,
+            },
+        )
+
+        self.assertEqual("stub_no_order", record["connector_mode"])
+        self.assertTrue(record["rejected"])
+        self.assertEqual("stub_no_order connector cannot place live orders", record["rejection_reason"])
+        self.assertFalse(record["order_placed"])
+
+    def test_live_connector_attempts_lists_records(self) -> None:
+        self.client.post("/live-connector/stub-submit", json={"ticket_id": "list-ticket", "operator": "josue"})
+
+        response = self.client.get("/live-connector/attempts")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("stub_no_order", payload["connector_mode"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual(1, len(payload["live_attempts"]))
+        self.assertTrue(payload["live_attempts"][0]["rejected"])
+
+    def test_cli_live_connector_submit_records_rejected_attempt(self) -> None:
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-connector-submit",
+                "--ticket-id",
+                "cli-stub-ticket",
+                "--operator",
+                "josue",
+                "--notes",
+                "cli stub",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR LIVE CONNECTOR STUB ATTEMPT", result.stdout)
+        self.assertIn("connector_mode: stub_no_order", result.stdout)
+        self.assertIn("order_placed: false", result.stdout)
+
+    def test_cli_live_attempts_displays_records(self) -> None:
+        self.client.post("/live-connector/stub-submit", json={"ticket_id": "cli-list-ticket", "operator": "josue"})
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-attempts",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR LIVE CONNECTOR ATTEMPTS", result.stdout)
+        self.assertIn("stub_no_order", result.stdout)
+        self.assertIn("order_placed=False", result.stdout)
+
+    def test_live_connector_stub_source_has_no_live_execution_imports(self) -> None:
+        source = Path("src/app/hammer_radar/operator/live_connector_stub.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("binance", source.lower())
+        self.assertNotIn("create_order", source)
+        self.assertNotIn("place_order", source)
+        self.assertNotIn("api_key", source.lower())
 
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)

@@ -668,6 +668,28 @@ def main() -> int:
         from src.app.hammer_radar.operator.live_safety import build_live_safety_text
 
         print(build_live_safety_text(log_dir=args.log_dir))
+    elif args.command == "live-connector-submit":
+        from src.app.hammer_radar.operator.live_connector_stub import build_live_connector_submit_text
+
+        print(
+            build_live_connector_submit_text(
+                ticket_id=args.ticket_id,
+                operator=args.operator,
+                notes=args.notes,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "live-attempts":
+        from src.app.hammer_radar.operator.live_connector_stub import build_live_attempts_text
+
+        print(
+            build_live_attempts_text(
+                limit=args.limit,
+                signal_id=args.signal_id,
+                ticket_id=args.ticket_id,
+                log_dir=args.log_dir,
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -772,6 +794,16 @@ def _build_parser() -> argparse.ArgumentParser:
     exchange_dry_run_parser.add_argument("--max-leverage", type=float, default=3.0)
 
     subparsers.add_parser("live-safety", parents=[parent])
+
+    live_connector_submit_parser = subparsers.add_parser("live-connector-submit", parents=[parent])
+    live_connector_submit_parser.add_argument("--ticket-id", required=True)
+    live_connector_submit_parser.add_argument("--operator", default="josue")
+    live_connector_submit_parser.add_argument("--notes", default="")
+
+    live_attempts_parser = subparsers.add_parser("live-attempts", parents=[parent])
+    live_attempts_parser.add_argument("--limit", type=int, default=50)
+    live_attempts_parser.add_argument("--signal-id", default=None)
+    live_attempts_parser.add_argument("--ticket-id", default=None)
 
     return parser
 
