@@ -25,6 +25,11 @@ from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
 )
+from src.app.hammer_radar.operator.live_connector_stub import (
+    CONNECTOR_MODE,
+    load_live_attempts,
+    submit_live_order_stub,
+)
 from src.app.hammer_radar.operator.inspect import (
     LIVE_DECISION_ELIGIBLE,
     LIVE_DECISION_FORBIDDEN,
@@ -106,6 +111,12 @@ class LiveSafetyEvaluateRequest(BaseModel):
     paper_executions: list[dict] | None = None
     manual_outcomes: list[dict] | None = None
     config_override: dict | None = None
+
+
+class LiveConnectorSubmitRequest(BaseModel):
+    ticket_id: str = Field(min_length=1)
+    operator: str = Field(min_length=1)
+    notes: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -262,6 +273,31 @@ def live_safety_evaluate(request: LiveSafetyEvaluateRequest) -> dict:
         manual_outcomes=request.manual_outcomes,
         config_override=request.config_override,
     )
+
+
+@app.post("/live-connector/stub-submit")
+def live_connector_stub_submit(request: LiveConnectorSubmitRequest) -> dict:
+    return submit_live_order_stub(
+        ticket_id=request.ticket_id,
+        operator=request.operator,
+        notes=request.notes,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-connector/attempts")
+def live_connector_attempts(
+    limit: int = Query(default=50, ge=0),
+    signal_id: str | None = None,
+    ticket_id: str | None = None,
+) -> dict:
+    records = load_live_attempts(limit=limit, signal_id=signal_id, ticket_id=ticket_id, log_dir=get_log_dir(use_env=True))
+    return {
+        "connector_mode": CONNECTOR_MODE,
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "live_attempts": records,
+    }
 
 
 @app.get("/candidates")
@@ -516,7 +552,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -661,6 +697,23 @@ def _operator_ui_html() -> str:
       <p class="muted">Live execution is disabled. Kill switch is active by default. No live order can be placed from this system in the current mode. This panel is a safety pre-check only.</p>
     </section>
 
+    <h2>Live Connector Stub</h2>
+    <section id="liveConnectorStub" class="live-connector blocked">
+      <div class="grid">
+        <div><div class="label">connector_mode</div><div id="connectorMode" class="value danger">stub_no_order</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="connectorLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="connectorOrder" class="value danger">false</div></div>
+        <div><div class="label">safety status</div><div id="connectorSafety" class="value danger">loading</div></div>
+        <div><div class="label">kill switch active</div><div id="connectorKill" class="value danger">true</div></div>
+      </div>
+      <p><strong>Last live attempt:</strong> <span id="lastLiveAttempt">loading</span></p>
+      <p class="muted">No real order can be placed. Stub connector only records rejected attempts. No API key is used. No Binance/network call exists.</p>
+      <div class="button-row">
+        <button class="reject" id="stubSubmitButton" onclick="submitLiveConnectorStub()" disabled>Test Live Connector Stub</button>
+        <span class="muted">Records rejected no-order attempt</span>
+      </div>
+    </section>
+
     <h2>Paper Executions</h2>
     <div id="paperExecutions">loading</div>
 
@@ -699,6 +752,7 @@ async function refreshAll() {
   await loadTradeTicket();
   await loadExchangeDryRun();
   await loadLiveSafety();
+  await loadLiveAttempts();
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
@@ -770,6 +824,7 @@ async function loadTradeTicket() {
   document.getElementById('approveTicketButton').disabled = !proposed;
   document.getElementById('executePaperButton').disabled = !proposed;
   document.getElementById('paperExecutionBlocked').style.display = proposed ? 'none' : 'block';
+  document.getElementById('stubSubmitButton').disabled = !data.ticket_id;
 }
 
 async function loadExchangeDryRun() {
@@ -821,6 +876,49 @@ async function loadLiveSafety() {
   document.getElementById('liveSafetyNext').textContent = data.next_required_action || '';
   const protocol = data.protocol || {};
   document.getElementById('liveSafetyProtocol').textContent = `${protocol.max_position_usd ?? 44} USDT max, ${protocol.preferred_leverage ?? 2}x preferred, ${protocol.max_leverage ?? 3}x max, ${protocol.margin_mode || 'isolated'} margin, ${protocol.max_trades_per_day ?? 1} trade/day, ${protocol.hard_daily_stop || 'stop after -5 USDT or 1 loss'}.`;
+  document.getElementById('connectorSafety').textContent = data.live_safety_status || 'BLOCKED';
+  document.getElementById('connectorKill').textContent = String(data.kill_switch_active);
+}
+
+async function submitLiveConnectorStub() {
+  if (!currentTicket || !currentTicket.ticket_id) return;
+  const operatorInput = document.getElementById('operator');
+  const notesInput = document.getElementById('ticketNotes');
+  const body = {
+    ticket_id: currentTicket.ticket_id,
+    operator: operatorInput ? operatorInput.value || 'josue' : 'josue',
+    notes: notesInput ? notesInput.value : ''
+  };
+  const res = await fetch('/live-connector/stub-submit', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback success';
+    message.innerHTML = `<strong>Live connector stub attempt recorded:</strong> live_attempt_id=${esc(data.live_attempt_id)} | connector_mode=${esc(data.connector_mode)} | rejected=${esc(data.rejected)} | order_placed=${esc(data.order_placed)}`;
+  }
+  await loadLiveAttempts();
+}
+
+async function loadLiveAttempts() {
+  const res = await fetch('/live-connector/attempts?limit=1');
+  const data = await res.json();
+  document.getElementById('connectorMode').textContent = data.connector_mode || 'stub_no_order';
+  document.getElementById('connectorLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('connectorOrder').textContent = String(data.order_placed);
+  const attempts = data.live_attempts || [];
+  if (!attempts.length) {
+    document.getElementById('lastLiveAttempt').textContent = 'none';
+    return;
+  }
+  const latest = attempts[0];
+  document.getElementById('lastLiveAttempt').textContent = `${latest.created_at} | ${latest.live_attempt_id} | rejected=${latest.rejected} | order_placed=${latest.order_placed}`;
 }
 
 async function loadCandidates() {
