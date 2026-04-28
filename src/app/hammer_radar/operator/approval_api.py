@@ -27,6 +27,10 @@ from src.app.hammer_radar.operator.manual_outcomes import (
     append_manual_outcome,
     load_manual_outcomes,
 )
+from src.app.hammer_radar.operator.paper_execution import (
+    execute_paper_ticket,
+    load_paper_executions,
+)
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
@@ -74,6 +78,12 @@ class ApprovePaperTicketRequest(BaseModel):
     operator: str = Field(min_length=1)
     notes: str = ""
     ticket_snapshot: dict | None = None
+
+
+class ExecutePaperTicketRequest(BaseModel):
+    ticket_id: str = Field(min_length=1)
+    operator: str = Field(min_length=1)
+    notes: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -141,6 +151,38 @@ def trade_tickets(limit: int = Query(default=50, ge=0), ticket_id: str | None = 
         "paper_execution_enabled": False,
         "paper_order_placed": False,
         "trade_tickets": records,
+    }
+
+
+@app.post("/trade-ticket/execute-paper")
+def execute_paper_trade_ticket(request: ExecutePaperTicketRequest) -> dict:
+    try:
+        return execute_paper_ticket(
+            ticket_id=request.ticket_id,
+            operator=request.operator,
+            notes=request.notes,
+            log_dir=get_log_dir(use_env=True),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/paper-executions")
+def paper_executions(
+    limit: int = Query(default=50, ge=0),
+    signal_id: str | None = None,
+    status: str | None = None,
+) -> dict:
+    records = load_paper_executions(
+        limit=limit,
+        signal_id=signal_id,
+        status=status,
+        log_dir=get_log_dir(use_env=True),
+    )
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "paper_executions": records,
     }
 
 
@@ -396,7 +438,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -491,12 +533,18 @@ def _operator_ui_html() -> str:
       <p><strong>Blockers:</strong> <span id="ticketBlockers">loading</span></p>
       <p><strong>Machine reason:</strong> <span id="ticketReason">loading</span></p>
       <p class="muted">No order will be placed. This records approval intent only.</p>
+      <p class="muted">Paper execution only. No live order will be placed.</p>
+      <p id="paperExecutionBlocked" class="muted">Blocked: no paper execution without PROPOSED ticket.</p>
       <p><input id="ticketNotes" class="notes" placeholder="paper ticket approval notes"></p>
       <div class="button-row">
         <button class="approve" id="approveTicketButton" onclick="approvePaperTicket()" disabled>Approve Paper Ticket</button>
+        <button class="approve" id="executePaperButton" onclick="executePaperTicket()" disabled>Execute Paper Ticket</button>
         <button class="reject" onclick="recordTicketWatch()">Reject / Watch</button>
       </div>
     </section>
+
+    <h2>Paper Executions</h2>
+    <div id="paperExecutions">loading</div>
 
     <section class="controls">
       <div class="controls-grid">
@@ -531,6 +579,7 @@ async function refreshAll() {
   await loadHealth();
   await loadReadiness();
   await loadTradeTicket();
+  await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
 }
@@ -599,6 +648,8 @@ async function loadTradeTicket() {
   document.getElementById('ticketBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
   document.getElementById('ticketReason').textContent = data.machine_reason || '';
   document.getElementById('approveTicketButton').disabled = !proposed;
+  document.getElementById('executePaperButton').disabled = !proposed;
+  document.getElementById('paperExecutionBlocked').style.display = proposed ? 'none' : 'block';
 }
 
 async function loadCandidates() {
@@ -697,10 +748,59 @@ async function approvePaperTicket() {
   }
 }
 
+async function executePaperTicket() {
+  if (!currentTicket || !currentTicket.ticket_id) return;
+  const operatorInput = document.getElementById('operator');
+  const notesInput = document.getElementById('ticketNotes');
+  const body = {
+    ticket_id: currentTicket.ticket_id,
+    operator: operatorInput ? operatorInput.value || 'josue' : 'josue',
+    notes: notesInput ? notesInput.value : ''
+  };
+  const res = await fetch('/trade-ticket/execute-paper', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback success';
+    message.innerHTML = `<strong>Paper execution recorded:</strong> paper_execution_id=${esc(data.paper_execution_id)} | paper_order_placed=${esc(data.paper_order_placed)} | order_placed=${esc(data.order_placed)} | live_execution_enabled=${esc(data.live_execution_enabled)}`;
+  }
+  await loadPaperExecutions();
+}
+
 function recordTicketWatch() {
   const message = document.getElementById('message');
   message.className = 'feedback';
   message.textContent = 'Ticket marked for watch/reject in operator console only. No order will be placed.';
+}
+
+async function loadPaperExecutions() {
+  const res = await fetch('/paper-executions?limit=10');
+  const data = await res.json();
+  const root = document.getElementById('paperExecutions');
+  if (!data.paper_executions || data.paper_executions.length === 0) {
+    root.innerHTML = '<div class="paper-execution">No paper execution records.</div>';
+    return;
+  }
+  root.innerHTML = data.paper_executions.map(record => `<div class="paper-execution">
+    <div class="grid">
+      <div><div class="label">created_at</div><div class="value">${esc(record.created_at)}</div></div>
+      <div><div class="label">paper_execution_id</div><div class="value mono">${esc(record.paper_execution_id)}</div></div>
+      <div><div class="label">signal_id</div><div class="value mono">${esc(record.signal_id)}</div></div>
+      <div><div class="label">direction/timeframe</div><div class="value">${esc(record.direction)}/${esc(record.timeframe)}</div></div>
+      <div><div class="label">position_usd</div><div class="value">${esc(record.position_usd)}</div></div>
+      <div><div class="label">leverage</div><div class="value">${esc(record.leverage)}</div></div>
+      <div><div class="label">status</div><div class="value">${esc(record.status)}</div></div>
+      <div><div class="label">paper_order_placed</div><div class="value safe">${esc(record.paper_order_placed)}</div></div>
+      <div><div class="label">order_placed</div><div class="value danger">${esc(record.order_placed)}</div></div>
+    </div>
+  </div>`).join('');
 }
 
 async function recordDecision(index, decision) {

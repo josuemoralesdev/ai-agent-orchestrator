@@ -630,6 +630,28 @@ def main() -> int:
         from src.app.hammer_radar.operator.trade_ticket import build_trade_tickets_text
 
         print(build_trade_tickets_text(limit=args.limit, ticket_id=args.ticket_id, log_dir=args.log_dir))
+    elif args.command == "execute-paper-ticket":
+        from src.app.hammer_radar.operator.paper_execution import build_execute_paper_ticket_text
+
+        print(
+            build_execute_paper_ticket_text(
+                ticket_id=args.ticket_id,
+                operator=args.operator,
+                notes=args.notes,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "paper-executions":
+        from src.app.hammer_radar.operator.paper_execution import build_paper_executions_text
+
+        print(
+            build_paper_executions_text(
+                limit=args.limit,
+                signal_id=args.signal_id,
+                status=args.status,
+                log_dir=args.log_dir,
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -716,6 +738,16 @@ def _build_parser() -> argparse.ArgumentParser:
     trade_tickets_parser = subparsers.add_parser("trade-tickets", parents=[parent])
     trade_tickets_parser.add_argument("--limit", type=int, default=50)
     trade_tickets_parser.add_argument("--ticket-id", default=None)
+
+    execute_paper_parser = subparsers.add_parser("execute-paper-ticket", parents=[parent])
+    execute_paper_parser.add_argument("--ticket-id", required=True)
+    execute_paper_parser.add_argument("--operator", default="josue")
+    execute_paper_parser.add_argument("--notes", default="")
+
+    paper_executions_parser = subparsers.add_parser("paper-executions", parents=[parent])
+    paper_executions_parser.add_argument("--limit", type=int, default=50)
+    paper_executions_parser.add_argument("--signal-id", default=None)
+    paper_executions_parser.add_argument("--status", default=None)
 
     return parser
 

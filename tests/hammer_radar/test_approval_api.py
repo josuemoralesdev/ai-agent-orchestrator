@@ -53,8 +53,11 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Friday Readiness", html)
             self.assertIn("Machine Trade Ticket", html)
             self.assertIn("Approve Paper Ticket", html)
+            self.assertIn("Execute Paper Ticket", html)
             self.assertIn("No order will be placed", html)
             self.assertIn("This records approval intent only", html)
+            self.assertIn("Paper execution only", html)
+            self.assertIn("Paper Executions", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -486,6 +489,117 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
         self.assertEqual(1, len(payload["trade_tickets"]))
+
+    def test_execute_paper_trade_ticket_rejects_blocked_ticket(self) -> None:
+        ticket = self.client.get("/trade-ticket").json()
+
+        response = self.client.post(
+            "/trade-ticket/execute-paper",
+            json={
+                "ticket_id": ticket["ticket_id"] or "missing-ticket",
+                "operator": "josue",
+                "notes": "should reject",
+            },
+        )
+
+        self.assertEqual(400, response.status_code)
+        self.assertFalse((self.log_dir / "paper_executions.ndjson").exists())
+
+    def test_execute_paper_trade_ticket_creates_paper_execution_for_proposed_ticket(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|execute-ticket"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+
+        response = self.client.post(
+            "/trade-ticket/execute-paper",
+            json={
+                "ticket_id": ticket["ticket_id"],
+                "operator": "josue",
+                "notes": "paper execution only",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("PAPER_OPEN", payload["status"])
+        self.assertEqual(ticket["ticket_id"], payload["ticket_id"])
+        self.assertEqual(ticket["signal_id"], payload["signal_id"])
+        self.assertEqual(ticket["suggested_position_usd"], payload["position_usd"])
+        self.assertEqual(ticket["suggested_leverage"], payload["leverage"])
+        self.assertTrue(payload["paper_order_placed"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertTrue((self.log_dir / "paper_executions.ndjson").exists())
+        self.assertTrue((self.log_dir / "trade_tickets.ndjson").exists())
+
+    def test_paper_executions_lists_records(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|paper-list"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+        created = self.client.post(
+            "/trade-ticket/execute-paper",
+            json={"ticket_id": ticket["ticket_id"], "operator": "josue"},
+        ).json()
+
+        list_response = self.client.get("/paper-executions")
+        signal_response = self.client.get("/paper-executions?signal_id=eligible%7Cpaper-list")
+        status_response = self.client.get("/paper-executions?status=PAPER_OPEN")
+
+        self.assertEqual(200, list_response.status_code)
+        payload = list_response.json()
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertEqual(1, len(payload["paper_executions"]))
+        self.assertEqual(created["paper_execution_id"], payload["paper_executions"][0]["paper_execution_id"])
+        self.assertEqual(1, len(signal_response.json()["paper_executions"]))
+        self.assertEqual(1, len(status_response.json()["paper_executions"]))
+
+    def test_cli_execute_paper_ticket_rejects_blocked_ticket(self) -> None:
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "execute-paper-ticket",
+                "--ticket-id",
+                "blocked-ticket",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("ticket_id", result.stderr)
+
+    def test_cli_paper_executions_displays_records(self) -> None:
+        archive.append_signal(self._eligible_signal(signal_id="eligible|cli-paper-list"), log_dir=self.log_dir)
+        ticket = self.client.get("/trade-ticket").json()
+        self.client.post(
+            "/trade-ticket/execute-paper",
+            json={"ticket_id": ticket["ticket_id"], "operator": "josue"},
+        )
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "paper-executions",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR PAPER EXECUTIONS", result.stdout)
+        self.assertIn("PAPER_OPEN", result.stdout)
+        self.assertIn("paper_order_placed=True", result.stdout)
 
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)
