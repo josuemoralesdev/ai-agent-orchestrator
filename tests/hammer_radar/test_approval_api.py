@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -11,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator import archive
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
 from src.app.hammer_radar.operator.live_connector_stub import submit_live_order_stub
 from src.app.hammer_radar.operator.models import SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
@@ -69,6 +72,10 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Test Live Connector Stub", html)
             self.assertIn("No real order can be placed", html)
             self.assertIn("No API key is used", html)
+            self.assertIn("Binance Read-Only Connector", html)
+            self.assertIn("Read-only connector. No order placement exists.", html)
+            self.assertIn("Secrets are never shown", html)
+            self.assertIn("Live trading env must remain false", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -985,6 +992,129 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertNotIn("create_order", source)
         self.assertNotIn("place_order", source)
         self.assertNotIn("api_key", source.lower())
+
+    def test_binance_readonly_status_with_no_env_is_missing_or_blocked_safely(self) -> None:
+        payload = build_binance_readonly_status(env={})
+
+        self.assertIn(payload["connector_status"], {"MISSING_ENV", "BLOCKED"})
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["api_key_present"])
+        self.assertFalse(payload["api_secret_present"])
+        self.assertIsNone(payload["api_key_preview"])
+        self.assertIn("place_order", payload["forbidden_actions"])
+
+    def test_binance_readonly_status_ready_with_read_only_env_and_live_false(self) -> None:
+        payload = build_binance_readonly_status(
+            env={
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "BINANCE_CONNECTOR_MODE": "read_only",
+                "BINANCE_LIVE_TRADING_ENABLED": "false",
+            }
+        )
+
+        serialized = json.dumps(payload)
+        self.assertEqual("READY_READ_ONLY", payload["connector_status"])
+        self.assertEqual("read_only", payload["connector_mode"])
+        self.assertTrue(payload["api_key_present"])
+        self.assertTrue(payload["api_secret_present"])
+        self.assertEqual("abcd...wxyz", payload["api_key_preview"])
+        self.assertNotIn("super-secret-value", serialized)
+        self.assertNotIn("abcd1234wxyz", serialized)
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_binance_readonly_status_blocks_live_trading_env_true(self) -> None:
+        payload = build_binance_readonly_status(
+            env={
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "BINANCE_CONNECTOR_MODE": "read_only",
+                "BINANCE_LIVE_TRADING_ENABLED": "true",
+            }
+        )
+
+        self.assertEqual("BLOCKED", payload["connector_status"])
+        self.assertIn("BINANCE_LIVE_TRADING_ENABLED must remain false", payload["blockers"])
+
+    def test_binance_readonly_status_blocks_non_read_only_mode(self) -> None:
+        payload = build_binance_readonly_status(
+            env={
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "BINANCE_CONNECTOR_MODE": "live",
+                "BINANCE_LIVE_TRADING_ENABLED": "false",
+            }
+        )
+
+        self.assertEqual("BLOCKED", payload["connector_status"])
+        self.assertIn("BINANCE_CONNECTOR_MODE must be read_only, got live", payload["blockers"])
+
+    def test_api_binance_readonly_status_returns_safety_fields(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "BINANCE_CONNECTOR_MODE": "read_only",
+                "BINANCE_LIVE_TRADING_ENABLED": "false",
+            },
+            clear=False,
+        ):
+            response = self.client.get("/binance-readonly/status")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("READY_READ_ONLY", payload["connector_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertTrue(payload["read_only"])
+        self.assertNotIn("super-secret-value", json.dumps(payload))
+
+    def test_cli_binance_readonly_status_works_without_printing_secret(self) -> None:
+        env = os.environ.copy()
+        env.update(
+            {
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "BINANCE_CONNECTOR_MODE": "read_only",
+                "BINANCE_LIVE_TRADING_ENABLED": "false",
+            }
+        )
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "binance-readonly-status",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("HAMMER RADAR BINANCE READ-ONLY CONNECTOR", result.stdout)
+        self.assertIn("connector_status: READY_READ_ONLY", result.stdout)
+        self.assertIn("api_key_preview: abcd...wxyz", result.stdout)
+        self.assertIn("live_execution_enabled: false", result.stdout)
+        self.assertIn("order_placed: false", result.stdout)
+        self.assertNotIn("super-secret-value", result.stdout)
+        self.assertNotIn("abcd1234wxyz", result.stdout)
+
+    def test_binance_readonly_module_has_no_order_placement_method(self) -> None:
+        source = Path("src/app/hammer_radar/operator/binance_readonly.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("def place_order", source)
+        self.assertNotIn("def create_order", source)
+        self.assertNotIn("def cancel_order", source)
+        self.assertNotIn("requests.", source)
+        self.assertNotIn("urlopen", source)
 
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)

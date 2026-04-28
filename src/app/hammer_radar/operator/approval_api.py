@@ -17,6 +17,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.binance_readonly import (
+    build_binance_exchange_info,
+    build_binance_readonly_status,
+)
 from src.app.hammer_radar.operator.exchange_dry_run import (
     build_current_exchange_dry_run,
     build_exchange_dry_run,
@@ -300,6 +304,16 @@ def live_connector_attempts(
     }
 
 
+@app.get("/binance-readonly/status")
+def binance_readonly_status() -> dict:
+    return build_binance_readonly_status()
+
+
+@app.get("/binance-readonly/exchange-info")
+def binance_readonly_exchange_info(symbol: str = "BTCUSDT") -> dict:
+    return build_binance_exchange_info(symbol=symbol)
+
+
 @app.get("/candidates")
 def candidates(
     limit: int = Query(default=10, ge=0),
@@ -552,7 +566,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -714,6 +728,24 @@ def _operator_ui_html() -> str:
       </div>
     </section>
 
+    <h2>Binance Read-Only Connector</h2>
+    <section id="binanceReadonly" class="binance-readonly blocked">
+      <div class="grid">
+        <div><div class="label">connector_status</div><div id="binanceStatus" class="value danger">loading</div></div>
+        <div><div class="label">connector_mode</div><div id="binanceMode" class="value">loading</div></div>
+        <div><div class="label">api_key_present</div><div id="binanceApiKeyPresent" class="value">false</div></div>
+        <div><div class="label">api_secret_present</div><div id="binanceApiSecretPresent" class="value">false</div></div>
+        <div><div class="label">api_key_preview</div><div id="binanceApiKeyPreview" class="value mono">n/a</div></div>
+        <div><div class="label">live_trading_env</div><div id="binanceLiveTradingEnv" class="value danger">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="binanceLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="binanceOrder" class="value danger">false</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="binanceBlockers">loading</span></p>
+      <p><strong>Forbidden actions:</strong> <span id="binanceForbidden">loading</span></p>
+      <p class="muted">Read-only connector. No order placement exists.</p>
+      <p class="muted">Secrets are never shown. Live trading env must remain false.</p>
+    </section>
+
     <h2>Paper Executions</h2>
     <div id="paperExecutions">loading</div>
 
@@ -753,6 +785,7 @@ async function refreshAll() {
   await loadExchangeDryRun();
   await loadLiveSafety();
   await loadLiveAttempts();
+  await loadBinanceReadonlyStatus();
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
@@ -919,6 +952,25 @@ async function loadLiveAttempts() {
   }
   const latest = attempts[0];
   document.getElementById('lastLiveAttempt').textContent = `${latest.created_at} | ${latest.live_attempt_id} | rejected=${latest.rejected} | order_placed=${latest.order_placed}`;
+}
+
+async function loadBinanceReadonlyStatus() {
+  const res = await fetch('/binance-readonly/status');
+  const data = await res.json();
+  const ready = data.connector_status === 'READY_READ_ONLY';
+  const root = document.getElementById('binanceReadonly');
+  root.className = 'binance-readonly ' + (ready ? 'proposed' : 'blocked');
+  document.getElementById('binanceStatus').textContent = data.connector_status || 'MISSING_ENV';
+  document.getElementById('binanceStatus').className = 'value ' + (ready ? 'safe' : 'danger');
+  document.getElementById('binanceMode').textContent = data.connector_mode || 'n/a';
+  document.getElementById('binanceApiKeyPresent').textContent = String(data.api_key_present === true);
+  document.getElementById('binanceApiSecretPresent').textContent = String(data.api_secret_present === true);
+  document.getElementById('binanceApiKeyPreview').textContent = data.api_key_preview || 'n/a';
+  document.getElementById('binanceLiveTradingEnv').textContent = data.live_trading_env || 'n/a';
+  document.getElementById('binanceLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('binanceOrder').textContent = String(data.order_placed);
+  document.getElementById('binanceBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
+  document.getElementById('binanceForbidden').textContent = (data.forbidden_actions || []).join(', ');
 }
 
 async function loadCandidates() {

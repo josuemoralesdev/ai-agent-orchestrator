@@ -690,6 +690,10 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "binance-readonly-status":
+        from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status_text
+
+        print(build_binance_readonly_status_text())
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -804,6 +808,8 @@ def _build_parser() -> argparse.ArgumentParser:
     live_attempts_parser.add_argument("--limit", type=int, default=50)
     live_attempts_parser.add_argument("--signal-id", default=None)
     live_attempts_parser.add_argument("--ticket-id", default=None)
+
+    subparsers.add_parser("binance-readonly-status", parents=[parent])
 
     return parser
 
