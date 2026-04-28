@@ -622,6 +622,14 @@ def main() -> int:
         from src.app.hammer_radar.operator.readiness import build_readiness_text
 
         print(build_readiness_text(log_dir=args.log_dir))
+    elif args.command == "trade-ticket":
+        from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket_text
+
+        print(build_trade_ticket_text(log_dir=args.log_dir))
+    elif args.command == "trade-tickets":
+        from src.app.hammer_radar.operator.trade_ticket import build_trade_tickets_text
+
+        print(build_trade_tickets_text(limit=args.limit, ticket_id=args.ticket_id, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -702,6 +710,12 @@ def _build_parser() -> argparse.ArgumentParser:
     manual_outcomes_parser.add_argument("--signal-id", default=None)
 
     subparsers.add_parser("readiness", parents=[parent])
+
+    subparsers.add_parser("trade-ticket", parents=[parent])
+
+    trade_tickets_parser = subparsers.add_parser("trade-tickets", parents=[parent])
+    trade_tickets_parser.add_argument("--limit", type=int, default=50)
+    trade_tickets_parser.add_argument("--ticket-id", default=None)
 
     return parser
 

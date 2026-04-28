@@ -28,6 +28,11 @@ from src.app.hammer_radar.operator.manual_outcomes import (
     load_manual_outcomes,
 )
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
+from src.app.hammer_radar.operator.trade_ticket import (
+    approve_paper_ticket,
+    build_trade_ticket,
+    load_trade_ticket_records,
+)
 
 SERVICE_NAME = "hammer_radar_approval_api"
 DECISIONS_FILENAME = "manual_decisions.ndjson"
@@ -64,6 +69,13 @@ class ManualOutcomeRequest(BaseModel):
     notes: str = ""
 
 
+class ApprovePaperTicketRequest(BaseModel):
+    ticket_id: str = Field(min_length=1)
+    operator: str = Field(min_length=1)
+    notes: str = ""
+    ticket_snapshot: dict | None = None
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/ui", response_class=HTMLResponse)
 def operator_ui() -> str:
@@ -82,6 +94,54 @@ def health() -> dict:
 @app.get("/readiness")
 def readiness() -> dict:
     return build_readiness_payload(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/trade-ticket")
+def trade_ticket(
+    signal_id: str | None = None,
+    latest_only: bool = True,
+    allow_short: bool = False,
+    max_position_usd: float = Query(default=DEFAULT_MAX_POSITION_USD, gt=0),
+    max_risk_usd: float = Query(default=5.0, gt=0),
+    max_leverage: float = Query(default=DEFAULT_MAX_LEVERAGE, gt=0),
+    fresh_minutes: int = Query(default=30, ge=0),
+) -> dict:
+    return build_trade_ticket(
+        signal_id=signal_id,
+        latest_only=latest_only,
+        allow_short=allow_short,
+        max_position_usd=max_position_usd,
+        max_risk_usd=max_risk_usd,
+        max_leverage=max_leverage,
+        fresh_minutes=fresh_minutes,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/trade-ticket/approve-paper")
+def approve_paper_trade_ticket(request: ApprovePaperTicketRequest) -> dict:
+    try:
+        return approve_paper_ticket(
+            ticket_id=request.ticket_id,
+            operator=request.operator,
+            notes=request.notes,
+            ticket_snapshot=request.ticket_snapshot,
+            log_dir=get_log_dir(use_env=True),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/trade-tickets")
+def trade_tickets(limit: int = Query(default=50, ge=0), ticket_id: str | None = None) -> dict:
+    records = load_trade_ticket_records(limit=limit, ticket_id=ticket_id, log_dir=get_log_dir(use_env=True))
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "paper_execution_enabled": False,
+        "paper_order_placed": False,
+        "trade_tickets": records,
+    }
 
 
 @app.get("/candidates")
@@ -336,7 +396,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -365,6 +425,9 @@ def _operator_ui_html() -> str:
     .error { border-color: #fca5a5; background: #fef2f2; color: #7f1d1d; }
     .ready { border-left: 6px solid #16a34a; }
     .not-ready { border-left: 6px solid #dc2626; }
+    .proposed { border-left: 6px solid #16a34a; }
+    .blocked { border-left: 6px solid #dc2626; }
+    .expired { border-left: 6px solid #d97706; }
     .muted { color: #667085; }
     h2 { margin-top: 28px; }
   </style>
@@ -407,6 +470,34 @@ def _operator_ui_html() -> str:
       <p class="muted">If NOT_READY, manual live trade should not be taken now. If READY: Log decision before manual exchange action. App does not place orders.</p>
     </section>
 
+    <h2>Machine Trade Ticket</h2>
+    <section id="tradeTicket" class="ticket blocked">
+      <div class="grid">
+        <div><div class="label">ticket_status</div><div id="ticketStatus" class="value danger">loading</div></div>
+        <div><div class="label">readiness_status</div><div id="ticketReadiness" class="value danger">loading</div></div>
+        <div><div class="label">allowed_now</div><div id="ticketAllowed" class="value danger">false</div></div>
+        <div><div class="label">signal_id</div><div id="ticketSignal" class="value mono">loading</div></div>
+        <div><div class="label">direction/timeframe</div><div id="ticketDirection" class="value">loading</div></div>
+        <div><div class="label">entry</div><div id="ticketEntry" class="value">loading</div></div>
+        <div><div class="label">stop</div><div id="ticketStop" class="value">loading</div></div>
+        <div><div class="label">take_profit</div><div id="ticketTakeProfit" class="value">loading</div></div>
+        <div><div class="label">suggested_position_usd</div><div id="ticketPosition" class="value">loading</div></div>
+        <div><div class="label">suggested_leverage</div><div id="ticketLeverage" class="value">loading</div></div>
+        <div><div class="label">max_loss_usd</div><div id="ticketMaxLoss" class="value">loading</div></div>
+        <div><div class="label">margin_mode</div><div id="ticketMargin" class="value">isolated</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="ticketLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="ticketOrder" class="value danger">false</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="ticketBlockers">loading</span></p>
+      <p><strong>Machine reason:</strong> <span id="ticketReason">loading</span></p>
+      <p class="muted">No order will be placed. This records approval intent only.</p>
+      <p><input id="ticketNotes" class="notes" placeholder="paper ticket approval notes"></p>
+      <div class="button-row">
+        <button class="approve" id="approveTicketButton" onclick="approvePaperTicket()" disabled>Approve Paper Ticket</button>
+        <button class="reject" onclick="recordTicketWatch()">Reject / Watch</button>
+      </div>
+    </section>
+
     <section class="controls">
       <div class="controls-grid">
         <label><input id="latestOnly" type="checkbox" checked> Latest only</label>
@@ -430,6 +521,7 @@ def _operator_ui_html() -> str:
   </main>
 <script>
 let currentCandidates = [];
+let currentTicket = null;
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -438,6 +530,7 @@ function esc(value) {
 async function refreshAll() {
   await loadHealth();
   await loadReadiness();
+  await loadTradeTicket();
   await loadCandidates();
   await loadDecisions();
 }
@@ -472,6 +565,40 @@ async function loadReadiness() {
   if (!isReady) {
     document.getElementById('readinessReason').textContent = (data.reason_summary || '') + ' Manual live trade should not be taken now.';
   }
+}
+
+async function loadTradeTicket() {
+  const params = new URLSearchParams({
+    latest_only: document.getElementById('latestOnly')?.checked ? 'true' : 'false',
+    allow_short: document.getElementById('allowShort')?.checked ? 'true' : 'false'
+  });
+  const res = await fetch('/trade-ticket?' + params.toString());
+  const data = await res.json();
+  currentTicket = data;
+  const status = data.ticket_status || 'BLOCKED';
+  const proposed = status === 'PROPOSED';
+  const root = document.getElementById('tradeTicket');
+  root.className = 'ticket ' + (status === 'EXPIRED' ? 'expired' : (proposed ? 'proposed' : 'blocked'));
+  document.getElementById('ticketStatus').textContent = status;
+  document.getElementById('ticketStatus').className = 'value ' + (proposed ? 'safe' : 'danger');
+  document.getElementById('ticketReadiness').textContent = data.readiness_status || 'UNKNOWN';
+  document.getElementById('ticketReadiness').className = 'value ' + (data.readiness_status === 'READY' ? 'safe' : 'danger');
+  document.getElementById('ticketAllowed').textContent = String(data.allowed_now === true);
+  document.getElementById('ticketAllowed').className = 'value ' + (data.allowed_now === true ? 'safe' : 'danger');
+  document.getElementById('ticketSignal').textContent = data.signal_id || 'n/a';
+  document.getElementById('ticketDirection').textContent = `${data.direction || 'n/a'}/${data.timeframe || 'n/a'}`;
+  document.getElementById('ticketEntry').textContent = String(data.entry ?? 'n/a');
+  document.getElementById('ticketStop').textContent = String(data.stop ?? 'n/a');
+  document.getElementById('ticketTakeProfit').textContent = String(data.take_profit ?? 'n/a');
+  document.getElementById('ticketPosition').textContent = String(data.suggested_position_usd ?? 'n/a');
+  document.getElementById('ticketLeverage').textContent = String(data.suggested_leverage ?? 'n/a');
+  document.getElementById('ticketMaxLoss').textContent = String(data.max_loss_usd ?? 'n/a');
+  document.getElementById('ticketMargin').textContent = data.margin_mode || 'isolated';
+  document.getElementById('ticketLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('ticketOrder').textContent = String(data.order_placed);
+  document.getElementById('ticketBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
+  document.getElementById('ticketReason').textContent = data.machine_reason || '';
+  document.getElementById('approveTicketButton').disabled = !proposed;
 }
 
 async function loadCandidates() {
@@ -544,6 +671,38 @@ function renderCandidate(c, index) {
   </section>`;
 }
 
+async function approvePaperTicket() {
+  if (!currentTicket || !currentTicket.ticket_id) return;
+  const operatorInput = document.getElementById('operator');
+  const notesInput = document.getElementById('ticketNotes');
+  const body = {
+    ticket_id: currentTicket.ticket_id,
+    operator: operatorInput ? operatorInput.value || 'josue' : 'josue',
+    notes: notesInput ? notesInput.value : '',
+    ticket_snapshot: currentTicket
+  };
+  const res = await fetch('/trade-ticket/approve-paper', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback success';
+    message.innerHTML = `<strong>Paper ticket approval intent recorded:</strong> ticket_id=${esc(data.ticket.ticket_id)} | order_placed=${esc(data.order_placed)} | paper_order_placed=${esc(data.paper_order_placed)}`;
+  }
+}
+
+function recordTicketWatch() {
+  const message = document.getElementById('message');
+  message.className = 'feedback';
+  message.textContent = 'Ticket marked for watch/reject in operator console only. No order will be placed.';
+}
+
 async function recordDecision(index, decision) {
   const candidate = currentCandidates[index];
   if (!candidate) return;
@@ -600,7 +759,10 @@ async function loadDecisions() {
 refreshAll();
 ['latestOnly', 'eligibleOnly', 'includeForbidden', 'allowShort', 'limit'].forEach(id => {
   document.addEventListener('change', event => {
-    if (event.target && event.target.id === id) loadCandidates();
+    if (event.target && event.target.id === id) {
+      loadTradeTicket();
+      loadCandidates();
+    }
   });
 });
 setInterval(refreshAll, 30000);
