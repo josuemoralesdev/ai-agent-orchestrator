@@ -17,6 +17,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.exchange_dry_run import (
+    build_current_exchange_dry_run,
+    build_exchange_dry_run,
+)
 from src.app.hammer_radar.operator.inspect import (
     LIVE_DECISION_ELIGIBLE,
     LIVE_DECISION_FORBIDDEN,
@@ -84,6 +88,10 @@ class ExecutePaperTicketRequest(BaseModel):
     ticket_id: str = Field(min_length=1)
     operator: str = Field(min_length=1)
     notes: str = ""
+
+
+class ExchangeDryRunRequest(BaseModel):
+    ticket: dict
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -184,6 +192,31 @@ def paper_executions(
         "order_placed": ORDER_PLACED,
         "paper_executions": records,
     }
+
+
+@app.get("/exchange-dry-run")
+def exchange_dry_run(
+    signal_id: str | None = None,
+    allow_short: bool = False,
+    max_position_usd: float = Query(default=DEFAULT_MAX_POSITION_USD, gt=0),
+    max_risk_usd: float = Query(default=5.0, gt=0),
+    max_leverage: float = Query(default=DEFAULT_MAX_LEVERAGE, gt=0),
+    fresh_minutes: int = Query(default=30, ge=0),
+) -> dict:
+    return build_current_exchange_dry_run(
+        signal_id=signal_id,
+        allow_short=allow_short,
+        max_position_usd=max_position_usd,
+        max_risk_usd=max_risk_usd,
+        max_leverage=max_leverage,
+        fresh_minutes=fresh_minutes,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/exchange-dry-run/from-ticket")
+def exchange_dry_run_from_ticket(request: ExchangeDryRunRequest) -> dict:
+    return build_exchange_dry_run(request.ticket)
 
 
 @app.get("/candidates")
@@ -438,7 +471,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -543,6 +576,29 @@ def _operator_ui_html() -> str:
       </div>
     </section>
 
+    <h2>Exchange Dry Run</h2>
+    <section id="exchangeDryRun" class="exchange-dry-run blocked">
+      <div class="grid">
+        <div><div class="label">validation_status</div><div id="dryRunStatus" class="value danger">loading</div></div>
+        <div><div class="label">exchange</div><div id="dryRunExchange" class="value">loading</div></div>
+        <div><div class="label">symbol</div><div id="dryRunSymbol" class="value">loading</div></div>
+        <div><div class="label">side</div><div id="dryRunSide" class="value">loading</div></div>
+        <div><div class="label">position_side</div><div id="dryRunPositionSide" class="value">loading</div></div>
+        <div><div class="label">notional_usd</div><div id="dryRunNotional" class="value">loading</div></div>
+        <div><div class="label">quantity_rounded</div><div id="dryRunQuantity" class="value">loading</div></div>
+        <div><div class="label">entry_price_rounded</div><div id="dryRunEntry" class="value">loading</div></div>
+        <div><div class="label">stop_price_rounded</div><div id="dryRunStop" class="value">loading</div></div>
+        <div><div class="label">take_profit_price_rounded</div><div id="dryRunTakeProfit" class="value">loading</div></div>
+        <div><div class="label">leverage</div><div id="dryRunLeverage" class="value">loading</div></div>
+        <div><div class="label">margin_mode</div><div id="dryRunMargin" class="value">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="dryRunLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="dryRunOrder" class="value danger">false</div></div>
+        <div><div class="label">dry_run</div><div id="dryRunFlag" class="value safe">true</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="dryRunBlockers">loading</span></p>
+      <p class="muted">Exchange dry run only. No order was sent. No API key used. No Binance order placement exists.</p>
+    </section>
+
     <h2>Paper Executions</h2>
     <div id="paperExecutions">loading</div>
 
@@ -579,6 +635,7 @@ async function refreshAll() {
   await loadHealth();
   await loadReadiness();
   await loadTradeTicket();
+  await loadExchangeDryRun();
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
@@ -650,6 +707,34 @@ async function loadTradeTicket() {
   document.getElementById('approveTicketButton').disabled = !proposed;
   document.getElementById('executePaperButton').disabled = !proposed;
   document.getElementById('paperExecutionBlocked').style.display = proposed ? 'none' : 'block';
+}
+
+async function loadExchangeDryRun() {
+  const params = new URLSearchParams({
+    allow_short: document.getElementById('allowShort')?.checked ? 'true' : 'false'
+  });
+  const res = await fetch('/exchange-dry-run?' + params.toString());
+  const data = await res.json();
+  const valid = data.validation_status === 'VALID';
+  const root = document.getElementById('exchangeDryRun');
+  root.className = 'exchange-dry-run ' + (valid ? 'proposed' : 'blocked');
+  document.getElementById('dryRunStatus').textContent = data.validation_status || 'BLOCKED';
+  document.getElementById('dryRunStatus').className = 'value ' + (valid ? 'safe' : 'danger');
+  document.getElementById('dryRunExchange').textContent = data.exchange || 'n/a';
+  document.getElementById('dryRunSymbol').textContent = data.symbol || 'n/a';
+  document.getElementById('dryRunSide').textContent = data.side || 'n/a';
+  document.getElementById('dryRunPositionSide').textContent = data.position_side || 'n/a';
+  document.getElementById('dryRunNotional').textContent = String(data.notional_usd ?? 'n/a');
+  document.getElementById('dryRunQuantity').textContent = String(data.quantity_rounded ?? 'n/a');
+  document.getElementById('dryRunEntry').textContent = String(data.entry_price_rounded ?? 'n/a');
+  document.getElementById('dryRunStop').textContent = String(data.stop_price_rounded ?? 'n/a');
+  document.getElementById('dryRunTakeProfit').textContent = String(data.take_profit_price_rounded ?? 'n/a');
+  document.getElementById('dryRunLeverage').textContent = String(data.leverage ?? 'n/a');
+  document.getElementById('dryRunMargin').textContent = data.margin_mode || 'n/a';
+  document.getElementById('dryRunLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('dryRunOrder').textContent = String(data.order_placed);
+  document.getElementById('dryRunFlag').textContent = String(data.dry_run === true);
+  document.getElementById('dryRunBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
 }
 
 async function loadCandidates() {
@@ -861,6 +946,7 @@ refreshAll();
   document.addEventListener('change', event => {
     if (event.target && event.target.id === id) {
       loadTradeTicket();
+      loadExchangeDryRun();
       loadCandidates();
     }
   });

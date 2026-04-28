@@ -652,6 +652,18 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "exchange-dry-run":
+        from src.app.hammer_radar.operator.exchange_dry_run import build_exchange_dry_run_text
+
+        print(
+            build_exchange_dry_run_text(
+                signal_id=args.signal_id,
+                allow_short=args.allow_short,
+                max_position_usd=args.max_position_usd,
+                max_leverage=args.max_leverage,
+                log_dir=args.log_dir,
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -748,6 +760,12 @@ def _build_parser() -> argparse.ArgumentParser:
     paper_executions_parser.add_argument("--limit", type=int, default=50)
     paper_executions_parser.add_argument("--signal-id", default=None)
     paper_executions_parser.add_argument("--status", default=None)
+
+    exchange_dry_run_parser = subparsers.add_parser("exchange-dry-run", parents=[parent])
+    exchange_dry_run_parser.add_argument("--allow-short", action="store_true")
+    exchange_dry_run_parser.add_argument("--signal-id", default=None)
+    exchange_dry_run_parser.add_argument("--max-position-usd", type=float, default=44.0)
+    exchange_dry_run_parser.add_argument("--max-leverage", type=float, default=3.0)
 
     return parser
 
