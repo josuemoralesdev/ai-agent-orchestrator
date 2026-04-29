@@ -1,0 +1,23 @@
+[Unit]
+Description=Hammer Radar paper refresh scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=josue
+WorkingDirectory=/home/josue/workspace/kernel/ai-agent-orchestrator-main
+EnvironmentFile=-/home/josue/.config/hammer-radar/binance-readonly.env
+EnvironmentFile=-/home/josue/.config/hammer-radar/notifications.env
+Environment=HAMMER_RADAR_LOG_DIR=/home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward
+Environment=HAMMER_REFRESH_USE_NETWORK=false
+Environment=HAMMER_REFRESH_WRITE_OUTPUTS=true
+Environment=HAMMER_REFRESH_SEND_NOTIFICATIONS=true
+Environment=HAMMER_REFRESH_POLL_SECONDS=300
+ExecStart=/home/josue/workspace/kernel/ai-agent-orchestrator-main/.venv/bin/python -m src.app.hammer_radar.operator.paper_refresh_scheduler --watch
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

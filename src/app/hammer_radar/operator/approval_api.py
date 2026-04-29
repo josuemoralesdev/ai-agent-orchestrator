@@ -1164,11 +1164,15 @@ def _operator_ui_html() -> str:
         <div><div class="label">runs recorded</div><div id="paperRefreshRuns" class="value">loading</div></div>
         <div><div class="label">last run</div><div id="paperRefreshLastRun" class="value">loading</div></div>
         <div><div class="label">configured poll seconds</div><div id="paperRefreshPoll" class="value">loading</div></div>
+        <div><div class="label">systemd service</div><div id="paperRefreshService" class="value mono">hammer-paper-refresh.service</div></div>
+        <div><div class="label">watcher entrypoint</div><div id="paperRefreshEntrypoint" class="value mono">loading</div></div>
       </div>
       <p class="muted">Paper/watch refresh only.</p>
       <p class="muted">No live orders.</p>
       <p class="muted">No ETH/alt live tickets.</p>
       <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <p class="muted">Systemd service available: hammer-paper-refresh.service</p>
+      <p class="muted">Use status/log commands before enabling.</p>
       <div class="button-row">
         <button onclick="runPaperRefresh(false)">Run Paper Refresh</button>
         <button onclick="runPaperRefresh(true)">Run Paper Refresh + Notify If Ready</button>
@@ -1673,6 +1677,8 @@ async function loadPaperRefreshStatus() {
   document.getElementById('paperRefreshTasks').textContent = (data.available_tasks || []).join(', ');
   document.getElementById('paperRefreshRuns').textContent = String(data.runs_recorded ?? 0);
   document.getElementById('paperRefreshPoll').textContent = String(data.configured_poll_seconds ?? 'n/a');
+  document.getElementById('paperRefreshService').textContent = data.service_name || 'hammer-paper-refresh.service';
+  document.getElementById('paperRefreshEntrypoint').textContent = data.watcher_entrypoint || 'n/a';
   const last = data.last_run;
   document.getElementById('paperRefreshLastRun').textContent = last
     ? `${last.created_at} | completed=${(last.completed_tasks || []).length} | failed=${(last.failed_tasks || []).length}`
