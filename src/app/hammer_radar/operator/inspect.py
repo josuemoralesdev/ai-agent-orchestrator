@@ -808,6 +808,25 @@ def main() -> int:
         from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_summary_text
 
         print(build_eth_paper_summary_text(log_dir=args.log_dir))
+    elif args.command == "eth-paper-outcome":
+        from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome_text
+
+        print(build_eth_paper_outcome_text(candidate_id=args.candidate_id, write=args.write, log_dir=args.log_dir))
+    elif args.command == "eth-paper-outcomes":
+        from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcomes_text
+
+        print(
+            build_eth_paper_outcomes_text(
+                limit=args.limit,
+                status=args.status,
+                candidate_id=args.candidate_id,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "eth-paper-outcome-summary":
+        from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome_summary_text
+
+        print(build_eth_paper_outcome_summary_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -1007,6 +1026,17 @@ def _build_parser() -> argparse.ArgumentParser:
     eth_candidates_parser.add_argument("--status", default=None)
 
     subparsers.add_parser("eth-paper-summary", parents=[parent])
+
+    eth_outcome_parser = subparsers.add_parser("eth-paper-outcome", parents=[parent])
+    eth_outcome_parser.add_argument("--candidate-id", default=None)
+    eth_outcome_parser.add_argument("--write", action="store_true")
+
+    eth_outcomes_parser = subparsers.add_parser("eth-paper-outcomes", parents=[parent])
+    eth_outcomes_parser.add_argument("--limit", type=int, default=50)
+    eth_outcomes_parser.add_argument("--status", default=None)
+    eth_outcomes_parser.add_argument("--candidate-id", default=None)
+
+    subparsers.add_parser("eth-paper-outcome-summary", parents=[parent])
 
     return parser
 
