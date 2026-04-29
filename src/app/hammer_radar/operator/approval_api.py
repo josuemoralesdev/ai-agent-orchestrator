@@ -54,6 +54,11 @@ from src.app.hammer_radar.operator.notification_watcher import (
     load_alert_records,
     notification_status,
 )
+from src.app.hammer_radar.operator.multi_symbol_scanner import (
+    build_multi_symbol_scans_payload,
+    build_multi_symbol_summary,
+    scan_watchlist,
+)
 from src.app.hammer_radar.operator.paper_execution import (
     execute_paper_ticket,
     load_paper_executions,
@@ -410,6 +415,43 @@ def watchlist_summary() -> dict:
     return build_watchlist_summary(log_dir=get_log_dir(use_env=True))
 
 
+@app.get("/multi-symbol/scan")
+def multi_symbol_scan(
+    symbol: str | None = None,
+    category: WatchlistCategory | None = None,
+    limit: int = Query(default=50, ge=0),
+    write: bool = False,
+) -> dict:
+    return scan_watchlist(
+        symbol=symbol,
+        category=category,
+        limit=limit,
+        write=write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/multi-symbol/scans")
+def multi_symbol_scans(
+    limit: int = Query(default=50, ge=0),
+    symbol: str | None = None,
+    category: WatchlistCategory | None = None,
+    status: str | None = None,
+) -> dict:
+    return build_multi_symbol_scans_payload(
+        limit=limit,
+        symbol=symbol,
+        category=category,
+        status=status,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/multi-symbol/summary")
+def multi_symbol_summary() -> dict:
+    return build_multi_symbol_summary(log_dir=get_log_dir(use_env=True))
+
+
 @app.get("/candidates")
 def candidates(
     limit: int = Query(default=10, ge=0),
@@ -662,7 +704,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -882,6 +924,28 @@ def _operator_ui_html() -> str:
       <div id="watchlistSymbols" class="muted">loading</div>
     </section>
 
+    <h2>Multi-Symbol Paper Scanner</h2>
+    <section id="multiSymbolScanner" class="multi-symbol-scanner blocked">
+      <div class="grid">
+        <div><div class="label">live_execution_enabled</div><div id="multiSymbolLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="multiSymbolOrder" class="value danger">false</div></div>
+        <div><div class="label">btc_live_only</div><div id="multiSymbolBtcOnly" class="value safe">true</div></div>
+        <div><div class="label">scanned symbols</div><div id="multiSymbolScanned" class="value">loading</div></div>
+        <div><div class="label">archived scan records</div><div id="multiSymbolArchived" class="value">loading</div></div>
+        <div><div class="label">key rotation pair</div><div id="multiSymbolKeyPair" class="value">ETHBTC</div></div>
+        <div><div class="label">next promotion candidate</div><div id="multiSymbolPromotion" class="value">ETHUSDT</div></div>
+      </div>
+      <p class="muted">Paper/watch-only. No alt live tickets.</p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <p class="muted">ETHBTC is a rotation compass, not a live order target.</p>
+      <div class="button-row">
+        <button onclick="runMultiSymbolScan(false)">Preview Multi-Symbol Scan</button>
+        <button onclick="runMultiSymbolScan(true)">Archive Multi-Symbol Scan</button>
+      </div>
+      <div id="multiSymbolTopRanked" class="muted">loading</div>
+      <div id="multiSymbolScanResult" class="muted">No multi-symbol scan yet.</div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -945,6 +1009,7 @@ async function refreshAll() {
   await loadBinanceReadonlyStatus();
   await loadNotificationStatus();
   await loadAltWatchlist();
+  await loadMultiSymbolSummary();
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1199,6 +1264,55 @@ async function loadAltWatchlist() {
       <div><div class="label">paper_watch_enabled</div><div class="value safe">${esc(record.paper_watch_enabled)}</div></div>
     </div>
   </div>`).join('');
+}
+
+async function loadMultiSymbolSummary() {
+  const res = await fetch('/multi-symbol/summary');
+  const data = await res.json();
+  document.getElementById('multiSymbolLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('multiSymbolOrder').textContent = String(data.order_placed);
+  document.getElementById('multiSymbolBtcOnly').textContent = String(data.btc_live_only === true);
+  document.getElementById('multiSymbolScanned').textContent = String(data.scanned_symbols ?? 0);
+  document.getElementById('multiSymbolArchived').textContent = String(data.archived_records ?? 0);
+  document.getElementById('multiSymbolKeyPair').textContent = data.key_rotation_pair || 'ETHBTC';
+  document.getElementById('multiSymbolPromotion').textContent = data.next_promotion_candidate || 'ETHUSDT';
+  renderMultiSymbolTopRanked(data.top_ranked_symbols || []);
+}
+
+function renderMultiSymbolTopRanked(records) {
+  const root = document.getElementById('multiSymbolTopRanked');
+  if (!records.length) {
+    root.innerHTML = '<div class="multi-symbol-scanner">No ranked symbols.</div>';
+    return;
+  }
+  root.innerHTML = records.map(record => `<div class="multi-symbol-scanner">
+    <div class="grid">
+      <div><div class="label">symbol</div><div class="value mono">${esc(record.symbol)}</div></div>
+      <div><div class="label">status</div><div class="value">${esc(record.paper_signal_status)}</div></div>
+      <div><div class="label">score/tier</div><div class="value">${esc(record.score)} / ${esc(record.tier)}</div></div>
+      <div><div class="label">direction/timeframe</div><div class="value">${esc(record.direction)}/${esc(record.timeframe || 'n/a')}</div></div>
+      <div><div class="label">permission</div><div class="value">${esc(record.current_phase_permission)}</div></div>
+      <div><div class="label">live_eligible_symbol</div><div class="value ${record.live_eligible_symbol ? 'safe' : 'danger'}">${esc(record.live_eligible_symbol)}</div></div>
+      <div><div class="label">order_placed</div><div class="value danger">${esc(record.order_placed)}</div></div>
+    </div>
+  </div>`).join('');
+}
+
+async function runMultiSymbolScan(write) {
+  const res = await fetch(`/multi-symbol/scan?limit=20&write=${write ? 'true' : 'false'}`);
+  const data = await res.json();
+  const result = document.getElementById('multiSymbolScanResult');
+  const message = document.getElementById('message');
+  result.textContent = `scanned_symbols=${data.scanned_symbols ?? 0} write=${data.write === true} order_placed=${data.order_placed}`;
+  renderMultiSymbolTopRanked(data.records || []);
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback';
+    message.textContent = `Multi-symbol paper scan complete. write=${data.write === true}. order_placed=${data.order_placed}.`;
+  }
+  await loadMultiSymbolSummary();
 }
 
 async function loadBetrayalShadowOutcomes() {
