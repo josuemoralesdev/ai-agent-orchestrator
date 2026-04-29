@@ -730,6 +730,14 @@ def main() -> int:
         from src.app.hammer_radar.operator.notification_watcher import build_readiness_alerts_text
 
         print(build_readiness_alerts_text(limit=args.limit, log_dir=args.log_dir))
+    elif args.command == "watchlist":
+        from src.app.hammer_radar.operator.alt_watchlist import build_watchlist_text
+
+        print(build_watchlist_text(category=args.category, limit=args.limit, log_dir=args.log_dir))
+    elif args.command == "watchlist-summary":
+        from src.app.hammer_radar.operator.alt_watchlist import build_watchlist_summary_text
+
+        print(build_watchlist_summary_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -867,6 +875,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     readiness_alerts_parser = subparsers.add_parser("readiness-alerts", parents=[parent])
     readiness_alerts_parser.add_argument("--limit", type=int, default=50)
+
+    watchlist_parser = subparsers.add_parser("watchlist", parents=[parent])
+    watchlist_parser.add_argument(
+        "--category",
+        choices=("CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"),
+        default=None,
+    )
+    watchlist_parser.add_argument("--limit", type=int, default=50)
+
+    subparsers.add_parser("watchlist-summary", parents=[parent])
 
     return parser
 

@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from src.app.hammer_radar.operator.alt_watchlist import build_watchlist, build_watchlist_summary
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.binance_readonly import (
     build_binance_exchange_info,
@@ -143,6 +144,9 @@ class BetrayalShadowTrackRequest(BaseModel):
 class NotificationCheckRequest(BaseModel):
     send: bool = False
     channel: Literal["telegram", "none"] = "none"
+
+
+WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -385,6 +389,25 @@ def notifications_alerts(limit: int = Query(default=50, ge=0)) -> dict:
         "order_placed": ORDER_PLACED,
         "readiness_alerts": load_alert_records(limit=limit, log_dir=get_log_dir(use_env=True)),
     }
+
+
+@app.get("/watchlist")
+def watchlist(
+    category: WatchlistCategory | None = None,
+    include_disabled: bool = True,
+    limit: int = Query(default=50, ge=0),
+) -> dict:
+    return build_watchlist(
+        category=category,
+        include_disabled=include_disabled,
+        limit=limit,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/watchlist/summary")
+def watchlist_summary() -> dict:
+    return build_watchlist_summary(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/candidates")
@@ -639,7 +662,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -839,6 +862,26 @@ def _operator_ui_html() -> str:
       <div id="notificationCheckResult" class="muted">No notification check yet.</div>
     </section>
 
+    <h2>ETH / Alt Watchlist</h2>
+    <section id="altWatchlist" class="alt-watchlist blocked">
+      <div class="grid">
+        <div><div class="label">btc_live_only</div><div id="watchlistBtcLiveOnly" class="value safe">true</div></div>
+        <div><div class="label">total symbols</div><div id="watchlistTotalSymbols" class="value">loading</div></div>
+        <div><div class="label">live eligible symbols</div><div id="watchlistLiveEligible" class="value">loading</div></div>
+        <div><div class="label">paper watch symbols</div><div id="watchlistPaperSymbols" class="value">loading</div></div>
+        <div><div class="label">relative strength symbols</div><div id="watchlistRelativeSymbols" class="value">loading</div></div>
+        <div><div class="label">key rotation pair</div><div id="watchlistKeyPair" class="value">ETHBTC</div></div>
+        <div><div class="label">next promotion candidate</div><div id="watchlistPromotion" class="value">ETHUSDT</div></div>
+      </div>
+      <p><strong>Warning:</strong> <span id="watchlistWarning">ETHUSDT, ETHBTC, and alts are paper/watch-only in R30</span></p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <p class="muted">ETHUSDT and ETHBTC are watchlist and paper-only.</p>
+      <p class="muted">ETHBTC tracks ETH strength vs BTC / alt-cycle rotation.</p>
+      <p class="muted">No alt live tickets.</p>
+      <p class="muted">No alt live orders.</p>
+      <div id="watchlistSymbols" class="muted">loading</div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -901,6 +944,7 @@ async function refreshAll() {
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
   await loadNotificationStatus();
+  await loadAltWatchlist();
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1122,6 +1166,39 @@ async function checkNotifications(send, channel) {
     message.textContent = `Notification check complete. would_alert=${data.would_alert === true}. order_placed=${data.order_placed}.`;
   }
   await loadNotificationStatus();
+}
+
+async function loadAltWatchlist() {
+  const summaryRes = await fetch('/watchlist/summary');
+  const summary = await summaryRes.json();
+  document.getElementById('watchlistBtcLiveOnly').textContent = String(summary.btc_live_only === true);
+  document.getElementById('watchlistTotalSymbols').textContent = String(summary.total_symbols ?? 0);
+  document.getElementById('watchlistLiveEligible').textContent = (summary.live_eligible_symbols || []).join(', ') || 'none';
+  document.getElementById('watchlistPaperSymbols').textContent = String((summary.paper_watch_symbols || []).length);
+  document.getElementById('watchlistRelativeSymbols').textContent = (summary.relative_strength_symbols || []).join(', ') || 'none';
+  document.getElementById('watchlistKeyPair').textContent = summary.key_rotation_pair || 'ETHBTC';
+  document.getElementById('watchlistPromotion').textContent = summary.next_promotion_candidate || 'ETHUSDT';
+  document.getElementById('watchlistWarning').textContent = summary.warning || 'ETHUSDT, ETHBTC, and alts are paper/watch-only in R30';
+
+  const listRes = await fetch('/watchlist?limit=10');
+  const list = await listRes.json();
+  const records = list.symbols || [];
+  const root = document.getElementById('watchlistSymbols');
+  if (!records.length) {
+    root.innerHTML = '<div class="alt-watchlist">No watchlist symbols configured.</div>';
+    return;
+  }
+  root.innerHTML = records.map(record => `<div class="alt-watchlist">
+    <div class="grid">
+      <div><div class="label">symbol</div><div class="value mono">${esc(record.symbol)}</div></div>
+      <div><div class="label">category</div><div class="value">${esc(record.category)}</div></div>
+      <div><div class="label">watch score</div><div class="value">${esc(record.watch_score)}</div></div>
+      <div><div class="label">pair_type</div><div class="value">${esc(record.pair_type)}</div></div>
+      <div><div class="label">permission</div><div class="value">${esc(record.current_phase_permission)}</div></div>
+      <div><div class="label">live_eligible_symbol</div><div class="value ${record.live_eligible_symbol ? 'safe' : 'danger'}">${esc(record.live_eligible_symbol)}</div></div>
+      <div><div class="label">paper_watch_enabled</div><div class="value safe">${esc(record.paper_watch_enabled)}</div></div>
+    </div>
+  </div>`).join('');
 }
 
 async function loadBetrayalShadowOutcomes() {
