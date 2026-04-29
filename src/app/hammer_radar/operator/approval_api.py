@@ -21,6 +21,10 @@ from src.app.hammer_radar.operator.binance_readonly import (
     build_binance_exchange_info,
     build_binance_readonly_status,
 )
+from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
+    build_betrayal_shadow_outcomes_payload,
+    track_betrayal_shadow_outcomes,
+)
 from src.app.hammer_radar.operator.exchange_dry_run import (
     build_current_exchange_dry_run,
     build_exchange_dry_run,
@@ -121,6 +125,14 @@ class LiveConnectorSubmitRequest(BaseModel):
     ticket_id: str = Field(min_length=1)
     operator: str = Field(min_length=1)
     notes: str = ""
+
+
+class BetrayalShadowTrackRequest(BaseModel):
+    latest_only: bool = True
+    limit: int = 20
+    since_hours: int = 24
+    symbol: str | None = None
+    min_betrayal_score: int = 50
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -312,6 +324,33 @@ def binance_readonly_status() -> dict:
 @app.get("/binance-readonly/exchange-info")
 def binance_readonly_exchange_info(symbol: str = "BTCUSDT") -> dict:
     return build_binance_exchange_info(symbol=symbol)
+
+
+@app.get("/betrayal-shadow/outcomes")
+def betrayal_shadow_outcomes(
+    limit: int = Query(default=50, ge=0),
+    status: str | None = None,
+    symbol: str | None = None,
+) -> dict:
+    return build_betrayal_shadow_outcomes_payload(
+        limit=limit,
+        status=status,
+        symbol=symbol,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/betrayal-shadow/track")
+def betrayal_shadow_track(request: BetrayalShadowTrackRequest | None = None) -> dict:
+    request = request or BetrayalShadowTrackRequest()
+    return track_betrayal_shadow_outcomes(
+        latest_only=request.latest_only,
+        limit=request.limit,
+        since_hours=request.since_hours,
+        symbol=request.symbol,
+        min_betrayal_score=request.min_betrayal_score,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.get("/candidates")
@@ -566,7 +605,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -746,6 +785,27 @@ def _operator_ui_html() -> str:
       <p class="muted">Secrets are never shown. Live trading env must remain false.</p>
     </section>
 
+    <h2>Betrayal Shadow Outcomes</h2>
+    <section id="betrayalShadow" class="betrayal-shadow blocked">
+      <div class="grid">
+        <div><div class="label">shadow_only</div><div id="betrayalShadowOnly" class="value safe">true</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="betrayalShadowLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="betrayalShadowOrder" class="value danger">false</div></div>
+        <div><div class="label">total records</div><div id="betrayalShadowTotal" class="value">loading</div></div>
+        <div><div class="label">wins</div><div id="betrayalShadowWins" class="value">loading</div></div>
+        <div><div class="label">losses</div><div id="betrayalShadowLosses" class="value">loading</div></div>
+        <div><div class="label">unresolved/no-data</div><div id="betrayalShadowUnknown" class="value">loading</div></div>
+        <div><div class="label">win rate</div><div id="betrayalShadowWinRate" class="value">n/a</div></div>
+        <div><div class="label">avg shadow pnl</div><div id="betrayalShadowAvgPnl" class="value">n/a</div></div>
+      </div>
+      <p class="muted">Betrayal remains shadow-only. No live order can be placed. This does not affect Friday readiness. This does not affect trade tickets.</p>
+      <div class="button-row">
+        <button onclick="trackBetrayalShadows()">Track Betrayal Shadows</button>
+        <span class="muted">Shadow tracking only. does not affect readiness or live trading.</span>
+      </div>
+      <div id="betrayalShadowRecords" class="muted">loading</div>
+    </section>
+
     <h2>Paper Executions</h2>
     <div id="paperExecutions">loading</div>
 
@@ -786,6 +846,7 @@ async function refreshAll() {
   await loadLiveSafety();
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
+  await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
@@ -971,6 +1032,69 @@ async function loadBinanceReadonlyStatus() {
   document.getElementById('binanceOrder').textContent = String(data.order_placed);
   document.getElementById('binanceBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
   document.getElementById('binanceForbidden').textContent = (data.forbidden_actions || []).join(', ');
+}
+
+async function loadBetrayalShadowOutcomes() {
+  const res = await fetch('/betrayal-shadow/outcomes?limit=5');
+  const data = await res.json();
+  const summary = data.summary || {};
+  const root = document.getElementById('betrayalShadow');
+  root.className = 'betrayal-shadow blocked';
+  document.getElementById('betrayalShadowOnly').textContent = String(data.shadow_only === true);
+  document.getElementById('betrayalShadowLive').textContent = String(data.live_execution_enabled === true);
+  document.getElementById('betrayalShadowOrder').textContent = String(data.order_placed === true);
+  document.getElementById('betrayalShadowTotal').textContent = String(summary.total_records ?? 0);
+  document.getElementById('betrayalShadowWins').textContent = String(summary.wins ?? 0);
+  document.getElementById('betrayalShadowLosses').textContent = String(summary.losses ?? 0);
+  document.getElementById('betrayalShadowUnknown').textContent = String(summary.unresolved_no_data ?? 0);
+  document.getElementById('betrayalShadowWinRate').textContent = summary.win_rate == null ? 'n/a' : String(summary.win_rate);
+  document.getElementById('betrayalShadowAvgPnl').textContent = summary.avg_shadow_pnl_pct == null ? 'n/a' : String(summary.avg_shadow_pnl_pct);
+  const records = data.records || [];
+  const recordsRoot = document.getElementById('betrayalShadowRecords');
+  if (!records.length) {
+    recordsRoot.innerHTML = '<div class="betrayal-shadow">No betrayal shadow outcome records.</div>';
+    return;
+  }
+  recordsRoot.innerHTML = records.map(record => {
+    const comparison = record.comparison || {};
+    const comparisonText = comparison.shadow_better ? 'shadow_better' : (comparison.original_better ? 'original_better' : 'inconclusive');
+    return `<div class="betrayal-shadow">
+      <div class="grid">
+        <div><div class="label">original signal</div><div class="value mono">${esc(record.original_signal_id)}</div></div>
+        <div><div class="label">original direction</div><div class="value">${esc(record.original_direction)}</div></div>
+        <div><div class="label">shadow direction</div><div class="value">${esc(record.shadow_direction)}</div></div>
+        <div><div class="label">betrayal score/tier</div><div class="value">${esc(record.betrayal_score)} / ${esc(record.betrayal_tier)}</div></div>
+        <div><div class="label">shadow status</div><div class="value">${esc(record.shadow_status)}</div></div>
+        <div><div class="label">comparison</div><div class="value">${esc(comparisonText)}</div></div>
+        <div><div class="label">live_execution_enabled</div><div class="value danger">${esc(record.live_execution_enabled)}</div></div>
+        <div><div class="label">order_placed</div><div class="value danger">${esc(record.order_placed)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function trackBetrayalShadows() {
+  const body = {
+    latest_only: document.getElementById('latestOnly')?.checked !== false,
+    limit: Number(document.getElementById('limit')?.value || 20),
+    since_hours: 24,
+    min_betrayal_score: 50
+  };
+  const res = await fetch('/betrayal-shadow/track', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback success';
+    message.innerHTML = `<strong>Betrayal shadows tracked:</strong> created=${esc(data.created)} | updated=${esc(data.updated)} | shadow_only=${esc(data.shadow_only)} | order_placed=${esc(data.order_placed)}`;
+  }
+  await loadBetrayalShadowOutcomes();
 }
 
 async function loadCandidates() {

@@ -6,7 +6,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.app.hammer_radar.operator import archive, inspect, manual_outcomes, positions, readiness
+from src.app.hammer_radar.operator import (
+    archive,
+    betrayal_shadow_outcomes,
+    inspect,
+    manual_outcomes,
+    positions,
+    readiness,
+)
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -823,6 +830,108 @@ class InspectCliTestCase(unittest.TestCase):
 
         self.assertIn("betrayal_mode: shadow_only", output)
         self.assertIn("This report does not affect live-checklist eligibility.", output)
+
+    def test_betrayal_shadow_tracker_creates_record_from_candidate(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-shadow-create"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-shadow|1",
+                timestamp=self._recent_timestamp(),
+                direction="long",
+                bias_direction="bearish",
+                bias_aligned=False,
+                trend_direction="bearish",
+                tradable=False,
+                reject_reason="bias_not_aligned",
+                hammer_strength=80.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        payload = betrayal_shadow_outcomes.track_betrayal_shadow_outcomes(
+            log_dir=report_dir,
+            since_hours=10000,
+        )
+
+        self.assertEqual(1, payload["created"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertTrue(payload["shadow_only"])
+        record = payload["records"][0]
+        self.assertEqual("betrayal-shadow|1", record["original_signal_id"])
+        self.assertEqual("long", record["original_direction"])
+        self.assertEqual("short", record["shadow_direction"])
+        self.assertEqual("SHADOW_NO_DATA", record["shadow_status"])
+        self.assertIsNone(record["shadow_pnl_pct"])
+        self.assertTrue(record["comparison"]["inconclusive"])
+
+    def test_betrayal_shadow_tracker_deduplicates_by_signal_and_direction(self) -> None:
+        report_dir = Path(self.temp_dir.name) / "betrayal-shadow-dedupe"
+        archive.append_signal(
+            self._build_signal(
+                signal_id="betrayal-shadow|dedupe",
+                timestamp=self._recent_timestamp(),
+                direction="long",
+                bias_direction="bearish",
+                bias_aligned=False,
+                tradable=False,
+                reject_reason="bias_not_aligned",
+                hammer_strength=80.0,
+            ),
+            log_dir=report_dir,
+        )
+
+        first = betrayal_shadow_outcomes.track_betrayal_shadow_outcomes(log_dir=report_dir, since_hours=10000)
+        second = betrayal_shadow_outcomes.track_betrayal_shadow_outcomes(log_dir=report_dir, since_hours=10000)
+        records = betrayal_shadow_outcomes.load_betrayal_shadow_outcomes(log_dir=report_dir)
+
+        self.assertEqual(1, first["created"])
+        self.assertEqual(0, second["created"])
+        self.assertEqual(1, second["updated"])
+        self.assertEqual(1, len(records))
+
+    def test_betrayal_shadow_levels_are_symmetric_and_deterministic(self) -> None:
+        long_signal = self._build_signal(direction="long", invalidation=95.0)
+        short_signal = self._build_signal(direction="short", invalidation=105.0)
+
+        long_levels = betrayal_shadow_outcomes.build_symmetric_shadow_levels(
+            long_signal,
+            shadow_direction="short",
+        )
+        short_levels = betrayal_shadow_outcomes.build_symmetric_shadow_levels(
+            short_signal,
+            shadow_direction="long",
+        )
+
+        self.assertEqual(100.0, long_levels["shadow_entry"])
+        self.assertEqual(105.0, long_levels["shadow_stop"])
+        self.assertEqual(95.0, long_levels["shadow_take_profit"])
+        self.assertEqual(100.0, short_levels["shadow_entry"])
+        self.assertEqual(95.0, short_levels["shadow_stop"])
+        self.assertEqual(105.0, short_levels["shadow_take_profit"])
+
+    def test_betrayal_shadow_missing_path_data_does_not_fake_win_or_loss(self) -> None:
+        signal = self._build_signal(
+            signal_id="betrayal-shadow|unknown",
+            direction="long",
+            bias_direction="bearish",
+            bias_aligned=False,
+            tradable=False,
+            reject_reason="bias_not_aligned",
+        )
+
+        record = betrayal_shadow_outcomes.build_shadow_outcome_record(
+            signal,
+            betrayal_score=90,
+            betrayal_tier="STRONG_BETRAYAL_WATCH",
+            betrayal_reasons=["bias_aligned=false"],
+            shadow_direction="short",
+            original_outcomes=[],
+        )
+
+        self.assertIn(record["shadow_status"], {"SHADOW_UNRESOLVED", "SHADOW_NO_DATA"})
+        self.assertNotIn(record["shadow_status"], {"SHADOW_WIN", "SHADOW_LOSS"})
+        self.assertIsNone(record["shadow_pnl_pct"])
 
     @staticmethod
     def _build_signal(

@@ -589,6 +589,30 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "betrayal-shadow-track":
+        from src.app.hammer_radar.operator.betrayal_shadow_outcomes import build_betrayal_shadow_track_text
+
+        print(
+            build_betrayal_shadow_track_text(
+                latest_only=args.latest_only,
+                limit=args.limit,
+                since_hours=args.since_hours,
+                symbol=args.symbol,
+                min_betrayal_score=args.min_betrayal_score,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "betrayal-shadow-outcomes":
+        from src.app.hammer_radar.operator.betrayal_shadow_outcomes import build_betrayal_shadow_outcomes_text
+
+        print(
+            build_betrayal_shadow_outcomes_text(
+                limit=args.limit,
+                symbol=args.symbol,
+                status=args.status,
+                log_dir=args.log_dir,
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -753,6 +777,18 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_parser.add_argument("--symbol", default=None)
     betrayal_parser.add_argument("--min-betrayal-score", type=int, default=50)
     betrayal_parser.add_argument("--latest-only", action="store_true")
+
+    betrayal_shadow_track_parser = subparsers.add_parser("betrayal-shadow-track", parents=[parent])
+    betrayal_shadow_track_parser.add_argument("--latest-only", action="store_true")
+    betrayal_shadow_track_parser.add_argument("--limit", type=int, default=20)
+    betrayal_shadow_track_parser.add_argument("--since-hours", type=int, default=24)
+    betrayal_shadow_track_parser.add_argument("--symbol", default=None)
+    betrayal_shadow_track_parser.add_argument("--min-betrayal-score", type=int, default=50)
+
+    betrayal_shadow_outcomes_parser = subparsers.add_parser("betrayal-shadow-outcomes", parents=[parent])
+    betrayal_shadow_outcomes_parser.add_argument("--limit", type=int, default=50)
+    betrayal_shadow_outcomes_parser.add_argument("--symbol", default=None)
+    betrayal_shadow_outcomes_parser.add_argument("--status", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

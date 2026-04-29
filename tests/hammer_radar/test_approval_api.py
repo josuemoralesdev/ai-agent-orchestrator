@@ -76,6 +76,10 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Read-only connector. No order placement exists.", html)
             self.assertIn("Secrets are never shown", html)
             self.assertIn("Live trading env must remain false", html)
+            self.assertIn("Betrayal Shadow Outcomes", html)
+            self.assertIn("Track Betrayal Shadows", html)
+            self.assertIn("does not affect readiness", html)
+            self.assertIn("This does not affect trade tickets", html)
             self.assertIn("44 USDT", html)
             self.assertIn("2x preferred", html)
             self.assertIn("3x max", html)
@@ -110,6 +114,99 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual("NOT_READY", payload["readiness_status"])
         self.assertFalse(payload["allowed_now"])
         self.assertIn("no fresh ELIGIBLE_TINY_LIVE", payload["reason_summary"])
+
+    def test_api_betrayal_shadow_track_and_outcomes_are_shadow_only(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="betrayal-api|1",
+                tradable=False,
+                reject_reason="bias_not_aligned",
+                hammer_strength=80.0,
+                bias_direction="bearish",
+                bias_aligned=False,
+                trend_direction="bearish",
+                divergence_type=None,
+                divergence_confirmed=False,
+            ),
+            log_dir=self.log_dir,
+        )
+
+        track_response = self.client.post(
+            "/betrayal-shadow/track",
+            json={"latest_only": True, "limit": 20, "since_hours": 10000, "min_betrayal_score": 50},
+        )
+        outcomes_response = self.client.get("/betrayal-shadow/outcomes")
+
+        self.assertEqual(200, track_response.status_code)
+        track_payload = track_response.json()
+        self.assertEqual(1, track_payload["created"])
+        self.assertFalse(track_payload["live_execution_enabled"])
+        self.assertFalse(track_payload["order_placed"])
+        self.assertTrue(track_payload["shadow_only"])
+        self.assertEqual("SHADOW_NO_DATA", track_payload["records"][0]["shadow_status"])
+        self.assertEqual(200, outcomes_response.status_code)
+        outcomes_payload = outcomes_response.json()
+        self.assertEqual(1, outcomes_payload["summary"]["total_records"])
+        self.assertFalse(outcomes_payload["live_execution_enabled"])
+        self.assertFalse(outcomes_payload["order_placed"])
+        self.assertTrue(outcomes_payload["shadow_only"])
+
+    def test_cli_betrayal_shadow_track_and_outcomes_work(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="betrayal-cli|1",
+                tradable=False,
+                reject_reason="bias_not_aligned",
+                hammer_strength=80.0,
+                bias_direction="bearish",
+                bias_aligned=False,
+                trend_direction="bearish",
+                divergence_type=None,
+                divergence_confirmed=False,
+            ),
+            log_dir=self.log_dir,
+        )
+
+        track_result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-shadow-track",
+                "--since-hours",
+                "10000",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        outcomes_result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-shadow-outcomes",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, track_result.returncode, track_result.stderr)
+        self.assertIn("HAMMER RADAR BETRAYAL SHADOW TRACKER", track_result.stdout)
+        self.assertIn("created: 1", track_result.stdout)
+        self.assertIn("live_execution_enabled: false", track_result.stdout)
+        self.assertIn("order_placed: false", track_result.stdout)
+        self.assertEqual(0, outcomes_result.returncode, outcomes_result.stderr)
+        self.assertIn("HAMMER RADAR BETRAYAL SHADOW OUTCOMES", outcomes_result.stdout)
+        self.assertIn("shadow_only: true", outcomes_result.stdout)
+        self.assertIn("SHADOW_NO_DATA", outcomes_result.stdout)
 
     def test_readiness_ready_with_fresh_eligible_candidate_and_no_manual_outcomes(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|ready"), log_dir=self.log_dir)
@@ -1282,6 +1379,11 @@ class ApprovalApiTestCase(unittest.TestCase):
         timestamp: str | None = None,
         invalidation: float = 95.0,
         rsi_state: str = "neutral",
+        bias_direction: str = "bullish",
+        bias_aligned: bool = True,
+        trend_direction: str | None = "bullish",
+        divergence_type: str | None = "bullish",
+        divergence_confirmed: bool = True,
     ) -> SignalRecord:
         return SignalRecord(
             signal_id=signal_id,
@@ -1298,13 +1400,13 @@ class ApprovalApiTestCase(unittest.TestCase):
             fib_786=98.5,
             invalidation=invalidation,
             bias_timeframe="4H",
-            bias_direction="bullish",
-            bias_aligned=True,
+            bias_direction=bias_direction,
+            bias_aligned=bias_aligned,
             same_direction_streak=0,
             opposite_direction_streak=0,
             tradable=tradable,
             reject_reason=reject_reason,
-            trend_direction="bullish",
+            trend_direction=trend_direction,
             trend_strength_score=0.4,
             trend_lookback_candles=3,
             ema_4h_20=100.0,
@@ -1312,8 +1414,8 @@ class ApprovalApiTestCase(unittest.TestCase):
             signal_close=100.0,
             rsi_value=50.0,
             rsi_state=rsi_state,
-            divergence_type="bullish",
-            divergence_confirmed=True,
+            divergence_type=divergence_type,
+            divergence_confirmed=divergence_confirmed,
         )
 
 
