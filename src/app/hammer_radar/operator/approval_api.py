@@ -79,6 +79,11 @@ from src.app.hammer_radar.operator.paper_execution import (
     execute_paper_ticket,
     load_paper_executions,
 )
+from src.app.hammer_radar.operator.paper_refresh_scheduler import (
+    build_refresh_runs_payload,
+    run_refresh_sequence,
+    scheduler_status,
+)
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
@@ -165,6 +170,13 @@ class BetrayalShadowTrackRequest(BaseModel):
 class NotificationCheckRequest(BaseModel):
     send: bool = False
     channel: Literal["telegram", "none"] = "none"
+
+
+class PaperRefreshRunRequest(BaseModel):
+    tasks: list[str] | None = None
+    use_network: bool = False
+    write_outputs: bool = True
+    send_notifications: bool = False
 
 
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
@@ -545,6 +557,29 @@ def eth_paper_outcome_summary() -> dict:
     return build_eth_paper_outcome_summary(log_dir=get_log_dir(use_env=True))
 
 
+@app.get("/paper-refresh/status")
+def paper_refresh_status() -> dict:
+    return scheduler_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/paper-refresh/run")
+def paper_refresh_run(request: PaperRefreshRunRequest | None = None) -> dict:
+    request = request or PaperRefreshRunRequest()
+    return run_refresh_sequence(
+        tasks=request.tasks,
+        use_network=request.use_network,
+        write_outputs=request.write_outputs,
+        send_notifications=request.send_notifications,
+        run_mode="API",
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/paper-refresh/runs")
+def paper_refresh_runs(limit: int = Query(default=50, ge=0)) -> dict:
+    return build_refresh_runs_payload(limit=limit, log_dir=get_log_dir(use_env=True))
+
+
 @app.get("/candidates")
 def candidates(
     limit: int = Query(default=10, ge=0),
@@ -797,7 +832,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1119,6 +1154,27 @@ def _operator_ui_html() -> str:
       </div>
     </section>
 
+    <h2>Paper Refresh Scheduler</h2>
+    <section id="paperRefreshScheduler" class="paper-refresh-scheduler blocked">
+      <div class="grid">
+        <div><div class="label">live_execution_enabled</div><div id="paperRefreshLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="paperRefreshOrder" class="value danger">false</div></div>
+        <div><div class="label">btc_live_only</div><div id="paperRefreshBtcOnly" class="value safe">true</div></div>
+        <div><div class="label">available tasks</div><div id="paperRefreshTasks" class="value">loading</div></div>
+        <div><div class="label">runs recorded</div><div id="paperRefreshRuns" class="value">loading</div></div>
+        <div><div class="label">last run</div><div id="paperRefreshLastRun" class="value">loading</div></div>
+        <div><div class="label">configured poll seconds</div><div id="paperRefreshPoll" class="value">loading</div></div>
+      </div>
+      <p class="muted">Paper/watch refresh only.</p>
+      <p class="muted">No live orders.</p>
+      <p class="muted">No ETH/alt live tickets.</p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <div class="button-row">
+        <button onclick="runPaperRefresh(false)">Run Paper Refresh</button>
+        <button onclick="runPaperRefresh(true)">Run Paper Refresh + Notify If Ready</button>
+      </div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -1186,6 +1242,7 @@ async function refreshAll() {
   await loadMarketIntelligence(false);
   await loadEthPaperSummary();
   await loadEthPaperOutcomeSummary();
+  await loadPaperRefreshStatus();
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1605,6 +1662,43 @@ async function loadEthPaperOutcome(write) {
     message.textContent = `ETH paper outcome checked. write=${data.write === true}. order_placed=${data.order_placed}. status=${data.outcome_status}.`;
   }
   await loadEthPaperOutcomeSummary();
+}
+
+async function loadPaperRefreshStatus() {
+  const res = await fetch('/paper-refresh/status');
+  const data = await res.json();
+  document.getElementById('paperRefreshLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('paperRefreshOrder').textContent = String(data.order_placed);
+  document.getElementById('paperRefreshBtcOnly').textContent = String(data.btc_live_only === true);
+  document.getElementById('paperRefreshTasks').textContent = (data.available_tasks || []).join(', ');
+  document.getElementById('paperRefreshRuns').textContent = String(data.runs_recorded ?? 0);
+  document.getElementById('paperRefreshPoll').textContent = String(data.configured_poll_seconds ?? 'n/a');
+  const last = data.last_run;
+  document.getElementById('paperRefreshLastRun').textContent = last
+    ? `${last.created_at} | completed=${(last.completed_tasks || []).length} | failed=${(last.failed_tasks || []).length}`
+    : 'none';
+}
+
+async function runPaperRefresh(sendNotifications) {
+  const res = await fetch('/paper-refresh/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      use_network: false,
+      write_outputs: true,
+      send_notifications: sendNotifications === true
+    })
+  });
+  const data = await res.json();
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback';
+    message.textContent = `Paper refresh complete. completed=${(data.completed_tasks || []).length}. failed=${(data.failed_tasks || []).length}. order_placed=${data.order_placed}.`;
+  }
+  await loadPaperRefreshStatus();
 }
 
 async function loadBetrayalShadowOutcomes() {

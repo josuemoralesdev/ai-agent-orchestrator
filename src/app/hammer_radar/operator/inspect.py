@@ -827,6 +827,26 @@ def main() -> int:
         from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome_summary_text
 
         print(build_eth_paper_outcome_summary_text(log_dir=args.log_dir))
+    elif args.command == "paper-refresh-status":
+        from src.app.hammer_radar.operator.paper_refresh_scheduler import build_refresh_status_text
+
+        print(build_refresh_status_text(log_dir=args.log_dir))
+    elif args.command == "paper-refresh-run":
+        from src.app.hammer_radar.operator.paper_refresh_scheduler import build_refresh_run_text
+
+        print(
+            build_refresh_run_text(
+                tasks=args.tasks,
+                use_network=args.use_network,
+                write_outputs=not args.no_write,
+                send_notifications=args.send_notifications,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "paper-refresh-runs":
+        from src.app.hammer_radar.operator.paper_refresh_scheduler import build_refresh_runs_text
+
+        print(build_refresh_runs_text(limit=args.limit, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -1037,6 +1057,17 @@ def _build_parser() -> argparse.ArgumentParser:
     eth_outcomes_parser.add_argument("--candidate-id", default=None)
 
     subparsers.add_parser("eth-paper-outcome-summary", parents=[parent])
+
+    subparsers.add_parser("paper-refresh-status", parents=[parent])
+
+    paper_refresh_run_parser = subparsers.add_parser("paper-refresh-run", parents=[parent])
+    paper_refresh_run_parser.add_argument("--tasks", default=None)
+    paper_refresh_run_parser.add_argument("--use-network", action="store_true")
+    paper_refresh_run_parser.add_argument("--no-write", action="store_true")
+    paper_refresh_run_parser.add_argument("--send-notifications", action="store_true")
+
+    paper_refresh_runs_parser = subparsers.add_parser("paper-refresh-runs", parents=[parent])
+    paper_refresh_runs_parser.add_argument("--limit", type=int, default=50)
 
     return parser
 
