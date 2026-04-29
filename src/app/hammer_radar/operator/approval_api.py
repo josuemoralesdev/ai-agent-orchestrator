@@ -54,6 +54,12 @@ from src.app.hammer_radar.operator.notification_watcher import (
     load_alert_records,
     notification_status,
 )
+from src.app.hammer_radar.operator.market_intelligence import (
+    build_market_intelligence_summary,
+    build_market_rankings,
+    build_market_snapshots_payload,
+    evaluate_ethbtc_rotation,
+)
 from src.app.hammer_radar.operator.multi_symbol_scanner import (
     build_multi_symbol_scans_payload,
     build_multi_symbol_summary,
@@ -452,6 +458,44 @@ def multi_symbol_summary() -> dict:
     return build_multi_symbol_summary(log_dir=get_log_dir(use_env=True))
 
 
+@app.get("/market-intelligence/summary")
+def market_intelligence_summary(
+    use_network: bool = False,
+    write: bool = False,
+    limit: int = Query(default=20, ge=0),
+) -> dict:
+    return build_market_intelligence_summary(
+        use_network=use_network,
+        write=write,
+        limit=limit,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/market-intelligence/rankings")
+def market_intelligence_rankings(
+    use_network: bool = False,
+    category: WatchlistCategory | None = None,
+    limit: int = Query(default=20, ge=0),
+) -> dict:
+    return build_market_rankings(
+        use_network=use_network,
+        category=category,
+        limit=limit,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/market-intelligence/rotation")
+def market_intelligence_rotation(use_network: bool = False) -> dict:
+    return evaluate_ethbtc_rotation(use_network=use_network, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/market-intelligence/snapshots")
+def market_intelligence_snapshots(limit: int = Query(default=50, ge=0)) -> dict:
+    return build_market_snapshots_payload(limit=limit, log_dir=get_log_dir(use_env=True))
+
+
 @app.get("/candidates")
 def candidates(
     limit: int = Query(default=10, ge=0),
@@ -704,7 +748,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -946,6 +990,36 @@ def _operator_ui_html() -> str:
       <div id="multiSymbolScanResult" class="muted">No multi-symbol scan yet.</div>
     </section>
 
+    <h2>Market Intelligence</h2>
+    <section id="marketIntelligence" class="market-intelligence blocked">
+      <div class="grid">
+        <div><div class="label">live_execution_enabled</div><div id="marketIntelLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="marketIntelOrder" class="value danger">false</div></div>
+        <div><div class="label">market_data_status</div><div id="marketIntelStatus" class="value">loading</div></div>
+        <div><div class="label">network_used</div><div id="marketIntelNetwork" class="value">false</div></div>
+        <div><div class="label">key rotation pair</div><div id="marketIntelKeyPair" class="value">ETHBTC</div></div>
+        <div><div class="label">ETHBTC rotation state</div><div id="marketIntelRotationState" class="value">loading</div></div>
+      </div>
+      <p><strong>Warning:</strong> <span id="marketIntelWarning">market intelligence is public/read-only and paper/watch-only</span></p>
+      <p class="muted">Public/read-only market data only.</p>
+      <p class="muted">No live tickets for ETH/alts.</p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <div class="button-row">
+        <button onclick="loadMarketIntelligence(false)">Refresh Market Intelligence</button>
+        <button onclick="loadMarketIntelligence(true)">Archive Market Intelligence Snapshot</button>
+      </div>
+      <div id="marketIntelTopRanked" class="muted">loading</div>
+      <div class="market-intelligence">
+        <h3>ETHBTC Rotation</h3>
+        <div class="grid">
+          <div><div class="label">ETHBTC price</div><div id="ethbtcPrice" class="value">n/a</div></div>
+          <div><div class="label">24h change</div><div id="ethbtcChange" class="value">n/a</div></div>
+          <div><div class="label">rotation_state</div><div id="ethbtcRotationState" class="value">UNKNOWN</div></div>
+          <div><div class="label">interpretation</div><div id="ethbtcInterpretation" class="value">loading</div></div>
+        </div>
+      </div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -1010,6 +1084,7 @@ async function refreshAll() {
   await loadNotificationStatus();
   await loadAltWatchlist();
   await loadMultiSymbolSummary();
+  await loadMarketIntelligence(false);
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1313,6 +1388,47 @@ async function runMultiSymbolScan(write) {
     message.textContent = `Multi-symbol paper scan complete. write=${data.write === true}. order_placed=${data.order_placed}.`;
   }
   await loadMultiSymbolSummary();
+}
+
+async function loadMarketIntelligence(write) {
+  const res = await fetch(`/market-intelligence/summary?limit=10&write=${write ? 'true' : 'false'}`);
+  const data = await res.json();
+  document.getElementById('marketIntelLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('marketIntelOrder').textContent = String(data.order_placed);
+  document.getElementById('marketIntelStatus').textContent = data.market_data_status || 'UNKNOWN';
+  document.getElementById('marketIntelNetwork').textContent = String(data.network_used === true);
+  document.getElementById('marketIntelKeyPair').textContent = data.key_rotation_pair || 'ETHBTC';
+  document.getElementById('marketIntelRotationState').textContent = data.ethbtc_rotation_state || 'UNKNOWN';
+  document.getElementById('marketIntelWarning').textContent = data.warning || 'market intelligence is public/read-only and paper/watch-only';
+  renderMarketIntelTopRanked(data.symbols || []);
+  await loadEthbtcRotation();
+}
+
+function renderMarketIntelTopRanked(records) {
+  const root = document.getElementById('marketIntelTopRanked');
+  if (!records.length) {
+    root.innerHTML = '<div class="market-intelligence">No market intelligence records.</div>';
+    return;
+  }
+  root.innerHTML = records.slice(0, 8).map(record => `<div class="market-intelligence">
+    <div class="grid">
+      <div><div class="label">symbol</div><div class="value mono">${esc(record.symbol)}</div></div>
+      <div><div class="label">score</div><div class="value">${esc(record.market_intelligence_score)}</div></div>
+      <div><div class="label">24h change</div><div class="value">${esc(record.price_change_percent_24h ?? 'n/a')}</div></div>
+      <div><div class="label">market status</div><div class="value">${esc(record.market_data_status)}</div></div>
+      <div><div class="label">permission</div><div class="value">${esc(record.current_phase_permission)}</div></div>
+      <div><div class="label">live_eligible_symbol</div><div class="value ${record.live_eligible_symbol ? 'safe' : 'danger'}">${esc(record.live_eligible_symbol)}</div></div>
+    </div>
+  </div>`).join('');
+}
+
+async function loadEthbtcRotation() {
+  const res = await fetch('/market-intelligence/rotation');
+  const data = await res.json();
+  document.getElementById('ethbtcPrice').textContent = String(data.ethbtc_price ?? 'n/a');
+  document.getElementById('ethbtcChange').textContent = String(data.ethbtc_change_percent_24h ?? 'n/a');
+  document.getElementById('ethbtcRotationState').textContent = data.rotation_state || 'UNKNOWN';
+  document.getElementById('ethbtcInterpretation').textContent = data.interpretation || '';
 }
 
 async function loadBetrayalShadowOutcomes() {

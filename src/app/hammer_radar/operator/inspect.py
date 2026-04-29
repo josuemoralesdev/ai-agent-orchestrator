@@ -766,6 +766,36 @@ def main() -> int:
         from src.app.hammer_radar.operator.multi_symbol_scanner import build_multi_symbol_summary_text
 
         print(build_multi_symbol_summary_text(log_dir=args.log_dir))
+    elif args.command == "market-intelligence-summary":
+        from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary_text
+
+        print(
+            build_market_intelligence_summary_text(
+                use_network=args.use_network,
+                write=args.write,
+                limit=args.limit,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "market-intelligence-rankings":
+        from src.app.hammer_radar.operator.market_intelligence import build_market_rankings_text
+
+        print(
+            build_market_rankings_text(
+                use_network=args.use_network,
+                category=args.category,
+                limit=args.limit,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "ethbtc-rotation":
+        from src.app.hammer_radar.operator.market_intelligence import build_ethbtc_rotation_text
+
+        print(build_ethbtc_rotation_text(use_network=args.use_network, log_dir=args.log_dir))
+    elif args.command == "market-intelligence-snapshots":
+        from src.app.hammer_radar.operator.market_intelligence import build_market_snapshots_text
+
+        print(build_market_snapshots_text(limit=args.limit, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -935,6 +965,26 @@ def _build_parser() -> argparse.ArgumentParser:
     multi_scans_parser.add_argument("--status", default=None)
 
     subparsers.add_parser("multi-symbol-summary", parents=[parent])
+
+    market_summary_parser = subparsers.add_parser("market-intelligence-summary", parents=[parent])
+    market_summary_parser.add_argument("--use-network", action="store_true")
+    market_summary_parser.add_argument("--write", action="store_true")
+    market_summary_parser.add_argument("--limit", type=int, default=20)
+
+    market_rankings_parser = subparsers.add_parser("market-intelligence-rankings", parents=[parent])
+    market_rankings_parser.add_argument("--use-network", action="store_true")
+    market_rankings_parser.add_argument(
+        "--category",
+        choices=("CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"),
+        default=None,
+    )
+    market_rankings_parser.add_argument("--limit", type=int, default=20)
+
+    ethbtc_rotation_parser = subparsers.add_parser("ethbtc-rotation", parents=[parent])
+    ethbtc_rotation_parser.add_argument("--use-network", action="store_true")
+
+    market_snapshots_parser = subparsers.add_parser("market-intelligence-snapshots", parents=[parent])
+    market_snapshots_parser.add_argument("--limit", type=int, default=50)
 
     return parser
 
