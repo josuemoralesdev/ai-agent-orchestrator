@@ -796,6 +796,18 @@ def main() -> int:
         from src.app.hammer_radar.operator.market_intelligence import build_market_snapshots_text
 
         print(build_market_snapshots_text(limit=args.limit, log_dir=args.log_dir))
+    elif args.command == "eth-paper-candidate":
+        from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_candidate_text
+
+        print(build_eth_paper_candidate_text(use_network=args.use_network, write=args.write, log_dir=args.log_dir))
+    elif args.command == "eth-paper-candidates":
+        from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_candidates_text
+
+        print(build_eth_candidates_text(limit=args.limit, status=args.status, log_dir=args.log_dir))
+    elif args.command == "eth-paper-summary":
+        from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_summary_text
+
+        print(build_eth_paper_summary_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -985,6 +997,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     market_snapshots_parser = subparsers.add_parser("market-intelligence-snapshots", parents=[parent])
     market_snapshots_parser.add_argument("--limit", type=int, default=50)
+
+    eth_candidate_parser = subparsers.add_parser("eth-paper-candidate", parents=[parent])
+    eth_candidate_parser.add_argument("--use-network", action="store_true")
+    eth_candidate_parser.add_argument("--write", action="store_true")
+
+    eth_candidates_parser = subparsers.add_parser("eth-paper-candidates", parents=[parent])
+    eth_candidates_parser.add_argument("--limit", type=int, default=50)
+    eth_candidates_parser.add_argument("--status", default=None)
+
+    subparsers.add_parser("eth-paper-summary", parents=[parent])
 
     return parser
 
