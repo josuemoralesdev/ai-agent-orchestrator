@@ -718,6 +718,18 @@ def main() -> int:
         from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status_text
 
         print(build_binance_readonly_status_text())
+    elif args.command == "notification-status":
+        from src.app.hammer_radar.operator.notification_watcher import build_notification_status_text
+
+        print(build_notification_status_text(log_dir=args.log_dir))
+    elif args.command == "notification-check":
+        from src.app.hammer_radar.operator.notification_watcher import build_notification_check_text
+
+        print(build_notification_check_text(send=args.send, channel=args.channel, log_dir=args.log_dir))
+    elif args.command == "readiness-alerts":
+        from src.app.hammer_radar.operator.notification_watcher import build_readiness_alerts_text
+
+        print(build_readiness_alerts_text(limit=args.limit, log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -846,6 +858,15 @@ def _build_parser() -> argparse.ArgumentParser:
     live_attempts_parser.add_argument("--ticket-id", default=None)
 
     subparsers.add_parser("binance-readonly-status", parents=[parent])
+
+    subparsers.add_parser("notification-status", parents=[parent])
+
+    notification_check_parser = subparsers.add_parser("notification-check", parents=[parent])
+    notification_check_parser.add_argument("--send", action="store_true")
+    notification_check_parser.add_argument("--channel", choices=("telegram", "none"), default="none")
+
+    readiness_alerts_parser = subparsers.add_parser("readiness-alerts", parents=[parent])
+    readiness_alerts_parser.add_argument("--limit", type=int, default=50)
 
     return parser
 
