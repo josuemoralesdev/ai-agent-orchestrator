@@ -48,6 +48,11 @@ from src.app.hammer_radar.operator.manual_outcomes import (
     append_manual_outcome,
     load_manual_outcomes,
 )
+from src.app.hammer_radar.operator.notification_watcher import (
+    check_notifications,
+    load_alert_records,
+    notification_status,
+)
 from src.app.hammer_radar.operator.paper_execution import (
     execute_paper_ticket,
     load_paper_executions,
@@ -133,6 +138,11 @@ class BetrayalShadowTrackRequest(BaseModel):
     since_hours: int = 24
     symbol: str | None = None
     min_betrayal_score: int = 50
+
+
+class NotificationCheckRequest(BaseModel):
+    send: bool = False
+    channel: Literal["telegram", "none"] = "none"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -351,6 +361,30 @@ def betrayal_shadow_track(request: BetrayalShadowTrackRequest | None = None) -> 
         min_betrayal_score=request.min_betrayal_score,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.get("/notifications/status")
+def notifications_status() -> dict:
+    return notification_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/notifications/check")
+def notifications_check(request: NotificationCheckRequest | None = None) -> dict:
+    request = request or NotificationCheckRequest()
+    return check_notifications(
+        send=request.send,
+        channel=request.channel,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/notifications/alerts")
+def notifications_alerts(limit: int = Query(default=50, ge=0)) -> dict:
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "readiness_alerts": load_alert_records(limit=limit, log_dir=get_log_dir(use_env=True)),
+    }
 
 
 @app.get("/candidates")
@@ -605,7 +639,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -785,6 +819,26 @@ def _operator_ui_html() -> str:
       <p class="muted">Secrets are never shown. Live trading env must remain false.</p>
     </section>
 
+    <h2>Notification Watcher</h2>
+    <section id="notificationWatcher" class="notification-watcher blocked">
+      <div class="grid">
+        <div><div class="label">telegram_enabled</div><div id="notificationTelegramEnabled" class="value">loading</div></div>
+        <div><div class="label">telegram_configured</div><div id="notificationTelegramConfigured" class="value">loading</div></div>
+        <div><div class="label">alerts_recorded</div><div id="notificationAlertsRecorded" class="value">loading</div></div>
+        <div><div class="label">last alert</div><div id="notificationLastAlert" class="value">loading</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="notificationLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="notificationOrder" class="value danger">false</div></div>
+      </div>
+      <p class="muted">Alerts only. No order placement.</p>
+      <p class="muted">Secrets are never shown.</p>
+      <p class="muted">Use this so you do not need to watch the UI constantly.</p>
+      <div class="button-row">
+        <button onclick="checkNotifications(false, 'none')">Check Notifications</button>
+        <button class="approve" onclick="checkNotifications(true, 'telegram')">Send Telegram Check</button>
+      </div>
+      <div id="notificationCheckResult" class="muted">No notification check yet.</div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -846,6 +900,7 @@ async function refreshAll() {
   await loadLiveSafety();
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
+  await loadNotificationStatus();
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1032,6 +1087,41 @@ async function loadBinanceReadonlyStatus() {
   document.getElementById('binanceOrder').textContent = String(data.order_placed);
   document.getElementById('binanceBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
   document.getElementById('binanceForbidden').textContent = (data.forbidden_actions || []).join(', ');
+}
+
+async function loadNotificationStatus() {
+  const res = await fetch('/notifications/status');
+  const data = await res.json();
+  document.getElementById('notificationTelegramEnabled').textContent = String(data.telegram_enabled === true);
+  document.getElementById('notificationTelegramConfigured').textContent = String(data.telegram_configured === true);
+  document.getElementById('notificationAlertsRecorded').textContent = String(data.alerts_recorded ?? 0);
+  document.getElementById('notificationLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('notificationOrder').textContent = String(data.order_placed);
+  const lastAlert = data.last_alert;
+  document.getElementById('notificationLastAlert').textContent = lastAlert
+    ? `${lastAlert.created_at} | ${lastAlert.alert_type} | signal=${lastAlert.signal_id || 'n/a'}`
+    : 'none';
+}
+
+async function checkNotifications(send, channel) {
+  const res = await fetch('/notifications/check', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({send, channel})
+  });
+  const data = await res.json();
+  const root = document.getElementById('notificationCheckResult');
+  const message = document.getElementById('message');
+  const telegram = data.telegram || {};
+  root.textContent = `would_alert=${data.would_alert === true} alert_type=${data.alert_type || 'none'} telegram_status=${telegram.status || 'not_requested'} recorded=${data.recorded === true}`;
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback';
+    message.textContent = `Notification check complete. would_alert=${data.would_alert === true}. order_placed=${data.order_placed}.`;
+  }
+  await loadNotificationStatus();
 }
 
 async function loadBetrayalShadowOutcomes() {
