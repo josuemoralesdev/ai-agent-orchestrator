@@ -35,6 +35,11 @@ from src.app.hammer_radar.operator.eth_paper_candidates import (
     build_eth_paper_candidate,
     build_eth_paper_summary,
 )
+from src.app.hammer_radar.operator.eth_paper_outcomes import (
+    build_eth_paper_outcome,
+    build_eth_paper_outcome_summary,
+    build_eth_paper_outcomes_payload,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -516,6 +521,30 @@ def eth_paper_summary() -> dict:
     return build_eth_paper_summary(log_dir=get_log_dir(use_env=True))
 
 
+@app.get("/eth-paper/outcome")
+def eth_paper_outcome(candidate_id: str | None = None, write: bool = False) -> dict:
+    return build_eth_paper_outcome(candidate_id=candidate_id, write=write, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/eth-paper/outcomes")
+def eth_paper_outcomes(
+    limit: int = Query(default=50, ge=0),
+    status: str | None = None,
+    candidate_id: str | None = None,
+) -> dict:
+    return build_eth_paper_outcomes_payload(
+        limit=limit,
+        status=status,
+        candidate_id=candidate_id,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/eth-paper/outcome-summary")
+def eth_paper_outcome_summary() -> dict:
+    return build_eth_paper_outcome_summary(log_dir=get_log_dir(use_env=True))
+
+
 @app.get("/candidates")
 def candidates(
     limit: int = Query(default=10, ge=0),
@@ -768,7 +797,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1064,6 +1093,32 @@ def _operator_ui_html() -> str:
       </div>
     </section>
 
+    <h2>ETHUSDT Paper Outcome Tracker</h2>
+    <section id="ethPaperOutcome" class="eth-paper-outcome blocked">
+      <div class="grid">
+        <div><div class="label">live_execution_enabled</div><div id="ethOutcomeLive" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="ethOutcomeOrder" class="value danger">false</div></div>
+        <div><div class="label">symbol</div><div id="ethOutcomeSymbol" class="value mono">ETHUSDT</div></div>
+        <div><div class="label">rotation pair</div><div id="ethOutcomeRotationPair" class="value mono">ETHBTC</div></div>
+        <div><div class="label">total outcomes</div><div id="ethOutcomeTotal" class="value">loading</div></div>
+        <div><div class="label">wins</div><div id="ethOutcomeWins" class="value">loading</div></div>
+        <div><div class="label">losses</div><div id="ethOutcomeLosses" class="value">loading</div></div>
+        <div><div class="label">open</div><div id="ethOutcomeOpen" class="value">loading</div></div>
+        <div><div class="label">unresolved</div><div id="ethOutcomeUnresolved" class="value">loading</div></div>
+        <div><div class="label">no-data</div><div id="ethOutcomeNoData" class="value">loading</div></div>
+        <div><div class="label">rotation state</div><div id="ethOutcomeRotationState" class="value">UNKNOWN</div></div>
+      </div>
+      <p><strong>Latest outcome:</strong> <span id="ethOutcomeLatest">loading</span></p>
+      <p class="muted">ETHUSDT outcomes are paper-only.</p>
+      <p class="muted">No ETH live tickets.</p>
+      <p class="muted">No ETH live orders.</p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <div class="button-row">
+        <button onclick="loadEthPaperOutcome(false)">Preview ETH Paper Outcome</button>
+        <button onclick="loadEthPaperOutcome(true)">Archive ETH Paper Outcome</button>
+      </div>
+    </section>
+
     <h2>Betrayal Shadow Outcomes</h2>
     <section id="betrayalShadow" class="betrayal-shadow blocked">
       <div class="grid">
@@ -1130,6 +1185,7 @@ async function refreshAll() {
   await loadMultiSymbolSummary();
   await loadMarketIntelligence(false);
   await loadEthPaperSummary();
+  await loadEthPaperOutcomeSummary();
   await loadBetrayalShadowOutcomes();
   await loadPaperExecutions();
   await loadCandidates();
@@ -1511,6 +1567,44 @@ async function loadEthPaperCandidate(write) {
     message.textContent = `ETH paper candidate checked. write=${data.write === true}. order_placed=${data.order_placed}.`;
   }
   await loadEthPaperSummary();
+}
+
+async function loadEthPaperOutcomeSummary() {
+  const res = await fetch('/eth-paper/outcome-summary');
+  const data = await res.json();
+  document.getElementById('ethOutcomeLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('ethOutcomeOrder').textContent = String(data.order_placed);
+  document.getElementById('ethOutcomeSymbol').textContent = data.symbol || 'ETHUSDT';
+  document.getElementById('ethOutcomeRotationPair').textContent = data.rotation_pair || 'ETHBTC';
+  document.getElementById('ethOutcomeTotal').textContent = String(data.total_outcomes ?? 0);
+  document.getElementById('ethOutcomeWins').textContent = String(data.win_count ?? 0);
+  document.getElementById('ethOutcomeLosses').textContent = String(data.loss_count ?? 0);
+  document.getElementById('ethOutcomeOpen').textContent = String(data.open_count ?? 0);
+  document.getElementById('ethOutcomeUnresolved').textContent = String(data.unresolved_count ?? 0);
+  document.getElementById('ethOutcomeNoData').textContent = String(data.no_data_count ?? 0);
+  document.getElementById('ethOutcomeRotationState').textContent = data.current_rotation_state || 'UNKNOWN';
+  const latest = data.latest_outcome;
+  document.getElementById('ethOutcomeLatest').textContent = latest
+    ? `${latest.created_at} | ${latest.outcome_status} | ${latest.candidate_direction} | candidate=${latest.candidate_id}`
+    : 'none';
+}
+
+async function loadEthPaperOutcome(write) {
+  const res = await fetch(`/eth-paper/outcome?write=${write ? 'true' : 'false'}`);
+  const data = await res.json();
+  document.getElementById('ethOutcomeLive').textContent = String(data.live_execution_enabled);
+  document.getElementById('ethOutcomeOrder').textContent = String(data.order_placed);
+  document.getElementById('ethOutcomeSymbol').textContent = data.symbol || 'ETHUSDT';
+  document.getElementById('ethOutcomeRotationPair').textContent = data.rotation_pair || 'ETHBTC';
+  const message = document.getElementById('message');
+  if (!res.ok) {
+    message.className = 'feedback error';
+    message.innerHTML = `<strong>API error ${res.status}</strong><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } else {
+    message.className = 'feedback';
+    message.textContent = `ETH paper outcome checked. write=${data.write === true}. order_placed=${data.order_placed}. status=${data.outcome_status}.`;
+  }
+  await loadEthPaperOutcomeSummary();
 }
 
 async function loadBetrayalShadowOutcomes() {
