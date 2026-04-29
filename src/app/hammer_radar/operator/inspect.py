@@ -738,6 +738,34 @@ def main() -> int:
         from src.app.hammer_radar.operator.alt_watchlist import build_watchlist_summary_text
 
         print(build_watchlist_summary_text(log_dir=args.log_dir))
+    elif args.command == "multi-symbol-scan":
+        from src.app.hammer_radar.operator.multi_symbol_scanner import build_multi_symbol_scan_text
+
+        print(
+            build_multi_symbol_scan_text(
+                symbol=args.symbol,
+                category=args.category,
+                limit=args.limit,
+                write=args.write,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "multi-symbol-scans":
+        from src.app.hammer_radar.operator.multi_symbol_scanner import build_multi_symbol_scans_text
+
+        print(
+            build_multi_symbol_scans_text(
+                limit=args.limit,
+                symbol=args.symbol,
+                category=args.category,
+                status=args.status,
+                log_dir=args.log_dir,
+            )
+        )
+    elif args.command == "multi-symbol-summary":
+        from src.app.hammer_radar.operator.multi_symbol_scanner import build_multi_symbol_summary_text
+
+        print(build_multi_symbol_summary_text(log_dir=args.log_dir))
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -885,6 +913,28 @@ def _build_parser() -> argparse.ArgumentParser:
     watchlist_parser.add_argument("--limit", type=int, default=50)
 
     subparsers.add_parser("watchlist-summary", parents=[parent])
+
+    multi_scan_parser = subparsers.add_parser("multi-symbol-scan", parents=[parent])
+    multi_scan_parser.add_argument("--symbol", default=None)
+    multi_scan_parser.add_argument(
+        "--category",
+        choices=("CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"),
+        default=None,
+    )
+    multi_scan_parser.add_argument("--limit", type=int, default=50)
+    multi_scan_parser.add_argument("--write", action="store_true")
+
+    multi_scans_parser = subparsers.add_parser("multi-symbol-scans", parents=[parent])
+    multi_scans_parser.add_argument("--limit", type=int, default=50)
+    multi_scans_parser.add_argument("--symbol", default=None)
+    multi_scans_parser.add_argument(
+        "--category",
+        choices=("CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"),
+        default=None,
+    )
+    multi_scans_parser.add_argument("--status", default=None)
+
+    subparsers.add_parser("multi-symbol-summary", parents=[parent])
 
     return parser
 
