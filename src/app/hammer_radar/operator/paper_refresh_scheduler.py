@@ -29,6 +29,9 @@ ORDER_PLACED = False
 SOURCE = "paper_refresh_scheduler"
 RUNS_FILENAME = "paper_refresh_runs.ndjson"
 WARNING = "Paper/watch refresh only. No live orders. No ETH/alt live tickets. BTCUSDT remains the only live-readiness symbol."
+SERVICE_NAME = "hammer-paper-refresh.service"
+SUGGESTED_SYSTEMD_UNIT_PATH = "ops/systemd/hammer-paper-refresh.service"
+WATCHER_ENTRYPOINT = ".venv/bin/python -m src.app.hammer_radar.operator.paper_refresh_scheduler --watch"
 
 TASK_MARKET_INTELLIGENCE = "market_intelligence"
 TASK_MULTI_SYMBOL_SCAN = "multi_symbol_scan"
@@ -88,6 +91,9 @@ def scheduler_status(
         "runs_recorded": len(runs),
         "last_run": runs[0] if runs else None,
         "btc_live_only": True,
+        "service_name": SERVICE_NAME,
+        "suggested_systemd_unit_path": SUGGESTED_SYSTEMD_UNIT_PATH,
+        "watcher_entrypoint": WATCHER_ENTRYPOINT,
         "warning": WARNING,
     }
 
