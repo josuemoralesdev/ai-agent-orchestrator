@@ -22,6 +22,7 @@ from src.app.hammer_radar.operator.notification_watcher import (
     notification_status,
 )
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
+from src.app.hammer_radar.operator.strategy_config import DEFAULT_MINIMUM_HAMMER_STRENGTH
 
 
 class NotificationWatcherTestCase(unittest.TestCase):
@@ -56,6 +57,10 @@ class NotificationWatcherTestCase(unittest.TestCase):
             require_dry_run_valid=True,
             require_proposed_ticket=True,
             blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
         )
 
         status = notification_status(log_dir=self.log_dir, config=config)
@@ -72,7 +77,7 @@ class NotificationWatcherTestCase(unittest.TestCase):
         result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
 
         self.assertTrue(result["would_alert"])
-        self.assertEqual("READY_TRADE_CANDIDATE", result["alert_type"])
+        self.assertEqual("LIVE_READY", result["alert_type"])
         self.assertEqual("PROPOSED", result["ticket_status"])
         self.assertEqual("VALID", result["dry_run_status"])
         self.assertFalse(result["live_execution_enabled"])
@@ -85,6 +90,200 @@ class NotificationWatcherTestCase(unittest.TestCase):
         self.assertIsNone(result["alert_type"])
         self.assertEqual("NOT_READY", result["readiness_status"])
 
+    def test_actionable_paper_alerts_without_live_ticket(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|paper",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                rsi_state=None,
+            ),
+            log_dir=self.log_dir,
+        )
+
+        result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
+
+        self.assertTrue(result["would_alert"])
+        self.assertEqual("ACTIONABLE_PAPER", result["alert_type"])
+        self.assertEqual("BLOCKED", result["ticket_status"])
+        self.assertEqual("BLOCKED", result["dry_run_status"])
+        self.assertEqual("BLOCKED", result["live_safety_status"])
+        self.assertEqual("notify|paper", result["signal_id"])
+        self.assertEqual("ACTIONABLE_PAPER_CANDIDATE", result["candidate"]["tier"])
+        self.assertEqual(DEFAULT_MINIMUM_HAMMER_STRENGTH, result["candidate"]["minimum_hammer_strength"])
+        self.assertEqual(DEFAULT_MINIMUM_HAMMER_STRENGTH, result["candidate"]["hammer_strength"])
+        self.assertIn("alert_type: ACTIONABLE_PAPER", result["message"])
+        self.assertIn("symbol: BTCUSDT", result["message"])
+        self.assertIn("paper candidate for operator visibility only", result["message"])
+        self.assertIn("live readiness is not implied", result["message"])
+        self.assertIn("operator action: watch / approve paper / wait for next fresh candidate", result["message"])
+        self.assertNotIn("passes conservative manual tiny-live checklist", result["message"])
+        self.assertFalse(result["live_execution_enabled"])
+        self.assertFalse(result["order_placed"])
+
+    def test_actionable_paper_requires_configured_hammer_strength_minimum(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|below-hammer-min",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH - 1.0,
+            ),
+            log_dir=self.log_dir,
+        )
+
+        result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
+
+        self.assertFalse(result["would_alert"])
+        self.assertIsNone(result["alert_type"])
+        self.assertIsNone(result["candidate"])
+        self.assertFalse(result["live_execution_enabled"])
+        self.assertFalse(result["order_placed"])
+
+    def test_actionable_paper_short_is_paper_visibility_not_live_approval(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|short-paper",
+                direction="short",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                divergence_type="bearish",
+                bias_direction="bearish",
+            ),
+            log_dir=self.log_dir,
+        )
+
+        result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
+
+        self.assertTrue(result["would_alert"])
+        self.assertEqual("ACTIONABLE_PAPER", result["alert_type"])
+        self.assertEqual("short", result["candidate"]["direction"])
+        self.assertEqual("BLOCKED", result["ticket_status"])
+        self.assertIn("short is paper/operator visibility only, not live approval", result["message"])
+        self.assertIn("live readiness is not implied", result["message"])
+        self.assertFalse(result["live_execution_enabled"])
+        self.assertFalse(result["order_placed"])
+
+    def test_expired_candidate_records_missed_without_telegram_spam(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|expired",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                rsi_state=None,
+                timestamp=(datetime.now(UTC) - timedelta(minutes=35)).isoformat(),
+            ),
+            log_dir=self.log_dir,
+        )
+        config = NotificationConfig(
+            telegram_enabled=True,
+            telegram_bot_token="fake-token",
+            telegram_chat_id="fake-chat",
+            min_interval_seconds=0,
+            poll_seconds=60,
+            require_dry_run_valid=True,
+            require_proposed_ticket=True,
+            blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
+        )
+        calls: list[tuple[str, str]] = []
+
+        result = check_notifications(
+            send=True,
+            channel="telegram",
+            log_dir=self.log_dir,
+            config=config,
+            telegram_sender=lambda chat_id, message: calls.append((chat_id, message)) or {"sent": True, "status": "sent"},
+        )
+        records = load_alert_records(limit=10, log_dir=self.log_dir)
+
+        self.assertFalse(result["would_alert"])
+        self.assertEqual("EXPIRED_MISSED", result["alert_type"])
+        self.assertTrue(result["recorded"])
+        self.assertEqual({"sent": False, "status": "not_requested"}, result["telegram"])
+        self.assertEqual([], calls)
+        self.assertEqual(1, len(records))
+        self.assertEqual("EXPIRED_MISSED", records[0]["alert_type"])
+        self.assertFalse(records[0]["telegram_sent"])
+
+    def test_duplicate_actionable_paper_candidate_does_not_alert_twice(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|paper-dedupe",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                rsi_state=None,
+            ),
+            log_dir=self.log_dir,
+        )
+        config = NotificationConfig(
+            telegram_enabled=True,
+            telegram_bot_token="fake-token",
+            telegram_chat_id="fake-chat",
+            min_interval_seconds=0,
+            poll_seconds=60,
+            require_dry_run_valid=True,
+            require_proposed_ticket=True,
+            blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
+        )
+        calls: list[tuple[str, str]] = []
+
+        first = check_notifications(
+            send=True,
+            channel="telegram",
+            log_dir=self.log_dir,
+            config=config,
+            telegram_sender=lambda chat_id, message: calls.append((chat_id, message)) or {"sent": True, "status": "sent"},
+        )
+        second = check_notifications(
+            send=True,
+            channel="telegram",
+            log_dir=self.log_dir,
+            config=config,
+            telegram_sender=lambda chat_id, message: calls.append((chat_id, message)) or {"sent": True, "status": "sent"},
+        )
+
+        self.assertTrue(first["recorded"])
+        self.assertFalse(second["recorded"])
+        self.assertEqual("duplicate_signal_alert", second["dedupe_reason"])
+        self.assertEqual(1, len(calls))
+
+    def test_expiring_soon_candidate_alerts_before_freshness_expiry(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|expiring",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                rsi_state=None,
+                timestamp=(datetime.now(UTC) - timedelta(minutes=27)).isoformat(),
+            ),
+            log_dir=self.log_dir,
+        )
+
+        result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
+
+        self.assertTrue(result["would_alert"])
+        self.assertEqual("EXPIRING_SOON", result["alert_type"])
+        self.assertEqual("fresh", result["candidate"]["freshness_status"])
+
+    def test_eth_actionable_paper_does_not_produce_operator_alert(self) -> None:
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="notify|eth",
+                symbol="ETHUSDT",
+                hammer_strength=DEFAULT_MINIMUM_HAMMER_STRENGTH,
+                rsi_state=None,
+            ),
+            log_dir=self.log_dir,
+        )
+
+        result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
+
+        self.assertFalse(result["would_alert"])
+        self.assertIsNone(result["alert_type"])
+        self.assertFalse(result["live_execution_enabled"])
+        self.assertFalse(result["order_placed"])
+
     def test_dedupe_prevents_duplicate_same_signal_alert(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="notify|dedupe"), log_dir=self.log_dir)
         config = NotificationConfig(
@@ -96,6 +295,10 @@ class NotificationWatcherTestCase(unittest.TestCase):
             require_dry_run_valid=True,
             require_proposed_ticket=True,
             blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
         )
         calls: list[tuple[str, str]] = []
 
@@ -134,6 +337,10 @@ class NotificationWatcherTestCase(unittest.TestCase):
             require_dry_run_valid=True,
             require_proposed_ticket=True,
             blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
         )
 
         result = check_notifications(
@@ -148,7 +355,7 @@ class NotificationWatcherTestCase(unittest.TestCase):
         self.assertTrue(result["recorded"])
         self.assertTrue((self.log_dir / "readiness_alerts.ndjson").exists())
         self.assertEqual(1, len(records))
-        self.assertEqual("READY_TRADE_CANDIDATE", records[0]["alert_type"])
+        self.assertEqual("LIVE_READY", records[0]["alert_type"])
         self.assertFalse(records[0]["live_execution_enabled"])
         self.assertFalse(records[0]["order_placed"])
 
@@ -185,6 +392,10 @@ class NotificationWatcherTestCase(unittest.TestCase):
             require_dry_run_valid=True,
             require_proposed_ticket=True,
             blocked_alert_enabled=False,
+            actionable_paper_enabled=True,
+            actionable_paper_min_score=80,
+            expiring_soon_minutes=5,
+            expired_missed_record_enabled=True,
         )
         check_notifications(
             send=True,
@@ -280,6 +491,10 @@ class NotificationWatcherTestCase(unittest.TestCase):
         symbol: str = "BTCUSDT",
         direction: str = "long",
         timestamp: str | None = None,
+        hammer_strength: float = 100.0,
+        rsi_state: str | None = "neutral",
+        divergence_type: str = "bullish",
+        bias_direction: str = "bullish",
     ) -> SignalRecord:
         return SignalRecord(
             signal_id=signal_id,
@@ -287,7 +502,7 @@ class NotificationWatcherTestCase(unittest.TestCase):
             timeframe="13m",
             direction=direction,
             timestamp=timestamp or (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
-            hammer_strength=100.0,
+            hammer_strength=hammer_strength,
             hammer_high=101.0,
             hammer_low=94.0,
             fib_50=100.5,
@@ -296,7 +511,7 @@ class NotificationWatcherTestCase(unittest.TestCase):
             fib_786=98.5,
             invalidation=95.0,
             bias_timeframe="4H",
-            bias_direction="bullish",
+            bias_direction=bias_direction,
             bias_aligned=True,
             same_direction_streak=0,
             opposite_direction_streak=0,
@@ -309,8 +524,8 @@ class NotificationWatcherTestCase(unittest.TestCase):
             price_vs_ema_4h_pct=0.1,
             signal_close=100.0,
             rsi_value=50.0,
-            rsi_state="neutral",
-            divergence_type="bullish",
+            rsi_state=rsi_state,
+            divergence_type=divergence_type,
             divergence_confirmed=True,
         )
 

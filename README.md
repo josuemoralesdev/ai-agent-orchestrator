@@ -480,6 +480,18 @@ Safety/readiness check:
 
 Live trading is still disabled. Supported execution modes remain `paper` and `binance_stub`, and any future Binance live integration requires a separate approval phase.
 
+Operator delivery bridge:
+
+```bash
+curl -s http://127.0.0.1:8015/notifications/status | jq .
+curl -s -X POST http://127.0.0.1:8015/notifications/check -H 'Content-Type: application/json' -d '{"send":false,"channel":"telegram"}' | jq .
+curl -s http://127.0.0.1:8015/notifications/alerts | jq .
+curl -s http://127.0.0.1:8015/candidates | jq .
+curl -s http://127.0.0.1:8015/readiness | jq .
+```
+
+Notification checks now separate strict `LIVE_READY` alerts from operator-visibility alerts for fresh BTCUSDT `ACTIONABLE_PAPER` candidates that meet the configured strategy hammer-strength minimum. `EXPIRING_SOON` alerts surface fresh candidates close to the freshness gate, and `EXPIRED_MISSED` records diagnostics without Telegram spam by default. Candidate-level dedupe prevents the same `signal_id` from repeatedly alerting, while the global minimum alert interval still applies to Telegram sends. This layer is alert-only: `live_execution_enabled=false`, `order_placed=false`, ETH and alt symbols remain paper/watch-only, and live safety gates are not loosened.
+
 Truth commands:
 
 ```bash

@@ -1,0 +1,109 @@
+Follow CODEX_RULES.md. If missing, STOP.
+
+Phase:
+R37 — Operator Delivery Bridge
+
+Goal:
+Make Hammer Radar deliver actionable BTCUSDT operator alerts in time, without enabling live trading.
+
+Problem:
+The system is alive and producing BTCUSDT actionable/paper candidates, but operator delivery is too strict. Current notification checks depend on strict readiness/ticket/dry-run gates, so useful candidates can expire without Telegram/operator visibility.
+
+Observed current state:
+- /readiness can return NOT_READY because there is no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate.
+- /readiness can show expired otherwise-eligible candidates.
+- /candidates can show ACTIONABLE_PAPER_CANDIDATE BTCUSDT entries.
+- /notifications/status can show telegram_configured=true but alerts_recorded=0.
+- /paper-refresh/status runs notification_check but returns would_alert=false.
+- BTCUSDT remains the only live-eligible symbol.
+- ETH/alt symbols remain paper/watch-only.
+- live_execution_enabled must remain false.
+- order_placed must remain false.
+
+Non-negotiable safety:
+- Do NOT enable live trading.
+- Do NOT place real orders.
+- Do NOT bypass live_safety.
+- Do NOT loosen live_safety gates.
+- Do NOT expose secrets.
+- Do NOT send secrets to logs, API responses, or Telegram.
+- This phase is only about timely operator visibility.
+
+Implement:
+1. Add or extend the notification/operator delivery layer so it can alert on BTCUSDT candidates worth human attention even when full live ticket/dry-run readiness is not satisfied.
+
+2. Add alert tiers:
+   - LIVE_READY:
+     Existing strict path where readiness/ticket/dry-run allow a proposed live-checklist ticket.
+   - ACTIONABLE_PAPER:
+     BTCUSDT candidate is tradable/actionable, fresh, score is high enough, and live execution is still disabled.
+   - EXPIRING_SOON:
+     BTCUSDT actionable candidate is still fresh but close to freshness expiry and has not already been alerted.
+   - EXPIRED_MISSED:
+     Record-only diagnostic by default when a candidate expired without alert. Do not Telegram-spam expired candidates unless explicitly configured.
+
+3. Telegram/operator alert payload should include:
+   - alert_type
+   - signal_id
+   - symbol
+   - timeframe
+   - direction
+   - entry
+   - stop
+   - take_profit
+   - score
+   - tier
+   - age_minutes
+   - freshness_status
+   - reason
+   - live_execution_enabled=false
+   - order_placed=false
+   - operator action: watch / approve paper / wait for next fresh candidate
+
+4. Preserve existing dedupe behavior and add candidate-level dedupe:
+   - Same signal_id must not spam Telegram.
+   - Dedupe must be recorded/inspectable.
+   - Existing min_interval behavior must still work.
+
+5. Endpoint behavior:
+   - POST /notifications/check should return would_alert=true for a fresh ACTIONABLE_PAPER BTCUSDT candidate even when strict live ticket/dry-run is blocked.
+   - POST /notifications/check with send=true should send Telegram only if Telegram is configured and dedupe allows it.
+   - GET /notifications/status should expose alert counts and last alert.
+   - GET /notifications/alerts should show recorded alerts.
+   - Existing strict live safety must remain blocked unless existing gates pass.
+
+6. Tests:
+   Add or extend tests for:
+   - ACTIONABLE_PAPER alert is generated for fresh BTCUSDT actionable candidate even without live ticket.
+   - expired candidate does not send normal Telegram alert.
+   - duplicate candidate does not alert twice inside dedupe window.
+   - EXPIRED_MISSED can be recorded without Telegram spam.
+   - live_execution_enabled remains false.
+   - order_placed remains false.
+   - strict live_safety remains blocked unless existing gates pass.
+   - ETH/alts remain paper/watch-only and do not produce live-ticket alerts.
+
+7. Docs:
+   Update README or docs with R37 operator-delivery behavior and manual commands:
+   - /notifications/status
+   - /notifications/check
+   - /notifications/alerts
+   - /candidates
+   - /readiness
+
+Validation:
+Use repo .venv, not system python.
+
+Run:
+.venv/bin/python -m pytest tests/hammer_radar/test_notification_watcher.py tests/hammer_radar/test_approval_api.py
+.venv/bin/python -m pytest tests/hammer_radar
+.venv/bin/python -m compileall src/app/hammer_radar
+
+Smoke checks if service is available:
+curl -s http://127.0.0.1:8015/notifications/status | jq .
+curl -s -X POST http://127.0.0.1:8015/notifications/check -H 'Content-Type: application/json' -d '{"send":false,"channel":"telegram"}' | jq .
+curl -s http://127.0.0.1:8015/notifications/alerts | jq .
+curl -s http://127.0.0.1:8015/candidates | jq .
+
+Expected result:
+The system can notify the operator about fresh actionable BTCUSDT candidates before they expire, while live execution remains disabled and no real order can be placed.

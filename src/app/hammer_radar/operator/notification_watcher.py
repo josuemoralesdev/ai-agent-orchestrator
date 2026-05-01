@@ -21,15 +21,25 @@ from typing import Any, Callable
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.exchange_dry_run import build_exchange_dry_run
+from src.app.hammer_radar.operator.inspect import LiveCandidateCheck, build_live_candidate_snapshot
 from src.app.hammer_radar.operator.live_safety import evaluate_live_safety
 from src.app.hammer_radar.operator.manual_outcomes import load_manual_outcomes
 from src.app.hammer_radar.operator.paper_execution import load_paper_executions
-from src.app.hammer_radar.operator.readiness import LIVE_EXECUTION_ENABLED, ORDER_PLACED, build_readiness_payload
+from src.app.hammer_radar.operator.readiness import LIVE_EXECUTION_ENABLED, ORDER_PLACED, PROTOCOL, build_readiness_payload
+from src.app.hammer_radar.operator.strategy_config import load_strategy_config
 from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket, load_trade_ticket_records
 
 ALERTS_FILENAME = "readiness_alerts.ndjson"
-READY_TRADE_CANDIDATE = "READY_TRADE_CANDIDATE"
+LIVE_READY = "LIVE_READY"
+READY_TRADE_CANDIDATE = LIVE_READY
+ACTIONABLE_PAPER = "ACTIONABLE_PAPER"
+EXPIRING_SOON = "EXPIRING_SOON"
+EXPIRED_MISSED = "EXPIRED_MISSED"
 SYSTEM_STILL_BLOCKED = "SYSTEM_STILL_BLOCKED"
+ACTIONABLE_PAPER_TIER = "ACTIONABLE_PAPER_CANDIDATE"
+ACTIONABLE_PAPER_MIN_SCORE = 80
+DEFAULT_FRESH_MINUTES = 30
+DEFAULT_EXPIRING_SOON_MINUTES = 5
 
 
 @dataclass(frozen=True)
@@ -42,6 +52,10 @@ class NotificationConfig:
     require_dry_run_valid: bool
     require_proposed_ticket: bool
     blocked_alert_enabled: bool
+    actionable_paper_enabled: bool
+    actionable_paper_min_score: int
+    expiring_soon_minutes: int
+    expired_missed_record_enabled: bool
 
     @property
     def token_present(self) -> bool:
@@ -66,6 +80,10 @@ class NotificationConfig:
             "poll_seconds": self.poll_seconds,
             "require_dry_run_valid": self.require_dry_run_valid,
             "require_proposed_ticket": self.require_proposed_ticket,
+            "actionable_paper_enabled": self.actionable_paper_enabled,
+            "actionable_paper_min_score": self.actionable_paper_min_score,
+            "expiring_soon_minutes": self.expiring_soon_minutes,
+            "expired_missed_record_enabled": self.expired_missed_record_enabled,
         }
 
 
@@ -83,6 +101,18 @@ def load_notification_config(env: dict[str, str] | None = None) -> NotificationC
         require_dry_run_valid=_env_bool(source.get("HAMMER_ALERT_REQUIRE_DRY_RUN_VALID"), default=True),
         require_proposed_ticket=_env_bool(source.get("HAMMER_ALERT_REQUIRE_PROPOSED_TICKET"), default=True),
         blocked_alert_enabled=_env_bool(source.get("HAMMER_ALERT_SYSTEM_STILL_BLOCKED_ENABLED"), default=False),
+        actionable_paper_enabled=_env_bool(source.get("HAMMER_ALERT_ACTIONABLE_PAPER_ENABLED"), default=True),
+        actionable_paper_min_score=_env_int(
+            source.get("HAMMER_ALERT_ACTIONABLE_PAPER_MIN_SCORE"),
+            default=ACTIONABLE_PAPER_MIN_SCORE,
+            minimum=0,
+        ),
+        expiring_soon_minutes=_env_int(
+            source.get("HAMMER_ALERT_EXPIRING_SOON_MINUTES"),
+            default=DEFAULT_EXPIRING_SOON_MINUTES,
+            minimum=0,
+        ),
+        expired_missed_record_enabled=_env_bool(source.get("HAMMER_ALERT_EXPIRED_MISSED_RECORD_ENABLED"), default=True),
     )
 
 
@@ -90,6 +120,22 @@ def build_readiness_notification_snapshot(*, log_dir: str | Path | None = None) 
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     readiness = build_readiness_payload(log_dir=resolved_log_dir)
     ticket = build_trade_ticket(log_dir=resolved_log_dir)
+    candidate_snapshot = build_live_candidate_snapshot(
+        limit=10,
+        since_hours=24,
+        min_score=ACTIONABLE_PAPER_MIN_SCORE,
+        symbol=PROTOCOL["symbol"],
+        allow_short=True,
+        allow_oversold=True,
+        allow_trigger_flags=True,
+        max_risk_usd=5.0,
+        max_leverage=float(PROTOCOL["max_leverage"]),
+        max_position_usd=float(PROTOCOL["max_position_usd"]),
+        fresh_minutes=DEFAULT_FRESH_MINUTES,
+        allow_expired=False,
+        latest_only=False,
+        log_dir=resolved_log_dir,
+    )
     exchange_dry_run = build_exchange_dry_run(ticket)
     live_safety = evaluate_live_safety(
         readiness=readiness,
@@ -104,6 +150,7 @@ def build_readiness_notification_snapshot(*, log_dir: str | Path | None = None) 
         "archive_log_dir": str(resolved_log_dir),
         "readiness": readiness,
         "ticket": ticket,
+        "candidate_snapshot": candidate_snapshot,
         "exchange_dry_run": exchange_dry_run,
         "live_safety": live_safety,
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -126,8 +173,15 @@ def evaluate_alert(snapshot: dict[str, Any], config: NotificationConfig | None =
         "live_execution_disabled": snapshot.get("live_execution_enabled") is False,
         "order_not_placed": snapshot.get("order_placed") is False,
     }
-    would_alert = all(checks.values())
-    alert_type = READY_TRADE_CANDIDATE if would_alert else None
+    strict_would_alert = all(checks.values())
+    candidate_alert = _evaluate_candidate_alert(snapshot, config) if config.actionable_paper_enabled else None
+    alert_type = LIVE_READY if strict_would_alert else None
+    would_alert = strict_would_alert
+    candidate_payload = None
+    if not would_alert and candidate_alert is not None:
+        alert_type = candidate_alert["alert_type"]
+        would_alert = candidate_alert["would_alert"]
+        candidate_payload = candidate_alert
     if not would_alert and config.blocked_alert_enabled:
         alert_type = SYSTEM_STILL_BLOCKED
         would_alert = True
@@ -135,19 +189,29 @@ def evaluate_alert(snapshot: dict[str, Any], config: NotificationConfig | None =
     return {
         "would_alert": would_alert,
         "alert_type": alert_type,
-        "signal_id": ticket.get("signal_id"),
+        "signal_id": (candidate_payload or {}).get("signal_id") or ticket.get("signal_id"),
         "readiness_status": readiness.get("readiness_status", "UNKNOWN"),
         "ticket_status": ticket.get("ticket_status", "UNKNOWN"),
         "dry_run_status": dry_run.get("validation_status", "UNKNOWN"),
         "live_safety_status": live_safety.get("live_safety_status", "UNKNOWN"),
         "checks": checks,
-        "message": build_telegram_message(snapshot, alert_type=alert_type) if alert_type else None,
+        "candidate": (candidate_payload or {}).get("candidate"),
+        "message": (
+            build_telegram_message(snapshot, alert_type=alert_type, candidate=(candidate_payload or {}).get("candidate"))
+            if alert_type
+            else None
+        ),
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
     }
 
 
-def build_telegram_message(snapshot: dict[str, Any], *, alert_type: str | None = READY_TRADE_CANDIDATE) -> str:
+def build_telegram_message(
+    snapshot: dict[str, Any],
+    *,
+    alert_type: str | None = LIVE_READY,
+    candidate: dict[str, Any] | None = None,
+) -> str:
     ticket = snapshot.get("ticket") or {}
     dry_run = snapshot.get("exchange_dry_run") or {}
     live_safety = snapshot.get("live_safety") or {}
@@ -162,9 +226,33 @@ def build_telegram_message(snapshot: dict[str, Any], *, alert_type: str | None =
                 "Alerts only. No order placement.",
             ]
         )
+    if alert_type in {ACTIONABLE_PAPER, EXPIRING_SOON, EXPIRED_MISSED}:
+        payload = candidate or {}
+        return "\n".join(
+            [
+                "Hammer Radar operator alert",
+                f"alert_type: {alert_type or 'n/a'}",
+                f"signal_id: {payload.get('signal_id') or 'n/a'}",
+                f"symbol: {payload.get('symbol') or 'n/a'}",
+                f"timeframe: {payload.get('timeframe') or 'n/a'}",
+                f"direction: {payload.get('direction') or 'n/a'}",
+                f"entry: {_format_value(payload.get('entry'))}",
+                f"stop: {_format_value(payload.get('stop'))}",
+                f"take_profit: {_format_value(payload.get('take_profit'))}",
+                f"score: {_format_value(payload.get('score'))}",
+                f"tier: {payload.get('tier') or 'n/a'}",
+                f"age_minutes: {_format_value(payload.get('age_minutes'))}",
+                f"freshness_status: {payload.get('freshness_status') or 'n/a'}",
+                f"reason: {payload.get('reason') or 'n/a'}",
+                "live_execution_enabled=false",
+                "order_placed=false",
+                f"operator action: {payload.get('operator_action') or 'watch / approve paper / wait for next fresh candidate'}",
+            ]
+        )
     return "\n".join(
         [
             "Hammer Radar READY candidate",
+            f"alert_type: {alert_type or 'n/a'}",
             f"symbol: {ticket.get('symbol') or 'n/a'}",
             f"signal_id: {ticket.get('signal_id') or 'n/a'}",
             f"direction/timeframe: {ticket.get('direction') or 'n/a'}/{ticket.get('timeframe') or 'n/a'}",
@@ -175,7 +263,9 @@ def build_telegram_message(snapshot: dict[str, Any], *, alert_type: str | None =
             f"suggested_leverage: {_format_value(ticket.get('suggested_leverage'))}",
             f"dry_run status: {dry_run.get('validation_status', 'UNKNOWN')}",
             f"live_safety status: {live_safety.get('live_safety_status', 'UNKNOWN')}",
-            "Open UI. Approve paper ticket first. No live order is placed by the app.",
+            "live_execution_enabled=false",
+            "order_placed=false",
+            "operator action: approve paper",
         ]
     )
 
@@ -218,8 +308,19 @@ def check_notifications(
     dedupe = evaluate_dedupe(evaluation, log_dir=resolved_log_dir, config=config)
     telegram_result: dict[str, Any] = {"sent": False, "status": "not_requested"}
     recorded = False
+    if evaluation["alert_type"] == EXPIRED_MISSED and config.expired_missed_record_enabled and dedupe["allowed"]:
+        append_alert_record(
+            build_alert_record(
+                evaluation,
+                telegram_sent=False,
+                message=evaluation["message"] or "",
+                dedupe_key=dedupe.get("dedupe_key"),
+            ),
+            log_dir=resolved_log_dir,
+        )
+        recorded = True
 
-    if send and channel == "telegram" and evaluation["would_alert"]:
+    if send and channel == "telegram" and evaluation["would_alert"] and evaluation["alert_type"] != EXPIRED_MISSED:
         if not config.telegram_enabled:
             telegram_result = {"sent": False, "status": "telegram_disabled"}
         elif not config.telegram_configured:
@@ -254,6 +355,8 @@ def check_notifications(
         "dry_run_status": evaluation["dry_run_status"],
         "live_safety_status": evaluation["live_safety_status"],
         "checks": evaluation["checks"],
+        "candidate": evaluation.get("candidate"),
+        "message": evaluation.get("message"),
         "send_requested": bool(send),
         "channel": channel,
         "dedupe_allowed": dedupe["allowed"],
@@ -269,6 +372,10 @@ def notification_status(*, log_dir: str | Path | None = None, config: Notificati
     config = config or load_notification_config()
     records = load_alert_records(limit=0, log_dir=log_dir)
     last_alert = records[0] if records else None
+    counts_by_type: dict[str, int] = {}
+    for record in records:
+        alert_type = str(record.get("alert_type") or "UNKNOWN")
+        counts_by_type[alert_type] = counts_by_type.get(alert_type, 0) + 1
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
@@ -277,6 +384,7 @@ def notification_status(*, log_dir: str | Path | None = None, config: Notificati
         "token_present": config.token_present,
         "chat_id_present": config.chat_id_present,
         "alerts_recorded": len(records),
+        "alert_counts": counts_by_type,
         "last_alert": last_alert,
         "secrets_shown": False,
     }
@@ -302,6 +410,7 @@ def build_alert_record(
         "ticket_status": evaluation.get("ticket_status"),
         "dry_run_status": evaluation.get("dry_run_status"),
         "live_safety_status": evaluation.get("live_safety_status"),
+        "candidate": evaluation.get("candidate"),
         "telegram_sent": bool(telegram_sent),
         "message": message,
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -341,27 +450,150 @@ def evaluate_dedupe(
 ) -> dict[str, Any]:
     config = config or load_notification_config()
     alert_type = evaluation.get("alert_type")
-    if not evaluation.get("would_alert") or not alert_type:
+    if (not evaluation.get("would_alert") and alert_type != EXPIRED_MISSED) or not alert_type:
         return {"allowed": False, "reason": "no_alert"}
 
     now = datetime.now(UTC)
     signal_id = evaluation.get("signal_id")
     fallback_key = _fallback_dedupe_key(evaluation, now=now, interval_seconds=config.min_interval_seconds)
     for record in load_alert_records(limit=0, log_dir=log_dir):
-        if record.get("telegram_sent") is not True:
+        if record.get("telegram_sent") is not True and record.get("alert_type") != EXPIRED_MISSED:
             continue
         created_at = _parse_datetime(record.get("created_at"))
-        if created_at is not None and config.min_interval_seconds > 0:
+        if record.get("telegram_sent") is True and created_at is not None and config.min_interval_seconds > 0:
             age_seconds = (now - created_at).total_seconds()
             if 0 <= age_seconds < config.min_interval_seconds:
                 return {"allowed": False, "reason": "global_min_interval"}
-        if record.get("alert_type") != alert_type:
-            continue
         if signal_id and record.get("signal_id") == signal_id:
             return {"allowed": False, "reason": "duplicate_signal_alert"}
+        if record.get("alert_type") != alert_type:
+            continue
         if not signal_id and record.get("dedupe_key") == fallback_key:
             return {"allowed": False, "reason": "duplicate_status_bucket"}
     return {"allowed": True, "reason": "allowed", "dedupe_key": fallback_key}
+
+
+def _evaluate_candidate_alert(snapshot: dict[str, Any], config: NotificationConfig) -> dict[str, Any] | None:
+    checks = list((snapshot.get("candidate_snapshot") or {}).get("checks") or [])
+    candidate = _select_operator_candidate(checks, min_score=config.actionable_paper_min_score)
+    if candidate is None:
+        return None
+    payload = _candidate_payload(candidate)
+    if candidate.freshness_status == "expired":
+        payload["alert_type"] = EXPIRED_MISSED
+        payload["reason"] = _operator_visibility_reason(
+            candidate,
+            prefix="BTCUSDT paper candidate expired before operator visibility",
+        )
+        payload["operator_action"] = "wait for next fresh candidate"
+        return {
+            "would_alert": False,
+            "alert_type": EXPIRED_MISSED,
+            "signal_id": payload["signal_id"],
+            "candidate": payload,
+        }
+    if _is_expiring_soon(candidate, expiring_soon_minutes=config.expiring_soon_minutes):
+        payload["alert_type"] = EXPIRING_SOON
+        payload["reason"] = _operator_visibility_reason(
+            candidate,
+            prefix="fresh BTCUSDT paper candidate for operator visibility only is near freshness expiry",
+        )
+        payload["operator_action"] = "watch / approve paper / wait for next fresh candidate"
+        return {
+            "would_alert": True,
+            "alert_type": EXPIRING_SOON,
+            "signal_id": payload["signal_id"],
+            "candidate": payload,
+        }
+    payload["alert_type"] = ACTIONABLE_PAPER
+    payload["reason"] = _operator_visibility_reason(
+        candidate,
+        prefix="fresh BTCUSDT paper candidate for operator visibility only",
+    )
+    payload["operator_action"] = "watch / approve paper / wait for next fresh candidate"
+    return {
+        "would_alert": True,
+        "alert_type": ACTIONABLE_PAPER,
+        "signal_id": payload["signal_id"],
+        "candidate": payload,
+    }
+
+
+def _select_operator_candidate(checks: list[LiveCandidateCheck], *, min_score: int) -> LiveCandidateCheck | None:
+    strategy_config = load_strategy_config()
+    min_hammer_strength = strategy_config.minimum_hammer_strength
+    candidates = [
+        check
+        for check in checks
+        if check.candidate.signal.symbol == PROTOCOL["symbol"]
+        and check.candidate.signal.tradable is True
+        and not check.candidate.signal.reject_reason
+        and check.candidate.signal.hammer_strength >= min_hammer_strength
+        and check.candidate.tier == ACTIONABLE_PAPER_TIER
+        and check.candidate.score >= min_score
+        and check.entry is not None
+        and check.stop is not None
+        and check.take_profit is not None
+        and check.candidate.signal.direction in {"long", "short"}
+    ]
+    candidates.sort(
+        key=lambda check: (
+            check.freshness_status == "fresh",
+            check.age_minutes is not None,
+            -(check.age_minutes or 0.0),
+            check.candidate.score,
+            check.candidate.signal.timestamp,
+        ),
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def _is_expiring_soon(candidate: LiveCandidateCheck, *, expiring_soon_minutes: int) -> bool:
+    if candidate.freshness_status != "fresh" or candidate.age_minutes is None or expiring_soon_minutes <= 0:
+        return False
+    return candidate.age_minutes >= max(candidate.fresh_minutes - expiring_soon_minutes, 0)
+
+
+def _candidate_payload(candidate: LiveCandidateCheck) -> dict[str, Any]:
+    signal = candidate.candidate.signal
+    min_hammer_strength = load_strategy_config().minimum_hammer_strength
+    return {
+        "alert_type": None,
+        "signal_id": signal.signal_id,
+        "symbol": signal.symbol,
+        "timeframe": signal.timeframe,
+        "direction": signal.direction,
+        "entry": candidate.entry,
+        "stop": candidate.stop,
+        "take_profit": candidate.take_profit,
+        "score": candidate.candidate.score,
+        "tier": candidate.candidate.tier,
+        "hammer_strength": signal.hammer_strength,
+        "minimum_hammer_strength": min_hammer_strength,
+        "age_minutes": candidate.age_minutes,
+        "freshness_status": candidate.freshness_status,
+        "reason": candidate.reason,
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "operator_action": "watch / approve paper / wait for next fresh candidate",
+    }
+
+
+def _operator_visibility_reason(candidate: LiveCandidateCheck, *, prefix: str) -> str:
+    direction_note = ""
+    if candidate.candidate.signal.direction == "short":
+        direction_note = "; short is paper/operator visibility only, not live approval"
+    return (
+        f"{prefix}; live readiness is not implied; checklist_status={candidate.decision}; "
+        f"operator_context={_operator_context(candidate)}{direction_note}"
+    )
+
+
+def _operator_context(candidate: LiveCandidateCheck) -> str:
+    if candidate.reason == "passes conservative manual tiny-live checklist":
+        return "candidate fields are complete for paper/operator review"
+    return candidate.reason
 
 
 def build_notification_status_text(*, log_dir: str | Path | None = None) -> str:
