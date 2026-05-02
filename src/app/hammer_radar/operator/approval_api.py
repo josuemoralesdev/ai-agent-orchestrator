@@ -22,6 +22,7 @@ from src.app.hammer_radar.operator.binance_readonly import (
     build_binance_exchange_info,
     build_binance_readonly_status,
 )
+from src.app.hammer_radar.operator.binance_live_status import build_binance_live_status
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     build_betrayal_shadow_outcomes_payload,
     track_betrayal_shadow_outcomes,
@@ -63,6 +64,13 @@ from src.app.hammer_radar.operator.notification_watcher import (
     check_notifications,
     load_alert_records,
     notification_status,
+)
+from src.app.hammer_radar.operator.operator_actions import (
+    append_operator_action,
+    build_operator_action_record,
+    load_operator_actions,
+    operator_actions_path,
+    parse_operator_action,
 )
 from src.app.hammer_radar.operator.market_intelligence import (
     build_market_intelligence_summary,
@@ -177,6 +185,18 @@ class PaperRefreshRunRequest(BaseModel):
     use_network: bool = False
     write_outputs: bool = True
     send_notifications: bool = False
+
+
+class OperatorActionRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: str = "approval_api"
+    signal_id: str | None = None
+    alert_id: str | None = None
+
+
+class OperatorParseActionRequest(BaseModel):
+    text: str = Field(min_length=1)
+    signal_id: str | None = None
 
 
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
@@ -373,6 +393,11 @@ def binance_readonly_exchange_info(symbol: str = "BTCUSDT") -> dict:
     return build_binance_exchange_info(symbol=symbol)
 
 
+@app.get("/binance-live/status")
+def binance_live_status() -> dict:
+    return build_binance_live_status()
+
+
 @app.get("/betrayal-shadow/outcomes")
 def betrayal_shadow_outcomes(
     limit: int = Query(default=50, ge=0),
@@ -421,6 +446,70 @@ def notifications_alerts(limit: int = Query(default=50, ge=0)) -> dict:
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
         "readiness_alerts": load_alert_records(limit=limit, log_dir=get_log_dir(use_env=True)),
+    }
+
+
+@app.post("/operator/parse-action")
+def operator_parse_action(request: OperatorParseActionRequest) -> dict:
+    return parse_operator_action(request.text, signal_id=request.signal_id)
+
+
+@app.post("/operator/actions")
+def create_operator_action(request: OperatorActionRequest) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    parsed = parse_operator_action(request.text, signal_id=request.signal_id)
+    candidate_snapshot = _operator_action_candidate_snapshot(
+        signal_id=parsed.get("signal_id"),
+        normalized_action=parsed["normalized_action"],
+    )
+    record = build_operator_action_record(
+        text=request.text,
+        source=request.source,
+        signal_id=parsed.get("signal_id"),
+        alert_id=request.alert_id,
+        candidate_snapshot=candidate_snapshot,
+    )
+    append_operator_action(record, log_dir=log_dir)
+    record["operator_actions_path"] = str(operator_actions_path(log_dir))
+    return record
+
+
+@app.get("/operator/actions")
+def operator_actions(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "operator_actions_path": str(operator_actions_path(log_dir)),
+        "operator_actions": load_operator_actions(limit=limit, signal_id=signal_id, log_dir=log_dir),
+    }
+
+
+@app.get("/operator/actions/{action_id}")
+def operator_action_by_id(action_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_operator_actions(limit=0, action_id=action_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="operator action not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["order_placed"] = ORDER_PLACED
+    record["operator_actions_path"] = str(operator_actions_path(log_dir))
+    return record
+
+
+@app.get("/operator/latest")
+def operator_latest() -> dict:
+    log_dir = get_log_dir(use_env=True)
+    actions = load_operator_actions(limit=1, log_dir=log_dir)
+    alerts = load_alert_records(limit=1, log_dir=log_dir)
+    latest_candidate = _latest_candidate_snapshot()
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "order_placed": ORDER_PLACED,
+        "latest_operator_action": actions[0] if actions else None,
+        "latest_alert": alerts[0] if alerts else None,
+        "latest_candidate": latest_candidate,
     }
 
 
@@ -755,6 +844,28 @@ def _current_candidate_by_signal_id(signal_id: str) -> dict | None:
     return None
 
 
+def _latest_candidate_snapshot() -> dict | None:
+    snapshot = build_live_candidate_snapshot(
+        limit=1,
+        since_hours=24,
+        fresh_minutes=30,
+        max_position_usd=DEFAULT_MAX_POSITION_USD,
+        max_risk_usd=5.0,
+        max_leverage=DEFAULT_MAX_LEVERAGE,
+    )
+    if not snapshot["checks"]:
+        return None
+    return _candidate_snapshot(snapshot["checks"][0])
+
+
+def _operator_action_candidate_snapshot(signal_id: str | None, normalized_action: str) -> dict | None:
+    if signal_id:
+        return _current_candidate_by_signal_id(signal_id)
+    if normalized_action == "show_latest":
+        return _latest_candidate_snapshot()
+    return None
+
+
 def _validate_decision_request(request: DecisionRequest, candidate: dict | None) -> None:
     if request.decision != "approve_manual_live":
         return
@@ -832,7 +943,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1010,6 +1121,21 @@ def _operator_ui_html() -> str:
       <p><strong>Forbidden actions:</strong> <span id="binanceForbidden">loading</span></p>
       <p class="muted">Read-only connector. No order placement exists.</p>
       <p class="muted">Secrets are never shown. Live trading env must remain false.</p>
+    </section>
+
+    <h2>Operator Actions / Binance Live Readiness</h2>
+    <section id="operatorActions" class="operator-actions blocked">
+      <div class="grid">
+        <div><div class="label">operator actions</div><div class="value danger">record-only</div></div>
+        <div><div class="label">live orders</div><div class="value danger">disabled</div></div>
+        <div><div class="label">live readiness symbol</div><div class="value safe">BTCUSDT</div></div>
+        <div><div class="label">ETH / alts</div><div class="value">paper/watch-only</div></div>
+      </div>
+      <p class="muted">Operator actions are record-only.</p>
+      <p class="muted">No live orders.</p>
+      <p class="muted">Live API credentials may be present, but live execution remains disabled.</p>
+      <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
+      <p class="muted">ETH/alts remain paper/watch-only.</p>
     </section>
 
     <h2>Notification Watcher</h2>

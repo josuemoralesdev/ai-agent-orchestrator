@@ -13,9 +13,11 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator import archive
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.binance_live_status import build_binance_live_status
 from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
 from src.app.hammer_radar.operator.live_connector_stub import submit_live_order_stub
 from src.app.hammer_radar.operator.models import SignalRecord
+from src.app.hammer_radar.operator.operator_actions import LIVE_BLOCK_REASON, parse_operator_action
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
 
@@ -91,6 +93,11 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Log Manual-Live Intent", html)
             self.assertIn("Blocked: candidate is FORBIDDEN", html)
             self.assertIn("No order placement", html)
+            self.assertIn("Operator actions are record-only.", html)
+            self.assertIn("No live orders.", html)
+            self.assertIn("Live API credentials may be present, but live execution remains disabled.", html)
+            self.assertIn("BTCUSDT remains the only live-readiness symbol.", html)
+            self.assertIn("ETH/alts remain paper/watch-only.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)
@@ -438,6 +445,81 @@ class ApprovalApiTestCase(unittest.TestCase):
         payload = response.json()
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
+
+    def test_operator_parser_accepts_safe_actions(self) -> None:
+        cases = {
+            "watch": "watch",
+            "paper approve": "paper_approve",
+            "approve paper": "paper_approve",
+            "ignore": "ignore",
+            "show latest": "show_latest",
+            "show alerts": "show_alerts",
+            "show candidate signal|123": "show_candidate",
+        }
+
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                payload = parse_operator_action(text)
+                self.assertEqual("ACCEPTED", payload["result_status"])
+                self.assertEqual(expected, payload["normalized_action"])
+                self.assertFalse(payload["live_execution_enabled"])
+                self.assertFalse(payload["order_placed"])
+
+        self.assertEqual("signal|123", parse_operator_action("show candidate signal|123")["signal_id"])
+
+    def test_operator_parser_blocks_live_and_leverage_commands(self) -> None:
+        for text in ("trade now live", "open live", "market buy", "market sell", "buy now", "sell now", "50x", "10x leverage"):
+            with self.subTest(text=text):
+                payload = parse_operator_action(text)
+                self.assertEqual("BLOCKED", payload["result_status"])
+                self.assertEqual("blocked_live_command", payload["normalized_action"])
+                self.assertEqual(LIVE_BLOCK_REASON, payload["reason"])
+                self.assertFalse(payload["live_execution_enabled"])
+                self.assertFalse(payload["order_placed"])
+
+    def test_operator_parser_rejects_unknown_commands(self) -> None:
+        payload = parse_operator_action("rotate into eth")
+
+        self.assertEqual("REJECTED", payload["result_status"])
+        self.assertEqual("unknown", payload["normalized_action"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_operator_actions_record_safe_actions_and_list_records(self) -> None:
+        response = self.client.post("/operator/actions", json={"text": "watch", "source": "telegram"})
+        action_id = response.json()["action_id"]
+        list_response = self.client.get("/operator/actions")
+        single_response = self.client.get(f"/operator/actions/{action_id}")
+        latest_response = self.client.get("/operator/latest")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("watch", payload["normalized_action"])
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertTrue((self.log_dir / "operator_actions.ndjson").exists())
+        self.assertEqual(200, list_response.status_code)
+        self.assertEqual(1, len(list_response.json()["operator_actions"]))
+        self.assertEqual(action_id, single_response.json()["action_id"])
+        self.assertEqual(action_id, latest_response.json()["latest_operator_action"]["action_id"])
+
+    def test_operator_actions_blocked_live_command_records_without_order_placement(self) -> None:
+        response = self.client.post("/operator/actions", json={"text": "trade now live 50x"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["result_status"])
+        self.assertEqual("blocked_live_command", payload["normalized_action"])
+        self.assertEqual(LIVE_BLOCK_REASON, payload["reason"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_api_operator_parse_action_reports_blocked_live_command(self) -> None:
+        response = self.client.post("/operator/parse-action", json={"text": "market sell"})
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("BLOCKED", response.json()["result_status"])
 
     def test_manual_outcome_api_writes_and_lists_records(self) -> None:
         response = self.client.post(
@@ -1169,6 +1251,70 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertTrue(payload["read_only"])
         self.assertNotIn("super-secret-value", json.dumps(payload))
 
+    def test_binance_live_status_defaults_to_blocked_without_secret_values(self) -> None:
+        payload = build_binance_live_status(env={})
+
+        self.assertFalse(payload["api_key_present"])
+        self.assertFalse(payload["api_secret_present"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertEqual(["BTCUSDT"], payload["allowed_symbols"])
+        self.assertEqual(44.0, payload["max_position_usd"])
+        self.assertEqual(3.0, payload["max_leverage"])
+        self.assertEqual("isolated", payload["margin_mode"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertEqual("BLOCKED", payload["readiness"])
+
+    def test_binance_live_status_reports_presence_booleans_only(self) -> None:
+        payload = build_binance_live_status(
+            env={
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+                "HAMMER_BINANCE_LIVE_ENABLED": "true",
+                "HAMMER_LIVE_EXECUTION_ENABLED": "true",
+                "HAMMER_ALLOW_LIVE_ORDERS": "true",
+                "HAMMER_GLOBAL_KILL_SWITCH": "false",
+                "HAMMER_LIVE_ALLOWED_SYMBOLS": "BTCUSDT,ETHUSDT",
+            }
+        )
+        serialized = json.dumps(payload)
+
+        self.assertTrue(payload["api_key_present"])
+        self.assertTrue(payload["api_secret_present"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertEqual(["BTCUSDT"], payload["allowed_symbols"])
+        self.assertEqual(["BTCUSDT", "ETHUSDT"], payload["configured_allowed_symbols"])
+        self.assertEqual("BLOCKED", payload["readiness"])
+        self.assertNotIn("super-secret-value", serialized)
+        self.assertNotIn("abcd1234wxyz", serialized)
+
+    def test_api_binance_live_status_returns_safe_metadata(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "BINANCE_API_KEY": "abcd1234wxyz",
+                "BINANCE_API_SECRET": "super-secret-value",
+            },
+            clear=False,
+        ):
+            response = self.client.get("/binance-live/status")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["api_key_present"])
+        self.assertTrue(payload["api_secret_present"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertEqual(["BTCUSDT"], payload["allowed_symbols"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertNotIn("super-secret-value", json.dumps(payload))
+
     def test_cli_binance_readonly_status_works_without_printing_secret(self) -> None:
         env = os.environ.copy()
         env.update(
@@ -1206,12 +1352,14 @@ class ApprovalApiTestCase(unittest.TestCase):
 
     def test_binance_readonly_module_has_no_order_placement_method(self) -> None:
         source = Path("src/app/hammer_radar/operator/binance_readonly.py").read_text(encoding="utf-8")
+        live_source = Path("src/app/hammer_radar/operator/binance_live_status.py").read_text(encoding="utf-8")
 
-        self.assertNotIn("def place_order", source)
-        self.assertNotIn("def create_order", source)
-        self.assertNotIn("def cancel_order", source)
-        self.assertNotIn("requests.", source)
-        self.assertNotIn("urlopen", source)
+        for module_source in (source, live_source):
+            self.assertNotIn("def place_order", module_source)
+            self.assertNotIn("def create_order", module_source)
+            self.assertNotIn("def cancel_order", module_source)
+            self.assertNotIn("requests.", module_source)
+            self.assertNotIn("urlopen", module_source)
 
     def test_cli_inspect_trade_ticket_works(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-ticket"), log_dir=self.log_dir)

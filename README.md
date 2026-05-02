@@ -207,6 +207,39 @@ http://127.0.0.1:8015/ui
 
 The UI records decisions only through the local Approval API. It does not place orders, does not call Binance, and keeps `live_execution_enabled=false` / `order_placed=false`.
 
+R38 adds record-only operator actions and Binance live API readiness metadata:
+
+```text
+POST /operator/actions
+GET /operator/actions
+GET /operator/actions/{action_id}
+GET /operator/latest
+POST /operator/parse-action
+GET /binance-live/status
+```
+
+The live credential env file is expected at:
+
+```text
+/home/josue/.config/hammer-radar/binance-live.env
+```
+
+Recommended permissions and defaults:
+
+```bash
+chmod 700 /home/josue/.config/hammer-radar
+chmod 600 /home/josue/.config/hammer-radar/binance-live.env
+```
+
+```text
+HAMMER_BINANCE_LIVE_ENABLED=false
+HAMMER_LIVE_EXECUTION_ENABLED=false
+HAMMER_ALLOW_LIVE_ORDERS=false
+HAMMER_GLOBAL_KILL_SWITCH=true
+```
+
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38 does not submit orders, does not create signed order payloads, and only reports whether key/secret variables are present.
+
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 
 The first manual tiny-live workflow is documented in:
