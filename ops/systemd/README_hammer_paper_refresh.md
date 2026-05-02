@@ -88,7 +88,26 @@ Optional environment files are loaded if present:
 
 ```text
 /home/josue/.config/hammer-radar/binance-readonly.env
+/home/josue/.config/hammer-radar/binance-live.env
 /home/josue/.config/hammer-radar/notifications.env
 ```
 
 No tokens, API keys, or secrets belong in this repository.
+
+For local Binance live API readiness plumbing, keep credentials outside the repo:
+
+```bash
+chmod 700 /home/josue/.config/hammer-radar
+chmod 600 /home/josue/.config/hammer-radar/binance-live.env
+```
+
+Recommended safe defaults for `/home/josue/.config/hammer-radar/binance-live.env`:
+
+```text
+HAMMER_BINANCE_LIVE_ENABLED=false
+HAMMER_LIVE_EXECUTION_ENABLED=false
+HAMMER_ALLOW_LIVE_ORDERS=false
+HAMMER_GLOBAL_KILL_SWITCH=true
+```
+
+Before any future live API use, allowlist the desktop public IP in Binance API Management. R38 only reports key/secret presence booleans and safety metadata; it does not place orders.
