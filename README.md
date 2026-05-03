@@ -240,6 +240,17 @@ LIVE APPROVE BTCUSDT|13m|long|2026-05-01T22:31:59.999000+00:00
 
 Vague commands such as `trade now live`, `open live`, `buy now`, `sell now`, `market buy`, `market sell`, `50x`, `live approve latest`, and `live approve all` remain blocked or rejected. Exact live approval requires `signal_id`. R39 evaluates only; no live orders. Execution remains disabled. R39 does not place orders and does not create signed order payloads.
 
+R40 adds a strategy performance audit and live-eligibility recommendation matrix:
+
+```text
+GET /strategy-performance/summary
+GET /strategy-performance/timeframes
+GET /strategy-performance/entry-modes
+GET /strategy-performance/live-eligibility
+```
+
+R40 is an audit/reporting phase only. It reads local paper logs, summarizes timeframe/direction/entry-mode performance, and recommends future tiny-live candidate classes without granting execution permission. Live eligibility is recommendation only, not permission. Future tiny-live still requires exact `LIVE APPROVE <signal_id>` and all safety gates. R40 does not place live orders and does not create signed order payloads.
+
 The live credential env file is expected at:
 
 ```text
@@ -260,7 +271,7 @@ HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true
 ```
 
-Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
 
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 
