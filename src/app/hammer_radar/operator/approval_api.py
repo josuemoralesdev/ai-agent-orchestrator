@@ -98,6 +98,12 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     scheduler_status,
 )
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
+from src.app.hammer_radar.operator.strategy_performance import (
+    build_live_eligibility_matrix,
+    build_strategy_entry_mode_summary,
+    build_strategy_performance_summary,
+    build_strategy_timeframe_summary,
+)
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
     build_trade_ticket,
@@ -457,6 +463,26 @@ def notifications_alerts(limit: int = Query(default=50, ge=0)) -> dict:
         "order_placed": ORDER_PLACED,
         "readiness_alerts": load_alert_records(limit=limit, log_dir=get_log_dir(use_env=True)),
     }
+
+
+@app.get("/strategy-performance/summary")
+def strategy_performance_summary() -> dict:
+    return build_strategy_performance_summary(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/strategy-performance/timeframes")
+def strategy_performance_timeframes() -> dict:
+    return build_strategy_timeframe_summary(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/strategy-performance/entry-modes")
+def strategy_performance_entry_modes() -> dict:
+    return build_strategy_entry_mode_summary(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/strategy-performance/live-eligibility")
+def strategy_performance_live_eligibility() -> dict:
+    return build_live_eligibility_matrix(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/operator/parse-action")
@@ -1007,7 +1033,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1203,6 +1229,21 @@ def _operator_ui_html() -> str:
       <p class="muted">Exact live approval requires signal_id.</p>
       <p class="muted">R39 evaluates only; no live orders.</p>
       <p class="muted">Execution remains disabled.</p>
+    </section>
+
+    <h2>Strategy Performance</h2>
+    <section id="strategyPerformance" class="strategy-performance blocked">
+      <div class="grid">
+        <div><div class="label">audit mode</div><div class="value danger">Audit only.</div></div>
+        <div><div class="label">live orders</div><div class="value danger">No live orders.</div></div>
+        <div><div class="label">execution_enabled</div><div id="strategyExecution" class="value danger">false</div></div>
+        <div><div class="label">order_placed</div><div id="strategyOrder" class="value danger">false</div></div>
+        <div><div class="label">no_order_payload_created</div><div id="strategyPayload" class="value safe">true</div></div>
+        <div><div class="label">eligible recommendations</div><div id="strategyEligibleCount" class="value">loading</div></div>
+      </div>
+      <p class="muted">Eligibility is recommendation, not permission.</p>
+      <p class="muted">Future tiny-live still requires exact LIVE APPROVE signal_id and all safety gates.</p>
+      <p><strong>Top recommendation:</strong> <span id="strategyTopRecommendation">loading</span></p>
     </section>
 
     <h2>Notification Watcher</h2>
@@ -1433,6 +1474,7 @@ async function refreshAll() {
   await loadLiveSafety();
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
+  await loadStrategyPerformance();
   await loadNotificationStatus();
   await loadAltWatchlist();
   await loadMultiSymbolSummary();
@@ -1626,6 +1668,20 @@ async function loadBinanceReadonlyStatus() {
   document.getElementById('binanceOrder').textContent = String(data.order_placed);
   document.getElementById('binanceBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
   document.getElementById('binanceForbidden').textContent = (data.forbidden_actions || []).join(', ');
+}
+
+async function loadStrategyPerformance() {
+  const res = await fetch('/strategy-performance/live-eligibility');
+  const data = await res.json();
+  const eligible = data.eligible_recommendations || [];
+  const top = eligible[0] || (data.recommendations || [])[0] || {};
+  document.getElementById('strategyExecution').textContent = String(data.execution_enabled === true);
+  document.getElementById('strategyOrder').textContent = String(data.order_placed === true);
+  document.getElementById('strategyPayload').textContent = String(data.no_order_payload_created === true);
+  document.getElementById('strategyEligibleCount').textContent = String(eligible.length);
+  document.getElementById('strategyTopRecommendation').textContent = top.timeframe
+    ? `${top.timeframe} ${top.direction || 'n/a'} ${top.entry_mode || 'n/a'}: ${top.recommendation}`
+    : 'none';
 }
 
 async function loadNotificationStatus() {
