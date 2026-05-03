@@ -251,6 +251,17 @@ GET /strategy-performance/live-eligibility
 
 R40 is an audit/reporting phase only. It reads local paper logs, summarizes timeframe/direction/entry-mode performance, and recommends future tiny-live candidate classes without granting execution permission. Live eligibility is recommendation only, not permission. Future tiny-live still requires exact `LIVE APPROVE <signal_id>` and all safety gates. R40 does not place live orders and does not create signed order payloads.
 
+R41 adds a strategy promotion watcher:
+
+```text
+GET /strategy-promotion/status
+POST /strategy-promotion/check
+GET /strategy-promotion/events
+GET /strategy-promotion/events/{event_id}
+```
+
+R41 records and reports when strategy buckets approach or cross R40 promotion thresholds. Promotion is review only, not permission to trade. It does not place orders, does not enable live execution, and does not create signed payloads. Promotion messages say that exact `LIVE APPROVE <signal_id>` and all live safety gates are still required, execution remains disabled, and no live orders are available.
+
 The live credential env file is expected at:
 
 ```text
@@ -271,7 +282,7 @@ HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true
 ```
 
-Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40/R41 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
 
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 
