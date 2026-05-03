@@ -218,6 +218,28 @@ POST /operator/parse-action
 GET /binance-live/status
 ```
 
+R39 adds an exact live approval gate for evaluation only:
+
+```text
+POST /operator/live-approval/evaluate
+GET /operator/live-approval/requests
+GET /operator/live-approval/requests/{request_id}
+```
+
+The only live approval intent format recognized by the parser is:
+
+```text
+LIVE APPROVE <signal_id>
+```
+
+Example:
+
+```text
+LIVE APPROVE BTCUSDT|13m|long|2026-05-01T22:31:59.999000+00:00
+```
+
+Vague commands such as `trade now live`, `open live`, `buy now`, `sell now`, `market buy`, `market sell`, `50x`, `live approve latest`, and `live approve all` remain blocked or rejected. Exact live approval requires `signal_id`. R39 evaluates only; no live orders. Execution remains disabled. R39 does not place orders and does not create signed order payloads.
+
 The live credential env file is expected at:
 
 ```text
@@ -238,7 +260,7 @@ HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true
 ```
 
-Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38 does not submit orders, does not create signed order payloads, and only reports whether key/secret variables are present.
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
 
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 

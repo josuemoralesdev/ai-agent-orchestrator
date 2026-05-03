@@ -98,6 +98,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Live API credentials may be present, but live execution remains disabled.", html)
             self.assertIn("BTCUSDT remains the only live-readiness symbol.", html)
             self.assertIn("ETH/alts remain paper/watch-only.", html)
+            self.assertIn("Exact live approval requires signal_id.", html)
+            self.assertIn("R39 evaluates only; no live orders.", html)
+            self.assertIn("Execution remains disabled.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)
@@ -467,8 +470,38 @@ class ApprovalApiTestCase(unittest.TestCase):
 
         self.assertEqual("signal|123", parse_operator_action("show candidate signal|123")["signal_id"])
 
+    def test_operator_parser_accepts_exact_live_approve_signal_id(self) -> None:
+        signal_id = self._exact_signal_id()
+
+        payload = parse_operator_action(f"LIVE APPROVE {signal_id}")
+
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertEqual("live_approve_exact", payload["normalized_action"])
+        self.assertEqual(signal_id, payload["signal_id"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_operator_parser_rejects_live_approve_without_exact_signal_id(self) -> None:
+        for text in ("LIVE APPROVE", "live approve latest", "live approve all", "LIVE APPROVE BTCUSDT"):
+            with self.subTest(text=text):
+                payload = parse_operator_action(text)
+                self.assertEqual("REJECTED", payload["result_status"])
+                self.assertEqual("blocked_live_command", payload["normalized_action"])
+                self.assertFalse(payload["live_execution_enabled"])
+                self.assertFalse(payload["order_placed"])
+
     def test_operator_parser_blocks_live_and_leverage_commands(self) -> None:
-        for text in ("trade now live", "open live", "market buy", "market sell", "buy now", "sell now", "50x", "10x leverage"):
+        for text in (
+            "trade now live",
+            "trade now live 50x",
+            "open live",
+            "market buy",
+            "market sell",
+            "buy now",
+            "sell now",
+            "50x",
+            "10x leverage",
+        ):
             with self.subTest(text=text):
                 payload = parse_operator_action(text)
                 self.assertEqual("BLOCKED", payload["result_status"])
@@ -520,6 +553,143 @@ class ApprovalApiTestCase(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual("BLOCKED", response.json()["result_status"])
+
+    def test_api_operator_parse_action_reports_exact_live_approve(self) -> None:
+        signal_id = self._exact_signal_id()
+        response = self.client.post("/operator/parse-action", json={"text": f"LIVE APPROVE {signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertEqual("live_approve_exact", payload["normalized_action"])
+        self.assertEqual(signal_id, payload["signal_id"])
+
+    def test_live_approval_evaluate_returns_not_found_for_unknown_signal_id(self) -> None:
+        signal_id = self._exact_signal_id()
+
+        response = self.client.post("/operator/live-approval/evaluate", json={"text": f"LIVE APPROVE {signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_FOUND", payload["approval_gate_status"])
+        self.assertEqual(signal_id, payload["signal_id"])
+        self.assertIsNone(payload["matched_alert"])
+        self.assertIsNone(payload["matched_candidate"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_live_approval_evaluate_returns_expired_for_expired_candidate(self) -> None:
+        timestamp = (datetime.now(UTC) - timedelta(minutes=90)).isoformat()
+        signal_id = self._exact_signal_id(timestamp=timestamp)
+        archive.append_signal(self._eligible_signal(signal_id=signal_id, timestamp=timestamp), log_dir=self.log_dir)
+
+        response = self.client.post("/operator/live-approval/evaluate", json={"text": f"LIVE APPROVE {signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("EXPIRED", payload["approval_gate_status"])
+        self.assertEqual("expired", payload["freshness_status"])
+        self.assertIn("candidate expired by freshness gate", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_live_approval_evaluate_ready_candidate_still_execution_disabled(self) -> None:
+        timestamp = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+        signal_id = self._exact_signal_id(timestamp=timestamp)
+        archive.append_signal(self._eligible_signal(signal_id=signal_id, timestamp=timestamp), log_dir=self.log_dir)
+
+        response = self.client.post("/operator/live-approval/evaluate", json={"text": f"LIVE APPROVE {signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("READY_BUT_EXECUTION_DISABLED", payload["approval_gate_status"])
+        self.assertEqual("READY", payload["readiness_status"])
+        self.assertEqual("PROPOSED", payload["ticket_status"])
+        self.assertEqual("VALID", payload["dry_run_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertIn("R39 evaluates only; no live order execution exists", payload["blockers"])
+
+    def test_live_approval_requests_are_persisted_and_listed(self) -> None:
+        signal_id = self._exact_signal_id()
+        created = self.client.post(
+            "/operator/live-approval/evaluate",
+            json={"text": f"LIVE APPROVE {signal_id}", "source": "unit_test"},
+        ).json()
+
+        list_response = self.client.get("/operator/live-approval/requests")
+        single_response = self.client.get(f"/operator/live-approval/requests/{created['request_id']}")
+
+        self.assertEqual(200, list_response.status_code)
+        listed = list_response.json()
+        self.assertFalse(listed["live_execution_enabled"])
+        self.assertFalse(listed["allow_live_orders"])
+        self.assertTrue(listed["global_kill_switch"])
+        self.assertFalse(listed["order_placed"])
+        self.assertFalse(listed["execution_attempted"])
+        self.assertFalse(listed["order_payload_created"])
+        self.assertEqual(1, len(listed["live_approval_requests"]))
+        self.assertEqual(created["request_id"], single_response.json()["request_id"])
+        self.assertTrue((self.log_dir / "live_approval_requests.ndjson").exists())
+
+    def test_operator_actions_live_approve_routes_into_gate_and_records_safely(self) -> None:
+        signal_id = self._exact_signal_id()
+
+        response = self.client.post("/operator/actions", json={"text": f"LIVE APPROVE {signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_FOUND", payload["approval_gate_status"])
+        self.assertEqual("live_approve_exact", payload["normalized_action"])
+        self.assertEqual("ACCEPTED", payload["parse_status"])
+        self.assertEqual("live_approve_exact", payload["operator_action"]["normalized_action"])
+        self.assertEqual("ACCEPTED", payload["operator_action"]["result_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertTrue((self.log_dir / "operator_actions.ndjson").exists())
+        self.assertTrue((self.log_dir / "live_approval_requests.ndjson").exists())
+
+    def test_live_approval_keeps_eth_and_shorts_not_live_eligible(self) -> None:
+        timestamp = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+        eth_signal_id = self._exact_signal_id(symbol="ETHUSDT", timestamp=timestamp)
+        short_signal_id = self._exact_signal_id(direction="short", timestamp=timestamp)
+        archive.append_signal(
+            self._eligible_signal(signal_id=eth_signal_id, symbol="ETHUSDT", timestamp=timestamp),
+            log_dir=self.log_dir,
+        )
+        archive.append_signal(
+            self._eligible_signal(signal_id=short_signal_id, direction="short", timestamp=timestamp),
+            log_dir=self.log_dir,
+        )
+
+        eth_payload = self.client.post(
+            "/operator/live-approval/evaluate",
+            json={"text": f"LIVE APPROVE {eth_signal_id}"},
+        ).json()
+        short_payload = self.client.post(
+            "/operator/live-approval/evaluate",
+            json={"text": f"LIVE APPROVE {short_signal_id}"},
+        ).json()
+
+        self.assertEqual("NOT_LIVE_ELIGIBLE", eth_payload["approval_gate_status"])
+        self.assertIn("only BTCUSDT is live-readiness eligible", eth_payload["blockers"])
+        self.assertEqual("NOT_LIVE_ELIGIBLE", short_payload["approval_gate_status"])
+        self.assertIn("shorts are paper/operator visibility only in R39", short_payload["blockers"])
+        self.assertFalse(eth_payload["allow_live_orders"])
+        self.assertFalse(short_payload["allow_live_orders"])
+        self.assertFalse(eth_payload["order_placed"])
+        self.assertFalse(short_payload["order_placed"])
 
     def test_manual_outcome_api_writes_and_lists_records(self) -> None:
         response = self.client.post(
@@ -1514,6 +1684,17 @@ class ApprovalApiTestCase(unittest.TestCase):
             "live_execution_enabled": False,
             "order_placed": False,
         }
+
+    @staticmethod
+    def _exact_signal_id(
+        *,
+        symbol: str = "BTCUSDT",
+        timeframe: str = "13m",
+        direction: str = "long",
+        timestamp: str | None = None,
+    ) -> str:
+        value = timestamp or (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+        return f"{symbol}|{timeframe}|{direction}|{value}"
 
     @staticmethod
     def _eligible_signal(
