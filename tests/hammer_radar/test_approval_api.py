@@ -104,6 +104,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Strategy Performance", html)
             self.assertIn("Audit only.", html)
             self.assertIn("Eligibility is recommendation, not permission.", html)
+            self.assertIn("Strategy Promotion", html)
+            self.assertIn("Promotion is review only.", html)
+            self.assertIn("Execution remains disabled.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)

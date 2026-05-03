@@ -104,6 +104,12 @@ from src.app.hammer_radar.operator.strategy_performance import (
     build_strategy_performance_summary,
     build_strategy_timeframe_summary,
 )
+from src.app.hammer_radar.operator.strategy_promotion_watcher import (
+    build_strategy_promotion_status,
+    check_strategy_promotions,
+    load_strategy_promotion_events,
+    strategy_promotion_events_path,
+)
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
     build_trade_ticket,
@@ -213,6 +219,10 @@ class OperatorParseActionRequest(BaseModel):
 class LiveApprovalEvaluateRequest(BaseModel):
     text: str = Field(min_length=1)
     source: str = "approval_api"
+
+
+class StrategyPromotionCheckRequest(BaseModel):
+    record_blocked: bool = False
 
 
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
@@ -483,6 +493,55 @@ def strategy_performance_entry_modes() -> dict:
 @app.get("/strategy-performance/live-eligibility")
 def strategy_performance_live_eligibility() -> dict:
     return build_live_eligibility_matrix(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/strategy-promotion/status")
+def strategy_promotion_status() -> dict:
+    return build_strategy_promotion_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/strategy-promotion/check")
+def strategy_promotion_check(request: StrategyPromotionCheckRequest | None = None) -> dict:
+    request = request or StrategyPromotionCheckRequest()
+    return check_strategy_promotions(log_dir=get_log_dir(use_env=True), record_blocked=request.record_blocked)
+
+
+@app.get("/strategy-promotion/events")
+def strategy_promotion_events(limit: int = Query(default=50, ge=0), strategy_key: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "execution_attempted": False,
+        "order_payload_created": False,
+        "secrets_shown": False,
+        "strategy_promotion_events_path": str(strategy_promotion_events_path(log_dir)),
+        "strategy_promotion_events": load_strategy_promotion_events(
+            limit=limit,
+            strategy_key=strategy_key,
+            log_dir=log_dir,
+        ),
+    }
+
+
+@app.get("/strategy-promotion/events/{event_id}")
+def strategy_promotion_event_by_id(event_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_strategy_promotion_events(limit=0, event_id=event_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="strategy promotion event not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["allow_live_orders"] = False
+    record["global_kill_switch"] = True
+    record["order_placed"] = ORDER_PLACED
+    record["execution_attempted"] = False
+    record["order_payload_created"] = False
+    record["secrets_shown"] = False
+    record["strategy_promotion_events_path"] = str(strategy_promotion_events_path(log_dir))
+    return record
 
 
 @app.post("/operator/parse-action")
@@ -1033,7 +1092,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .strategy-promotion, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1244,6 +1303,20 @@ def _operator_ui_html() -> str:
       <p class="muted">Eligibility is recommendation, not permission.</p>
       <p class="muted">Future tiny-live still requires exact LIVE APPROVE signal_id and all safety gates.</p>
       <p><strong>Top recommendation:</strong> <span id="strategyTopRecommendation">loading</span></p>
+    </section>
+
+    <h2>Strategy Promotion</h2>
+    <section id="strategyPromotion" class="strategy-promotion blocked">
+      <div class="grid">
+        <div><div class="label">mode</div><div class="value danger">Promotion is review only.</div></div>
+        <div><div class="label">live orders</div><div class="value danger">No live orders.</div></div>
+        <div><div class="label">execution</div><div class="value danger">Execution remains disabled.</div></div>
+        <div><div class="label">near promotion</div><div id="promotionNearCount" class="value">loading</div></div>
+        <div><div class="label">eligible buckets</div><div id="promotionReadyCount" class="value">loading</div></div>
+        <div><div class="label">latest event</div><div id="promotionLatest" class="value mono">loading</div></div>
+      </div>
+      <p><strong>Top near-promotion:</strong> <span id="promotionNearTop">loading</span></p>
+      <p><strong>Top eligible:</strong> <span id="promotionReadyTop">loading</span></p>
     </section>
 
     <h2>Notification Watcher</h2>
@@ -1475,6 +1548,7 @@ async function refreshAll() {
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
   await loadStrategyPerformance();
+  await loadStrategyPromotion();
   await loadNotificationStatus();
   await loadAltWatchlist();
   await loadMultiSymbolSummary();
@@ -1682,6 +1756,22 @@ async function loadStrategyPerformance() {
   document.getElementById('strategyTopRecommendation').textContent = top.timeframe
     ? `${top.timeframe} ${top.direction || 'n/a'} ${top.entry_mode || 'n/a'}: ${top.recommendation}`
     : 'none';
+}
+
+async function loadStrategyPromotion() {
+  const res = await fetch('/strategy-promotion/status');
+  const data = await res.json();
+  const near = data.near_promotion || [];
+  const ready = data.promotion_ready || [];
+  const latest = data.latest_promotion_event || {};
+  const formatRow = row => row.strategy_key
+    ? `${row.strategy_key}: samples=${row.sample_count}/${row.required_sample_count} ${row.event_type}`
+    : 'none';
+  document.getElementById('promotionNearCount').textContent = String(near.length);
+  document.getElementById('promotionReadyCount').textContent = String(ready.length);
+  document.getElementById('promotionLatest').textContent = latest.event_id || 'none';
+  document.getElementById('promotionNearTop').textContent = formatRow(near[0] || {});
+  document.getElementById('promotionReadyTop').textContent = formatRow(ready[0] || {});
 }
 
 async function loadNotificationStatus() {
