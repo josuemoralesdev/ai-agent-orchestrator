@@ -45,6 +45,11 @@ from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
 )
+from src.app.hammer_radar.operator.live_approval import (
+    evaluate_live_approval_request,
+    live_approval_requests_path,
+    load_live_approval_requests,
+)
 from src.app.hammer_radar.operator.live_connector_stub import (
     CONNECTOR_MODE,
     load_live_attempts,
@@ -197,6 +202,11 @@ class OperatorActionRequest(BaseModel):
 class OperatorParseActionRequest(BaseModel):
     text: str = Field(min_length=1)
     signal_id: str | None = None
+
+
+class LiveApprovalEvaluateRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: str = "approval_api"
 
 
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
@@ -454,6 +464,47 @@ def operator_parse_action(request: OperatorParseActionRequest) -> dict:
     return parse_operator_action(request.text, signal_id=request.signal_id)
 
 
+@app.post("/operator/live-approval/evaluate")
+def operator_live_approval_evaluate(request: LiveApprovalEvaluateRequest) -> dict:
+    return evaluate_live_approval_request(
+        text=request.text,
+        source=request.source,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/operator/live-approval/requests")
+def operator_live_approval_requests(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "execution_attempted": False,
+        "order_payload_created": False,
+        "live_approval_requests_path": str(live_approval_requests_path(log_dir)),
+        "live_approval_requests": load_live_approval_requests(limit=limit, signal_id=signal_id, log_dir=log_dir),
+    }
+
+
+@app.get("/operator/live-approval/requests/{request_id}")
+def operator_live_approval_request_by_id(request_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_live_approval_requests(limit=0, request_id=request_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="live approval request not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["allow_live_orders"] = False
+    record["global_kill_switch"] = True
+    record["order_placed"] = ORDER_PLACED
+    record["execution_attempted"] = False
+    record["order_payload_created"] = False
+    record["live_approval_requests_path"] = str(live_approval_requests_path(log_dir))
+    return record
+
+
 @app.post("/operator/actions")
 def create_operator_action(request: OperatorActionRequest) -> dict:
     log_dir = get_log_dir(use_env=True)
@@ -471,6 +522,15 @@ def create_operator_action(request: OperatorActionRequest) -> dict:
     )
     append_operator_action(record, log_dir=log_dir)
     record["operator_actions_path"] = str(operator_actions_path(log_dir))
+    if parsed["normalized_action"] == "live_approve_exact":
+        gate = evaluate_live_approval_request(
+            text=request.text,
+            source=request.source,
+            log_dir=log_dir,
+        )
+        gate["operator_action"] = record
+        gate["operator_actions_path"] = str(operator_actions_path(log_dir))
+        return gate
     return record
 
 
@@ -503,11 +563,15 @@ def operator_latest() -> dict:
     log_dir = get_log_dir(use_env=True)
     actions = load_operator_actions(limit=1, log_dir=log_dir)
     alerts = load_alert_records(limit=1, log_dir=log_dir)
+    live_approval_requests = load_live_approval_requests(limit=1, log_dir=log_dir)
     latest_candidate = _latest_candidate_snapshot()
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
         "order_placed": ORDER_PLACED,
         "latest_operator_action": actions[0] if actions else None,
+        "latest_live_approval_request": live_approval_requests[0] if live_approval_requests else None,
         "latest_alert": alerts[0] if alerts else None,
         "latest_candidate": latest_candidate,
     }
@@ -1136,6 +1200,9 @@ def _operator_ui_html() -> str:
       <p class="muted">Live API credentials may be present, but live execution remains disabled.</p>
       <p class="muted">BTCUSDT remains the only live-readiness symbol.</p>
       <p class="muted">ETH/alts remain paper/watch-only.</p>
+      <p class="muted">Exact live approval requires signal_id.</p>
+      <p class="muted">R39 evaluates only; no live orders.</p>
+      <p class="muted">Execution remains disabled.</p>
     </section>
 
     <h2>Notification Watcher</h2>

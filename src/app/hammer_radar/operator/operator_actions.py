@@ -20,6 +20,8 @@ LIVE_BLOCK_REASON = (
     "Live execution is disabled. Exact future live approval requires a signal_id "
     "and all live safety gates."
 )
+LIVE_APPROVE_EXACT_REASON = "exact live approval request accepted for gate evaluation only"
+LIVE_APPROVE_REJECT_REASON = "LIVE APPROVE requires an exact signal_id"
 
 SAFE_ACTIONS = {
     "watch",
@@ -31,6 +33,7 @@ SAFE_ACTIONS = {
 }
 
 _LEVERAGE_RE = re.compile(r"\b(?:[2-9]\d*x|[1-9]\d+\s*x|leverage|leveraged|increase\s+leverage)\b")
+_LIVE_APPROVE_RE = re.compile(r"^live approve(?:\s+(?P<signal_id>\S+))?$", re.IGNORECASE)
 
 
 def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> dict[str, Any]:
@@ -43,6 +46,25 @@ def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> 
             normalized_action="unknown",
             result_status="REJECTED",
             reason="operator action text is required",
+            signal_id=signal_id,
+        )
+
+    live_approve_match = _LIVE_APPROVE_RE.match(raw_text)
+    if live_approve_match:
+        supplied_signal_id = live_approve_match.group("signal_id")
+        if _is_exact_live_approval_signal_id(supplied_signal_id):
+            return _parse_result(
+                raw_text=raw_text,
+                normalized_action="live_approve_exact",
+                result_status="ACCEPTED",
+                reason=LIVE_APPROVE_EXACT_REASON,
+                signal_id=supplied_signal_id,
+            )
+        return _parse_result(
+            raw_text=raw_text,
+            normalized_action="blocked_live_command",
+            result_status="REJECTED",
+            reason=LIVE_APPROVE_REJECT_REASON,
             signal_id=signal_id,
         )
 
@@ -168,6 +190,25 @@ def _is_live_execution_command(normalized_text: str) -> bool:
         "approve live",
     }
     return any(phrase in normalized_text for phrase in blocked_phrases) or bool(_LEVERAGE_RE.search(normalized_text))
+
+
+def _is_exact_live_approval_signal_id(value: str | None) -> bool:
+    if not value:
+        return False
+    lowered = value.lower()
+    if lowered in {"latest", "all"}:
+        return False
+    parts = value.split("|")
+    if len(parts) != 4:
+        return False
+    symbol, timeframe, direction, timestamp = parts
+    if not symbol or not timeframe or direction not in {"long", "short"}:
+        return False
+    try:
+        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
 
 
 def _parse_result(
