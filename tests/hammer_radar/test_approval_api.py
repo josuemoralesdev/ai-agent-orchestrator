@@ -112,6 +112,11 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Exact LIVE APPROVE &lt;signal_id&gt; required later.", html)
             self.assertIn("Recommendation/preflight only, not permission to execute.", html)
             self.assertIn("No signed payloads.", html)
+            self.assertIn("Binance Live Connector", html)
+            self.assertIn("No random altcoins.", html)
+            self.assertIn("No vague live commands.", html)
+            self.assertIn("Exact LIVE APPROVE &lt;signal_id&gt; required.", html)
+            self.assertIn("Payload preview is not permission to execute.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)

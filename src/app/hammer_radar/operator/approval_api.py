@@ -16,6 +16,14 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from src.app.hammer_radar.execution.binance_futures_connector import (
+    build_connector_status,
+    connector_attempts_path,
+    execute_live_order,
+    load_connector_attempts,
+    preview_payload,
+    submit_test_order,
+)
 from src.app.hammer_radar.operator.alt_watchlist import build_watchlist, build_watchlist_summary
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.binance_readonly import (
@@ -430,6 +438,46 @@ def binance_live_status() -> dict:
     return build_binance_live_status()
 
 
+@app.get("/binance-live/connector-status")
+def binance_live_connector_status() -> dict:
+    return build_connector_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/binance-live/payload-preview")
+def binance_live_payload_preview() -> dict:
+    return preview_payload(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/binance-live/test-order")
+def binance_live_test_order() -> dict:
+    return submit_test_order(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/binance-live/execute")
+def binance_live_execute() -> dict:
+    return execute_live_order(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/binance-live/connector-attempts")
+def binance_live_connector_attempts(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "execution_attempted": False,
+        "order_payload_created": False,
+        "secrets_shown": False,
+        "binance_live_connector_attempts_path": str(connector_attempts_path(log_dir)),
+        "binance_live_connector_attempts": load_connector_attempts(
+            limit=limit,
+            signal_id=signal_id,
+            log_dir=log_dir,
+        ),
+    }
+
+
 @app.get("/betrayal-shadow/outcomes")
 def betrayal_shadow_outcomes(
     limit: int = Query(default=50, ge=0),
@@ -707,6 +755,7 @@ def operator_latest() -> dict:
     alerts = load_alert_records(limit=1, log_dir=log_dir)
     live_approval_requests = load_live_approval_requests(limit=1, log_dir=log_dir)
     live_preflight_packs = load_live_preflight_packs(limit=1, log_dir=log_dir)
+    connector_attempts = load_connector_attempts(limit=1, log_dir=log_dir)
     latest_candidate = _latest_candidate_snapshot()
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -716,6 +765,7 @@ def operator_latest() -> dict:
         "latest_operator_action": actions[0] if actions else None,
         "latest_live_approval_request": live_approval_requests[0] if live_approval_requests else None,
         "latest_live_preflight_pack": live_preflight_packs[0] if live_preflight_packs else None,
+        "latest_binance_live_connector_attempt": connector_attempts[0] if connector_attempts else None,
         "latest_alert": alerts[0] if alerts else None,
         "latest_candidate": latest_candidate,
     }
@@ -1151,7 +1201,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1329,6 +1379,26 @@ def _operator_ui_html() -> str:
       <p><strong>Forbidden actions:</strong> <span id="binanceForbidden">loading</span></p>
       <p class="muted">Read-only connector. No order placement exists.</p>
       <p class="muted">Secrets are never shown. Live trading env must remain false.</p>
+    </section>
+
+    <h2>Binance Live Connector</h2>
+    <section id="binanceLiveConnector" class="binance-live-connector blocked">
+      <div class="grid">
+        <div><div class="label">connector_mode</div><div id="binanceLiveConnectorMode" class="value danger">DRY_RUN_ONLY</div></div>
+        <div><div class="label">readiness</div><div id="binanceLiveConnectorReadiness" class="value danger">BLOCKED</div></div>
+        <div><div class="label">api_key_present</div><div id="binanceLiveConnectorKey" class="value">false</div></div>
+        <div><div class="label">api_secret_present</div><div id="binanceLiveConnectorSecret" class="value">false</div></div>
+        <div><div class="label">live_execution_enabled</div><div id="binanceLiveConnectorLive" class="value danger">false</div></div>
+        <div><div class="label">allow_live_orders</div><div id="binanceLiveConnectorAllow" class="value danger">false</div></div>
+        <div><div class="label">global_kill_switch</div><div id="binanceLiveConnectorKill" class="value danger">true</div></div>
+        <div><div class="label">latest attempt</div><div id="binanceLiveConnectorLatest" class="value mono">loading</div></div>
+        <div><div class="label">payload preview status</div><div id="binanceLiveConnectorPreview" class="value danger">loading</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="binanceLiveConnectorBlockers">loading</span></p>
+      <p class="muted">No random altcoins.</p>
+      <p class="muted">No vague live commands.</p>
+      <p class="muted">Exact LIVE APPROVE &lt;signal_id&gt; required.</p>
+      <p class="muted">Payload preview is not permission to execute. Test-order mode is not live order placement.</p>
     </section>
 
     <h2>Operator Actions / Binance Live Readiness</h2>
@@ -1625,6 +1695,7 @@ async function refreshAll() {
   await loadLiveSafety();
   await loadLiveAttempts();
   await loadBinanceReadonlyStatus();
+  await loadBinanceLiveConnector();
   await loadStrategyPerformance();
   await loadStrategyPromotion();
   await loadLivePreflight();
@@ -1821,6 +1892,24 @@ async function loadBinanceReadonlyStatus() {
   document.getElementById('binanceOrder').textContent = String(data.order_placed);
   document.getElementById('binanceBlockers').textContent = (data.blockers || []).length ? data.blockers.join('; ') : 'none';
   document.getElementById('binanceForbidden').textContent = (data.forbidden_actions || []).join(', ');
+}
+
+async function loadBinanceLiveConnector() {
+  const statusRes = await fetch('/binance-live/connector-status');
+  const status = await statusRes.json();
+  const attemptsRes = await fetch('/binance-live/connector-attempts?limit=1');
+  const attempts = await attemptsRes.json();
+  const latest = (attempts.binance_live_connector_attempts || [])[0] || {};
+  document.getElementById('binanceLiveConnectorMode').textContent = status.connector_mode || 'DRY_RUN_ONLY';
+  document.getElementById('binanceLiveConnectorReadiness').textContent = status.readiness || 'BLOCKED';
+  document.getElementById('binanceLiveConnectorKey').textContent = String(status.api_key_present === true);
+  document.getElementById('binanceLiveConnectorSecret').textContent = String(status.api_secret_present === true);
+  document.getElementById('binanceLiveConnectorLive').textContent = String(status.live_execution_enabled === true);
+  document.getElementById('binanceLiveConnectorAllow').textContent = String(status.allow_live_orders === true);
+  document.getElementById('binanceLiveConnectorKill').textContent = String(status.global_kill_switch === true);
+  document.getElementById('binanceLiveConnectorLatest').textContent = latest.attempt_id || 'none';
+  document.getElementById('binanceLiveConnectorPreview').textContent = latest.status || 'none';
+  document.getElementById('binanceLiveConnectorBlockers').textContent = (status.blockers || []).length ? status.blockers.join('; ') : 'none';
 }
 
 async function loadStrategyPerformance() {

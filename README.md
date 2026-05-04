@@ -273,6 +273,18 @@ GET /live-preflight/packs/{preflight_id}
 
 R42 bridges strategy-level promotion to signal-level readiness. It reports whether the promoted `BTCUSDT|13m|long|ladder_close_50_618` strategy has a fresh matching BTCUSDT 13m long signal, then summarizes readiness, ticket, dry-run, and live-safety gates when a signal exists. If no fresh matching signal exists, it returns `WAITING_FOR_FRESH_PROMOTED_SIGNAL`. R42 is preflight/reporting only: it does not place orders, does not enable live execution, and does not create signed payloads. Fresh signal approval still requires exact `LIVE APPROVE <signal_id>` and all safety gates. Development can proceed without a fresh signal; execution cannot.
 
+R43 adds a default-blocked Binance Futures tiny-live connector:
+
+```text
+GET /binance-live/connector-status
+POST /binance-live/payload-preview
+POST /binance-live/test-order
+POST /binance-live/execute
+GET /binance-live/connector-attempts
+```
+
+R43 does not loosen strategy gates and does not allow random altcoins, random timeframes, shorts, or vague live commands. Default connector mode is `DRY_RUN_ONLY`. Payload preview is not permission to execute, test-order mode is not live order placement, and live order placement remains blocked unless every gate is explicit: `LIVE_ORDER_ENABLED`, Binance live env enabled, live execution enabled, live orders allowed, kill switch off, exact `LIVE APPROVE <signal_id>`, fresh promoted BTCUSDT 13m long `ladder_close_50_618` signal, valid ticket, valid dry-run, passing live-safety, 44 USDT max, 3x max, isolated margin, and one-trade locks. R43 stores sanitized connector attempts and does not create signed payloads in `DRY_RUN_ONLY`.
+
 The live credential env file is expected at:
 
 ```text
@@ -288,12 +300,19 @@ chmod 600 /home/josue/.config/hammer-radar/binance-live.env
 
 ```text
 HAMMER_BINANCE_LIVE_ENABLED=false
+HAMMER_BINANCE_CONNECTOR_MODE=DRY_RUN_ONLY
 HAMMER_LIVE_EXECUTION_ENABLED=false
 HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true
+HAMMER_LIVE_ALLOWED_SYMBOLS=BTCUSDT
+HAMMER_LIVE_MAX_POSITION_USD=44
+HAMMER_LIVE_MAX_LEVERAGE=3
+HAMMER_LIVE_MARGIN_MODE=isolated
+HAMMER_LIVE_REQUIRE_EXACT_APPROVAL=true
+HAMMER_LIVE_MAX_TRADES_PER_DAY=1
 ```
 
-Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40/R41/R42 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40/R41/R42/R43 default paths do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
 
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 
