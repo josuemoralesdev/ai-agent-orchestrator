@@ -262,6 +262,17 @@ GET /strategy-promotion/events/{event_id}
 
 R41 records and reports when strategy buckets approach or cross R40 promotion thresholds. Promotion is review only, not permission to trade. It does not place orders, does not enable live execution, and does not create signed payloads. Promotion messages say that exact `LIVE APPROVE <signal_id>` and all live safety gates are still required, execution remains disabled, and no live orders are available.
 
+R42 adds a promoted strategy live preflight pack:
+
+```text
+GET /live-preflight/promoted-strategy
+POST /live-preflight/evaluate
+GET /live-preflight/packs
+GET /live-preflight/packs/{preflight_id}
+```
+
+R42 bridges strategy-level promotion to signal-level readiness. It reports whether the promoted `BTCUSDT|13m|long|ladder_close_50_618` strategy has a fresh matching BTCUSDT 13m long signal, then summarizes readiness, ticket, dry-run, and live-safety gates when a signal exists. If no fresh matching signal exists, it returns `WAITING_FOR_FRESH_PROMOTED_SIGNAL`. R42 is preflight/reporting only: it does not place orders, does not enable live execution, and does not create signed payloads. Fresh signal approval still requires exact `LIVE APPROVE <signal_id>` and all safety gates. Development can proceed without a fresh signal; execution cannot.
+
 The live credential env file is expected at:
 
 ```text
@@ -282,7 +293,7 @@ HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true
 ```
 
-Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40/R41 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
+Before any future live API use, the desktop public IP should be allowlisted in Binance API Management. R38/R39/R40/R41/R42 do not submit orders, do not create signed order payloads, and only report whether key/secret variables are present.
 
 ## Hammer Radar Friday Manual Tiny-Live Protocol
 
