@@ -107,6 +107,11 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Strategy Promotion", html)
             self.assertIn("Promotion is review only.", html)
             self.assertIn("Execution remains disabled.", html)
+            self.assertIn("Live Preflight", html)
+            self.assertIn("Preflight only.", html)
+            self.assertIn("Exact LIVE APPROVE &lt;signal_id&gt; required later.", html)
+            self.assertIn("Recommendation/preflight only, not permission to execute.", html)
+            self.assertIn("No signed payloads.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)

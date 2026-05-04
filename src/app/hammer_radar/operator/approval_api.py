@@ -50,6 +50,12 @@ from src.app.hammer_radar.operator.live_approval import (
     live_approval_requests_path,
     load_live_approval_requests,
 )
+from src.app.hammer_radar.operator.live_preflight import (
+    build_promoted_strategy_preflight,
+    evaluate_and_record_live_preflight,
+    live_preflight_packs_path,
+    load_live_preflight_packs,
+)
 from src.app.hammer_radar.operator.live_connector_stub import (
     CONNECTOR_MODE,
     load_live_attempts,
@@ -544,6 +550,57 @@ def strategy_promotion_event_by_id(event_id: str) -> dict:
     return record
 
 
+@app.get("/live-preflight/promoted-strategy")
+def live_preflight_promoted_strategy() -> dict:
+    return build_promoted_strategy_preflight(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live-preflight/evaluate")
+def live_preflight_evaluate() -> dict:
+    return evaluate_and_record_live_preflight(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live-preflight/packs")
+def live_preflight_packs(
+    limit: int = Query(default=50, ge=0),
+    strategy_key: str | None = None,
+) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "execution_attempted": False,
+        "order_payload_created": False,
+        "secrets_shown": False,
+        "live_preflight_packs_path": str(live_preflight_packs_path(log_dir)),
+        "live_preflight_packs": load_live_preflight_packs(
+            limit=limit,
+            strategy_key=strategy_key,
+            log_dir=log_dir,
+        ),
+    }
+
+
+@app.get("/live-preflight/packs/{preflight_id}")
+def live_preflight_pack_by_id(preflight_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_live_preflight_packs(limit=0, preflight_id=preflight_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="live preflight pack not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["allow_live_orders"] = False
+    record["global_kill_switch"] = True
+    record["order_placed"] = ORDER_PLACED
+    record["execution_attempted"] = False
+    record["order_payload_created"] = False
+    record["secrets_shown"] = False
+    record["live_preflight_packs_path"] = str(live_preflight_packs_path(log_dir))
+    return record
+
+
 @app.post("/operator/parse-action")
 def operator_parse_action(request: OperatorParseActionRequest) -> dict:
     return parse_operator_action(request.text, signal_id=request.signal_id)
@@ -649,6 +706,7 @@ def operator_latest() -> dict:
     actions = load_operator_actions(limit=1, log_dir=log_dir)
     alerts = load_alert_records(limit=1, log_dir=log_dir)
     live_approval_requests = load_live_approval_requests(limit=1, log_dir=log_dir)
+    live_preflight_packs = load_live_preflight_packs(limit=1, log_dir=log_dir)
     latest_candidate = _latest_candidate_snapshot()
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -657,6 +715,7 @@ def operator_latest() -> dict:
         "order_placed": ORDER_PLACED,
         "latest_operator_action": actions[0] if actions else None,
         "latest_live_approval_request": live_approval_requests[0] if live_approval_requests else None,
+        "latest_live_preflight_pack": live_preflight_packs[0] if live_preflight_packs else None,
         "latest_alert": alerts[0] if alerts else None,
         "latest_candidate": latest_candidate,
     }
@@ -1092,7 +1151,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .strategy-promotion, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -1317,6 +1376,25 @@ def _operator_ui_html() -> str:
       </div>
       <p><strong>Top near-promotion:</strong> <span id="promotionNearTop">loading</span></p>
       <p><strong>Top eligible:</strong> <span id="promotionReadyTop">loading</span></p>
+    </section>
+
+    <h2>Live Preflight</h2>
+    <section id="livePreflight" class="live-preflight blocked">
+      <div class="grid">
+        <div><div class="label">mode</div><div class="value danger">Preflight only.</div></div>
+        <div><div class="label">live orders</div><div class="value danger">No live orders.</div></div>
+        <div><div class="label">approval command</div><div class="value danger">Exact LIVE APPROVE &lt;signal_id&gt; required later.</div></div>
+        <div><div class="label">execution</div><div class="value danger">Execution remains disabled.</div></div>
+        <div><div class="label">preflight_status</div><div id="preflightStatus" class="value danger">loading</div></div>
+        <div><div class="label">promoted strategy ready</div><div id="preflightPromotedReady" class="value">loading</div></div>
+        <div><div class="label">fresh matching signal</div><div id="preflightSignalFound" class="value">loading</div></div>
+        <div><div class="label">latest pack</div><div id="preflightLatest" class="value mono">loading</div></div>
+      </div>
+      <p><strong>Strategy:</strong> <span id="preflightStrategy">loading</span></p>
+      <p><strong>Candidate signal:</strong> <span id="preflightSignal" class="mono">loading</span></p>
+      <p><strong>Next action:</strong> <span id="preflightNextAction">loading</span></p>
+      <p class="muted">Recommendation/preflight only, not permission to execute.</p>
+      <p class="muted">No signed payloads.</p>
     </section>
 
     <h2>Notification Watcher</h2>
@@ -1549,6 +1627,7 @@ async function refreshAll() {
   await loadBinanceReadonlyStatus();
   await loadStrategyPerformance();
   await loadStrategyPromotion();
+  await loadLivePreflight();
   await loadNotificationStatus();
   await loadAltWatchlist();
   await loadMultiSymbolSummary();
@@ -1772,6 +1851,21 @@ async function loadStrategyPromotion() {
   document.getElementById('promotionLatest').textContent = latest.event_id || 'none';
   document.getElementById('promotionNearTop').textContent = formatRow(near[0] || {});
   document.getElementById('promotionReadyTop').textContent = formatRow(ready[0] || {});
+}
+
+async function loadLivePreflight() {
+  const res = await fetch('/live-preflight/promoted-strategy');
+  const data = await res.json();
+  const packsRes = await fetch('/live-preflight/packs?limit=1');
+  const packsData = await packsRes.json();
+  const latest = (packsData.live_preflight_packs || [])[0] || {};
+  document.getElementById('preflightStatus').textContent = data.preflight_status || 'UNKNOWN';
+  document.getElementById('preflightPromotedReady').textContent = String(data.promoted_strategy_ready === true);
+  document.getElementById('preflightSignalFound').textContent = String(data.matching_fresh_signal_found === true);
+  document.getElementById('preflightLatest').textContent = latest.preflight_id || 'none';
+  document.getElementById('preflightStrategy').textContent = data.strategy_key || 'none';
+  document.getElementById('preflightSignal').textContent = data.candidate_signal_id || 'none';
+  document.getElementById('preflightNextAction').textContent = data.operator_next_action || 'n/a';
 }
 
 async function loadNotificationStatus() {
