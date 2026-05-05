@@ -17,17 +17,24 @@ from src.app.hammer_radar.execution.binance_futures_connector import (
     TEST_ORDER_ENDPOINT,
     TEST_ORDER_ONLY,
     append_connector_attempt,
+    append_protective_attempt,
     build_canonical_query,
     build_connector_status,
+    build_protective_status,
+    build_signed_protective_order_requests,
     build_signed_live_order_request,
     build_signed_test_order_request,
     connector_attempts_path,
     execute_live_order,
     load_connector_attempts,
+    load_protective_attempts,
     preview_payload,
+    protective_attempts_path,
+    protective_preview,
     sanitize_headers,
     sanitize_signed_params,
     sign_query,
+    submit_protective_test,
     submit_test_order,
 )
 from src.app.hammer_radar.operator.approval_api import app
@@ -65,6 +72,27 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertTrue(payload["live_order_default_blocked"])
         self.assertFalse(payload["live_order_adapter_configured"])
         self.assertFalse(payload["protective_orders_supported"])
+        self.assertTrue(payload["protective_orders_required"])
+        self.assertFalse(payload["protective_orders_ready"])
+        self.assertEqual("PREVIEW_ONLY", payload["protective_order_mode"])
+
+    def test_protective_status_defaults_to_required_preview_only_and_not_ready(self) -> None:
+        payload = build_protective_status(env={}, log_dir=self.log_dir)
+
+        self.assertTrue(payload["protective_orders_required"])
+        self.assertFalse(payload["protective_orders_enabled"])
+        self.assertEqual("PREVIEW_ONLY", payload["protective_order_mode"])
+        self.assertFalse(payload["protective_orders_supported"])
+        self.assertFalse(payload["protective_stop_supported"])
+        self.assertFalse(payload["protective_take_profit_supported"])
+        self.assertFalse(payload["protective_orders_ready"])
+        self.assertTrue(payload["protective_orders_default_blocked"])
+        self.assertEqual("/fapi/v1/order", payload["protective_order_endpoint"])
+        self.assertFalse(payload["protective_orders_atomic"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["protective_orders_sent"])
+        self.assertFalse(payload["secrets_shown"])
 
     def test_status_shows_key_presence_booleans_only_and_no_secrets(self) -> None:
         payload = build_connector_status(
@@ -131,6 +159,106 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertFalse(preview["sent"])
         self.assertFalse(preview["signed"])
         self.assertNotIn("signature", preview)
+
+    def test_protective_preview_blocked_with_no_fresh_promoted_preflight(self) -> None:
+        payload = protective_preview(env={}, log_dir=self.log_dir)
+
+        self.assertEqual("BLOCKED", payload["status"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["protective_orders_sent"])
+        self.assertIn("promoted strategy is not ready", payload["blockers"])
+
+    def test_protective_preview_builds_sanitized_stop_and_take_profit_for_long(self) -> None:
+        payload = protective_preview(preflight_pack=self._ready_pack(), env={}, log_dir=self.log_dir)
+        stop = payload["sanitized_stop_order_preview"]
+        take_profit = payload["sanitized_take_profit_order_preview"]
+
+        self.assertEqual("PROTECTIVE_PREVIEW_CREATED", payload["status"])
+        self.assertTrue(payload["order_payload_created"])
+        self.assertTrue(payload["stop_order_payload_created"])
+        self.assertTrue(payload["take_profit_order_payload_created"])
+        self.assertFalse(payload["signed_payload_created"])
+        self.assertFalse(payload["protective_orders_sent"])
+        self.assertEqual("SELL", stop["side"])
+        self.assertEqual("SELL", take_profit["side"])
+        self.assertEqual("STOP_MARKET", stop["order_type"])
+        self.assertEqual("TAKE_PROFIT_MARKET", take_profit["order_type"])
+        self.assertEqual(95.0, stop["stopPrice"])
+        self.assertEqual(105.0, take_profit["stopPrice"])
+        self.assertTrue(stop["reduce_only"])
+        self.assertTrue(take_profit["reduce_only"])
+        self.assertFalse(stop["signature_present"])
+        self.assertFalse(take_profit["signature_present"])
+
+    def test_signed_protective_requests_are_sanitized(self) -> None:
+        preview = protective_preview(preflight_pack=self._ready_pack(), env={}, log_dir=self.log_dir, persist=False)
+        signed = build_signed_protective_order_requests(
+            preview["sanitized_stop_order_preview"],
+            preview["sanitized_take_profit_order_preview"],
+            signal_id="BTCUSDT|13m|long|ready",
+            config={"base_url": "https://fapi.binance.com", "recv_window": 5000},
+            source={"BINANCE_API_KEY": "key-value", "BINANCE_API_SECRET": "secret-value"},
+            timestamp_ms=1700000000000,
+        )
+        sanitized = [sanitize_signed_params(request["params"]) for request in signed]
+
+        self.assertEqual([REAL_ORDER_ENDPOINT, REAL_ORDER_ENDPOINT], [request["endpoint"] for request in signed])
+        self.assertEqual("STOP_MARKET", signed[0]["params"]["type"])
+        self.assertEqual("TAKE_PROFIT_MARKET", signed[1]["params"]["type"])
+        self.assertEqual("<hidden>", sanitized[0]["signature"])
+        self.assertEqual("<hidden>", sanitized[1]["signature"])
+        self.assertNotIn("secret-value", str(sanitized))
+
+    def test_protective_test_blocked_by_default(self) -> None:
+        payload = submit_protective_test(preflight_pack=self._ready_pack(), env={}, log_dir=self.log_dir)
+
+        self.assertEqual("BLOCKED", payload["status"])
+        self.assertFalse(payload["signed_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_placed"])
+        self.assertIn("protective_order_mode must be TEST_ONLY for protective test", payload["blockers"])
+        self.assertIn("HAMMER_PROTECTIVE_ORDERS_ENABLED is false", payload["blockers"])
+
+    def test_protective_mock_test_succeeds_with_explicit_mock_and_valid_pack(self) -> None:
+        payload = submit_protective_test(
+            preflight_pack=self._ready_pack(),
+            env=self._protective_test_env(),
+            log_dir=self.log_dir,
+            use_mock_adapter=True,
+        )
+
+        self.assertEqual("PROTECTIVE_TEST_MOCK_VALIDATED", payload["status"])
+        self.assertTrue(payload["signed_payload_created"])
+        self.assertTrue(payload["execution_attempted"])
+        self.assertFalse(payload["network_used"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["protective_orders_sent"])
+        self.assertEqual("<hidden>", payload["sanitized_signed_requests"][0]["params"]["signature"])
+        self.assertEqual("<present>", payload["sanitized_signed_requests"][0]["headers"]["X-MBX-APIKEY"])
+        self.assertNotIn("secret-value", str(payload))
+
+    def test_protective_attempts_are_persisted_and_duplicate_success_is_blocked(self) -> None:
+        first = submit_protective_test(
+            preflight_pack=self._ready_pack(),
+            env=self._protective_test_env(),
+            log_dir=self.log_dir,
+            use_mock_adapter=True,
+        )
+        duplicate = submit_protective_test(
+            preflight_pack=self._ready_pack(),
+            env=self._protective_test_env(),
+            log_dir=self.log_dir,
+            use_mock_adapter=True,
+        )
+        records = load_protective_attempts(limit=10, log_dir=self.log_dir)
+
+        self.assertEqual("PROTECTIVE_TEST_MOCK_VALIDATED", first["status"])
+        self.assertEqual("BLOCKED", duplicate["status"])
+        self.assertIn("protective orders already recorded for signal_id BTCUSDT|13m|long|ready", duplicate["blockers"])
+        self.assertTrue(protective_attempts_path(self.log_dir).exists())
+        self.assertEqual(2, len(records))
+        self.assertFalse(records[0]["secrets_shown"])
 
     def test_test_order_endpoint_blocked_by_default(self) -> None:
         payload = submit_test_order(preflight_pack=self._ready_pack(), env={}, log_dir=self.log_dir)
@@ -321,7 +449,7 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertIn("successful test-order is required before live execute", payload["blockers"])
         self.assertFalse(payload["order_placed"])
 
-    def test_execute_blocks_if_protective_order_path_not_implemented(self) -> None:
+    def test_execute_blocks_if_protective_order_path_not_ready(self) -> None:
         self._append_exact_approval("BTCUSDT|13m|long|ready")
         self._append_test_order_validated("BTCUSDT|13m|long|ready")
 
@@ -331,7 +459,11 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
             log_dir=self.log_dir,
         )
 
-        self.assertIn("protective stop/take-profit live order path not implemented", payload["blockers"])
+        self.assertIn("protective stop/take-profit live order path not ready", payload["blockers"])
+        self.assertTrue(payload["protective_orders_required"])
+        self.assertFalse(payload["protective_orders_ready"])
+        self.assertFalse(payload["protective_orders_sent"])
+        self.assertTrue(payload["naked_entry_blocked"])
         self.assertFalse(payload["order_placed"])
 
     def test_mock_live_adapter_success_only_when_all_mocked_gates_pass(self) -> None:
@@ -427,8 +559,12 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         status = self.client.get("/binance-live/connector-status")
         preview = self.client.post("/binance-live/payload-preview", json={})
         test_order = self.client.post("/binance-live/test-order", json={})
+        protective_status = self.client.get("/binance-live/protective-status")
+        protective_preview_response = self.client.post("/binance-live/protective-preview", json={})
+        protective_test = self.client.post("/binance-live/protective-test", json={})
         execute = self.client.post("/binance-live/execute", json={})
         attempts = self.client.get("/binance-live/connector-attempts")
+        protective_attempts = self.client.get("/binance-live/protective-attempts")
 
         self.assertEqual(200, status.status_code)
         self.assertEqual(DRY_RUN_ONLY, status.json()["connector_mode"])
@@ -438,15 +574,28 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertTrue(status.json()["live_order_default_blocked"])
         self.assertFalse(status.json()["live_order_adapter_configured"])
         self.assertFalse(status.json()["protective_orders_supported"])
+        self.assertTrue(status.json()["protective_orders_required"])
+        self.assertFalse(status.json()["protective_orders_ready"])
         self.assertEqual(200, preview.status_code)
         self.assertEqual("BLOCKED", preview.json()["status"])
         self.assertEqual(200, test_order.status_code)
         self.assertEqual("BLOCKED", test_order.json()["status"])
+        self.assertEqual(200, protective_status.status_code)
+        self.assertTrue(protective_status.json()["protective_orders_required"])
+        self.assertFalse(protective_status.json()["protective_orders_ready"])
+        self.assertEqual("PREVIEW_ONLY", protective_status.json()["protective_order_mode"])
+        self.assertEqual(200, protective_preview_response.status_code)
+        self.assertEqual("BLOCKED", protective_preview_response.json()["status"])
+        self.assertEqual(200, protective_test.status_code)
+        self.assertEqual("BLOCKED", protective_test.json()["status"])
         self.assertEqual(200, execute.status_code)
         self.assertFalse(execute.json()["order_placed"])
         self.assertFalse(execute.json()["real_order_placed"])
+        self.assertTrue(execute.json()["naked_entry_blocked"])
         self.assertEqual(200, attempts.status_code)
         self.assertFalse(attempts.json()["secrets_shown"])
+        self.assertEqual(200, protective_attempts.status_code)
+        self.assertFalse(protective_attempts.json()["secrets_shown"])
 
     def test_api_test_order_returns_safe_fields(self) -> None:
         response = self.client.post("/binance-live/test-order", json={"use_mock_adapter": True})
@@ -550,6 +699,16 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
     def _test_order_env() -> dict[str, str]:
         return {
             "HAMMER_BINANCE_CONNECTOR_MODE": TEST_ORDER_ONLY,
+            "BINANCE_API_KEY": "key-value",
+            "BINANCE_API_SECRET": "secret-value",
+        }
+
+    @staticmethod
+    def _protective_test_env() -> dict[str, str]:
+        return {
+            "HAMMER_BINANCE_CONNECTOR_MODE": LIVE_ORDER_ENABLED,
+            "HAMMER_PROTECTIVE_ORDERS_ENABLED": "true",
+            "HAMMER_PROTECTIVE_ORDER_MODE": "TEST_ONLY",
             "BINANCE_API_KEY": "key-value",
             "BINANCE_API_SECRET": "secret-value",
         }

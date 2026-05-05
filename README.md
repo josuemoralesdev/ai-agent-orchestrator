@@ -301,6 +301,17 @@ POST /fapi/v1/order
 
 R45 remains default-blocked and safe to merge with production switches off. It does not trade random altcoins, shorts, wrong timeframes, or non-promoted strategies. Live execute requires exact `LIVE APPROVE <signal_id>`, a fresh promoted BTCUSDT 13m long signal, valid preflight, successful prior test-order when required, one-trade locks, isolated margin, 44 USDT max, and 3x max. R45 blocks if the protective stop/take-profit live order path is not implemented, so it should not place naked live entries. The test endpoint remains `POST /fapi/v1/order/test`; the real endpoint is prepared only behind explicit gates.
 
+R46 adds the protective order safety harness:
+
+```text
+GET /binance-live/protective-status
+POST /binance-live/protective-preview
+POST /binance-live/protective-test
+GET /binance-live/protective-attempts
+```
+
+R46 keeps `HAMMER_PROTECTIVE_ORDERS_REQUIRED=true` by default, `HAMMER_PROTECTIVE_ORDERS_ENABLED=false` by default, and `HAMMER_PROTECTIVE_ORDER_MODE=PREVIEW_ONLY` by default. Protective stop-loss and take-profit handling is required before live entry can be allowed. The harness can build sanitized stop-loss and take-profit previews for the promoted BTCUSDT 13m long ticket, and mock protective validation is explicit. Real protective orders are not sent by default, no naked live entries are allowed, and `/binance-live/execute` remains blocked with `protective stop/take-profit live order path not ready` when the protective path is not ready. Option A is a future explicitly enabled protective path; Option B is the current safe behavior: block live entry if protective stop/take-profit cannot be guaranteed.
+
 The live credential env file is expected at:
 
 ```text

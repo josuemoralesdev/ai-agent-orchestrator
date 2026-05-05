@@ -18,10 +18,15 @@ from pydantic import BaseModel, Field
 
 from src.app.hammer_radar.execution.binance_futures_connector import (
     build_connector_status,
+    build_protective_status,
     connector_attempts_path,
     execute_live_order,
     load_connector_attempts,
+    load_protective_attempts,
     preview_payload,
+    protective_attempts_path,
+    protective_preview,
+    submit_protective_test,
     submit_test_order,
 )
 from src.app.hammer_radar.operator.alt_watchlist import build_watchlist, build_watchlist_summary
@@ -251,6 +256,10 @@ class BinanceLiveExecuteRequest(BaseModel):
     require_protective_orders: bool = True
 
 
+class BinanceProtectiveRequest(BaseModel):
+    use_mock_adapter: bool = False
+
+
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
 
 
@@ -470,6 +479,22 @@ def binance_live_test_order(request: BinanceLiveTestOrderRequest | None = None) 
     )
 
 
+@app.get("/binance-live/protective-status")
+def binance_live_protective_status() -> dict:
+    return build_protective_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/binance-live/protective-preview")
+def binance_live_protective_preview() -> dict:
+    return protective_preview(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/binance-live/protective-test")
+def binance_live_protective_test(request: BinanceProtectiveRequest | None = None) -> dict:
+    request = request or BinanceProtectiveRequest()
+    return submit_protective_test(log_dir=get_log_dir(use_env=True), use_mock_adapter=request.use_mock_adapter)
+
+
 @app.post("/binance-live/execute")
 def binance_live_execute(request: BinanceLiveExecuteRequest | None = None) -> dict:
     request = request or BinanceLiveExecuteRequest()
@@ -496,6 +521,29 @@ def binance_live_connector_attempts(limit: int = Query(default=50, ge=0), signal
         "secrets_shown": False,
         "binance_live_connector_attempts_path": str(connector_attempts_path(log_dir)),
         "binance_live_connector_attempts": load_connector_attempts(
+            limit=limit,
+            signal_id=signal_id,
+            log_dir=log_dir,
+        ),
+    }
+
+
+@app.get("/binance-live/protective-attempts")
+def binance_live_protective_attempts(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "protective_orders_sent": False,
+        "execution_attempted": False,
+        "order_payload_created": False,
+        "signed_payload_created": False,
+        "secrets_shown": False,
+        "binance_protective_order_attempts_path": str(protective_attempts_path(log_dir)),
+        "binance_protective_order_attempts": load_protective_attempts(
             limit=limit,
             signal_id=signal_id,
             log_dir=log_dir,
@@ -1417,6 +1465,10 @@ def _operator_ui_html() -> str:
         <div><div class="label">signing_available</div><div id="binanceLiveConnectorSigning" class="value">false</div></div>
         <div><div class="label">live_order_adapter_configured</div><div id="binanceLiveConnectorAdapter" class="value danger">false</div></div>
         <div><div class="label">protective_orders_supported</div><div id="binanceLiveConnectorProtective" class="value danger">false</div></div>
+        <div><div class="label">protective_orders_required</div><div id="binanceLiveConnectorProtectiveRequired" class="value danger">true</div></div>
+        <div><div class="label">protective_orders_ready</div><div id="binanceLiveConnectorProtectiveReady" class="value danger">false</div></div>
+        <div><div class="label">protective_order_mode</div><div id="binanceLiveConnectorProtectiveMode" class="value danger">PREVIEW_ONLY</div></div>
+        <div><div class="label">protective stop/take-profit</div><div id="binanceLiveConnectorProtectiveTypes" class="value mono">STOP_MARKET / TAKE_PROFIT_MARKET</div></div>
         <div><div class="label">real_live_endpoint_prepared</div><div id="binanceLiveConnectorRealEndpoint" class="value">false</div></div>
         <div><div class="label">live_execution_enabled</div><div id="binanceLiveConnectorLive" class="value danger">false</div></div>
         <div><div class="label">allow_live_orders</div><div id="binanceLiveConnectorAllow" class="value danger">false</div></div>
@@ -1434,6 +1486,8 @@ def _operator_ui_html() -> str:
       <p class="muted">Secrets and signatures are hidden.</p>
       <p class="muted">Default blocked.</p>
       <p class="muted">No naked live entries.</p>
+      <p class="muted">Protective stop and take-profit required.</p>
+      <p class="muted">Secrets/signatures hidden.</p>
       <p class="muted">No random altcoins / no shorts / no vague commands.</p>
     </section>
 
@@ -1935,6 +1989,8 @@ async function loadBinanceLiveConnector() {
   const status = await statusRes.json();
   const attemptsRes = await fetch('/binance-live/connector-attempts?limit=1');
   const attempts = await attemptsRes.json();
+  const protectiveRes = await fetch('/binance-live/protective-status');
+  const protective = await protectiveRes.json();
   const latest = (attempts.binance_live_connector_attempts || [])[0] || {};
   document.getElementById('binanceLiveConnectorMode').textContent = status.connector_mode || 'DRY_RUN_ONLY';
   document.getElementById('binanceLiveConnectorReadiness').textContent = status.readiness || 'BLOCKED';
@@ -1944,6 +2000,10 @@ async function loadBinanceLiveConnector() {
   document.getElementById('binanceLiveConnectorSigning').textContent = String(status.signing_available === true);
   document.getElementById('binanceLiveConnectorAdapter').textContent = String(status.live_order_adapter_configured === true);
   document.getElementById('binanceLiveConnectorProtective').textContent = String(status.protective_orders_supported === true);
+  document.getElementById('binanceLiveConnectorProtectiveRequired').textContent = String(protective.protective_orders_required === true);
+  document.getElementById('binanceLiveConnectorProtectiveReady').textContent = String(protective.protective_orders_ready === true);
+  document.getElementById('binanceLiveConnectorProtectiveMode').textContent = protective.protective_order_mode || 'PREVIEW_ONLY';
+  document.getElementById('binanceLiveConnectorProtectiveTypes').textContent = `${protective.protective_stop_order_type || 'STOP_MARKET'} / ${protective.protective_take_profit_order_type || 'TAKE_PROFIT_MARKET'}`;
   document.getElementById('binanceLiveConnectorRealEndpoint').textContent = String(status.real_live_endpoint_prepared === true);
   document.getElementById('binanceLiveConnectorLive').textContent = String(status.live_execution_enabled === true);
   document.getElementById('binanceLiveConnectorAllow').textContent = String(status.allow_live_orders === true);
