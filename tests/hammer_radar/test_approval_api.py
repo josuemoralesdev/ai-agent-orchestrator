@@ -120,6 +120,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Test order only. No matching-engine submission.", html)
             self.assertIn("No real orders.", html)
             self.assertIn("Secrets and signatures are hidden.", html)
+            self.assertIn("Default blocked.", html)
+            self.assertIn("No naked live entries.", html)
+            self.assertIn("No random altcoins / no shorts / no vague commands.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|1"), log_dir=self.log_dir)

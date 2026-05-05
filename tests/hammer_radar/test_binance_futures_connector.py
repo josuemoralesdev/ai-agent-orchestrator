@@ -13,11 +13,13 @@ from src.app.hammer_radar.execution.binance_futures_connector import (
     LIVE_ORDER_ENABLED,
     PREFLIGHT_READY_BUT_EXECUTION_DISABLED,
     PROMOTED_STRATEGY_KEY,
+    REAL_ORDER_ENDPOINT,
     TEST_ORDER_ENDPOINT,
     TEST_ORDER_ONLY,
     append_connector_attempt,
     build_canonical_query,
     build_connector_status,
+    build_signed_live_order_request,
     build_signed_test_order_request,
     connector_attempts_path,
     execute_live_order,
@@ -59,6 +61,10 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertFalse(payload["order_payload_created"])
         self.assertFalse(payload["signed_payload_created"])
         self.assertFalse(payload["test_order_network_enabled"])
+        self.assertTrue(payload["real_live_endpoint_prepared"])
+        self.assertTrue(payload["live_order_default_blocked"])
+        self.assertFalse(payload["live_order_adapter_configured"])
+        self.assertFalse(payload["protective_orders_supported"])
 
     def test_status_shows_key_presence_booleans_only_and_no_secrets(self) -> None:
         payload = build_connector_status(
@@ -227,6 +233,13 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertFalse(payload["execution_attempted"])
         self.assertIn("connector_mode must be LIVE_ORDER_ENABLED", payload["blockers"])
 
+    def test_execute_blocked_in_test_order_only(self) -> None:
+        payload = execute_live_order(preflight_pack=self._ready_pack(), env=self._test_order_env(), log_dir=self.log_dir)
+
+        self.assertEqual("BLOCKED", payload["status"])
+        self.assertIn("connector_mode must be LIVE_ORDER_ENABLED", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+
     def test_execute_blocks_live_switches_and_kill_switch_individually(self) -> None:
         cases = [
             ({"HAMMER_LIVE_EXECUTION_ENABLED": "false"}, "live_execution_enabled is false"),
@@ -255,11 +268,25 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertFalse(no_approval["order_placed"])
         self.assertFalse(wrong_approval["order_placed"])
 
+    def test_execute_blocks_requested_signal_id_mismatch(self) -> None:
+        self._append_exact_approval("BTCUSDT|13m|long|ready")
+
+        payload = execute_live_order(
+            preflight_pack=self._ready_pack(),
+            env=self._enabled_env(),
+            log_dir=self.log_dir,
+            signal_id="BTCUSDT|13m|long|other",
+        )
+
+        self.assertIn("requested signal_id does not match current preflight signal_id", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+
     def test_execute_blocks_wrong_symbol_short_wrong_timeframe_and_risk_overrides(self) -> None:
         cases = [
             (self._ready_pack(symbol="ETHUSDT"), self._enabled_env(), "symbol must be BTCUSDT"),
             (self._ready_pack(direction="short"), self._enabled_env(), "direction must be long"),
             (self._ready_pack(timeframe="44m"), self._enabled_env(), "timeframe must be 13m"),
+            (self._ready_pack(strategy_key="ETHUSDT|13m|long|ladder_close_50_618"), self._enabled_env(), "strategy_key must be BTCUSDT|13m|long|ladder_close_50_618"),
             (self._ready_pack(), {**self._enabled_env(), "HAMMER_LIVE_MAX_POSITION_USD": "45"}, "HAMMER_LIVE_MAX_POSITION_USD exceeds 44"),
             (self._ready_pack(), {**self._enabled_env(), "HAMMER_LIVE_MAX_LEVERAGE": "4"}, "HAMMER_LIVE_MAX_LEVERAGE exceeds 3"),
             (self._ready_pack(), {**self._enabled_env(), "HAMMER_LIVE_MARGIN_MODE": "cross"}, "HAMMER_LIVE_MARGIN_MODE must be isolated"),
@@ -273,6 +300,81 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
                 self.assertEqual("BLOCKED", payload["status"])
                 self.assertIn(blocker, payload["blockers"])
                 self.assertFalse(payload["order_placed"])
+
+    def test_execute_blocks_without_fresh_promoted_preflight(self) -> None:
+        payload = execute_live_order(preflight_pack={"preflight_status": "NO_PROMOTED_STRATEGY"}, env=self._enabled_env(), log_dir=self.log_dir)
+
+        self.assertIn("promoted strategy is not ready", payload["blockers"])
+        self.assertIn("no fresh promoted signal is available", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_execute_blocks_if_test_order_required_but_not_validated(self) -> None:
+        self._append_exact_approval("BTCUSDT|13m|long|ready")
+
+        payload = execute_live_order(
+            preflight_pack=self._ready_pack(live_safety_status="PASS"),
+            env=self._enabled_env(),
+            log_dir=self.log_dir,
+            require_protective_orders=False,
+        )
+
+        self.assertIn("successful test-order is required before live execute", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_execute_blocks_if_protective_order_path_not_implemented(self) -> None:
+        self._append_exact_approval("BTCUSDT|13m|long|ready")
+        self._append_test_order_validated("BTCUSDT|13m|long|ready")
+
+        payload = execute_live_order(
+            preflight_pack=self._ready_pack(live_safety_status="PASS"),
+            env=self._enabled_env(),
+            log_dir=self.log_dir,
+        )
+
+        self.assertIn("protective stop/take-profit live order path not implemented", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_mock_live_adapter_success_only_when_all_mocked_gates_pass(self) -> None:
+        self._append_exact_approval("BTCUSDT|13m|long|ready")
+        self._append_test_order_validated("BTCUSDT|13m|long|ready")
+
+        payload = execute_live_order(
+            preflight_pack=self._ready_pack(live_safety_status="PASS"),
+            env=self._enabled_env(),
+            log_dir=self.log_dir,
+            use_mock_adapter=True,
+            require_protective_orders=False,
+        )
+
+        self.assertEqual("LIVE_ORDER_MOCK_PLACED", payload["status"])
+        self.assertTrue(payload["signed_payload_created"])
+        self.assertTrue(payload["execution_attempted"])
+        self.assertTrue(payload["order_placed"])
+        self.assertTrue(payload["mock_order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["network_used"])
+        self.assertEqual(REAL_ORDER_ENDPOINT, payload["sanitized_signed_request"]["endpoint"])
+        self.assertEqual("<hidden>", payload["sanitized_signed_request"]["params"]["signature"])
+
+    def test_live_signed_request_uses_real_order_endpoint_and_sanitizes(self) -> None:
+        preview = preview_payload(preflight_pack=self._ready_pack(), env={}, log_dir=self.log_dir, persist=False)[
+            "payload_preview"
+        ]
+
+        signed = build_signed_live_order_request(
+            preview,
+            signal_id="BTCUSDT|13m|long|ready",
+            config={"base_url": "https://fapi.binance.com", "recv_window": 5000},
+            source={"BINANCE_API_KEY": "key-value", "BINANCE_API_SECRET": "secret-value"},
+            timestamp_ms=1700000000000,
+        )
+        sanitized = sanitize_signed_params(signed["params"])
+
+        self.assertEqual(REAL_ORDER_ENDPOINT, signed["endpoint"])
+        self.assertEqual("LIMIT", signed["params"]["type"])
+        self.assertIn("newClientOrderId", signed["params"])
+        self.assertEqual("<hidden>", sanitized["signature"])
+        self.assertNotIn("secret-value", str(sanitized))
 
     def test_execute_blocks_duplicate_signal_id_and_second_live_order_today(self) -> None:
         self._append_live_sent_attempt(signal_id="BTCUSDT|13m|long|ready")
@@ -332,12 +434,17 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         self.assertEqual(DRY_RUN_ONLY, status.json()["connector_mode"])
         self.assertFalse(status.json()["test_order_network_enabled"])
         self.assertFalse(status.json()["signing_available"])
+        self.assertTrue(status.json()["real_live_endpoint_prepared"])
+        self.assertTrue(status.json()["live_order_default_blocked"])
+        self.assertFalse(status.json()["live_order_adapter_configured"])
+        self.assertFalse(status.json()["protective_orders_supported"])
         self.assertEqual(200, preview.status_code)
         self.assertEqual("BLOCKED", preview.json()["status"])
         self.assertEqual(200, test_order.status_code)
         self.assertEqual("BLOCKED", test_order.json()["status"])
         self.assertEqual(200, execute.status_code)
         self.assertFalse(execute.json()["order_placed"])
+        self.assertFalse(execute.json()["real_order_placed"])
         self.assertEqual(200, attempts.status_code)
         self.assertFalse(attempts.json()["secrets_shown"])
 
@@ -385,12 +492,44 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
                 "order_payload_created": True,
                 "execution_attempted": True,
                 "order_placed": True,
+                "real_order_placed": True,
+                "mock_order_placed": False,
                 "live_execution_enabled": True,
                 "allow_live_orders": True,
                 "global_kill_switch": False,
                 "secrets_shown": False,
                 "payload_preview": None,
                 "exchange_response": {"order_placed": True},
+            },
+            log_dir=self.log_dir,
+        )
+
+    def _append_test_order_validated(self, signal_id: str) -> None:
+        append_connector_attempt(
+            {
+                "attempt_id": f"test-order-{signal_id}",
+                "created_at": datetime.now(UTC).isoformat(),
+                "endpoint": "test_order",
+                "action": "test_order",
+                "connector_mode": TEST_ORDER_ONLY,
+                "signal_id": signal_id,
+                "preflight_id": "preflight-ready",
+                "status": "TEST_ORDER_MOCK_VALIDATED",
+                "blockers": [],
+                "network_used": False,
+                "order_payload_created": True,
+                "signed_payload_created": True,
+                "execution_attempted": True,
+                "order_placed": False,
+                "real_order_placed": False,
+                "mock_order_placed": False,
+                "live_execution_enabled": False,
+                "allow_live_orders": False,
+                "global_kill_switch": True,
+                "secrets_shown": False,
+                "payload_preview": None,
+                "sanitized_signed_request": None,
+                "exchange_response": {"validated": True},
             },
             log_dir=self.log_dir,
         )
@@ -422,19 +561,21 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
         symbol: str = "BTCUSDT",
         timeframe: str = "13m",
         direction: str = "long",
+        strategy_key: str = PROMOTED_STRATEGY_KEY,
+        live_safety_status: str = "BLOCKED",
     ) -> dict:
         return {
             "preflight_id": "preflight-ready",
             "preflight_status": PREFLIGHT_READY_BUT_EXECUTION_DISABLED,
             "promoted_strategy_ready": True,
             "matching_fresh_signal_found": True,
-            "strategy_key": PROMOTED_STRATEGY_KEY,
+            "strategy_key": strategy_key,
             "candidate_signal_id": signal_id,
             "signal_id": signal_id,
             "readiness_status": "READY",
             "ticket_status": "PROPOSED",
             "dry_run_status": "VALID",
-            "live_safety_status": "BLOCKED",
+            "live_safety_status": live_safety_status,
             "candidate": {
                 "signal_id": signal_id,
                 "symbol": symbol,

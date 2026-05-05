@@ -75,6 +75,11 @@ class SignedTestOrderAdapter(Protocol):
         """Send a signed Binance USD-M Futures test-order request."""
 
 
+class SignedLiveOrderAdapter(Protocol):
+    def send_live_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        """Send a signed Binance USD-M Futures live order request."""
+
+
 class MockSignedTestOrderAdapter:
     def send_test_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -83,6 +88,19 @@ class MockSignedTestOrderAdapter:
             "network_used": False,
             "order_placed": False,
             "validated": True,
+        }
+
+
+class MockSignedLiveOrderAdapter:
+    def send_live_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "mock_adapter": True,
+            "endpoint": signed_request.get("endpoint"),
+            "network_used": False,
+            "order_placed": True,
+            "real_order_placed": False,
+            "mock_order_placed": True,
+            "exchange_order_id": "mock_only",
         }
 
 
@@ -107,6 +125,33 @@ class BinanceFuturesHttpClient:
                 "endpoint": TEST_ORDER_ENDPOINT,
                 "network_used": True,
                 "order_placed": False,
+            }
+
+
+class BinanceFuturesLiveHttpClient:
+    """Explicit live-order client. It only targets /fapi/v1/order."""
+
+    def send_live_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        endpoint = signed_request.get("endpoint")
+        if endpoint != REAL_ORDER_ENDPOINT:
+            raise ValueError("R45 live adapter only permits Binance real order endpoint")
+        url = f"{signed_request['base_url'].rstrip('/')}{REAL_ORDER_ENDPOINT}"
+        query = signed_request["query_string"]
+        headers = dict(signed_request["headers"])
+        data = query.encode("utf-8")
+        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - explicit gated live endpoint
+            body = response.read().decode("utf-8")
+            payload = json.loads(body) if body else {}
+            return {
+                "status_code": response.status,
+                "body": payload,
+                "endpoint": REAL_ORDER_ENDPOINT,
+                "network_used": True,
+                "order_placed": True,
+                "real_order_placed": True,
+                "mock_order_placed": False,
+                "exchange_order_id": payload.get("orderId"),
             }
 
 
@@ -184,6 +229,11 @@ def _connector_status_from_config(config: dict[str, Any], *, log_dir: Path) -> d
         "base_url_host": _base_url_host(config["base_url"]),
         "recv_window": config["recv_window"],
         "signing_available": config["api_secret_present"],
+        "live_order_adapter_configured": False,
+        "protective_orders_supported": False,
+        "real_live_endpoint_prepared": True,
+        "real_order_endpoint": REAL_ORDER_ENDPOINT,
+        "live_order_default_blocked": True,
         "order_placed": False,
         "execution_attempted": False,
         "order_payload_created": False,
@@ -291,30 +341,66 @@ def execute_live_order(
     preflight_pack: dict[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
     log_dir: str | Path | None = None,
-    adapter: BinanceOrderAdapter | None = None,
+    signal_id: str | None = None,
+    use_mock_adapter: bool = False,
+    require_test_order_first: bool = True,
+    require_protective_orders: bool = True,
+    adapter: SignedLiveOrderAdapter | None = None,
     persist: bool = True,
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     source = os.environ if env is None else env
     config = _config(source)
     pack = preflight_pack or build_promoted_strategy_preflight(log_dir=resolved_log_dir)
+    if signal_id is not None and _signal_id(pack) != signal_id:
+        pack = dict(pack)
+        pack["requested_signal_id"] = signal_id
     payload, blockers = _payload_preview_from_pack(pack, config=config)
-    blockers.extend(_execute_blockers(pack, config=config, log_dir=resolved_log_dir))
-    if adapter is None:
+    exact_approval_found = _has_exact_approval(_signal_id(pack), log_dir=resolved_log_dir)
+    test_order_validated = _has_test_order_validated(_signal_id(pack), log_dir=resolved_log_dir)
+    protective_orders_ready = False
+    blockers.extend(
+        _execute_blockers(
+            pack,
+            config=config,
+            log_dir=resolved_log_dir,
+            requested_signal_id=signal_id,
+            exact_approval_found=exact_approval_found,
+            test_order_validated=test_order_validated,
+            require_test_order_first=require_test_order_first,
+            require_protective_orders=require_protective_orders,
+            protective_orders_ready=protective_orders_ready,
+        )
+    )
+    if adapter is None and not use_mock_adapter:
         blockers.append("live Binance order adapter is not configured")
 
     exchange_response = None
     network_used = False
     order_placed = False
+    real_order_placed = False
+    mock_order_placed = False
     execution_attempted = False
+    signed_request = None
+    signed_payload_created = False
     status = "BLOCKED"
-    if not blockers and payload is not None and adapter is not None:
+    if not blockers and payload is not None:
+        signed_request = build_signed_live_order_request(payload, signal_id=_signal_id(pack), config=config, source=source)
+        signed_payload_created = True
+        selected_adapter = adapter or MockSignedLiveOrderAdapter()
         execution_attempted = True
         try:
-            exchange_response = _sanitize_exchange_response(adapter.submit_order(payload))
+            exchange_response = _sanitize_exchange_response(selected_adapter.send_live_order(signed_request))
             network_used = bool(exchange_response.get("network_used"))
             order_placed = bool(exchange_response.get("order_placed"))
-            status = "LIVE_ORDER_SENT" if order_placed else "ERROR"
+            real_order_placed = bool(exchange_response.get("real_order_placed"))
+            mock_order_placed = bool(exchange_response.get("mock_order_placed"))
+            if real_order_placed:
+                status = "LIVE_ORDER_SENT"
+            elif mock_order_placed:
+                status = "LIVE_ORDER_MOCK_PLACED"
+            else:
+                status = "ERROR"
         except Exception as exc:  # pragma: no cover - defensive adapter boundary
             status = "ERROR"
             exchange_response = {"error": exc.__class__.__name__, "message": "adapter failed without exposing secrets"}
@@ -328,12 +414,19 @@ def execute_live_order(
         blockers=blockers,
         network_used=network_used,
         order_payload_created=payload is not None and not blockers,
-        signed_payload_created=False,
+        signed_payload_created=signed_payload_created,
         execution_attempted=execution_attempted,
         order_placed=order_placed,
+        real_order_placed=real_order_placed,
+        mock_order_placed=mock_order_placed,
         config=config,
         payload_preview=payload if payload is not None and not blockers else None,
+        signed_request=signed_request,
         exchange_response=exchange_response,
+        strategy_key=pack.get("strategy_key"),
+        exact_approval_found=exact_approval_found,
+        test_order_validated=test_order_validated,
+        protective_orders_ready=protective_orders_ready,
     )
     if persist:
         append_connector_attempt(record, log_dir=resolved_log_dir)
@@ -457,6 +550,49 @@ def build_signed_test_order_request(
     }
 
 
+def build_signed_live_order_request(
+    payload_preview: dict[str, Any],
+    *,
+    signal_id: str | None,
+    config: dict[str, Any],
+    source: Mapping[str, str],
+    timestamp_ms: int | None = None,
+) -> dict[str, Any]:
+    timestamp = timestamp_ms if timestamp_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+    params = {
+        "symbol": payload_preview["symbol"],
+        "side": payload_preview["side"],
+        "type": "LIMIT",
+        "timeInForce": "GTC",
+        "quantity": payload_preview["quantity"],
+        "price": payload_preview["price"],
+        "recvWindow": config["recv_window"],
+        "timestamp": timestamp,
+        "newClientOrderId": _client_order_id(signal_id),
+    }
+    query_without_signature = build_canonical_query(params)
+    signature = sign_query(query_without_signature, _env_value(source, ENV_API_SECRET))
+    signed_params = dict(params)
+    signed_params["signature"] = signature
+    query_string = build_canonical_query(signed_params)
+    headers = {
+        "X-MBX-APIKEY": _env_value(source, ENV_API_KEY),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    return {
+        "method": "POST",
+        "endpoint": REAL_ORDER_ENDPOINT,
+        "base_url": config["base_url"],
+        "base_url_host": _base_url_host(config["base_url"]),
+        "params": signed_params,
+        "query_string": query_string,
+        "headers": headers,
+        "signed": True,
+        "sent": False,
+        "order_placed": False,
+    }
+
+
 def _preflight_blockers(pack: dict[str, Any], *, config: dict[str, Any]) -> list[str]:
     candidate = pack.get("candidate") or {}
     blockers: list[str] = []
@@ -491,9 +627,22 @@ def _preflight_blockers(pack: dict[str, Any], *, config: dict[str, Any]) -> list
     return list(dict.fromkeys(blockers))
 
 
-def _execute_blockers(pack: dict[str, Any], *, config: dict[str, Any], log_dir: Path) -> list[str]:
+def _execute_blockers(
+    pack: dict[str, Any],
+    *,
+    config: dict[str, Any],
+    log_dir: Path,
+    requested_signal_id: str | None,
+    exact_approval_found: bool,
+    test_order_validated: bool,
+    require_test_order_first: bool,
+    require_protective_orders: bool,
+    protective_orders_ready: bool,
+) -> list[str]:
     signal_id = _signal_id(pack)
     blockers = []
+    if requested_signal_id is not None and requested_signal_id != signal_id:
+        blockers.append("requested signal_id does not match current preflight signal_id")
     if config["connector_mode"] != LIVE_ORDER_ENABLED:
         blockers.append("connector_mode must be LIVE_ORDER_ENABLED")
     if config["binance_live_enabled"] is not True:
@@ -506,8 +655,19 @@ def _execute_blockers(pack: dict[str, Any], *, config: dict[str, Any], log_dir: 
         blockers.append("global kill switch is active")
     if not config["api_key_present"] or not config["api_secret_present"]:
         blockers.append("Binance API key and secret must be present")
-    if config["require_exact_approval"] is True and not _has_exact_approval(signal_id, log_dir=log_dir):
+    if config["require_exact_approval"] is True and not exact_approval_found:
         blockers.append("exact LIVE APPROVE <signal_id> is missing")
+    if pack.get("live_safety_status") not in {"PASS", "WOULD_BE_ALLOWED_IF_LIVE_ENABLED"}:
+        blockers.append(f"live_safety_status is {pack.get('live_safety_status', 'UNKNOWN')}")
+    candidate = pack.get("candidate") or {}
+    if candidate.get("stop") is None:
+        blockers.append("stop is required")
+    if candidate.get("take_profit") is None:
+        blockers.append("take_profit is required")
+    if require_test_order_first and not test_order_validated:
+        blockers.append("successful test-order is required before live execute")
+    if require_protective_orders and not protective_orders_ready:
+        blockers.append("protective stop/take-profit live order path not implemented")
     blockers.extend(_one_trade_lock_blockers(signal_id, config=config, log_dir=log_dir))
     return list(dict.fromkeys(blockers))
 
@@ -542,6 +702,19 @@ def _has_exact_approval(signal_id: str | None, *, log_dir: Path) -> bool:
     return False
 
 
+def _has_test_order_validated(signal_id: str | None, *, log_dir: Path) -> bool:
+    if not signal_id:
+        return False
+    for record in load_connector_attempts(limit=0, signal_id=signal_id, log_dir=log_dir):
+        if record.get("endpoint") == "test_order" and record.get("status") in {
+            "TEST_ORDER_SENT",
+            "TEST_ORDER_MOCK_VALIDATED",
+            "TEST_ORDER_VALIDATED",
+        }:
+            return True
+    return False
+
+
 def _attempt_record(
     *,
     action: str,
@@ -554,11 +727,17 @@ def _attempt_record(
     order_payload_created: bool,
     execution_attempted: bool,
     order_placed: bool,
+    real_order_placed: bool = False,
+    mock_order_placed: bool = False,
     config: dict[str, Any],
     signed_payload_created: bool = False,
     payload_preview: dict[str, Any] | None = None,
     signed_request: dict[str, Any] | None = None,
     exchange_response: dict[str, Any] | None = None,
+    strategy_key: object = None,
+    exact_approval_found: bool = False,
+    test_order_validated: bool = False,
+    protective_orders_ready: bool = False,
 ) -> dict[str, Any]:
     return {
         "attempt_id": uuid4().hex,
@@ -568,7 +747,11 @@ def _attempt_record(
         "connector_name": CONNECTOR_NAME,
         "connector_mode": connector_mode,
         "signal_id": signal_id,
+        "strategy_key": strategy_key,
         "preflight_id": preflight_id,
+        "exact_approval_found": exact_approval_found,
+        "test_order_validated": test_order_validated,
+        "protective_orders_ready": protective_orders_ready,
         "status": status,
         "blockers": list(dict.fromkeys(blockers)),
         "network_used": network_used,
@@ -576,6 +759,8 @@ def _attempt_record(
         "signed_payload_created": signed_payload_created,
         "execution_attempted": execution_attempted,
         "order_placed": order_placed,
+        "real_order_placed": real_order_placed,
+        "mock_order_placed": mock_order_placed,
         "live_execution_enabled": config["live_execution_enabled"],
         "allow_live_orders": config["allow_live_orders"],
         "global_kill_switch": config["global_kill_switch"],
@@ -599,6 +784,8 @@ def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> di
         "signed_payload_created": record.get("signed_payload_created", False),
         "execution_attempted": record["execution_attempted"],
         "order_placed": record["order_placed"],
+        "real_order_placed": record.get("real_order_placed", False),
+        "mock_order_placed": record.get("mock_order_placed", False),
         "live_execution_enabled": record["live_execution_enabled"],
         "allow_live_orders": record["allow_live_orders"],
         "global_kill_switch": record["global_kill_switch"],
@@ -662,6 +849,11 @@ def _status_blockers(config: dict[str, Any]) -> list[str]:
         if not config["api_secret_present"]:
             blockers.append("BINANCE_API_SECRET missing")
     return list(dict.fromkeys(blockers))
+
+
+def _client_order_id(signal_id: str | None) -> str:
+    digest = hmac.new(b"hammer", str(signal_id or "unknown").encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+    return f"hammer_{digest}"
 
 
 def _sanitize_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
