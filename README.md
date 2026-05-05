@@ -312,6 +312,17 @@ GET /binance-live/protective-attempts
 
 R46 keeps `HAMMER_PROTECTIVE_ORDERS_REQUIRED=true` by default, `HAMMER_PROTECTIVE_ORDERS_ENABLED=false` by default, and `HAMMER_PROTECTIVE_ORDER_MODE=PREVIEW_ONLY` by default. Protective stop-loss and take-profit handling is required before live entry can be allowed. The harness can build sanitized stop-loss and take-profit previews for the promoted BTCUSDT 13m long ticket, and mock protective validation is explicit. Real protective orders are not sent by default, no naked live entries are allowed, and `/binance-live/execute` remains blocked with `protective stop/take-profit live order path not ready` when the protective path is not ready. Option A is a future explicitly enabled protective path; Option B is the current safe behavior: block live entry if protective stop/take-profit cannot be guaranteed.
 
+R47 adds the first protected tiny-live runbook and enablement gate:
+
+```text
+GET /first-live/runbook
+POST /first-live/evaluate
+GET /first-live/evaluations
+GET /first-live/evaluations/{evaluation_id}
+```
+
+R47 is a runbook and go/no-go checklist only. It does not place orders, does not enable live trading, does not modify env files automatically, does not restart systemd, and does not call Binance network. The first live order remains one protected BTCUSDT 13m long trade only: no random altcoins, no shorts, no vague commands, exact `LIVE APPROVE <signal_id>` required, test-order validation required, protective stop-loss and take-profit required, 44 USDT max, 3x max, isolated margin, one trade per day, and no duplicate signal order. A `GO_FOR_ENABLEMENT_PLAN` response means the operator may manually follow the enablement plan; it is not automatic execution. After the first attempt, the system must be locked back down.
+
 The live credential env file is expected at:
 
 ```text

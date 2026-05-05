@@ -22,6 +22,7 @@ LIVE_BLOCK_REASON = (
 )
 LIVE_APPROVE_EXACT_REASON = "exact live approval request accepted for gate evaluation only"
 LIVE_APPROVE_REJECT_REASON = "LIVE APPROVE requires an exact signal_id"
+FIRST_LIVE_RUNBOOK_REASON = "first protected tiny-live runbook check accepted; no execution or enablement"
 
 SAFE_ACTIONS = {
     "watch",
@@ -30,6 +31,7 @@ SAFE_ACTIONS = {
     "show_latest",
     "show_alerts",
     "show_candidate",
+    "first_live_check",
 }
 
 _LEVERAGE_RE = re.compile(r"\b(?:[2-9]\d*x|[1-9]\d+\s*x|leverage|leveraged|increase\s+leverage)\b")
@@ -74,6 +76,15 @@ def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> 
             normalized_action="blocked_live_command",
             result_status="BLOCKED",
             reason=LIVE_BLOCK_REASON,
+            signal_id=signal_id,
+        )
+
+    if normalized_text in {"first live check", "first live runbook", "first live evaluate"}:
+        return _parse_result(
+            raw_text=raw_text,
+            normalized_action="first_live_check",
+            result_status="ACCEPTED",
+            reason=FIRST_LIVE_RUNBOOK_REASON,
             signal_id=signal_id,
         )
 

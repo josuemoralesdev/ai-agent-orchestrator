@@ -54,6 +54,12 @@ from src.app.hammer_radar.operator.eth_paper_outcomes import (
     build_eth_paper_outcome_summary,
     build_eth_paper_outcomes_payload,
 )
+from src.app.hammer_radar.operator.first_live_runbook import (
+    build_first_live_runbook,
+    evaluate_first_live_runbook,
+    first_live_runbook_evaluations_path,
+    load_first_live_runbook_evaluations,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -722,6 +728,52 @@ def live_preflight_pack_by_id(preflight_id: str) -> dict:
     return record
 
 
+@app.get("/first-live/runbook")
+def first_live_runbook() -> dict:
+    return build_first_live_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/first-live/evaluate")
+def first_live_evaluate() -> dict:
+    return evaluate_first_live_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/first-live/evaluations")
+def first_live_evaluations(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "secrets_shown": False,
+        "first_live_runbook_evaluations_path": str(first_live_runbook_evaluations_path(log_dir)),
+        "first_live_runbook_evaluations": load_first_live_runbook_evaluations(
+            limit=limit,
+            signal_id=signal_id,
+            log_dir=log_dir,
+        ),
+    }
+
+
+@app.get("/first-live/evaluations/{evaluation_id}")
+def first_live_evaluation_by_id(evaluation_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_first_live_runbook_evaluations(limit=0, evaluation_id=evaluation_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="first live runbook evaluation not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["allow_live_orders"] = False
+    record["global_kill_switch"] = True
+    record["order_placed"] = ORDER_PLACED
+    record["real_order_placed"] = False
+    record["secrets_shown"] = False
+    record["first_live_runbook_evaluations_path"] = str(first_live_runbook_evaluations_path(log_dir))
+    return record
+
+
 @app.post("/operator/parse-action")
 def operator_parse_action(request: OperatorParseActionRequest) -> dict:
     return parse_operator_action(request.text, signal_id=request.signal_id)
@@ -794,6 +846,11 @@ def create_operator_action(request: OperatorActionRequest) -> dict:
         gate["operator_action"] = record
         gate["operator_actions_path"] = str(operator_actions_path(log_dir))
         return gate
+    if parsed["normalized_action"] == "first_live_check":
+        runbook = evaluate_first_live_runbook(log_dir=log_dir)
+        runbook["operator_action"] = record
+        runbook["operator_actions_path"] = str(operator_actions_path(log_dir))
+        return runbook
     return record
 
 
@@ -829,6 +886,7 @@ def operator_latest() -> dict:
     live_approval_requests = load_live_approval_requests(limit=1, log_dir=log_dir)
     live_preflight_packs = load_live_preflight_packs(limit=1, log_dir=log_dir)
     connector_attempts = load_connector_attempts(limit=1, log_dir=log_dir)
+    first_live_evaluations = load_first_live_runbook_evaluations(limit=1, log_dir=log_dir)
     latest_candidate = _latest_candidate_snapshot()
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -839,6 +897,7 @@ def operator_latest() -> dict:
         "latest_live_approval_request": live_approval_requests[0] if live_approval_requests else None,
         "latest_live_preflight_pack": live_preflight_packs[0] if live_preflight_packs else None,
         "latest_binance_live_connector_attempt": connector_attempts[0] if connector_attempts else None,
+        "latest_first_live_runbook_evaluation": first_live_evaluations[0] if first_live_evaluations else None,
         "latest_alert": alerts[0] if alerts else None,
         "latest_candidate": latest_candidate,
     }
@@ -1491,6 +1550,25 @@ def _operator_ui_html() -> str:
       <p class="muted">No random altcoins / no shorts / no vague commands.</p>
     </section>
 
+    <h2>First Live Runbook</h2>
+    <section id="firstLiveRunbook" class="operator-actions blocked">
+      <div class="grid">
+        <div><div class="label">runbook_status</div><div id="firstLiveRunbookStatus" class="value danger">loading</div></div>
+        <div><div class="label">gate_decision</div><div id="firstLiveGateDecision" class="value danger">NO_GO</div></div>
+        <div><div class="label">signal_id</div><div id="firstLiveSignalId" class="value mono">none</div></div>
+        <div><div class="label">checklist</div><div id="firstLiveChecklist" class="value">loading</div></div>
+      </div>
+      <p><strong>Blockers:</strong> <span id="firstLiveBlockers">loading</span></p>
+      <p><strong>Enablement plan:</strong> <span id="firstLivePlan">none</span></p>
+      <p class="muted">Runbook only.</p>
+      <p class="muted">Does not flip env.</p>
+      <p class="muted">Does not place orders.</p>
+      <p class="muted">Lock back down after one attempt.</p>
+      <p class="muted">Exact LIVE APPROVE &lt;signal_id&gt; required.</p>
+      <p class="muted">Protective stop-loss and take-profit required.</p>
+      <p class="muted">Test-order validation required.</p>
+    </section>
+
     <h2>Operator Actions / Binance Live Readiness</h2>
     <section id="operatorActions" class="operator-actions blocked">
       <div class="grid">
@@ -1789,6 +1867,7 @@ async function refreshAll() {
   await loadStrategyPerformance();
   await loadStrategyPromotion();
   await loadLivePreflight();
+  await loadFirstLiveRunbook();
   await loadNotificationStatus();
   await loadAltWatchlist();
   await loadMultiSymbolSummary();
@@ -2056,6 +2135,20 @@ async function loadLivePreflight() {
   document.getElementById('preflightStrategy').textContent = data.strategy_key || 'none';
   document.getElementById('preflightSignal').textContent = data.candidate_signal_id || 'none';
   document.getElementById('preflightNextAction').textContent = data.operator_next_action || 'n/a';
+}
+
+async function loadFirstLiveRunbook() {
+  const res = await fetch('/first-live/runbook');
+  const data = await res.json();
+  const checklist = data.checklist || {};
+  const passed = Object.values(checklist).filter(item => item && item.passed === true).length;
+  const total = Object.keys(checklist).length;
+  document.getElementById('firstLiveRunbookStatus').textContent = data.runbook_status || 'WAITING_FOR_PROMOTED_SIGNAL';
+  document.getElementById('firstLiveGateDecision').textContent = data.gate_decision || 'NO_GO';
+  document.getElementById('firstLiveSignalId').textContent = data.signal_id || 'none';
+  document.getElementById('firstLiveChecklist').textContent = `${passed}/${total}`;
+  document.getElementById('firstLiveBlockers').textContent = (data.blockers || []).length ? data.blockers.slice(0, 6).join('; ') : 'none';
+  document.getElementById('firstLivePlan').textContent = (data.enablement_plan || []).length ? `${data.enablement_plan.length} manual steps` : 'none';
 }
 
 async function loadNotificationStatus() {
