@@ -51,11 +51,18 @@ ENV_MAX_TRADES_PER_DAY = "HAMMER_LIVE_MAX_TRADES_PER_DAY"
 ENV_TEST_ORDER_NETWORK_ENABLED = "HAMMER_BINANCE_TEST_ORDER_NETWORK_ENABLED"
 ENV_BINANCE_BASE_URL = "HAMMER_BINANCE_BASE_URL"
 ENV_RECV_WINDOW = "HAMMER_BINANCE_RECV_WINDOW"
+ENV_PROTECTIVE_ORDERS_REQUIRED = "HAMMER_PROTECTIVE_ORDERS_REQUIRED"
+ENV_PROTECTIVE_ORDERS_ENABLED = "HAMMER_PROTECTIVE_ORDERS_ENABLED"
+ENV_PROTECTIVE_ORDER_MODE = "HAMMER_PROTECTIVE_ORDER_MODE"
+ENV_PROTECTIVE_STOP_TYPE = "HAMMER_PROTECTIVE_STOP_TYPE"
+ENV_PROTECTIVE_TAKE_PROFIT_TYPE = "HAMMER_PROTECTIVE_TAKE_PROFIT_TYPE"
 
 ATTEMPTS_FILENAME = "binance_live_connector_attempts.ndjson"
+PROTECTIVE_ATTEMPTS_FILENAME = "binance_protective_order_attempts.ndjson"
 CONNECTOR_NAME = "binance_futures_tiny_live"
 TEST_ORDER_ENDPOINT = "/fapi/v1/order/test"
 REAL_ORDER_ENDPOINT = "/fapi/v1/order"
+PROTECTIVE_ORDER_ENDPOINT = REAL_ORDER_ENDPOINT
 DEFAULT_BASE_URL = "https://fapi.binance.com"
 DEFAULT_RECV_WINDOW = 5000
 DEFAULT_ALLOWED_SYMBOLS = ["BTCUSDT"]
@@ -63,6 +70,13 @@ DEFAULT_MAX_POSITION_USD = 44.0
 DEFAULT_MAX_LEVERAGE = 3.0
 DEFAULT_MARGIN_MODE = "isolated"
 DEFAULT_MAX_TRADES_PER_DAY = 1
+PROTECTIVE_PREVIEW_ONLY = "PREVIEW_ONLY"
+PROTECTIVE_TEST_ONLY = "TEST_ONLY"
+LIVE_PROTECTIVE_ENABLED = "LIVE_PROTECTIVE_ENABLED"
+PROTECTIVE_ORDER_MODES = {PROTECTIVE_PREVIEW_ONLY, PROTECTIVE_TEST_ONLY, LIVE_PROTECTIVE_ENABLED}
+DEFAULT_PROTECTIVE_STOP_TYPE = "STOP_MARKET"
+DEFAULT_PROTECTIVE_TAKE_PROFIT_TYPE = "TAKE_PROFIT_MARKET"
+DEFAULT_PROTECTIVE_WORKING_TYPE = "MARK_PRICE"
 
 
 class BinanceOrderAdapter(Protocol):
@@ -78,6 +92,11 @@ class SignedTestOrderAdapter(Protocol):
 class SignedLiveOrderAdapter(Protocol):
     def send_live_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
         """Send a signed Binance USD-M Futures live order request."""
+
+
+class ProtectiveOrderAdapter(Protocol):
+    def send_protective_orders(self, signed_requests: list[dict[str, Any]]) -> dict[str, Any]:
+        """Send or validate signed protective stop/take-profit requests."""
 
 
 class MockSignedTestOrderAdapter:
@@ -101,6 +120,19 @@ class MockSignedLiveOrderAdapter:
             "real_order_placed": False,
             "mock_order_placed": True,
             "exchange_order_id": "mock_only",
+        }
+
+
+class MockProtectiveOrderAdapter:
+    def send_protective_orders(self, signed_requests: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "mock_adapter": True,
+            "endpoints": [request.get("endpoint") for request in signed_requests],
+            "network_used": False,
+            "protective_orders_sent": False,
+            "validated": True,
+            "stop_validated": True,
+            "take_profit_validated": True,
         }
 
 
@@ -155,6 +187,34 @@ class BinanceFuturesLiveHttpClient:
             }
 
 
+class BinanceFuturesProtectiveHttpClient:
+    """Explicit protective-order client. It only targets /fapi/v1/order."""
+
+    def send_protective_orders(self, signed_requests: list[dict[str, Any]]) -> dict[str, Any]:
+        responses = []
+        for signed_request in signed_requests:
+            endpoint = signed_request.get("endpoint")
+            if endpoint != PROTECTIVE_ORDER_ENDPOINT:
+                raise ValueError("R46 protective adapter only permits Binance real order endpoint")
+            url = f"{signed_request['base_url'].rstrip('/')}{PROTECTIVE_ORDER_ENDPOINT}"
+            query = signed_request["query_string"]
+            headers = dict(signed_request["headers"])
+            data = query.encode("utf-8")
+            request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - explicit gated protective endpoint
+                body = response.read().decode("utf-8")
+                payload = json.loads(body) if body else {}
+                responses.append({"status_code": response.status, "body": payload, "endpoint": PROTECTIVE_ORDER_ENDPOINT})
+        return {
+            "endpoint": PROTECTIVE_ORDER_ENDPOINT,
+            "network_used": True,
+            "protective_orders_sent": True,
+            "order_placed": True,
+            "real_order_placed": True,
+            "responses": responses,
+        }
+
+
 def build_canonical_query(params: dict[str, Any]) -> str:
     pairs = []
     for key in sorted(params):
@@ -195,6 +255,16 @@ def build_connector_status(
     return _connector_status_from_config(config, log_dir=get_log_dir(log_dir, use_env=True))
 
 
+def build_protective_status(
+    *,
+    env: Mapping[str, str] | None = None,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    config = _config(os.environ if env is None else env)
+    return _protective_status_from_config(config, log_dir=resolved_log_dir)
+
+
 def _connector_status_from_config(config: dict[str, Any], *, log_dir: Path) -> dict[str, Any]:
     blockers = _status_blockers(config)
     readiness = "BLOCKED"
@@ -230,7 +300,17 @@ def _connector_status_from_config(config: dict[str, Any], *, log_dir: Path) -> d
         "recv_window": config["recv_window"],
         "signing_available": config["api_secret_present"],
         "live_order_adapter_configured": False,
-        "protective_orders_supported": False,
+        "protective_orders_supported": config["protective_orders_supported"],
+        "protective_order_mode": config["protective_order_mode"],
+        "protective_stop_supported": config["protective_stop_supported"],
+        "protective_take_profit_supported": config["protective_take_profit_supported"],
+        "protective_orders_required": config["protective_orders_required"],
+        "protective_orders_ready": False,
+        "protective_orders_default_blocked": True,
+        "protective_stop_order_type": config["protective_stop_order_type"],
+        "protective_take_profit_order_type": config["protective_take_profit_order_type"],
+        "protective_order_endpoint": PROTECTIVE_ORDER_ENDPOINT,
+        "protective_orders_atomic": False,
         "real_live_endpoint_prepared": True,
         "real_order_endpoint": REAL_ORDER_ENDPOINT,
         "live_order_default_blocked": True,
@@ -273,6 +353,119 @@ def preview_payload(
     if persist:
         append_connector_attempt(record, log_dir=resolved_log_dir)
     return _response(record, connector_status=_connector_status_from_config(config, log_dir=resolved_log_dir))
+
+
+def protective_preview(
+    *,
+    preflight_pack: dict[str, Any] | None = None,
+    env: Mapping[str, str] | None = None,
+    log_dir: str | Path | None = None,
+    persist: bool = True,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    config = _config(os.environ if env is None else env)
+    pack = preflight_pack or build_promoted_strategy_preflight(log_dir=resolved_log_dir)
+    stop_preview, take_profit_preview, blockers = _protective_payload_previews_from_pack(pack, config=config)
+    status = "PROTECTIVE_PREVIEW_CREATED" if stop_preview and take_profit_preview and not blockers else "BLOCKED"
+    record = _protective_attempt_record(
+        action="protective_preview",
+        connector_mode=config["connector_mode"],
+        protective_order_mode=config["protective_order_mode"],
+        signal_id=_signal_id(pack),
+        preflight_id=pack.get("preflight_id"),
+        strategy_key=pack.get("strategy_key"),
+        status=status,
+        blockers=blockers,
+        network_used=False,
+        signed_payload_created=False,
+        order_payload_created=status == "PROTECTIVE_PREVIEW_CREATED",
+        protective_orders_sent=False,
+        stop_order_payload_created=stop_preview is not None and not blockers,
+        take_profit_order_payload_created=take_profit_preview is not None and not blockers,
+        execution_attempted=False,
+        order_placed=False,
+        real_order_placed=False,
+        config=config,
+        stop_preview=stop_preview if not blockers else None,
+        take_profit_preview=take_profit_preview if not blockers else None,
+    )
+    if persist:
+        append_protective_attempt(record, log_dir=resolved_log_dir)
+    return _protective_response(record, protective_status=_protective_status_from_config(config, log_dir=resolved_log_dir))
+
+
+def submit_protective_test(
+    *,
+    preflight_pack: dict[str, Any] | None = None,
+    env: Mapping[str, str] | None = None,
+    log_dir: str | Path | None = None,
+    use_mock_adapter: bool = False,
+    adapter: ProtectiveOrderAdapter | None = None,
+    persist: bool = True,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    source = os.environ if env is None else env
+    config = _config(source)
+    pack = preflight_pack or build_promoted_strategy_preflight(log_dir=resolved_log_dir)
+    stop_preview, take_profit_preview, blockers = _protective_payload_previews_from_pack(pack, config=config)
+    if config["protective_order_mode"] != PROTECTIVE_TEST_ONLY:
+        blockers.append("protective_order_mode must be TEST_ONLY for protective test")
+    if not config["protective_orders_enabled"]:
+        blockers.append("HAMMER_PROTECTIVE_ORDERS_ENABLED is false")
+    if not config["api_key_present"] or not config["api_secret_present"]:
+        blockers.append("Binance API key and secret must be present for protective test")
+    if not use_mock_adapter and adapter is None:
+        blockers.append("protective test real network disabled")
+    if _has_protective_attempt(_signal_id(pack), log_dir=resolved_log_dir):
+        blockers.append(f"protective orders already recorded for signal_id {_signal_id(pack)}")
+    signed_requests = None
+    sanitized_response = None
+    execution_attempted = False
+    network_used = False
+    signed_payload_created = False
+    status = "BLOCKED"
+    if not blockers and stop_preview and take_profit_preview:
+        signed_requests = build_signed_protective_order_requests(
+            stop_preview,
+            take_profit_preview,
+            signal_id=_signal_id(pack),
+            config=config,
+            source=source,
+        )
+        signed_payload_created = True
+        selected_adapter = adapter or MockProtectiveOrderAdapter()
+        execution_attempted = True
+        response = selected_adapter.send_protective_orders(signed_requests)
+        sanitized_response = _sanitize_exchange_response(response)
+        network_used = bool(sanitized_response.get("network_used"))
+        status = "PROTECTIVE_ORDERS_SENT" if network_used else "PROTECTIVE_TEST_MOCK_VALIDATED"
+    record = _protective_attempt_record(
+        action="protective_test",
+        connector_mode=config["connector_mode"],
+        protective_order_mode=config["protective_order_mode"],
+        signal_id=_signal_id(pack),
+        preflight_id=pack.get("preflight_id"),
+        strategy_key=pack.get("strategy_key"),
+        status=status,
+        blockers=blockers,
+        network_used=network_used,
+        signed_payload_created=signed_payload_created,
+        order_payload_created=bool(stop_preview and take_profit_preview and not blockers),
+        protective_orders_sent=status == "PROTECTIVE_ORDERS_SENT",
+        stop_order_payload_created=stop_preview is not None and not blockers,
+        take_profit_order_payload_created=take_profit_preview is not None and not blockers,
+        execution_attempted=execution_attempted,
+        order_placed=status == "PROTECTIVE_ORDERS_SENT",
+        real_order_placed=status == "PROTECTIVE_ORDERS_SENT",
+        config=config,
+        stop_preview=stop_preview if not blockers else None,
+        take_profit_preview=take_profit_preview if not blockers else None,
+        signed_requests=signed_requests,
+        exchange_response=sanitized_response,
+    )
+    if persist:
+        append_protective_attempt(record, log_dir=resolved_log_dir)
+    return _protective_response(record, protective_status=_protective_status_from_config(config, log_dir=resolved_log_dir))
 
 
 def submit_test_order(
@@ -358,7 +551,11 @@ def execute_live_order(
     payload, blockers = _payload_preview_from_pack(pack, config=config)
     exact_approval_found = _has_exact_approval(_signal_id(pack), log_dir=resolved_log_dir)
     test_order_validated = _has_test_order_validated(_signal_id(pack), log_dir=resolved_log_dir)
-    protective_orders_ready = False
+    protective_orders_ready = _protective_orders_ready(_signal_id(pack), config=config, log_dir=resolved_log_dir)
+    stop_preview, take_profit_preview, _protective_preview_blockers = _protective_payload_previews_from_pack(
+        pack,
+        config=config,
+    )
     blockers.extend(
         _execute_blockers(
             pack,
@@ -427,6 +624,11 @@ def execute_live_order(
         exact_approval_found=exact_approval_found,
         test_order_validated=test_order_validated,
         protective_orders_ready=protective_orders_ready,
+        protective_orders_required=require_protective_orders,
+        protective_orders_sent=False,
+        protective_stop_payload_preview=stop_preview if stop_preview is not None and not blockers else None,
+        protective_take_profit_payload_preview=take_profit_preview if take_profit_preview is not None and not blockers else None,
+        naked_entry_blocked=require_protective_orders and not protective_orders_ready,
     )
     if persist:
         append_connector_attempt(record, log_dir=resolved_log_dir)
@@ -472,6 +674,45 @@ def connector_attempts_path(log_dir: str | Path) -> Path:
     return Path(log_dir) / ATTEMPTS_FILENAME
 
 
+def append_protective_attempt(record: dict[str, Any], *, log_dir: str | Path) -> None:
+    path = protective_attempts_path(log_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def load_protective_attempts(
+    *,
+    limit: int = 50,
+    attempt_id: str | None = None,
+    signal_id: str | None = None,
+    log_dir: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    path = protective_attempts_path(get_log_dir(log_dir, use_env=True))
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            if attempt_id is not None and record.get("attempt_id") != attempt_id:
+                continue
+            if signal_id is not None and record.get("signal_id") != signal_id:
+                continue
+            records.append(record)
+    records = list(reversed(records))
+    if limit > 0:
+        return records[:limit]
+    return records
+
+
+def protective_attempts_path(log_dir: str | Path) -> Path:
+    return Path(log_dir) / PROTECTIVE_ATTEMPTS_FILENAME
+
+
 def _payload_preview_from_pack(
     pack: dict[str, Any],
     *,
@@ -507,6 +748,57 @@ def _payload_preview_from_pack(
         "order_payload_created": True,
     }
     return payload, []
+
+
+def _protective_payload_previews_from_pack(
+    pack: dict[str, Any],
+    *,
+    config: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, list[str]]:
+    _, blockers = _payload_preview_from_pack(pack, config=config)
+    candidate = pack.get("candidate") or {}
+    entry = _float_or_none(candidate.get("entry"))
+    stop = _float_or_none(candidate.get("stop"))
+    take_profit = _float_or_none(candidate.get("take_profit"))
+    if stop is None or stop <= 0.0:
+        blockers.append("stop is required")
+    if take_profit is None or take_profit <= 0.0:
+        blockers.append("take_profit is required")
+    if entry is not None and stop is not None and stop >= entry:
+        blockers.append("stop must be below entry for long BTCUSDT")
+    if entry is not None and take_profit is not None and take_profit <= entry:
+        blockers.append("take_profit must be above entry for long BTCUSDT")
+    if blockers:
+        return None, None, list(dict.fromkeys(blockers))
+    quantity = round(float(config["max_position_usd"]) / float(entry), 6)
+    common = {
+        "symbol": "BTCUSDT",
+        "side": "SELL",
+        "position_side": "LONG",
+        "quantity": quantity,
+        "reduce_only": True,
+        "working_type": DEFAULT_PROTECTIVE_WORKING_TYPE,
+        "preview_only": True,
+        "sent": False,
+        "signed": False,
+        "signature_present": False,
+        "endpoint": PROTECTIVE_ORDER_ENDPOINT,
+    }
+    stop_preview = {
+        **common,
+        "protective_role": "stop_loss",
+        "order_type": config["protective_stop_order_type"],
+        "stopPrice": stop,
+        "protective_order_payload_created": True,
+    }
+    take_profit_preview = {
+        **common,
+        "protective_role": "take_profit",
+        "order_type": config["protective_take_profit_order_type"],
+        "stopPrice": take_profit,
+        "protective_order_payload_created": True,
+    }
+    return stop_preview, take_profit_preview, []
 
 
 def build_signed_test_order_request(
@@ -550,6 +842,36 @@ def build_signed_test_order_request(
     }
 
 
+def build_signed_protective_order_requests(
+    stop_preview: dict[str, Any],
+    take_profit_preview: dict[str, Any],
+    *,
+    signal_id: str | None,
+    config: dict[str, Any],
+    source: Mapping[str, str],
+    timestamp_ms: int | None = None,
+) -> list[dict[str, Any]]:
+    timestamp = timestamp_ms if timestamp_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+    return [
+        _build_signed_protective_order_request(
+            stop_preview,
+            signal_id=signal_id,
+            suffix="sl",
+            config=config,
+            source=source,
+            timestamp_ms=timestamp,
+        ),
+        _build_signed_protective_order_request(
+            take_profit_preview,
+            signal_id=signal_id,
+            suffix="tp",
+            config=config,
+            source=source,
+            timestamp_ms=timestamp + 1,
+        ),
+    ]
+
+
 def build_signed_live_order_request(
     payload_preview: dict[str, Any],
     *,
@@ -590,6 +912,51 @@ def build_signed_live_order_request(
         "signed": True,
         "sent": False,
         "order_placed": False,
+    }
+
+
+def _build_signed_protective_order_request(
+    preview: dict[str, Any],
+    *,
+    signal_id: str | None,
+    suffix: str,
+    config: dict[str, Any],
+    source: Mapping[str, str],
+    timestamp_ms: int,
+) -> dict[str, Any]:
+    params = {
+        "symbol": preview["symbol"],
+        "side": preview["side"],
+        "type": preview["order_type"],
+        "quantity": preview["quantity"],
+        "stopPrice": preview["stopPrice"],
+        "reduceOnly": "true",
+        "workingType": preview["working_type"],
+        "recvWindow": config["recv_window"],
+        "timestamp": timestamp_ms,
+        "newClientOrderId": f"{_client_order_id(signal_id)}_{suffix}",
+    }
+    query_without_signature = build_canonical_query(params)
+    signature = sign_query(query_without_signature, _env_value(source, ENV_API_SECRET))
+    signed_params = dict(params)
+    signed_params["signature"] = signature
+    query_string = build_canonical_query(signed_params)
+    headers = {
+        "X-MBX-APIKEY": _env_value(source, ENV_API_KEY),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    return {
+        "method": "POST",
+        "endpoint": PROTECTIVE_ORDER_ENDPOINT,
+        "base_url": config["base_url"],
+        "base_url_host": _base_url_host(config["base_url"]),
+        "params": signed_params,
+        "query_string": query_string,
+        "headers": headers,
+        "signed": True,
+        "sent": False,
+        "order_placed": False,
+        "protective_role": preview["protective_role"],
     }
 
 
@@ -667,7 +1034,7 @@ def _execute_blockers(
     if require_test_order_first and not test_order_validated:
         blockers.append("successful test-order is required before live execute")
     if require_protective_orders and not protective_orders_ready:
-        blockers.append("protective stop/take-profit live order path not implemented")
+        blockers.append("protective stop/take-profit live order path not ready")
     blockers.extend(_one_trade_lock_blockers(signal_id, config=config, log_dir=log_dir))
     return list(dict.fromkeys(blockers))
 
@@ -715,6 +1082,30 @@ def _has_test_order_validated(signal_id: str | None, *, log_dir: Path) -> bool:
     return False
 
 
+def _protective_orders_ready(signal_id: str | None, *, config: dict[str, Any], log_dir: Path) -> bool:
+    if not signal_id:
+        return False
+    if not config["protective_orders_enabled"]:
+        return False
+    if config["protective_order_mode"] != LIVE_PROTECTIVE_ENABLED:
+        return False
+    if not config["protective_stop_supported"] or not config["protective_take_profit_supported"]:
+        return False
+    for record in load_protective_attempts(limit=0, signal_id=signal_id, log_dir=log_dir):
+        if record.get("status") in {"PROTECTIVE_TEST_MOCK_VALIDATED", "PROTECTIVE_ORDERS_SENT"}:
+            return True
+    return False
+
+
+def _has_protective_attempt(signal_id: str | None, *, log_dir: Path) -> bool:
+    if not signal_id:
+        return False
+    return any(
+        record.get("status") in {"PROTECTIVE_TEST_MOCK_VALIDATED", "PROTECTIVE_ORDERS_SENT"}
+        for record in load_protective_attempts(limit=0, signal_id=signal_id, log_dir=log_dir)
+    )
+
+
 def _attempt_record(
     *,
     action: str,
@@ -738,6 +1129,11 @@ def _attempt_record(
     exact_approval_found: bool = False,
     test_order_validated: bool = False,
     protective_orders_ready: bool = False,
+    protective_orders_required: bool = False,
+    protective_orders_sent: bool = False,
+    protective_stop_payload_preview: dict[str, Any] | None = None,
+    protective_take_profit_payload_preview: dict[str, Any] | None = None,
+    naked_entry_blocked: bool = False,
 ) -> dict[str, Any]:
     return {
         "attempt_id": uuid4().hex,
@@ -752,6 +1148,11 @@ def _attempt_record(
         "exact_approval_found": exact_approval_found,
         "test_order_validated": test_order_validated,
         "protective_orders_ready": protective_orders_ready,
+        "protective_orders_required": protective_orders_required,
+        "protective_orders_sent": protective_orders_sent,
+        "protective_stop_payload_preview": _sanitize_payload(protective_stop_payload_preview),
+        "protective_take_profit_payload_preview": _sanitize_payload(protective_take_profit_payload_preview),
+        "naked_entry_blocked": naked_entry_blocked,
         "status": status,
         "blockers": list(dict.fromkeys(blockers)),
         "network_used": network_used,
@@ -772,6 +1173,64 @@ def _attempt_record(
     }
 
 
+def _protective_attempt_record(
+    *,
+    action: str,
+    connector_mode: str,
+    protective_order_mode: str,
+    signal_id: str | None,
+    preflight_id: str | None,
+    strategy_key: object,
+    status: str,
+    blockers: list[str],
+    network_used: bool,
+    signed_payload_created: bool,
+    order_payload_created: bool,
+    protective_orders_sent: bool,
+    stop_order_payload_created: bool,
+    take_profit_order_payload_created: bool,
+    execution_attempted: bool,
+    order_placed: bool,
+    real_order_placed: bool,
+    config: dict[str, Any],
+    stop_preview: dict[str, Any] | None = None,
+    take_profit_preview: dict[str, Any] | None = None,
+    signed_requests: list[dict[str, Any]] | None = None,
+    exchange_response: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "attempt_id": uuid4().hex,
+        "created_at": datetime.now(UTC).isoformat(),
+        "endpoint": action,
+        "action": action,
+        "connector_name": CONNECTOR_NAME,
+        "connector_mode": connector_mode,
+        "protective_order_mode": protective_order_mode,
+        "signal_id": signal_id,
+        "preflight_id": preflight_id,
+        "strategy_key": strategy_key,
+        "status": status,
+        "blockers": list(dict.fromkeys(blockers)),
+        "network_used": network_used,
+        "signed_payload_created": signed_payload_created,
+        "order_payload_created": order_payload_created,
+        "protective_orders_sent": protective_orders_sent,
+        "stop_order_payload_created": stop_order_payload_created,
+        "take_profit_order_payload_created": take_profit_order_payload_created,
+        "execution_attempted": execution_attempted,
+        "order_placed": order_placed,
+        "real_order_placed": real_order_placed,
+        "live_execution_enabled": config["live_execution_enabled"],
+        "allow_live_orders": config["allow_live_orders"],
+        "global_kill_switch": config["global_kill_switch"],
+        "secrets_shown": False,
+        "sanitized_stop_order_preview": _sanitize_payload(stop_preview),
+        "sanitized_take_profit_order_preview": _sanitize_payload(take_profit_preview),
+        "sanitized_signed_requests": [_sanitize_signed_request(request) for request in signed_requests or []],
+        "sanitized_exchange_response": _sanitize_exchange_response(exchange_response),
+    }
+
+
 def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> dict[str, Any]:
     return {
         "connector_name": CONNECTOR_NAME,
@@ -786,6 +1245,12 @@ def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> di
         "order_placed": record["order_placed"],
         "real_order_placed": record.get("real_order_placed", False),
         "mock_order_placed": record.get("mock_order_placed", False),
+        "protective_orders_required": record.get("protective_orders_required", False),
+        "protective_orders_ready": record.get("protective_orders_ready", False),
+        "protective_orders_sent": record.get("protective_orders_sent", False),
+        "protective_stop_payload_preview": record.get("protective_stop_payload_preview"),
+        "protective_take_profit_payload_preview": record.get("protective_take_profit_payload_preview"),
+        "naked_entry_blocked": record.get("naked_entry_blocked", False),
         "live_execution_enabled": record["live_execution_enabled"],
         "allow_live_orders": record["allow_live_orders"],
         "global_kill_switch": record["global_kill_switch"],
@@ -798,10 +1263,43 @@ def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> di
     }
 
 
+def _protective_response(record: dict[str, Any], *, protective_status: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "connector_name": CONNECTOR_NAME,
+        "connector_mode": record["connector_mode"],
+        "protective_order_mode": record["protective_order_mode"],
+        "status": record["status"],
+        "attempt": record,
+        "blockers": record["blockers"],
+        "network_used": record["network_used"],
+        "signed_payload_created": record["signed_payload_created"],
+        "order_payload_created": record["order_payload_created"],
+        "protective_orders_sent": record["protective_orders_sent"],
+        "stop_order_payload_created": record["stop_order_payload_created"],
+        "take_profit_order_payload_created": record["take_profit_order_payload_created"],
+        "execution_attempted": record["execution_attempted"],
+        "order_placed": record["order_placed"],
+        "real_order_placed": record["real_order_placed"],
+        "live_execution_enabled": record["live_execution_enabled"],
+        "allow_live_orders": record["allow_live_orders"],
+        "global_kill_switch": record["global_kill_switch"],
+        "secrets_shown": False,
+        "sanitized_stop_order_preview": record.get("sanitized_stop_order_preview"),
+        "sanitized_take_profit_order_preview": record.get("sanitized_take_profit_order_preview"),
+        "sanitized_signed_requests": record.get("sanitized_signed_requests"),
+        "sanitized_exchange_response": record.get("sanitized_exchange_response"),
+        "protective_status": protective_status,
+    }
+
+
 def _config(source: Mapping[str, str]) -> dict[str, Any]:
     mode = _env_value(source, ENV_CONNECTOR_MODE).upper() or DRY_RUN_ONLY
     if mode not in CONNECTOR_MODES:
         mode = DRY_RUN_ONLY
+    protective_mode = _env_value(source, ENV_PROTECTIVE_ORDER_MODE).upper() or PROTECTIVE_PREVIEW_ONLY
+    if protective_mode not in PROTECTIVE_ORDER_MODES:
+        protective_mode = PROTECTIVE_PREVIEW_ONLY
+    protective_enabled = _env_bool(source, ENV_PROTECTIVE_ORDERS_ENABLED, default=False)
     return {
         "connector_mode": mode,
         "api_key_present": bool(_env_value(source, ENV_API_KEY)),
@@ -819,6 +1317,43 @@ def _config(source: Mapping[str, str]) -> dict[str, Any]:
         "test_order_network_enabled": _env_bool(source, ENV_TEST_ORDER_NETWORK_ENABLED, default=False),
         "base_url": _env_value(source, ENV_BINANCE_BASE_URL) or DEFAULT_BASE_URL,
         "recv_window": int(_env_float(source, ENV_RECV_WINDOW, DEFAULT_RECV_WINDOW)),
+        "protective_orders_required": _env_bool(source, ENV_PROTECTIVE_ORDERS_REQUIRED, default=True),
+        "protective_orders_enabled": protective_enabled,
+        "protective_order_mode": protective_mode,
+        "protective_orders_supported": protective_enabled and protective_mode in {PROTECTIVE_TEST_ONLY, LIVE_PROTECTIVE_ENABLED},
+        "protective_stop_supported": protective_enabled and protective_mode in {PROTECTIVE_TEST_ONLY, LIVE_PROTECTIVE_ENABLED},
+        "protective_take_profit_supported": protective_enabled and protective_mode in {PROTECTIVE_TEST_ONLY, LIVE_PROTECTIVE_ENABLED},
+        "protective_stop_order_type": _env_value(source, ENV_PROTECTIVE_STOP_TYPE).upper() or DEFAULT_PROTECTIVE_STOP_TYPE,
+        "protective_take_profit_order_type": _env_value(source, ENV_PROTECTIVE_TAKE_PROFIT_TYPE).upper()
+        or DEFAULT_PROTECTIVE_TAKE_PROFIT_TYPE,
+    }
+
+
+def _protective_status_from_config(config: dict[str, Any], *, log_dir: Path) -> dict[str, Any]:
+    return {
+        "connector_name": CONNECTOR_NAME,
+        "connector_mode": config["connector_mode"],
+        "protective_orders_required": config["protective_orders_required"],
+        "protective_orders_enabled": config["protective_orders_enabled"],
+        "protective_order_mode": config["protective_order_mode"],
+        "protective_orders_supported": config["protective_orders_supported"],
+        "protective_stop_supported": config["protective_stop_supported"],
+        "protective_take_profit_supported": config["protective_take_profit_supported"],
+        "protective_orders_ready": False,
+        "protective_orders_default_blocked": True,
+        "protective_stop_order_type": config["protective_stop_order_type"],
+        "protective_take_profit_order_type": config["protective_take_profit_order_type"],
+        "protective_order_endpoint": PROTECTIVE_ORDER_ENDPOINT,
+        "protective_orders_atomic": False,
+        "live_execution_enabled": config["live_execution_enabled"],
+        "allow_live_orders": config["allow_live_orders"],
+        "global_kill_switch": config["global_kill_switch"],
+        "order_placed": False,
+        "real_order_placed": False,
+        "protective_orders_sent": False,
+        "secrets_shown": False,
+        "blockers": _protective_status_blockers(config),
+        "protective_attempts_path": str(protective_attempts_path(log_dir)),
     }
 
 
@@ -848,6 +1383,17 @@ def _status_blockers(config: dict[str, Any]) -> list[str]:
             blockers.append("BINANCE_API_KEY missing")
         if not config["api_secret_present"]:
             blockers.append("BINANCE_API_SECRET missing")
+    return list(dict.fromkeys(blockers))
+
+
+def _protective_status_blockers(config: dict[str, Any]) -> list[str]:
+    blockers = []
+    if not config["protective_orders_enabled"]:
+        blockers.append("HAMMER_PROTECTIVE_ORDERS_ENABLED is false")
+    if config["protective_order_mode"] == PROTECTIVE_PREVIEW_ONLY:
+        blockers.append("protective_order_mode is PREVIEW_ONLY")
+    if config["protective_orders_required"] is not True:
+        blockers.append("HAMMER_PROTECTIVE_ORDERS_REQUIRED must remain true for default runtime")
     return list(dict.fromkeys(blockers))
 
 

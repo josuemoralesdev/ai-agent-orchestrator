@@ -122,6 +122,8 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Secrets and signatures are hidden.", html)
             self.assertIn("Default blocked.", html)
             self.assertIn("No naked live entries.", html)
+            self.assertIn("Protective stop and take-profit required.", html)
+            self.assertIn("Secrets/signatures hidden.", html)
             self.assertIn("No random altcoins / no shorts / no vague commands.", html)
 
     def test_candidates_returns_live_execution_disabled_and_decisions(self) -> None:
