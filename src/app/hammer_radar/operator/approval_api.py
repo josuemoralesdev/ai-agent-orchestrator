@@ -244,6 +244,13 @@ class BinanceLiveTestOrderRequest(BaseModel):
     require_exact_approval: bool | None = None
 
 
+class BinanceLiveExecuteRequest(BaseModel):
+    signal_id: str | None = None
+    use_mock_adapter: bool = False
+    require_test_order_first: bool = True
+    require_protective_orders: bool = True
+
+
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
 
 
@@ -464,8 +471,15 @@ def binance_live_test_order(request: BinanceLiveTestOrderRequest | None = None) 
 
 
 @app.post("/binance-live/execute")
-def binance_live_execute() -> dict:
-    return execute_live_order(log_dir=get_log_dir(use_env=True))
+def binance_live_execute(request: BinanceLiveExecuteRequest | None = None) -> dict:
+    request = request or BinanceLiveExecuteRequest()
+    return execute_live_order(
+        log_dir=get_log_dir(use_env=True),
+        signal_id=request.signal_id,
+        use_mock_adapter=request.use_mock_adapter,
+        require_test_order_first=request.require_test_order_first,
+        require_protective_orders=request.require_protective_orders,
+    )
 
 
 @app.get("/binance-live/connector-attempts")
@@ -1401,6 +1415,9 @@ def _operator_ui_html() -> str:
         <div><div class="label">api_secret_present</div><div id="binanceLiveConnectorSecret" class="value">false</div></div>
         <div><div class="label">test_order_network_enabled</div><div id="binanceLiveConnectorTestNetwork" class="value danger">false</div></div>
         <div><div class="label">signing_available</div><div id="binanceLiveConnectorSigning" class="value">false</div></div>
+        <div><div class="label">live_order_adapter_configured</div><div id="binanceLiveConnectorAdapter" class="value danger">false</div></div>
+        <div><div class="label">protective_orders_supported</div><div id="binanceLiveConnectorProtective" class="value danger">false</div></div>
+        <div><div class="label">real_live_endpoint_prepared</div><div id="binanceLiveConnectorRealEndpoint" class="value">false</div></div>
         <div><div class="label">live_execution_enabled</div><div id="binanceLiveConnectorLive" class="value danger">false</div></div>
         <div><div class="label">allow_live_orders</div><div id="binanceLiveConnectorAllow" class="value danger">false</div></div>
         <div><div class="label">global_kill_switch</div><div id="binanceLiveConnectorKill" class="value danger">true</div></div>
@@ -1415,6 +1432,9 @@ def _operator_ui_html() -> str:
       <p class="muted">Test order only. No matching-engine submission.</p>
       <p class="muted">No real orders.</p>
       <p class="muted">Secrets and signatures are hidden.</p>
+      <p class="muted">Default blocked.</p>
+      <p class="muted">No naked live entries.</p>
+      <p class="muted">No random altcoins / no shorts / no vague commands.</p>
     </section>
 
     <h2>Operator Actions / Binance Live Readiness</h2>
@@ -1922,6 +1942,9 @@ async function loadBinanceLiveConnector() {
   document.getElementById('binanceLiveConnectorSecret').textContent = String(status.api_secret_present === true);
   document.getElementById('binanceLiveConnectorTestNetwork').textContent = String(status.test_order_network_enabled === true);
   document.getElementById('binanceLiveConnectorSigning').textContent = String(status.signing_available === true);
+  document.getElementById('binanceLiveConnectorAdapter').textContent = String(status.live_order_adapter_configured === true);
+  document.getElementById('binanceLiveConnectorProtective').textContent = String(status.protective_orders_supported === true);
+  document.getElementById('binanceLiveConnectorRealEndpoint').textContent = String(status.real_live_endpoint_prepared === true);
   document.getElementById('binanceLiveConnectorLive').textContent = String(status.live_execution_enabled === true);
   document.getElementById('binanceLiveConnectorAllow').textContent = String(status.allow_live_orders === true);
   document.getElementById('binanceLiveConnectorKill').textContent = String(status.global_kill_switch === true);

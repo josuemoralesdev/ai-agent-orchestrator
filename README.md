@@ -293,6 +293,14 @@ POST /fapi/v1/order/test
 
 The Binance test-order endpoint validates a request but does not submit it to the matching engine. R44 does not call `POST /fapi/v1/order`, does not place real orders, and keeps default mode as `DRY_RUN_ONLY`. Signed payload creation is blocked in `DRY_RUN_ONLY` and allowed only after explicit `TEST_ORDER_ONLY` gates pass. Real network test-order calls require `HAMMER_BINANCE_TEST_ORDER_NETWORK_ENABLED=true`; otherwise `/binance-live/test-order` remains blocked unless an explicitly requested mock adapter is used. API keys, API secrets, raw signatures, and raw auth headers are never persisted or shown; signature values are hidden in sanitized records.
 
+R45 prepares the first real Binance USD-M Futures live order endpoint support for:
+
+```text
+POST /fapi/v1/order
+```
+
+R45 remains default-blocked and safe to merge with production switches off. It does not trade random altcoins, shorts, wrong timeframes, or non-promoted strategies. Live execute requires exact `LIVE APPROVE <signal_id>`, a fresh promoted BTCUSDT 13m long signal, valid preflight, successful prior test-order when required, one-trade locks, isolated margin, 44 USDT max, and 3x max. R45 blocks if the protective stop/take-profit live order path is not implemented, so it should not place naked live entries. The test endpoint remains `POST /fapi/v1/order/test`; the real endpoint is prepared only behind explicit gates.
+
 The live credential env file is expected at:
 
 ```text
