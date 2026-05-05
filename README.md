@@ -285,6 +285,14 @@ GET /binance-live/connector-attempts
 
 R43 does not loosen strategy gates and does not allow random altcoins, random timeframes, shorts, or vague live commands. Default connector mode is `DRY_RUN_ONLY`. Payload preview is not permission to execute, test-order mode is not live order placement, and live order placement remains blocked unless every gate is explicit: `LIVE_ORDER_ENABLED`, Binance live env enabled, live execution enabled, live orders allowed, kill switch off, exact `LIVE APPROVE <signal_id>`, fresh promoted BTCUSDT 13m long `ladder_close_50_618` signal, valid ticket, valid dry-run, passing live-safety, 44 USDT max, 3x max, isolated margin, and one-trade locks. R43 stores sanitized connector attempts and does not create signed payloads in `DRY_RUN_ONLY`.
 
+R44 adds a signed Binance USD-M Futures test-order harness for:
+
+```text
+POST /fapi/v1/order/test
+```
+
+The Binance test-order endpoint validates a request but does not submit it to the matching engine. R44 does not call `POST /fapi/v1/order`, does not place real orders, and keeps default mode as `DRY_RUN_ONLY`. Signed payload creation is blocked in `DRY_RUN_ONLY` and allowed only after explicit `TEST_ORDER_ONLY` gates pass. Real network test-order calls require `HAMMER_BINANCE_TEST_ORDER_NETWORK_ENABLED=true`; otherwise `/binance-live/test-order` remains blocked unless an explicitly requested mock adapter is used. API keys, API secrets, raw signatures, and raw auth headers are never persisted or shown; signature values are hidden in sanitized records.
+
 The live credential env file is expected at:
 
 ```text
@@ -301,6 +309,9 @@ chmod 600 /home/josue/.config/hammer-radar/binance-live.env
 ```text
 HAMMER_BINANCE_LIVE_ENABLED=false
 HAMMER_BINANCE_CONNECTOR_MODE=DRY_RUN_ONLY
+HAMMER_BINANCE_TEST_ORDER_NETWORK_ENABLED=false
+HAMMER_BINANCE_BASE_URL=https://fapi.binance.com
+HAMMER_BINANCE_RECV_WINDOW=5000
 HAMMER_LIVE_EXECUTION_ENABLED=false
 HAMMER_ALLOW_LIVE_ORDERS=false
 HAMMER_GLOBAL_KILL_SWITCH=true

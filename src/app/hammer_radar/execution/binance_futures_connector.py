@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+import hmac
+import hashlib
+import urllib.parse
+import urllib.request
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,9 +48,16 @@ ENV_MAX_LEVERAGE = "HAMMER_LIVE_MAX_LEVERAGE"
 ENV_MARGIN_MODE = "HAMMER_LIVE_MARGIN_MODE"
 ENV_REQUIRE_EXACT_APPROVAL = "HAMMER_LIVE_REQUIRE_EXACT_APPROVAL"
 ENV_MAX_TRADES_PER_DAY = "HAMMER_LIVE_MAX_TRADES_PER_DAY"
+ENV_TEST_ORDER_NETWORK_ENABLED = "HAMMER_BINANCE_TEST_ORDER_NETWORK_ENABLED"
+ENV_BINANCE_BASE_URL = "HAMMER_BINANCE_BASE_URL"
+ENV_RECV_WINDOW = "HAMMER_BINANCE_RECV_WINDOW"
 
 ATTEMPTS_FILENAME = "binance_live_connector_attempts.ndjson"
 CONNECTOR_NAME = "binance_futures_tiny_live"
+TEST_ORDER_ENDPOINT = "/fapi/v1/order/test"
+REAL_ORDER_ENDPOINT = "/fapi/v1/order"
+DEFAULT_BASE_URL = "https://fapi.binance.com"
+DEFAULT_RECV_WINDOW = 5000
 DEFAULT_ALLOWED_SYMBOLS = ["BTCUSDT"]
 DEFAULT_MAX_POSITION_USD = 44.0
 DEFAULT_MAX_LEVERAGE = 3.0
@@ -57,6 +68,76 @@ DEFAULT_MAX_TRADES_PER_DAY = 1
 class BinanceOrderAdapter(Protocol):
     def submit_order(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Submit a sanitized payload through an explicit future adapter."""
+
+
+class SignedTestOrderAdapter(Protocol):
+    def send_test_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        """Send a signed Binance USD-M Futures test-order request."""
+
+
+class MockSignedTestOrderAdapter:
+    def send_test_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "mock_adapter": True,
+            "endpoint": signed_request.get("endpoint"),
+            "network_used": False,
+            "order_placed": False,
+            "validated": True,
+        }
+
+
+class BinanceFuturesHttpClient:
+    """Minimal explicit test-order client. It only targets /fapi/v1/order/test."""
+
+    def send_test_order(self, signed_request: dict[str, Any]) -> dict[str, Any]:
+        endpoint = signed_request.get("endpoint")
+        if endpoint != TEST_ORDER_ENDPOINT:
+            raise ValueError("R44 only permits Binance test-order endpoint")
+        url = f"{signed_request['base_url'].rstrip('/')}{TEST_ORDER_ENDPOINT}"
+        query = signed_request["query_string"]
+        headers = dict(signed_request["headers"])
+        data = query.encode("utf-8")
+        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - explicit gated test endpoint
+            body = response.read().decode("utf-8")
+            payload = json.loads(body) if body else {}
+            return {
+                "status_code": response.status,
+                "body": payload,
+                "endpoint": TEST_ORDER_ENDPOINT,
+                "network_used": True,
+                "order_placed": False,
+            }
+
+
+def build_canonical_query(params: dict[str, Any]) -> str:
+    pairs = []
+    for key in sorted(params):
+        value = params[key]
+        if value is None:
+            continue
+        pairs.append((str(key), str(value)))
+    return urllib.parse.urlencode(pairs, doseq=False, quote_via=urllib.parse.quote)
+
+
+def sign_query(query_string: str, secret: str) -> str:
+    return hmac.new(secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def sanitize_signed_params(params: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(params)
+    sanitized.pop("api_secret", None)
+    sanitized.pop("secret", None)
+    if "signature" in sanitized:
+        sanitized["signature"] = "<hidden>"
+    return sanitized
+
+
+def sanitize_headers(headers: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(headers)
+    if "X-MBX-APIKEY" in sanitized:
+        sanitized["X-MBX-APIKEY"] = "<present>"
+    return sanitized
 
 
 def build_connector_status(
@@ -99,9 +180,14 @@ def _connector_status_from_config(config: dict[str, Any], *, log_dir: Path) -> d
         "max_trades_per_day": DEFAULT_MAX_TRADES_PER_DAY,
         "configured_max_trades_per_day": config["max_trades_per_day"],
         "require_exact_approval": config["require_exact_approval"],
+        "test_order_network_enabled": config["test_order_network_enabled"],
+        "base_url_host": _base_url_host(config["base_url"]),
+        "recv_window": config["recv_window"],
+        "signing_available": config["api_secret_present"],
         "order_placed": False,
         "execution_attempted": False,
         "order_payload_created": False,
+        "signed_payload_created": False,
         "readiness": readiness,
         "blockers": blockers,
         "attempts_path": str(connector_attempts_path(log_dir)),
@@ -144,6 +230,9 @@ def submit_test_order(
     preflight_pack: dict[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
     log_dir: str | Path | None = None,
+    use_mock_adapter: bool = False,
+    require_exact_approval: bool | None = None,
+    adapter: SignedTestOrderAdapter | None = None,
     persist: bool = True,
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
@@ -151,11 +240,30 @@ def submit_test_order(
     config = _config(source)
     pack = preflight_pack or build_promoted_strategy_preflight(log_dir=resolved_log_dir)
     payload, blockers = _payload_preview_from_pack(pack, config=config)
+    exact_approval_required = config["require_exact_approval"] if require_exact_approval is None else require_exact_approval
     if config["connector_mode"] != TEST_ORDER_ONLY:
         blockers.append("connector_mode must be TEST_ORDER_ONLY for test-order")
     if not config["api_key_present"] or not config["api_secret_present"]:
         blockers.append("Binance API key and secret must be present for test-order")
-    status = "BLOCKED" if blockers else "TEST_ORDER_SENT"
+    if exact_approval_required and not _has_exact_approval(_signal_id(pack), log_dir=resolved_log_dir):
+        blockers.append("exact LIVE APPROVE <signal_id> is missing")
+    if not use_mock_adapter and config["test_order_network_enabled"] is not True:
+        blockers.append("test-order network disabled")
+    signed_request = None
+    sanitized_response = None
+    network_used = False
+    execution_attempted = False
+    signed_payload_created = False
+    status = "BLOCKED"
+    if not blockers and payload is not None:
+        signed_request = build_signed_test_order_request(payload, config=config, source=source)
+        signed_payload_created = True
+        selected_adapter = adapter or (MockSignedTestOrderAdapter() if use_mock_adapter else BinanceFuturesHttpClient())
+        execution_attempted = True
+        response = selected_adapter.send_test_order(signed_request)
+        sanitized_response = _sanitize_exchange_response(response)
+        network_used = bool(sanitized_response.get("network_used"))
+        status = "TEST_ORDER_SENT" if network_used else "TEST_ORDER_MOCK_VALIDATED"
     record = _attempt_record(
         action="test_order",
         connector_mode=config["connector_mode"],
@@ -163,13 +271,15 @@ def submit_test_order(
         preflight_id=pack.get("preflight_id"),
         status=status,
         blockers=blockers,
-        network_used=False,
+        network_used=network_used,
         order_payload_created=payload is not None and not blockers,
-        execution_attempted=not blockers,
+        signed_payload_created=signed_payload_created,
+        execution_attempted=execution_attempted,
         order_placed=False,
         config=config,
         payload_preview=payload if not blockers else None,
-        exchange_response={"local_test_adapter": True, "sent": False} if not blockers else None,
+        signed_request=signed_request,
+        exchange_response=sanitized_response,
     )
     if persist:
         append_connector_attempt(record, log_dir=resolved_log_dir)
@@ -218,6 +328,7 @@ def execute_live_order(
         blockers=blockers,
         network_used=network_used,
         order_payload_created=payload is not None and not blockers,
+        signed_payload_created=False,
         execution_attempted=execution_attempted,
         order_placed=order_placed,
         config=config,
@@ -303,6 +414,47 @@ def _payload_preview_from_pack(
         "order_payload_created": True,
     }
     return payload, []
+
+
+def build_signed_test_order_request(
+    payload_preview: dict[str, Any],
+    *,
+    config: dict[str, Any],
+    source: Mapping[str, str],
+    timestamp_ms: int | None = None,
+) -> dict[str, Any]:
+    timestamp = timestamp_ms if timestamp_ms is not None else int(datetime.now(UTC).timestamp() * 1000)
+    params = {
+        "symbol": payload_preview["symbol"],
+        "side": payload_preview["side"],
+        "type": payload_preview.get("order_type", "LIMIT"),
+        "timeInForce": "GTC" if payload_preview.get("order_type", "LIMIT") == "LIMIT" else None,
+        "quantity": payload_preview["quantity"],
+        "price": payload_preview["price"],
+        "recvWindow": config["recv_window"],
+        "timestamp": timestamp,
+    }
+    query_without_signature = build_canonical_query(params)
+    signature = sign_query(query_without_signature, _env_value(source, ENV_API_SECRET))
+    signed_params = dict(params)
+    signed_params["signature"] = signature
+    query_string = build_canonical_query(signed_params)
+    headers = {
+        "X-MBX-APIKEY": _env_value(source, ENV_API_KEY),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    return {
+        "method": "POST",
+        "endpoint": TEST_ORDER_ENDPOINT,
+        "base_url": config["base_url"],
+        "base_url_host": _base_url_host(config["base_url"]),
+        "params": signed_params,
+        "query_string": query_string,
+        "headers": headers,
+        "signed": True,
+        "sent": False,
+        "order_placed": False,
+    }
 
 
 def _preflight_blockers(pack: dict[str, Any], *, config: dict[str, Any]) -> list[str]:
@@ -403,7 +555,9 @@ def _attempt_record(
     execution_attempted: bool,
     order_placed: bool,
     config: dict[str, Any],
+    signed_payload_created: bool = False,
     payload_preview: dict[str, Any] | None = None,
+    signed_request: dict[str, Any] | None = None,
     exchange_response: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
@@ -419,6 +573,7 @@ def _attempt_record(
         "blockers": list(dict.fromkeys(blockers)),
         "network_used": network_used,
         "order_payload_created": order_payload_created,
+        "signed_payload_created": signed_payload_created,
         "execution_attempted": execution_attempted,
         "order_placed": order_placed,
         "live_execution_enabled": config["live_execution_enabled"],
@@ -426,7 +581,9 @@ def _attempt_record(
         "global_kill_switch": config["global_kill_switch"],
         "secrets_shown": False,
         "payload_preview": _sanitize_payload(payload_preview),
+        "sanitized_signed_request": _sanitize_signed_request(signed_request),
         "exchange_response": _sanitize_exchange_response(exchange_response),
+        "sanitized_exchange_response": _sanitize_exchange_response(exchange_response),
     }
 
 
@@ -439,6 +596,7 @@ def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> di
         "blockers": record["blockers"],
         "network_used": record["network_used"],
         "order_payload_created": record["order_payload_created"],
+        "signed_payload_created": record.get("signed_payload_created", False),
         "execution_attempted": record["execution_attempted"],
         "order_placed": record["order_placed"],
         "live_execution_enabled": record["live_execution_enabled"],
@@ -446,7 +604,9 @@ def _response(record: dict[str, Any], *, connector_status: dict[str, Any]) -> di
         "global_kill_switch": record["global_kill_switch"],
         "secrets_shown": False,
         "payload_preview": record.get("payload_preview"),
+        "sanitized_signed_request": record.get("sanitized_signed_request"),
         "exchange_response": record.get("exchange_response"),
+        "sanitized_exchange_response": record.get("sanitized_exchange_response"),
         "connector_status": connector_status,
     }
 
@@ -469,6 +629,9 @@ def _config(source: Mapping[str, str]) -> dict[str, Any]:
         "margin_mode": (_env_value(source, ENV_MARGIN_MODE).lower() or DEFAULT_MARGIN_MODE),
         "require_exact_approval": _env_bool(source, ENV_REQUIRE_EXACT_APPROVAL, default=True),
         "max_trades_per_day": int(_env_float(source, ENV_MAX_TRADES_PER_DAY, DEFAULT_MAX_TRADES_PER_DAY)),
+        "test_order_network_enabled": _env_bool(source, ENV_TEST_ORDER_NETWORK_ENABLED, default=False),
+        "base_url": _env_value(source, ENV_BINANCE_BASE_URL) or DEFAULT_BASE_URL,
+        "recv_window": int(_env_float(source, ENV_RECV_WINDOW, DEFAULT_RECV_WINDOW)),
     }
 
 
@@ -512,6 +675,21 @@ def _sanitize_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return sanitized
 
 
+def _sanitize_signed_request(signed_request: dict[str, Any] | None) -> dict[str, Any] | None:
+    if signed_request is None:
+        return None
+    return {
+        "method": signed_request.get("method"),
+        "endpoint": signed_request.get("endpoint"),
+        "base_url_host": signed_request.get("base_url_host"),
+        "params": sanitize_signed_params(signed_request.get("params") or {}),
+        "headers": sanitize_headers(signed_request.get("headers") or {}),
+        "signed": True,
+        "sent": False,
+        "order_placed": False,
+    }
+
+
 def _sanitize_exchange_response(response: dict[str, Any] | None) -> dict[str, Any] | None:
     if response is None:
         return None
@@ -531,6 +709,11 @@ def _record_date(record: dict[str, Any]) -> object:
 def _signal_id(pack: dict[str, Any]) -> str | None:
     value = pack.get("candidate_signal_id") or pack.get("signal_id")
     return str(value) if value else None
+
+
+def _base_url_host(base_url: str) -> str:
+    parsed = urllib.parse.urlparse(base_url)
+    return parsed.netloc or parsed.path
 
 
 def _float_or_none(value: object) -> float | None:

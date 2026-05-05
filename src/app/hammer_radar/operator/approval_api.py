@@ -239,6 +239,11 @@ class StrategyPromotionCheckRequest(BaseModel):
     record_blocked: bool = False
 
 
+class BinanceLiveTestOrderRequest(BaseModel):
+    use_mock_adapter: bool = False
+    require_exact_approval: bool | None = None
+
+
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
 
 
@@ -449,8 +454,13 @@ def binance_live_payload_preview() -> dict:
 
 
 @app.post("/binance-live/test-order")
-def binance_live_test_order() -> dict:
-    return submit_test_order(log_dir=get_log_dir(use_env=True))
+def binance_live_test_order(request: BinanceLiveTestOrderRequest | None = None) -> dict:
+    request = request or BinanceLiveTestOrderRequest()
+    return submit_test_order(
+        log_dir=get_log_dir(use_env=True),
+        use_mock_adapter=request.use_mock_adapter,
+        require_exact_approval=request.require_exact_approval,
+    )
 
 
 @app.post("/binance-live/execute")
@@ -468,6 +478,7 @@ def binance_live_connector_attempts(limit: int = Query(default=50, ge=0), signal
         "order_placed": ORDER_PLACED,
         "execution_attempted": False,
         "order_payload_created": False,
+        "signed_payload_created": False,
         "secrets_shown": False,
         "binance_live_connector_attempts_path": str(connector_attempts_path(log_dir)),
         "binance_live_connector_attempts": load_connector_attempts(
@@ -1388,6 +1399,8 @@ def _operator_ui_html() -> str:
         <div><div class="label">readiness</div><div id="binanceLiveConnectorReadiness" class="value danger">BLOCKED</div></div>
         <div><div class="label">api_key_present</div><div id="binanceLiveConnectorKey" class="value">false</div></div>
         <div><div class="label">api_secret_present</div><div id="binanceLiveConnectorSecret" class="value">false</div></div>
+        <div><div class="label">test_order_network_enabled</div><div id="binanceLiveConnectorTestNetwork" class="value danger">false</div></div>
+        <div><div class="label">signing_available</div><div id="binanceLiveConnectorSigning" class="value">false</div></div>
         <div><div class="label">live_execution_enabled</div><div id="binanceLiveConnectorLive" class="value danger">false</div></div>
         <div><div class="label">allow_live_orders</div><div id="binanceLiveConnectorAllow" class="value danger">false</div></div>
         <div><div class="label">global_kill_switch</div><div id="binanceLiveConnectorKill" class="value danger">true</div></div>
@@ -1399,6 +1412,9 @@ def _operator_ui_html() -> str:
       <p class="muted">No vague live commands.</p>
       <p class="muted">Exact LIVE APPROVE &lt;signal_id&gt; required.</p>
       <p class="muted">Payload preview is not permission to execute. Test-order mode is not live order placement.</p>
+      <p class="muted">Test order only. No matching-engine submission.</p>
+      <p class="muted">No real orders.</p>
+      <p class="muted">Secrets and signatures are hidden.</p>
     </section>
 
     <h2>Operator Actions / Binance Live Readiness</h2>
@@ -1904,6 +1920,8 @@ async function loadBinanceLiveConnector() {
   document.getElementById('binanceLiveConnectorReadiness').textContent = status.readiness || 'BLOCKED';
   document.getElementById('binanceLiveConnectorKey').textContent = String(status.api_key_present === true);
   document.getElementById('binanceLiveConnectorSecret').textContent = String(status.api_secret_present === true);
+  document.getElementById('binanceLiveConnectorTestNetwork').textContent = String(status.test_order_network_enabled === true);
+  document.getElementById('binanceLiveConnectorSigning').textContent = String(status.signing_available === true);
   document.getElementById('binanceLiveConnectorLive').textContent = String(status.live_execution_enabled === true);
   document.getElementById('binanceLiveConnectorAllow').textContent = String(status.allow_live_orders === true);
   document.getElementById('binanceLiveConnectorKill').textContent = String(status.global_kill_switch === true);
