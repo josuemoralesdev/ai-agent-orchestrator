@@ -323,6 +323,21 @@ GET /first-live/evaluations/{evaluation_id}
 
 R47 is a runbook and go/no-go checklist only. It does not place orders, does not enable live trading, does not modify env files automatically, does not restart systemd, and does not call Binance network. The first live order remains one protected BTCUSDT 13m long trade only: no random altcoins, no shorts, no vague commands, exact `LIVE APPROVE <signal_id>` required, test-order validation required, protective stop-loss and take-profit required, 44 USDT max, 3x max, isolated margin, one trade per day, and no duplicate signal order. A `GO_FOR_ENABLEMENT_PLAN` response means the operator may manually follow the enablement plan; it is not automatic execution. After the first attempt, the system must be locked back down.
 
+R48 adds the Telegram inbound operator bridge and first-live approval challenge flow:
+
+```text
+POST /telegram/operator-command
+POST /telegram/first-live/challenge
+POST /telegram/first-live/reply
+GET /telegram/first-live/challenges
+GET /telegram/first-live/challenges/{challenge_id}
+GET /telegram/operator-commands
+```
+
+Telegram is the preferred phone operator surface for status, evaluation, and approval intent. Cloudflare dashboard exposure is not required for phone operation, and the `127.0.0.1` dashboard remains desktop-local. R48 does not change the API bind address, does not modify Cloudflare config, does not place orders, does not flip env switches, does not restart systemd, and does not call Binance network.
+
+First live approval uses a signal-bound challenge/reply flow. Raw `YES` is rejected. Only `YES <code>` for an active, unexpired one-time challenge is accepted. A valid code records exact approval intent for the matching `signal_id` through the existing `LIVE APPROVE <signal_id>` gate, but approval is not execution and no live order is placed by challenge approval. Execution still requires all runbook, preflight, test-order, protective, live-safety, and deliberate live enablement gates. Paper-only alerts, including 8m shorts, may be acknowledged or recorded as paper/manual intent only; they never create live approval challenges.
+
 The live credential env file is expected at:
 
 ```text

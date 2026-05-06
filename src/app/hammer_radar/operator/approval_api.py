@@ -135,6 +135,17 @@ from src.app.hammer_radar.operator.strategy_promotion_watcher import (
     load_strategy_promotion_events,
     strategy_promotion_events_path,
 )
+from src.app.hammer_radar.operator.telegram_approval_challenge import (
+    create_first_live_approval_challenge,
+    load_telegram_approval_challenges,
+    process_first_live_challenge_reply,
+    telegram_approval_challenges_path,
+)
+from src.app.hammer_radar.operator.telegram_operator_bridge import (
+    handle_telegram_operator_command,
+    load_telegram_operator_commands,
+    telegram_operator_commands_path,
+)
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
     build_trade_ticket,
@@ -244,6 +255,18 @@ class OperatorParseActionRequest(BaseModel):
 class LiveApprovalEvaluateRequest(BaseModel):
     text: str = Field(min_length=1)
     source: str = "approval_api"
+
+
+class TelegramOperatorCommandRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: str = "manual"
+    chat_id: str | None = None
+    update_id: int | None = None
+
+
+class TelegramChallengeReplyRequest(BaseModel):
+    text: str = Field(min_length=1)
+    source: str = "manual"
 
 
 class StrategyPromotionCheckRequest(BaseModel):
@@ -774,6 +797,85 @@ def first_live_evaluation_by_id(evaluation_id: str) -> dict:
     return record
 
 
+@app.post("/telegram/operator-command")
+def telegram_operator_command(request: TelegramOperatorCommandRequest) -> dict:
+    return handle_telegram_operator_command(
+        text=request.text,
+        source=request.source,
+        chat_id=request.chat_id,
+        update_id=request.update_id,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/telegram/first-live/challenge")
+def telegram_first_live_challenge() -> dict:
+    return create_first_live_approval_challenge(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/telegram/first-live/reply")
+def telegram_first_live_reply(request: TelegramChallengeReplyRequest) -> dict:
+    return process_first_live_challenge_reply(
+        text=request.text,
+        source=request.source,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/telegram/first-live/challenges")
+def telegram_first_live_challenges(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "secrets_shown": False,
+        "telegram_approval_challenges_path": str(telegram_approval_challenges_path(log_dir)),
+        "telegram_approval_challenges": load_telegram_approval_challenges(
+            limit=limit,
+            signal_id=signal_id,
+            log_dir=log_dir,
+        ),
+    }
+
+
+@app.get("/telegram/first-live/challenges/{challenge_id}")
+def telegram_first_live_challenge_by_id(challenge_id: str) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    records = load_telegram_approval_challenges(limit=0, challenge_id=challenge_id, log_dir=log_dir)
+    if not records:
+        raise HTTPException(status_code=404, detail="telegram approval challenge not found")
+    record = dict(records[0])
+    record["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    record["allow_live_orders"] = False
+    record["global_kill_switch"] = True
+    record["order_placed"] = ORDER_PLACED
+    record["real_order_placed"] = False
+    record["execution_attempted"] = False
+    record["secrets_shown"] = False
+    record["telegram_approval_challenges_path"] = str(telegram_approval_challenges_path(log_dir))
+    return record
+
+
+@app.get("/telegram/operator-commands")
+def telegram_operator_commands(limit: int = Query(default=50, ge=0)) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "secrets_shown": False,
+        "telegram_operator_commands_path": str(telegram_operator_commands_path(log_dir)),
+        "telegram_operator_commands": load_telegram_operator_commands(limit=limit, log_dir=log_dir),
+    }
+
+
 @app.post("/operator/parse-action")
 def operator_parse_action(request: OperatorParseActionRequest) -> dict:
     return parse_operator_action(request.text, signal_id=request.signal_id)
@@ -851,6 +953,15 @@ def create_operator_action(request: OperatorActionRequest) -> dict:
         runbook["operator_action"] = record
         runbook["operator_actions_path"] = str(operator_actions_path(log_dir))
         return runbook
+    if parsed["normalized_action"] == "telegram_operator_command":
+        bridge = handle_telegram_operator_command(
+            text=request.text,
+            source=request.source,
+            log_dir=log_dir,
+        )
+        bridge["operator_action"] = record
+        bridge["operator_actions_path"] = str(operator_actions_path(log_dir))
+        return bridge
     return record
 
 
@@ -887,6 +998,8 @@ def operator_latest() -> dict:
     live_preflight_packs = load_live_preflight_packs(limit=1, log_dir=log_dir)
     connector_attempts = load_connector_attempts(limit=1, log_dir=log_dir)
     first_live_evaluations = load_first_live_runbook_evaluations(limit=1, log_dir=log_dir)
+    telegram_commands = load_telegram_operator_commands(limit=1, log_dir=log_dir)
+    telegram_challenges = load_telegram_approval_challenges(limit=1, log_dir=log_dir)
     latest_candidate = _latest_candidate_snapshot()
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
@@ -898,6 +1011,8 @@ def operator_latest() -> dict:
         "latest_live_preflight_pack": live_preflight_packs[0] if live_preflight_packs else None,
         "latest_binance_live_connector_attempt": connector_attempts[0] if connector_attempts else None,
         "latest_first_live_runbook_evaluation": first_live_evaluations[0] if first_live_evaluations else None,
+        "latest_telegram_operator_command": telegram_commands[0] if telegram_commands else None,
+        "latest_telegram_approval_challenge": telegram_challenges[0] if telegram_challenges else None,
         "latest_alert": alerts[0] if alerts else None,
         "latest_candidate": latest_candidate,
     }

@@ -32,6 +32,7 @@ SAFE_ACTIONS = {
     "show_alerts",
     "show_candidate",
     "first_live_check",
+    "telegram_operator_command",
 }
 
 _LEVERAGE_RE = re.compile(r"\b(?:[2-9]\d*x|[1-9]\d+\s*x|leverage|leveraged|increase\s+leverage)\b")
@@ -79,12 +80,40 @@ def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> 
             signal_id=signal_id,
         )
 
+    telegram_commands = {
+        "help",
+        "first live challenge",
+        "approval challenge",
+        "live preflight",
+        "promotion status",
+        "connector status",
+        "protective status",
+        "readiness status",
+        "paper only",
+        "reject",
+    }
     if normalized_text in {"first live check", "first live runbook", "first live evaluate"}:
         return _parse_result(
             raw_text=raw_text,
             normalized_action="first_live_check",
             result_status="ACCEPTED",
             reason=FIRST_LIVE_RUNBOOK_REASON,
+            signal_id=signal_id,
+        )
+    if normalized_text == "yes" or normalized_text.startswith("yes "):
+        return _parse_result(
+            raw_text=raw_text,
+            normalized_action="telegram_operator_command",
+            result_status="ACCEPTED" if normalized_text.startswith("yes ") else "REJECTED",
+            reason="Telegram challenge reply is handled by the inbound command bridge",
+            signal_id=signal_id,
+        )
+    if normalized_text in telegram_commands:
+        return _parse_result(
+            raw_text=raw_text,
+            normalized_action="telegram_operator_command",
+            result_status="ACCEPTED",
+            reason="Telegram operator command accepted for bridge handling only",
             signal_id=signal_id,
         )
 
