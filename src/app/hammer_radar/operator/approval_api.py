@@ -94,6 +94,11 @@ from src.app.hammer_radar.operator.live_arming_checklist import (
     evaluate_and_record_live_arming_check,
     list_live_arming_checks,
 )
+from src.app.hammer_radar.operator.first_live_execution_gate import (
+    build_first_live_execution_gate,
+    evaluate_and_record_first_live_execution_gate,
+    list_first_live_execution_gates,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -259,6 +264,14 @@ class LiveExecutionIntentRequest(BaseModel):
 class LiveExecutorRehearsalRequest(BaseModel):
     execution_intent_id: str | None = None
     signal_id: str | None = None
+    dry_run: bool = True
+
+
+class FirstLiveExecutionGateRequest(BaseModel):
+    execution_intent_id: str | None = None
+    executor_rehearsal_id: str | None = None
+    signal_id: str | None = None
+    final_confirmation: bool = False
     dry_run: bool = True
 
 
@@ -599,6 +612,33 @@ def live_arming_check() -> dict:
 @app.get("/live/arming/checks")
 def live_arming_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_live_arming_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-execution/gate")
+def first_live_execution_gate_status() -> dict:
+    return build_first_live_execution_gate(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-execution/gate")
+def first_live_execution_gate(request: FirstLiveExecutionGateRequest | None = None) -> dict:
+    request = request or FirstLiveExecutionGateRequest()
+    return evaluate_and_record_first_live_execution_gate(
+        execution_intent_id=request.execution_intent_id,
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        signal_id=request.signal_id,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-execution/gates")
+def first_live_execution_gates(
+    limit: int = Query(default=20, ge=0),
+    signal_id: str | None = None,
+    status: str | None = None,
+) -> dict:
+    return list_first_live_execution_gates(limit=limit, signal_id=signal_id, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/live-connector/stub-submit")
