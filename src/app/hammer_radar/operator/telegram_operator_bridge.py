@@ -17,6 +17,10 @@ from src.app.hammer_radar.execution.binance_futures_connector import build_conne
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_runbook import build_first_live_runbook, evaluate_first_live_runbook
 from src.app.hammer_radar.operator.live_begins import evaluate_and_record_live_begins, format_live_begins_operator_message
+from src.app.hammer_radar.operator.live_execution_preview import (
+    evaluate_and_record_live_execution_preview,
+    format_live_execution_preview_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -43,6 +47,8 @@ HELP_COMMANDS = [
     "APPROVAL CHALLENGE",
     "LIVE BEGINS",
     "FIRST LIVE BEGINS",
+    "LIVE PREVIEW",
+    "FIRST LIVE PREVIEW",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -156,6 +162,15 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_live_begins_operator_message(live_begins),
             payload={"live_begins": live_begins},
             signal_id=live_begins.get("latest_signal_id"),
+        )
+    if normalized in {"LIVE PREVIEW", "FIRST LIVE PREVIEW"}:
+        preview = evaluate_and_record_live_execution_preview(log_dir=log_dir)
+        return _result(
+            "live_execution_preview",
+            "ACCEPTED",
+            format_live_execution_preview_operator_message(preview),
+            payload={"live_execution_preview": preview},
+            signal_id=preview.get("latest_signal_id"),
         )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)
