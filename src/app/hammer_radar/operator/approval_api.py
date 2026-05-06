@@ -146,6 +146,11 @@ from src.app.hammer_radar.operator.telegram_operator_bridge import (
     load_telegram_operator_commands,
     telegram_operator_commands_path,
 )
+from src.app.hammer_radar.operator.telegram_polling_worker import (
+    poll_telegram_once,
+    polling_state,
+    polling_status,
+)
 from src.app.hammer_radar.operator.trade_ticket import (
     approve_paper_ticket,
     build_trade_ticket,
@@ -267,6 +272,11 @@ class TelegramOperatorCommandRequest(BaseModel):
 class TelegramChallengeReplyRequest(BaseModel):
     text: str = Field(min_length=1)
     source: str = "manual"
+
+
+class TelegramPollingOnceRequest(BaseModel):
+    dry_run: bool = False
+    send_responses: bool = True
 
 
 class StrategyPromotionCheckRequest(BaseModel):
@@ -874,6 +884,26 @@ def telegram_operator_commands(limit: int = Query(default=50, ge=0)) -> dict:
         "telegram_operator_commands_path": str(telegram_operator_commands_path(log_dir)),
         "telegram_operator_commands": load_telegram_operator_commands(limit=limit, log_dir=log_dir),
     }
+
+
+@app.get("/telegram/polling/status")
+def telegram_polling_status() -> dict:
+    return polling_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/telegram/polling/once")
+def telegram_polling_once(request: TelegramPollingOnceRequest | None = None) -> dict:
+    request = request or TelegramPollingOnceRequest()
+    return poll_telegram_once(
+        log_dir=get_log_dir(use_env=True),
+        send_responses=request.send_responses,
+        dry_run=request.dry_run,
+    )
+
+
+@app.get("/telegram/polling/state")
+def telegram_polling_state() -> dict:
+    return polling_state(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/operator/parse-action")

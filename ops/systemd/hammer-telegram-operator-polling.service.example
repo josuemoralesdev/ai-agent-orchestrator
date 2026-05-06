@@ -1,0 +1,16 @@
+[Unit]
+Description=Hammer Radar Telegram operator polling worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=josue
+WorkingDirectory=/home/josue/workspace/kernel/ai-agent-orchestrator-main
+EnvironmentFile=-/home/josue/.config/hammer-radar/notifications.env
+ExecStart=/home/josue/workspace/kernel/ai-agent-orchestrator-main/.venv/bin/python -m src.app.hammer_radar.operator.telegram_polling_worker --loop --interval 3
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

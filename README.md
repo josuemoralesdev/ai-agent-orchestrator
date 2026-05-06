@@ -338,6 +338,26 @@ Telegram is the preferred phone operator surface for status, evaluation, and app
 
 First live approval uses a signal-bound challenge/reply flow. Raw `YES` is rejected. Only `YES <code>` for an active, unexpired one-time challenge is accepted. A valid code records exact approval intent for the matching `signal_id` through the existing `LIVE APPROVE <signal_id>` gate, but approval is not execution and no live order is placed by challenge approval. Execution still requires all runbook, preflight, test-order, protective, live-safety, and deliberate live enablement gates. Paper-only alerts, including 8m shorts, may be acknowledged or recorded as paper/manual intent only; they never create live approval challenges.
 
+R49 wires the Telegram polling worker into one-shot and manual loop operation:
+
+```text
+GET /telegram/polling/status
+POST /telegram/polling/once
+GET /telegram/polling/state
+```
+
+Polling uses Telegram `getUpdates`, routes text messages through the R48 command handler, sends compact `sendMessage` replies when not in dry-run mode, and persists update offset in `logs/hammer_radar_forward/telegram_polling_state.json`. This avoids Cloudflare exposure and keeps the dashboard local. Telegram polling does not place orders, does not flip env switches, does not call Binance, and keeps raw `YES` / `trade now live` rejected.
+
+Manual commands:
+
+```bash
+.venv/bin/python -m src.app.hammer_radar.operator.telegram_polling_worker --once
+.venv/bin/python -m src.app.hammer_radar.operator.telegram_polling_worker --once --dry-run
+.venv/bin/python -m src.app.hammer_radar.operator.telegram_polling_worker --loop --interval 3
+```
+
+A systemd template is provided at `ops/systemd/hammer-telegram-operator-polling.service.example`. It is not installed, enabled, or started automatically. The Telegram token is never printed; status surfaces only token/chat-id presence booleans.
+
 The live credential env file is expected at:
 
 ```text
