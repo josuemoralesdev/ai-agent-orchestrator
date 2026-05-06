@@ -99,6 +99,12 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     evaluate_and_record_first_live_execution_gate,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.live_executor_transport import (
+    attempt_live_executor_transport,
+    build_live_executor_transport_status,
+    check_live_executor_transport,
+    list_live_executor_transport_attempts,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -271,6 +277,15 @@ class FirstLiveExecutionGateRequest(BaseModel):
     execution_intent_id: str | None = None
     executor_rehearsal_id: str | None = None
     signal_id: str | None = None
+    final_confirmation: bool = False
+    dry_run: bool = True
+
+
+class LiveExecutorTransportRequest(BaseModel):
+    executor_rehearsal_id: str | None = None
+    execution_intent_id: str | None = None
+    signal_id: str | None = None
+    transport_mode: str | None = None
     final_confirmation: bool = False
     dry_run: bool = True
 
@@ -639,6 +654,55 @@ def first_live_execution_gates(
     status: str | None = None,
 ) -> dict:
     return list_first_live_execution_gates(limit=limit, signal_id=signal_id, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/executor/transport/status")
+def live_executor_transport_status() -> dict:
+    return build_live_executor_transport_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/executor/transport/check")
+def live_executor_transport_check(request: LiveExecutorTransportRequest | None = None) -> dict:
+    request = request or LiveExecutorTransportRequest()
+    return check_live_executor_transport(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live/executor/transport/attempt")
+def live_executor_transport_attempt(request: LiveExecutorTransportRequest | None = None) -> dict:
+    request = request or LiveExecutorTransportRequest()
+    return attempt_live_executor_transport(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/executor/transport/attempts")
+def live_executor_transport_attempts(
+    limit: int = Query(default=20, ge=0),
+    signal_id: str | None = None,
+    transport_mode: str | None = None,
+    status: str | None = None,
+) -> dict:
+    return list_live_executor_transport_attempts(
+        limit=limit,
+        signal_id=signal_id,
+        transport_mode=transport_mode,
+        status=status,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.post("/live-connector/stub-submit")
