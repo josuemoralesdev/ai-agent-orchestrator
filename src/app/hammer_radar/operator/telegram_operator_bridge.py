@@ -27,6 +27,12 @@ from src.app.hammer_radar.operator.live_execution_intent import (
     format_live_execution_intents_operator_message,
     list_live_execution_intents,
 )
+from src.app.hammer_radar.operator.live_executor_rehearsal import (
+    create_live_executor_rehearsal,
+    format_live_executor_rehearsal_operator_message,
+    format_live_executor_rehearsals_operator_message,
+    list_live_executor_rehearsals,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -58,6 +64,10 @@ HELP_COMMANDS = [
     "LIVE INTENT <signal_id>",
     "FIRST LIVE INTENT <signal_id>",
     "LIVE INTENTS",
+    "LIVE REHEARSAL <execution_intent_id>",
+    "LIVE REHEARSAL SIGNAL <signal_id>",
+    "FIRST LIVE REHEARSAL <execution_intent_id>",
+    "LIVE REHEARSALS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -210,6 +220,40 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_live_execution_intent_operator_message(intent),
             payload={"live_execution_intent": intent},
             signal_id=intent.get("signal_id"),
+        )
+    if normalized == "LIVE REHEARSALS":
+        rehearsals = list_live_executor_rehearsals(log_dir=log_dir)
+        return _result(
+            "live_executor_rehearsals",
+            "ACCEPTED",
+            format_live_executor_rehearsals_operator_message(rehearsals),
+            payload={"live_executor_rehearsals": rehearsals},
+        )
+    if normalized == "LIVE REHEARSAL" or normalized.startswith("LIVE REHEARSAL "):
+        parts = raw_text.split(maxsplit=3)
+        if len(parts) >= 4 and parts[2].upper() == "SIGNAL":
+            rehearsal = create_live_executor_rehearsal(signal_id=parts[3].strip(), log_dir=log_dir)
+        else:
+            intent_id = raw_text.split(maxsplit=2)[2].strip() if len(raw_text.split(maxsplit=2)) == 3 else None
+            rehearsal = create_live_executor_rehearsal(execution_intent_id=intent_id, log_dir=log_dir)
+        result_status = "ACCEPTED" if rehearsal.get("status") == "REHEARSAL_READY" else str(rehearsal.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_rehearsal",
+            result_status,
+            format_live_executor_rehearsal_operator_message(rehearsal),
+            payload={"live_executor_rehearsal": rehearsal},
+            signal_id=rehearsal.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE REHEARSAL" or normalized.startswith("FIRST LIVE REHEARSAL "):
+        intent_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+        rehearsal = create_live_executor_rehearsal(execution_intent_id=intent_id, log_dir=log_dir)
+        result_status = "ACCEPTED" if rehearsal.get("status") == "REHEARSAL_READY" else str(rehearsal.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_rehearsal",
+            result_status,
+            format_live_executor_rehearsal_operator_message(rehearsal),
+            payload={"live_executor_rehearsal": rehearsal},
+            signal_id=rehearsal.get("signal_id"),
         )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)

@@ -85,6 +85,10 @@ from src.app.hammer_radar.operator.live_execution_intent import (
     create_live_execution_intent,
     list_live_execution_intents,
 )
+from src.app.hammer_radar.operator.live_executor_rehearsal import (
+    create_live_executor_rehearsal,
+    list_live_executor_rehearsals,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -244,6 +248,12 @@ class LiveConnectorSubmitRequest(BaseModel):
 class LiveExecutionIntentRequest(BaseModel):
     signal_id: str | None = None
     approval_code: str | None = None
+    dry_run: bool = True
+
+
+class LiveExecutorRehearsalRequest(BaseModel):
+    execution_intent_id: str | None = None
+    signal_id: str | None = None
     dry_run: bool = True
 
 
@@ -541,6 +551,31 @@ def live_execution_intent(request: LiveExecutionIntentRequest | None = None) -> 
     return create_live_execution_intent(
         signal_id=request.signal_id,
         approval_code=request.approval_code,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/executor/rehearsals")
+def live_executor_rehearsals(
+    limit: int = Query(default=20, ge=0),
+    signal_id: str | None = None,
+    execution_intent_id: str | None = None,
+) -> dict:
+    return list_live_executor_rehearsals(
+        limit=limit,
+        signal_id=signal_id,
+        execution_intent_id=execution_intent_id,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live/executor/rehearsal")
+def live_executor_rehearsal(request: LiveExecutorRehearsalRequest | None = None) -> dict:
+    request = request or LiveExecutorRehearsalRequest()
+    return create_live_executor_rehearsal(
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
         dry_run=request.dry_run,
         log_dir=get_log_dir(use_env=True),
     )
