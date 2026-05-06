@@ -52,6 +52,14 @@ from src.app.hammer_radar.operator.live_executor_transport import (
     format_live_executor_transport_operator_message,
     list_live_executor_transport_attempts,
 )
+from src.app.hammer_radar.operator.live_arming_runbook import (
+    build_live_arming_runbook,
+    evaluate_and_record_live_arming_runbook,
+    format_live_arming_runbook_operator_message,
+    format_live_arming_runbooks_operator_message,
+    format_live_blockers_operator_message,
+    list_live_arming_runbooks,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -103,6 +111,10 @@ HELP_COMMANDS = [
     "LIVE TRANSPORT MOCK <executor_rehearsal_id>",
     "LIVE TRANSPORT LIVE <executor_rehearsal_id> FINAL",
     "LIVE TRANSPORT ATTEMPTS",
+    "LIVE RUNBOOK",
+    "LIVE BLOCKERS",
+    "LIVE ARMING RUNBOOK",
+    "LIVE ARMING RUNBOOKS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -180,7 +192,7 @@ def telegram_operator_commands_path(log_dir: str | Path) -> Path:
 def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: Path) -> dict[str, Any]:
     if normalized == "HELP":
         return _result("help", "ACCEPTED", "Available commands: " + ", ".join(HELP_COMMANDS))
-    if normalized in {"FIRST LIVE CHECK", "FIRST LIVE RUNBOOK"}:
+    if normalized == "FIRST LIVE CHECK":
         runbook = build_first_live_runbook(log_dir=log_dir)
         return _result(
             "first_live_check",
@@ -188,6 +200,32 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             f"First live runbook: {runbook['runbook_status']} / {runbook['gate_decision']}. No order placed.",
             payload={"runbook": runbook},
             signal_id=runbook.get("signal_id"),
+        )
+    if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
+        runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
+        return _result(
+            "live_arming_runbook",
+            "ACCEPTED",
+            format_live_arming_runbook_operator_message(runbook),
+            payload={"live_arming_runbook": runbook},
+            signal_id=runbook.get("latest_signal_id"),
+        )
+    if normalized == "LIVE BLOCKERS":
+        runbook = build_live_arming_runbook(log_dir=log_dir)
+        return _result(
+            "live_blockers",
+            "ACCEPTED",
+            format_live_blockers_operator_message(runbook),
+            payload={"live_arming_runbook": runbook},
+            signal_id=runbook.get("latest_signal_id"),
+        )
+    if normalized == "LIVE ARMING RUNBOOKS":
+        runbooks = list_live_arming_runbooks(log_dir=log_dir)
+        return _result(
+            "live_arming_runbooks",
+            "ACCEPTED",
+            format_live_arming_runbooks_operator_message(runbooks),
+            payload={"live_arming_runbooks": runbooks},
         )
     if normalized == "FIRST LIVE EVALUATE":
         runbook = evaluate_first_live_runbook(log_dir=log_dir)

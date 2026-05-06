@@ -105,6 +105,11 @@ from src.app.hammer_radar.operator.live_executor_transport import (
     check_live_executor_transport,
     list_live_executor_transport_attempts,
 )
+from src.app.hammer_radar.operator.live_arming_runbook import (
+    build_live_arming_runbook,
+    evaluate_and_record_live_arming_runbook,
+    list_live_arming_runbooks,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -703,6 +708,21 @@ def live_executor_transport_attempts(
         status=status,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.get("/live/arming/runbook")
+def live_arming_runbook() -> dict:
+    return build_live_arming_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/arming/runbook/check")
+def live_arming_runbook_check() -> dict:
+    return evaluate_and_record_live_arming_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/arming/runbooks")
+def live_arming_runbooks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_live_arming_runbooks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/live-connector/stub-submit")
