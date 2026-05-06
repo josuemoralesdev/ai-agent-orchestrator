@@ -59,8 +59,9 @@ class LiveArmingRunbookTestCase(unittest.TestCase):
             payload = build_live_arming_runbook(log_dir=self.log_dir, env=self._safe_env())
 
         blockers = payload["blocker_summary"]["categories"]["sizing"]
-        self.assertTrue(any("notional is below min_notional" in item for item in blockers))
-        self.assertTrue(any("quantity is invalid" in item for item in blockers))
+        self.assertTrue(any("notional is below effective minimum notional" in item for item in blockers))
+        self.assertTrue(any("quantity rounds to zero" in item for item in blockers))
+        self.assertTrue(any("margin is below tiny-live planning floor 8.44 USDT" in item for item in blockers))
 
     def test_approval_intent_rehearsal_blockers_classified(self) -> None:
         payload = build_live_arming_runbook(log_dir=self.log_dir, env={})
@@ -71,14 +72,54 @@ class LiveArmingRunbookTestCase(unittest.TestCase):
         self.assertTrue(categories["rehearsal"])
 
     def test_sizing_suggestions(self) -> None:
-        preview = self._preview(margin_usdt=4.44, leverage=1.0, entry=100000.0)
+        preview = self._preview(margin_usdt=8.44, leverage=1.0, entry=81500.0)
         with self._patched_chain(preview=preview):
             payload = build_live_arming_runbook(log_dir=self.log_dir, env=self._safe_env())
 
         sizing = payload["sizing_status"]
-        self.assertEqual(5.0, sizing["suggested_min_margin_usdt"])
-        self.assertEqual(2, sizing["suggested_min_leverage"])
+        self.assertEqual(81.5, sizing["effective_min_notional_usdt"])
+        self.assertEqual(81.5, sizing["quantity_step_notional_usdt"])
+        self.assertEqual(81.5, sizing["suggested_min_margin_usdt"])
+        self.assertEqual(10, sizing["suggested_min_leverage"])
         self.assertEqual("increase_margin_or_leverage", sizing["sizing_action"])
+
+    def test_effective_min_notional_uses_quantity_step(self) -> None:
+        preview = self._preview(margin_usdt=8.44, leverage=1.0, entry=81500.0)
+        with self._patched_chain(preview=preview):
+            payload = build_live_arming_runbook(log_dir=self.log_dir, env=self._safe_env())
+
+        sizing = payload["sizing_status"]
+        self.assertEqual(5.0, sizing["min_notional"])
+        self.assertEqual(81.5, sizing["effective_min_notional_usdt"])
+        self.assertEqual("max(min_notional, entry * quantity_step)", sizing["effective_min_reason"])
+        self.assertEqual(81.5, sizing["suggested_min_margin_usdt"])
+        self.assertGreater(sizing["effective_min_notional_usdt"], sizing["min_notional"])
+
+    def test_suggested_leverage_for_operator_ladder(self) -> None:
+        cases = [(8.44, 10), (44.0, 2), (88.0, 1)]
+        for margin, expected_leverage in cases:
+            with self.subTest(margin=margin):
+                preview = self._preview(margin_usdt=margin, leverage=1.0, entry=81500.0)
+                with self._patched_chain(preview=preview):
+                    payload = build_live_arming_runbook(log_dir=self.log_dir, env=self._safe_env())
+
+                self.assertEqual(expected_leverage, payload["sizing_status"]["suggested_min_leverage"])
+
+    def test_sizing_plan_exposes_tiny_live_floor_and_ladder(self) -> None:
+        preview = self._preview(margin_usdt=8.44, leverage=1.0, entry=81500.0)
+        with self._patched_chain(preview=preview):
+            payload = build_live_arming_runbook(log_dir=self.log_dir, env=self._safe_env())
+
+        sizing = payload["sizing_status"]
+        plan = sizing["sizing_plan"]
+        self.assertEqual(8.44, sizing["tiny_live_floor_margin_usdt"])
+        self.assertEqual(8.44, plan["tiny_live_floor_margin_usdt"])
+        self.assertEqual([8.44, 44.0, 88.0, 444.0, 888.0], plan["operator_ladder_usdt"])
+        self.assertEqual(10, plan["minimum_leverage_for_8_44"])
+        self.assertEqual(2, plan["minimum_leverage_for_44"])
+        self.assertEqual(1, plan["minimum_leverage_for_88"])
+        self.assertEqual(8.44, plan["recommended_first_test_margin_usdt"])
+        self.assertEqual(10, plan["recommended_first_test_leverage"])
 
     def test_manual_runbook_present(self) -> None:
         payload = build_live_arming_runbook(log_dir=self.log_dir, env={})
@@ -86,6 +127,8 @@ class LiveArmingRunbookTestCase(unittest.TestCase):
 
         self.assertIn("HAMMER_BINANCE_CONNECTOR_MODE", rendered)
         self.assertIn("HAMMER_GLOBAL_KILL_SWITCH=false", rendered)
+        self.assertIn("8.44 USDT", rendered)
+        self.assertIn("0.001 BTC step", rendered)
         self.assertIn("hammer-approval-api.service", rendered)
         self.assertIn("/live/arming/status", rendered)
         self.assertIn("R58", rendered)
@@ -178,7 +221,7 @@ class LiveArmingRunbookTestCase(unittest.TestCase):
         return {"status": "REJECTED", "blockers": ["transport rejected"]}
 
     @staticmethod
-    def _preview(*, margin_usdt: float = 4.44, leverage: float = 1.0, entry: float = 100000.0) -> dict:
+    def _preview(*, margin_usdt: float = 8.44, leverage: float = 1.0, entry: float = 100000.0) -> dict:
         return {
             "status": "BLOCKED",
             "latest_signal_id": "sig-r57",
