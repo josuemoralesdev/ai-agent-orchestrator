@@ -88,6 +88,8 @@ def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> 
         "first live intent",
         "first live rehearsal",
         "first live arming",
+        "first live gate",
+        "first live executions",
         "live begins",
         "live preview",
         "live intent",

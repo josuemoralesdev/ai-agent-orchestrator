@@ -39,6 +39,12 @@ from src.app.hammer_radar.operator.live_arming_checklist import (
     format_live_arming_operator_message,
     list_live_arming_checks,
 )
+from src.app.hammer_radar.operator.first_live_execution_gate import (
+    evaluate_and_record_first_live_execution_gate,
+    format_first_live_execution_gate_operator_message,
+    format_first_live_execution_gates_operator_message,
+    list_first_live_execution_gates,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -77,6 +83,12 @@ HELP_COMMANDS = [
     "LIVE ARMING",
     "FIRST LIVE ARMING",
     "LIVE ARMING CHECKS",
+    "FIRST LIVE GATE",
+    "FIRST LIVE GATE <signal_id>",
+    "FIRST LIVE GATE INTENT <execution_intent_id>",
+    "FIRST LIVE GATE REHEARSAL <executor_rehearsal_id>",
+    "FIRST LIVE EXECUTE <executor_rehearsal_id> FINAL",
+    "FIRST LIVE EXECUTIONS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -282,6 +294,34 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_live_arming_checks_operator_message(checks),
             payload={"live_arming_checks": checks},
         )
+    if normalized == "FIRST LIVE EXECUTIONS":
+        gates = list_first_live_execution_gates(log_dir=log_dir)
+        return _result(
+            "first_live_execution_gates",
+            "ACCEPTED",
+            format_first_live_execution_gates_operator_message(gates),
+            payload={"first_live_execution_gates": gates},
+        )
+    if normalized == "FIRST LIVE GATE" or normalized.startswith("FIRST LIVE GATE "):
+        gate = _first_live_gate_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
+        result_status = "ACCEPTED" if gate.get("status") == "EXECUTION_GATE_READY" else str(gate.get("status") or "BLOCKED")
+        return _result(
+            "first_live_execution_gate",
+            result_status,
+            format_first_live_execution_gate_operator_message(gate),
+            payload={"first_live_execution_gate": gate},
+            signal_id=gate.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE EXECUTE" or normalized.startswith("FIRST LIVE EXECUTE "):
+        gate = _first_live_execute_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
+        result_status = "ACCEPTED" if gate.get("status") == "EXECUTION_GATE_READY" else str(gate.get("status") or "BLOCKED")
+        return _result(
+            "first_live_execution_gate",
+            result_status,
+            format_first_live_execution_gate_operator_message(gate),
+            payload={"first_live_execution_gate": gate},
+            signal_id=gate.get("signal_id"),
+        )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)
         message = (
@@ -384,6 +424,34 @@ def _latest_alert_candidate(log_dir: Path) -> dict[str, Any] | None:
         return None
     candidate = alerts[0].get("candidate")
     return dict(candidate) if isinstance(candidate, dict) and candidate.get("signal_id") else None
+
+
+def _first_live_gate_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:
+    parts = raw_text.split(maxsplit=4)
+    if normalized == "FIRST LIVE GATE":
+        return evaluate_and_record_first_live_execution_gate(log_dir=log_dir)
+    if len(parts) >= 5 and parts[3].upper() == "INTENT":
+        return evaluate_and_record_first_live_execution_gate(execution_intent_id=parts[4].strip(), log_dir=log_dir)
+    if len(parts) >= 5 and parts[3].upper() == "REHEARSAL":
+        return evaluate_and_record_first_live_execution_gate(executor_rehearsal_id=parts[4].strip(), log_dir=log_dir)
+    signal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+    return evaluate_and_record_first_live_execution_gate(signal_id=signal_id, log_dir=log_dir)
+
+
+def _first_live_execute_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:
+    parts = raw_text.split(maxsplit=4)
+    final_confirmation = normalized.endswith(" FINAL")
+    rehearsal_id = None
+    if len(parts) >= 4:
+        rehearsal_id = parts[3].strip()
+        if rehearsal_id.upper() == "FINAL":
+            rehearsal_id = None
+    return evaluate_and_record_first_live_execution_gate(
+        executor_rehearsal_id=rehearsal_id,
+        final_confirmation=final_confirmation,
+        dry_run=True,
+        log_dir=log_dir,
+    )
 
 
 def _result(
