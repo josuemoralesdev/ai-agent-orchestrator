@@ -75,6 +75,12 @@ from src.app.hammer_radar.operator.live_begins import (
     live_begins_events_path,
     load_live_begins_events,
 )
+from src.app.hammer_radar.operator.live_execution_preview import (
+    build_live_execution_preview,
+    evaluate_and_record_live_execution_preview,
+    live_execution_previews_path,
+    load_live_execution_previews,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -486,6 +492,31 @@ def live_begins_events(limit: int = Query(default=50, ge=0), event_id: str | Non
         "secrets_shown": False,
         "live_begins_events_path": str(live_begins_events_path(log_dir)),
         "live_begins_events": load_live_begins_events(limit=limit, event_id=event_id, log_dir=log_dir),
+    }
+
+
+@app.get("/live/execution/preview")
+def live_execution_preview() -> dict:
+    return build_live_execution_preview(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/execution/preview")
+def live_execution_preview_check() -> dict:
+    return evaluate_and_record_live_execution_preview(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/execution/previews")
+def live_execution_previews(limit: int = Query(default=50, ge=0), event_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "secrets_shown": False,
+        "live_execution_previews_path": str(live_execution_previews_path(log_dir)),
+        "live_execution_previews": load_live_execution_previews(limit=limit, event_id=event_id, log_dir=log_dir),
     }
 
 
