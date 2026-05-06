@@ -21,6 +21,12 @@ from src.app.hammer_radar.operator.live_execution_preview import (
     evaluate_and_record_live_execution_preview,
     format_live_execution_preview_operator_message,
 )
+from src.app.hammer_radar.operator.live_execution_intent import (
+    create_live_execution_intent,
+    format_live_execution_intent_operator_message,
+    format_live_execution_intents_operator_message,
+    list_live_execution_intents,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -49,6 +55,9 @@ HELP_COMMANDS = [
     "FIRST LIVE BEGINS",
     "LIVE PREVIEW",
     "FIRST LIVE PREVIEW",
+    "LIVE INTENT <signal_id>",
+    "FIRST LIVE INTENT <signal_id>",
+    "LIVE INTENTS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -171,6 +180,36 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_live_execution_preview_operator_message(preview),
             payload={"live_execution_preview": preview},
             signal_id=preview.get("latest_signal_id"),
+        )
+    if normalized == "LIVE INTENTS":
+        intents = list_live_execution_intents(log_dir=log_dir)
+        return _result(
+            "live_execution_intents",
+            "ACCEPTED",
+            format_live_execution_intents_operator_message(intents),
+            payload={"live_execution_intents": intents},
+        )
+    if normalized == "LIVE INTENT" or normalized.startswith("LIVE INTENT "):
+        signal_id = raw_text.split(maxsplit=2)[2].strip() if len(raw_text.split(maxsplit=2)) == 3 else None
+        intent = create_live_execution_intent(signal_id=signal_id, log_dir=log_dir)
+        result_status = "ACCEPTED" if intent.get("status") == "INTENT_READY" else str(intent.get("status") or "BLOCKED")
+        return _result(
+            "live_execution_intent",
+            result_status,
+            format_live_execution_intent_operator_message(intent),
+            payload={"live_execution_intent": intent},
+            signal_id=intent.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE INTENT" or normalized.startswith("FIRST LIVE INTENT "):
+        signal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+        intent = create_live_execution_intent(signal_id=signal_id, log_dir=log_dir)
+        result_status = "ACCEPTED" if intent.get("status") == "INTENT_READY" else str(intent.get("status") or "BLOCKED")
+        return _result(
+            "live_execution_intent",
+            result_status,
+            format_live_execution_intent_operator_message(intent),
+            payload={"live_execution_intent": intent},
+            signal_id=intent.get("signal_id"),
         )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)

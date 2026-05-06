@@ -81,6 +81,10 @@ from src.app.hammer_radar.operator.live_execution_preview import (
     live_execution_previews_path,
     load_live_execution_previews,
 )
+from src.app.hammer_radar.operator.live_execution_intent import (
+    create_live_execution_intent,
+    list_live_execution_intents,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -235,6 +239,12 @@ class LiveConnectorSubmitRequest(BaseModel):
     ticket_id: str = Field(min_length=1)
     operator: str = Field(min_length=1)
     notes: str = ""
+
+
+class LiveExecutionIntentRequest(BaseModel):
+    signal_id: str | None = None
+    approval_code: str | None = None
+    dry_run: bool = True
 
 
 class BetrayalShadowTrackRequest(BaseModel):
@@ -518,6 +528,22 @@ def live_execution_previews(limit: int = Query(default=50, ge=0), event_id: str 
         "live_execution_previews_path": str(live_execution_previews_path(log_dir)),
         "live_execution_previews": load_live_execution_previews(limit=limit, event_id=event_id, log_dir=log_dir),
     }
+
+
+@app.get("/live/execution/intents")
+def live_execution_intents(limit: int = Query(default=20, ge=0), signal_id: str | None = None) -> dict:
+    return list_live_execution_intents(limit=limit, signal_id=signal_id, log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/execution/intent")
+def live_execution_intent(request: LiveExecutionIntentRequest | None = None) -> dict:
+    request = request or LiveExecutionIntentRequest()
+    return create_live_execution_intent(
+        signal_id=request.signal_id,
+        approval_code=request.approval_code,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.post("/live-connector/stub-submit")
