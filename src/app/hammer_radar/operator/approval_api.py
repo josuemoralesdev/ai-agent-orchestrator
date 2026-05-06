@@ -69,6 +69,12 @@ from src.app.hammer_radar.operator.live_approval import (
     live_approval_requests_path,
     load_live_approval_requests,
 )
+from src.app.hammer_radar.operator.live_begins import (
+    build_live_begins_status,
+    evaluate_and_record_live_begins,
+    live_begins_events_path,
+    load_live_begins_events,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -456,6 +462,31 @@ def live_safety_evaluate(request: LiveSafetyEvaluateRequest) -> dict:
         manual_outcomes=request.manual_outcomes,
         config_override=request.config_override,
     )
+
+
+@app.get("/live/begins/status")
+def live_begins_status() -> dict:
+    return build_live_begins_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/begins/check")
+def live_begins_check() -> dict:
+    return evaluate_and_record_live_begins(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/begins/events")
+def live_begins_events(limit: int = Query(default=50, ge=0), event_id: str | None = None) -> dict:
+    log_dir = get_log_dir(use_env=True)
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
+        "secrets_shown": False,
+        "live_begins_events_path": str(live_begins_events_path(log_dir)),
+        "live_begins_events": load_live_begins_events(limit=limit, event_id=event_id, log_dir=log_dir),
+    }
 
 
 @app.post("/live-connector/stub-submit")
