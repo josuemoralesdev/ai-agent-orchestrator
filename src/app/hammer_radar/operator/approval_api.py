@@ -89,6 +89,11 @@ from src.app.hammer_radar.operator.live_executor_rehearsal import (
     create_live_executor_rehearsal,
     list_live_executor_rehearsals,
 )
+from src.app.hammer_radar.operator.live_arming_checklist import (
+    build_live_arming_status,
+    evaluate_and_record_live_arming_check,
+    list_live_arming_checks,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -579,6 +584,21 @@ def live_executor_rehearsal(request: LiveExecutorRehearsalRequest | None = None)
         dry_run=request.dry_run,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.get("/live/arming/status")
+def live_arming_status() -> dict:
+    return build_live_arming_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/arming/check")
+def live_arming_check() -> dict:
+    return evaluate_and_record_live_arming_check(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/arming/checks")
+def live_arming_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_live_arming_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/live-connector/stub-submit")

@@ -33,6 +33,12 @@ from src.app.hammer_radar.operator.live_executor_rehearsal import (
     format_live_executor_rehearsals_operator_message,
     list_live_executor_rehearsals,
 )
+from src.app.hammer_radar.operator.live_arming_checklist import (
+    evaluate_and_record_live_arming_check,
+    format_live_arming_checks_operator_message,
+    format_live_arming_operator_message,
+    list_live_arming_checks,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -68,6 +74,9 @@ HELP_COMMANDS = [
     "LIVE REHEARSAL SIGNAL <signal_id>",
     "FIRST LIVE REHEARSAL <execution_intent_id>",
     "LIVE REHEARSALS",
+    "LIVE ARMING",
+    "FIRST LIVE ARMING",
+    "LIVE ARMING CHECKS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -254,6 +263,24 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_live_executor_rehearsal_operator_message(rehearsal),
             payload={"live_executor_rehearsal": rehearsal},
             signal_id=rehearsal.get("signal_id"),
+        )
+    if normalized in {"LIVE ARMING", "FIRST LIVE ARMING"}:
+        arming = evaluate_and_record_live_arming_check(log_dir=log_dir)
+        result_status = "ACCEPTED" if arming.get("status") == "ARMING_ALLOWED" else str(arming.get("status") or "BLOCKED")
+        return _result(
+            "live_arming_check",
+            result_status,
+            format_live_arming_operator_message(arming),
+            payload={"live_arming_check": arming},
+            signal_id=arming.get("latest_signal_id"),
+        )
+    if normalized == "LIVE ARMING CHECKS":
+        checks = list_live_arming_checks(log_dir=log_dir)
+        return _result(
+            "live_arming_checks",
+            "ACCEPTED",
+            format_live_arming_checks_operator_message(checks),
+            payload={"live_arming_checks": checks},
         )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)
