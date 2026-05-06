@@ -30,6 +30,8 @@ PHASE = "R57"
 SYSTEM = "money_printing_machine_hammer_radar"
 EXECUTION_MODE = "RUNBOOK_ONLY"
 RUNBOOKS_FILENAME = "live_arming_runbooks.ndjson"
+TINY_LIVE_FLOOR_MARGIN_USDT = 8.44
+OPERATOR_LADDER_USDT = [8.44, 44.0, 88.0, 444.0, 888.0]
 
 ORDER_PLACED = False
 REAL_ORDER_PLACED = False
@@ -138,7 +140,7 @@ def format_live_arming_runbook_operator_message(payload: dict[str, Any]) -> str:
             f"blocker_count: {summary.get('count', 0)}",
             f"top_blockers: {blocker_text}",
             f"env_edit_required: {_env_edit_required(categories)} restart_required_after_manual_env_edit: {_env_edit_required(categories)}",
-            f"tiny_sizing_valid: {bool(sizing.get('min_notional_ok') and sizing.get('quantity_valid'))}",
+            f"tiny_sizing_valid: {bool(sizing.get('effective_min_notional_ok') and sizing.get('quantity_valid'))}",
             f"signal_chain_complete: {_signal_chain_complete(payload)}",
             f"next operator action: {payload.get('operator_action')}",
         ]
@@ -260,13 +262,31 @@ def _sizing_status(preview: dict[str, Any]) -> dict[str, Any]:
     quantity_step = float(rules["step_size"]) if rules else _float_or_none(preview.get("quantity_step"))
     rounded_quantity = _round_to_step(raw_quantity, quantity_step) if raw_quantity is not None and quantity_step else _float_or_none(preview.get("quantity"))
     min_notional = float(rules["min_notional_usd"]) if rules else None
+    quantity_step_notional = entry * quantity_step if entry is not None and quantity_step is not None else None
+    effective_min_notional = _effective_min_notional(min_notional=min_notional, quantity_step_notional=quantity_step_notional)
     min_notional_ok = bool(min_notional is not None and notional is not None and notional >= min_notional)
+    effective_min_notional_ok = bool(
+        effective_min_notional is not None and notional is not None and notional >= effective_min_notional
+    )
     quantity_valid = bool(rounded_quantity is not None and rounded_quantity > 0)
-    suggested_margin = _ceil_to_cent(min_notional / leverage) if min_notional is not None and leverage not in (None, 0.0) else None
-    suggested_leverage = math.ceil(min_notional / margin) if min_notional is not None and margin not in (None, 0.0) else None
-    if min_notional is None:
+    suggested_margin = (
+        _ceil_to_cent(effective_min_notional / leverage)
+        if effective_min_notional is not None and leverage not in (None, 0.0)
+        else None
+    )
+    suggested_leverage = (
+        math.ceil(effective_min_notional / margin)
+        if effective_min_notional is not None and margin not in (None, 0.0)
+        else None
+    )
+    sizing_plan = _sizing_plan(
+        effective_min_notional=effective_min_notional,
+        leverage=leverage,
+        margin=margin,
+    )
+    if effective_min_notional is None:
         action = "unknown"
-    elif not min_notional_ok or not quantity_valid:
+    elif not effective_min_notional_ok or not quantity_valid or (margin is not None and margin < TINY_LIVE_FLOOR_MARGIN_USDT):
         action = "increase_margin_or_leverage"
     elif not preview.get("latest_signal_id"):
         action = "wait"
@@ -282,9 +302,15 @@ def _sizing_status(preview: dict[str, Any]) -> dict[str, Any]:
         "quantity_step": quantity_step,
         "min_notional": min_notional,
         "min_notional_ok": min_notional_ok,
+        "effective_min_notional_usdt": effective_min_notional,
+        "effective_min_reason": "max(min_notional, entry * quantity_step)",
+        "quantity_step_notional_usdt": quantity_step_notional,
+        "effective_min_notional_ok": effective_min_notional_ok,
         "quantity_valid": quantity_valid,
         "suggested_min_margin_usdt": suggested_margin,
         "suggested_min_leverage": suggested_leverage,
+        "tiny_live_floor_margin_usdt": TINY_LIVE_FLOOR_MARGIN_USDT,
+        "sizing_plan": sizing_plan,
         "sizing_action": action,
     }
 
@@ -368,12 +394,15 @@ def _env_blockers(categories: dict[str, list[str]], env_status: dict[str, Any]) 
 
 
 def _sizing_blockers(categories: dict[str, list[str]], sizing: dict[str, Any]) -> None:
-    if sizing["min_notional"] is None:
-        categories["sizing"].append("min_notional unavailable from local filters")
-    elif not sizing["min_notional_ok"]:
-        categories["sizing"].append("notional is below min_notional")
+    if sizing["effective_min_notional_usdt"] is None:
+        categories["sizing"].append("effective minimum notional unavailable from local rules")
+    elif not sizing["effective_min_notional_ok"]:
+        categories["sizing"].append("notional is below effective minimum notional")
     if not sizing["quantity_valid"]:
-        categories["sizing"].append("quantity is invalid or rounds to zero at current margin/leverage")
+        categories["sizing"].append("quantity rounds to zero at current margin/leverage")
+    margin = _float_or_none(sizing.get("margin_usdt"))
+    if margin is not None and margin < TINY_LIVE_FLOOR_MARGIN_USDT:
+        categories["sizing"].append(f"margin is below tiny-live planning floor {TINY_LIVE_FLOOR_MARGIN_USDT:.2f} USDT")
 
 
 def _manual_runbook() -> list[dict[str, Any]]:
@@ -381,7 +410,7 @@ def _manual_runbook() -> list[dict[str, Any]]:
         ("review blockers", "inspect /live/arming/runbook", "safe"),
         ("confirm latest signal", "verify latest signal is fresh and complete before approval", "safe"),
         ("check R50-R56", "run /live/begins/status, /live/execution/preview, /live/arming/status, /live/first-execution/gate, /live/executor/transport/status", "safe"),
-        ("fix sizing", "increase HAMMER_TINY_LIVE_PREVIEW_MARGIN_USDT or HAMMER_TINY_LIVE_PREVIEW_LEVERAGE if local BTCUSDT filters fail", "manual"),
+        ("fix sizing", "set HAMMER_TINY_LIVE_PREVIEW_MARGIN_USDT to at least 8.44 USDT; for BTCUSDT use enough leverage to clear the 0.001 BTC step, or prefer 44/88 USDT with lower leverage; re-run /live/arming/runbook after restart", "manual"),
         ("manual env edit", "operator may edit env: HAMMER_BINANCE_CONNECTOR_MODE=LIVE_ORDER_ENABLED; HAMMER_BINANCE_LIVE_ENABLED=true; HAMMER_LIVE_EXECUTION_ENABLED=true; HAMMER_ALLOW_LIVE_ORDERS=true; HAMMER_GLOBAL_KILL_SWITCH=false; HAMMER_PROTECTIVE_ORDERS_ENABLED=true; HAMMER_PROTECTIVE_ORDER_MODE=LIVE_PROTECTIVE_ENABLED", "dangerous"),
         ("manual restart", "after manual env edit, operator restarts hammer-approval-api.service manually", "manual"),
         ("recheck arming", "curl /live/arming/status and confirm order_placed=false real_order_placed=false", "safe"),
@@ -422,6 +451,55 @@ def _operator_action(*, blocker_summary: dict[str, Any], sizing_status: dict[str
     if categories.get("env") or categories.get("protective_orders"):
         return "arm manually"
     return "prepare R58"
+
+
+def _effective_min_notional(*, min_notional: float | None, quantity_step_notional: float | None) -> float | None:
+    values = [value for value in (min_notional, quantity_step_notional) if value is not None and value > 0]
+    if not values:
+        return None
+    return max(values)
+
+
+def _sizing_plan(
+    *,
+    effective_min_notional: float | None,
+    leverage: float | None,
+    margin: float | None,
+) -> dict[str, Any]:
+    minimum_margin_at_1x = _ceil_to_cent(effective_min_notional) if effective_min_notional is not None else None
+    minimum_leverage_by_margin = {
+        str(_format_ladder_margin(ladder_margin)): _minimum_leverage(
+            effective_min_notional=effective_min_notional,
+            margin=ladder_margin,
+        )
+        for ladder_margin in OPERATOR_LADDER_USDT
+    }
+    recommended_leverage = minimum_leverage_by_margin[str(_format_ladder_margin(TINY_LIVE_FLOOR_MARGIN_USDT))]
+    return {
+        "tiny_live_floor_margin_usdt": TINY_LIVE_FLOOR_MARGIN_USDT,
+        "operator_ladder_usdt": OPERATOR_LADDER_USDT,
+        "effective_min_notional_usdt": effective_min_notional,
+        "minimum_margin_at_1x": minimum_margin_at_1x,
+        "minimum_leverage_for_8_44": minimum_leverage_by_margin["8.44"],
+        "minimum_leverage_for_44": minimum_leverage_by_margin["44"],
+        "minimum_leverage_for_88": minimum_leverage_by_margin["88"],
+        "minimum_leverage_for_444": minimum_leverage_by_margin["444"],
+        "minimum_leverage_for_888": minimum_leverage_by_margin["888"],
+        "recommended_first_test_margin_usdt": TINY_LIVE_FLOOR_MARGIN_USDT,
+        "recommended_first_test_leverage": recommended_leverage,
+        "current_margin_usdt": margin,
+        "current_leverage": leverage,
+    }
+
+
+def _minimum_leverage(*, effective_min_notional: float | None, margin: float) -> int | None:
+    if effective_min_notional is None or margin <= 0:
+        return None
+    return max(1, math.ceil(effective_min_notional / margin))
+
+
+def _format_ladder_margin(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else str(value)
 
 
 def _runbook_record(payload: dict[str, Any]) -> dict[str, Any]:
