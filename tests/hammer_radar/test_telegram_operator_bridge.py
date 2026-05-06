@@ -24,6 +24,7 @@ from src.app.hammer_radar.operator.telegram_operator_bridge import (
     load_telegram_operator_commands,
 )
 from src.app.hammer_radar.operator.telegram_polling_worker import poll_telegram_once, telegram_polling_state_path
+from src.app.hammer_radar.operator.telegram_polling_worker import build_arg_parser, polling_state, polling_status
 
 
 class TelegramOperatorBridgeTestCase(unittest.TestCase):
@@ -185,6 +186,104 @@ class TelegramOperatorBridgeTestCase(unittest.TestCase):
         self.assertNotIn("secret-token", str(payload))
         self.assertEqual("help", commands[0]["normalized_action"])
 
+    def test_polling_status_and_state_are_sanitized(self) -> None:
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+        status = polling_status(env=env, log_dir=self.log_dir)
+        state = polling_state(log_dir=self.log_dir)
+
+        self.assertTrue(status["token_present"])
+        self.assertTrue(status["chat_id_configured"])
+        self.assertFalse(status["secrets_shown"])
+        self.assertNotIn("secret-token", str(status))
+        self.assertFalse(state["secrets_shown"])
+
+    def test_polling_api_endpoints_are_one_shot_and_safe(self) -> None:
+        status = self.client.get("/telegram/polling/status")
+        state = self.client.get("/telegram/polling/state")
+        once = self.client.post("/telegram/polling/once", json={"dry_run": True})
+
+        self.assertEqual(200, status.status_code)
+        self.assertFalse(status.json()["secrets_shown"])
+        self.assertEqual(200, state.status_code)
+        self.assertFalse(state.json()["secrets_shown"])
+        self.assertEqual(200, once.status_code)
+        self.assertIn(once.json()["result_status"], {"BLOCKED", "ACCEPTED"})
+        self.assertFalse(once.json()["order_placed"])
+        self.assertFalse(once.json()["real_order_placed"])
+
+    def test_polling_dedupes_old_update_and_persists_last_update_id(self) -> None:
+        transport = _UpdatesTransport([{"update_id": 5, "message": {"text": "HELP", "chat": {"id": 123}}}])
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+        first = poll_telegram_once(env=env, log_dir=self.log_dir, transport=transport, send_responses=False)
+        second = poll_telegram_once(env=env, log_dir=self.log_dir, transport=transport, send_responses=False)
+        state = polling_state(log_dir=self.log_dir)["state"]
+
+        self.assertEqual(5, state["last_update_id"])
+        self.assertEqual("PROCESSED", first["processed"][0]["status"])
+        self.assertEqual("DEDUPED_OLD_UPDATE", second["processed"][0]["status"])
+
+    def test_polling_non_text_update_is_ignored_safely(self) -> None:
+        transport = _UpdatesTransport([{"update_id": 7, "message": {"photo": [], "chat": {"id": 123}}}])
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+
+        payload = poll_telegram_once(env=env, log_dir=self.log_dir, transport=transport)
+
+        self.assertEqual("IGNORED_NON_TEXT", payload["processed"][0]["status"])
+        self.assertEqual([], load_telegram_operator_commands(limit=10, log_dir=self.log_dir))
+
+    def test_polling_dry_run_does_not_send_message(self) -> None:
+        transport = _UpdatesTransport([{"update_id": 9, "message": {"text": "HELP", "chat": {"id": 123}}}])
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+
+        payload = poll_telegram_once(env=env, log_dir=self.log_dir, transport=transport, send_responses=True, dry_run=True)
+
+        self.assertEqual("PROCESSED", payload["processed"][0]["status"])
+        self.assertEqual(0, transport.send_count)
+        self.assertFalse(payload["processed"][0]["message_sent"])
+
+    def test_polling_fake_send_records_sanitized_send_result(self) -> None:
+        transport = _UpdatesTransport([{"update_id": 11, "message": {"text": "HELP", "chat": {"id": 123}}}])
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+
+        payload = poll_telegram_once(env=env, log_dir=self.log_dir, transport=transport, send_responses=True)
+        send_result = payload["processed"][0]["send_result"]
+
+        self.assertEqual(1, transport.send_count)
+        self.assertTrue(send_result["network_used"])
+        self.assertTrue(send_result["message_sent"])
+        self.assertFalse(send_result["secrets_shown"])
+        self.assertNotIn("secret-token", str(payload))
+
+    def test_polling_routes_raw_yes_and_trade_now_live_safely(self) -> None:
+        updates = [
+            {"update_id": 21, "message": {"text": "YES", "chat": {"id": 123}}},
+            {"update_id": 22, "message": {"text": "trade now live", "chat": {"id": 123}}},
+        ]
+        env = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "123"}
+        payload = poll_telegram_once(env=env, log_dir=self.log_dir, transport=_UpdatesTransport(updates), send_responses=False)
+        commands = load_telegram_operator_commands(limit=10, log_dir=self.log_dir)
+
+        self.assertEqual(["REJECTED", "BLOCKED"], [item["result_status"] for item in payload["processed"]])
+        self.assertEqual("blocked_live_command", commands[0]["normalized_action"])
+        self.assertEqual("challenge_reply", commands[1]["normalized_action"])
+
+    def test_cli_parser_modes_without_running_loop(self) -> None:
+        parser = build_arg_parser()
+        once = parser.parse_args(["--once", "--dry-run"])
+        loop = parser.parse_args(["--loop", "--interval", "3"])
+
+        self.assertTrue(once.once)
+        self.assertTrue(once.dry_run)
+        self.assertTrue(loop.loop)
+        self.assertEqual(3, loop.interval)
+
+    def test_systemd_template_exists_but_not_installed(self) -> None:
+        template = Path("ops/systemd/hammer-telegram-operator-polling.service.example")
+        self.assertTrue(template.exists())
+        text = template.read_text(encoding="utf-8")
+        self.assertIn("--loop --interval 3", text)
+        self.assertIn("User=josue", text)
+
     def test_no_env_changes_or_binance_network_calls(self) -> None:
         before = dict(os.environ)
         with patch("urllib.request.urlopen") as urlopen:
@@ -263,6 +362,19 @@ class _FakeTelegramTransport:
     def send_message(self, *, token: str, chat_id: str, text: str) -> dict:
         self.tokens.append("<token>" if token else "")
         return {"ok": True}
+
+
+class _UpdatesTransport:
+    def __init__(self, updates: list[dict]) -> None:
+        self.updates = updates
+        self.send_count = 0
+
+    def get_updates(self, *, token: str, offset: int | None) -> dict:
+        return {"ok": True, "result": self.updates}
+
+    def send_message(self, *, token: str, chat_id: str, text: str) -> dict:
+        self.send_count += 1
+        return {"ok": True, "result": {"chat_id": chat_id, "text_length": len(text)}}
 
 
 if __name__ == "__main__":
