@@ -45,6 +45,13 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     format_first_live_execution_gates_operator_message,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.live_executor_transport import (
+    attempt_live_executor_transport,
+    check_live_executor_transport,
+    format_live_executor_transport_attempts_operator_message,
+    format_live_executor_transport_operator_message,
+    list_live_executor_transport_attempts,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -89,6 +96,13 @@ HELP_COMMANDS = [
     "FIRST LIVE GATE REHEARSAL <executor_rehearsal_id>",
     "FIRST LIVE EXECUTE <executor_rehearsal_id> FINAL",
     "FIRST LIVE EXECUTIONS",
+    "LIVE TRANSPORT",
+    "LIVE TRANSPORT CHECK",
+    "LIVE TRANSPORT ATTEMPT <executor_rehearsal_id>",
+    "LIVE TRANSPORT DRY RUN <executor_rehearsal_id>",
+    "LIVE TRANSPORT MOCK <executor_rehearsal_id>",
+    "LIVE TRANSPORT LIVE <executor_rehearsal_id> FINAL",
+    "LIVE TRANSPORT ATTEMPTS",
     "LIVE PREFLIGHT",
     "PROMOTION STATUS",
     "CONNECTOR STATUS",
@@ -321,6 +335,77 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_first_live_execution_gate_operator_message(gate),
             payload={"first_live_execution_gate": gate},
             signal_id=gate.get("signal_id"),
+        )
+    if normalized == "LIVE TRANSPORT ATTEMPTS":
+        attempts = list_live_executor_transport_attempts(log_dir=log_dir)
+        return _result(
+            "live_executor_transport_attempts",
+            "ACCEPTED",
+            format_live_executor_transport_attempts_operator_message(attempts),
+            payload={"live_executor_transport_attempts": attempts},
+        )
+    if normalized in {"LIVE TRANSPORT", "LIVE TRANSPORT CHECK"}:
+        transport = check_live_executor_transport(log_dir=log_dir)
+        return _result(
+            "live_executor_transport",
+            str(transport.get("status") or "BLOCKED"),
+            format_live_executor_transport_operator_message(transport),
+            payload={"live_executor_transport": transport},
+            signal_id=transport.get("signal_id"),
+        )
+    if normalized == "LIVE TRANSPORT ATTEMPT" or normalized.startswith("LIVE TRANSPORT ATTEMPT "):
+        rehearsal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+        transport = attempt_live_executor_transport(executor_rehearsal_id=rehearsal_id, transport_mode="DRY_RUN", log_dir=log_dir)
+        result_status = "ACCEPTED" if transport.get("status") in {"DRY_RUN_ATTEMPT_RECORDED", "MOCK_ATTEMPT_RECORDED"} else str(transport.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_transport",
+            result_status,
+            format_live_executor_transport_operator_message(transport),
+            payload={"live_executor_transport": transport},
+            signal_id=transport.get("signal_id"),
+        )
+    if normalized == "LIVE TRANSPORT DRY RUN" or normalized.startswith("LIVE TRANSPORT DRY RUN "):
+        rehearsal_id = raw_text.split(maxsplit=4)[4].strip() if len(raw_text.split(maxsplit=4)) == 5 else None
+        transport = attempt_live_executor_transport(executor_rehearsal_id=rehearsal_id, transport_mode="DRY_RUN", log_dir=log_dir)
+        result_status = "ACCEPTED" if transport.get("status") == "DRY_RUN_ATTEMPT_RECORDED" else str(transport.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_transport",
+            result_status,
+            format_live_executor_transport_operator_message(transport),
+            payload={"live_executor_transport": transport},
+            signal_id=transport.get("signal_id"),
+        )
+    if normalized == "LIVE TRANSPORT MOCK" or normalized.startswith("LIVE TRANSPORT MOCK "):
+        rehearsal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+        transport = attempt_live_executor_transport(executor_rehearsal_id=rehearsal_id, transport_mode="MOCK", log_dir=log_dir)
+        result_status = "ACCEPTED" if transport.get("status") == "MOCK_ATTEMPT_RECORDED" else str(transport.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_transport",
+            result_status,
+            format_live_executor_transport_operator_message(transport),
+            payload={"live_executor_transport": transport},
+            signal_id=transport.get("signal_id"),
+        )
+    if normalized == "LIVE TRANSPORT LIVE" or normalized.startswith("LIVE TRANSPORT LIVE "):
+        parts = raw_text.split(maxsplit=4)
+        rehearsal_id = parts[3].strip() if len(parts) >= 4 else None
+        final_confirmation = normalized.endswith(" FINAL")
+        if rehearsal_id and rehearsal_id.upper() == "FINAL":
+            rehearsal_id = None
+        transport = attempt_live_executor_transport(
+            executor_rehearsal_id=rehearsal_id,
+            transport_mode="LIVE",
+            final_confirmation=final_confirmation,
+            dry_run=False if final_confirmation else True,
+            log_dir=log_dir,
+        )
+        result_status = "ACCEPTED" if transport.get("status") == "LIVE_READY" else str(transport.get("status") or "BLOCKED")
+        return _result(
+            "live_executor_transport",
+            result_status,
+            format_live_executor_transport_operator_message(transport),
+            payload={"live_executor_transport": transport},
+            signal_id=transport.get("signal_id"),
         )
     if normalized == "LIVE PREFLIGHT":
         preflight = build_promoted_strategy_preflight(log_dir=log_dir)
