@@ -82,6 +82,13 @@ def parse_operator_action(text: str | None, *, signal_id: str | None = None) -> 
 
     telegram_commands = {
         "help",
+        "first live profile",
+        "first live status",
+        "first live attempts",
+        "first live attempt",
+        "first live dry run",
+        "first live mock",
+        "first live execute",
         "first live challenge",
         "first live begins",
         "first live preview",

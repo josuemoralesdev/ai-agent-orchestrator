@@ -45,6 +45,15 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     format_first_live_execution_gates_operator_message,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
+    build_first_microscopic_live_profile,
+    build_first_microscopic_live_status,
+    check_first_microscopic_live_attempt,
+    execute_first_microscopic_live_attempt,
+    format_first_microscopic_live_attempt_operator_message,
+    format_first_microscopic_live_attempts_operator_message,
+    list_first_microscopic_live_attempts,
+)
 from src.app.hammer_radar.operator.live_executor_transport import (
     attempt_live_executor_transport,
     check_live_executor_transport,
@@ -79,7 +88,14 @@ COMMANDS_FILENAME = "telegram_operator_commands.ndjson"
 
 HELP_COMMANDS = [
     "HELP",
+    "FIRST LIVE PROFILE",
+    "FIRST LIVE STATUS",
     "FIRST LIVE CHECK",
+    "FIRST LIVE ATTEMPT <executor_rehearsal_id>",
+    "FIRST LIVE DRY RUN <executor_rehearsal_id>",
+    "FIRST LIVE MOCK <executor_rehearsal_id>",
+    "FIRST LIVE EXECUTE <executor_rehearsal_id> FINAL",
+    "FIRST LIVE ATTEMPTS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -192,14 +208,32 @@ def telegram_operator_commands_path(log_dir: str | Path) -> Path:
 def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: Path) -> dict[str, Any]:
     if normalized == "HELP":
         return _result("help", "ACCEPTED", "Available commands: " + ", ".join(HELP_COMMANDS))
-    if normalized == "FIRST LIVE CHECK":
-        runbook = build_first_live_runbook(log_dir=log_dir)
+    if normalized == "FIRST LIVE PROFILE":
+        payload = build_first_microscopic_live_profile(log_dir=log_dir)
         return _result(
-            "first_live_check",
+            "first_microscopic_live_profile",
+            str(payload.get("status") or "BLOCKED"),
+            format_first_microscopic_live_attempt_operator_message(payload),
+            payload={"first_microscopic_live_attempt": payload},
+            signal_id=payload.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE STATUS":
+        payload = build_first_microscopic_live_status(log_dir=log_dir)
+        return _result(
+            "first_microscopic_live_status",
+            str(payload.get("status") or "BLOCKED"),
+            format_first_microscopic_live_attempt_operator_message(payload),
+            payload={"first_microscopic_live_attempt": payload},
+            signal_id=payload.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE CHECK":
+        payload = check_first_microscopic_live_attempt(log_dir=log_dir)
+        return _result(
+            "first_microscopic_live_check",
             "ACCEPTED",
-            f"First live runbook: {runbook['runbook_status']} / {runbook['gate_decision']}. No order placed.",
-            payload={"runbook": runbook},
-            signal_id=runbook.get("signal_id"),
+            format_first_microscopic_live_attempt_operator_message(payload),
+            payload={"first_microscopic_live_attempt": payload},
+            signal_id=payload.get("signal_id"),
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
@@ -354,18 +388,61 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_first_live_execution_gates_operator_message(gates),
             payload={"first_live_execution_gates": gates},
         )
-    if normalized == "FIRST LIVE GATE" or normalized.startswith("FIRST LIVE GATE "):
-        gate = _first_live_gate_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
-        result_status = "ACCEPTED" if gate.get("status") == "EXECUTION_GATE_READY" else str(gate.get("status") or "BLOCKED")
+    if normalized == "FIRST LIVE ATTEMPTS":
+        attempts = list_first_microscopic_live_attempts(log_dir=log_dir)
         return _result(
-            "first_live_execution_gate",
+            "first_microscopic_live_attempts",
+            "ACCEPTED",
+            format_first_microscopic_live_attempts_operator_message(attempts),
+            payload={"first_microscopic_live_attempts": attempts},
+        )
+    if normalized == "FIRST LIVE ATTEMPT" or normalized.startswith("FIRST LIVE ATTEMPT "):
+        attempt = _first_microscopic_attempt_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir, mode="DRY_RUN")
+        result_status = "ACCEPTED" if attempt.get("status") in {"DRY_RUN_RECORDED", "MOCK_RECORDED"} else str(attempt.get("status") or "BLOCKED")
+        return _result(
+            "first_microscopic_live_attempt",
             result_status,
-            format_first_live_execution_gate_operator_message(gate),
-            payload={"first_live_execution_gate": gate},
-            signal_id=gate.get("signal_id"),
+            format_first_microscopic_live_attempt_operator_message(attempt),
+            payload={"first_microscopic_live_attempt": attempt},
+            signal_id=attempt.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE DRY RUN" or normalized.startswith("FIRST LIVE DRY RUN "):
+        attempt = _first_microscopic_attempt_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir, mode="DRY_RUN")
+        result_status = "ACCEPTED" if attempt.get("status") == "DRY_RUN_RECORDED" else str(attempt.get("status") or "BLOCKED")
+        return _result(
+            "first_microscopic_live_attempt",
+            result_status,
+            format_first_microscopic_live_attempt_operator_message(attempt),
+            payload={"first_microscopic_live_attempt": attempt},
+            signal_id=attempt.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE MOCK" or normalized.startswith("FIRST LIVE MOCK "):
+        attempt = _first_microscopic_attempt_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir, mode="MOCK")
+        result_status = "ACCEPTED" if attempt.get("status") == "MOCK_RECORDED" else str(attempt.get("status") or "BLOCKED")
+        return _result(
+            "first_microscopic_live_attempt",
+            result_status,
+            format_first_microscopic_live_attempt_operator_message(attempt),
+            payload={"first_microscopic_live_attempt": attempt},
+            signal_id=attempt.get("signal_id"),
         )
     if normalized == "FIRST LIVE EXECUTE" or normalized.startswith("FIRST LIVE EXECUTE "):
-        gate = _first_live_execute_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
+        attempt = _first_microscopic_live_execute_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
+        if attempt.get("status") == "LIVE_ORDER_PLACED":
+            result_status = "ACCEPTED"
+        elif attempt.get("status") == "REJECTED":
+            result_status = "REJECTED"
+        else:
+            result_status = "BLOCKED"
+        return _result(
+            "first_microscopic_live_attempt",
+            result_status,
+            format_first_microscopic_live_attempt_operator_message(attempt),
+            payload={"first_microscopic_live_attempt": attempt},
+            signal_id=attempt.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE GATE" or normalized.startswith("FIRST LIVE GATE "):
+        gate = _first_live_gate_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
         result_status = "ACCEPTED" if gate.get("status") == "EXECUTION_GATE_READY" else str(gate.get("status") or "BLOCKED")
         return _result(
             "first_live_execution_gate",
@@ -547,6 +624,39 @@ def _latest_alert_candidate(log_dir: Path) -> dict[str, Any] | None:
         return None
     candidate = alerts[0].get("candidate")
     return dict(candidate) if isinstance(candidate, dict) and candidate.get("signal_id") else None
+
+
+def _first_microscopic_attempt_from_command(*, raw_text: str, normalized: str, log_dir: Path, mode: str) -> dict[str, Any]:
+    if normalized in {"FIRST LIVE ATTEMPT", "FIRST LIVE DRY RUN", "FIRST LIVE MOCK"}:
+        rehearsal_id = None
+    elif mode == "DRY_RUN" and normalized.startswith("FIRST LIVE DRY RUN "):
+        rehearsal_id = raw_text.split(maxsplit=4)[4].strip() if len(raw_text.split(maxsplit=4)) == 5 else None
+    elif mode == "MOCK" and normalized.startswith("FIRST LIVE MOCK "):
+        rehearsal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+    else:
+        rehearsal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
+    return execute_first_microscopic_live_attempt(
+        executor_rehearsal_id=rehearsal_id,
+        transport_mode=mode,
+        dry_run=True,
+        final_confirmation=False,
+        log_dir=log_dir,
+    )
+
+
+def _first_microscopic_live_execute_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:
+    parts = raw_text.split(maxsplit=4)
+    final_confirmation = normalized.endswith(" FINAL")
+    rehearsal_id = parts[3].strip() if len(parts) >= 4 else None
+    if rehearsal_id and rehearsal_id.upper() == "FINAL":
+        rehearsal_id = None
+    return execute_first_microscopic_live_attempt(
+        executor_rehearsal_id=rehearsal_id,
+        transport_mode="LIVE",
+        final_confirmation=final_confirmation,
+        dry_run=False if final_confirmation else True,
+        log_dir=log_dir,
+    )
 
 
 def _first_live_gate_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:
