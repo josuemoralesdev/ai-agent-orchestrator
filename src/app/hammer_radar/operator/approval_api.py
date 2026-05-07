@@ -99,6 +99,13 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     evaluate_and_record_first_live_execution_gate,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
+    build_first_microscopic_live_profile,
+    build_first_microscopic_live_status,
+    check_first_microscopic_live_attempt,
+    execute_first_microscopic_live_attempt,
+    list_first_microscopic_live_attempts,
+)
 from src.app.hammer_radar.operator.live_executor_transport import (
     attempt_live_executor_transport,
     build_live_executor_transport_status,
@@ -293,6 +300,16 @@ class LiveExecutorTransportRequest(BaseModel):
     transport_mode: str | None = None
     final_confirmation: bool = False
     dry_run: bool = True
+
+
+class FirstMicroscopicLiveAttemptRequest(BaseModel):
+    executor_rehearsal_id: str | None = None
+    execution_intent_id: str | None = None
+    signal_id: str | None = None
+    final_confirmation: bool = False
+    transport_mode: str | None = None
+    dry_run: bool = True
+    profile: dict | None = None
 
 
 class BetrayalShadowTrackRequest(BaseModel):
@@ -702,6 +719,62 @@ def live_executor_transport_attempts(
     status: str | None = None,
 ) -> dict:
     return list_live_executor_transport_attempts(
+        limit=limit,
+        signal_id=signal_id,
+        transport_mode=transport_mode,
+        status=status,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-attempt/profile")
+def first_microscopic_live_attempt_profile() -> dict:
+    return build_first_microscopic_live_profile(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-attempt/status")
+def first_microscopic_live_attempt_status() -> dict:
+    return build_first_microscopic_live_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-attempt/check")
+def first_microscopic_live_attempt_check(request: FirstMicroscopicLiveAttemptRequest | None = None) -> dict:
+    request = request or FirstMicroscopicLiveAttemptRequest()
+    return check_first_microscopic_live_attempt(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        profile=request.profile,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live/first-attempt/execute")
+def first_microscopic_live_attempt_execute(request: FirstMicroscopicLiveAttemptRequest | None = None) -> dict:
+    request = request or FirstMicroscopicLiveAttemptRequest()
+    return execute_first_microscopic_live_attempt(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        profile=request.profile,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-attempt/attempts")
+def first_microscopic_live_attempts(
+    limit: int = Query(default=20, ge=0),
+    signal_id: str | None = None,
+    transport_mode: str | None = None,
+    status: str | None = None,
+) -> dict:
+    return list_first_microscopic_live_attempts(
         limit=limit,
         signal_id=signal_id,
         transport_mode=transport_mode,
