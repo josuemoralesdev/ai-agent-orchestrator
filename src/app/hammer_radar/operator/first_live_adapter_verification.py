@@ -20,6 +20,7 @@ from src.app.hammer_radar.execution.binance_futures_connector import build_conne
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_readiness import build_first_live_readiness_status
 from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build_first_live_ladder_submit_status
+from src.app.hammer_radar.operator.first_live_protective_adapter import build_first_live_protective_status
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import build_first_microscopic_live_profile
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
 
@@ -183,8 +184,14 @@ def _evaluate(*, log_dir: str | Path | None, env: Mapping[str, str] | None, pers
     protective = build_protective_status(env=source, log_dir=resolved_log_dir)
     readiness = build_first_live_readiness_status(log_dir=resolved_log_dir, env=source)
     ladder_submit = build_first_live_ladder_submit_status(log_dir=resolved_log_dir, env=source)
+    protective_adapter = build_first_live_protective_status(log_dir=resolved_log_dir, env=source)
     ladder_status = _ladder_adapter_status(profile=profile, preview=preview, ladder_submit=ladder_submit)
-    protective_status = _protective_adapter_status(profile=profile, preview=preview, protective=protective)
+    protective_status = _protective_adapter_status(
+        profile=profile,
+        preview=preview,
+        protective=protective,
+        protective_adapter=protective_adapter,
+    )
     no_naked_entry = _no_naked_entry_status(protective_status=protective_status)
     test_order = _test_order_status(connector=connector)
     live_submit = _live_submit_status(protective_status=protective_status)
@@ -318,22 +325,40 @@ def _aggregate_entry_preview(*, profile: dict[str, Any], preview: dict[str, Any]
     )
 
 
-def _protective_adapter_status(*, profile: dict[str, Any], preview: dict[str, Any], protective: dict[str, Any]) -> dict[str, Any]:
+def _protective_adapter_status(
+    *,
+    profile: dict[str, Any],
+    preview: dict[str, Any],
+    protective: dict[str, Any],
+    protective_adapter: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    r63_plan = (protective_adapter or {}).get("protective_plan") if isinstance(protective_adapter, dict) else {}
+    r63_gate = (protective_adapter or {}).get("protective_gate") if isinstance(protective_adapter, dict) else {}
     protective_preview = preview.get("protective_orders_preview") if isinstance(preview.get("protective_orders_preview"), dict) else {}
     stop = protective_preview.get("stop_loss") if isinstance(protective_preview, dict) else None
     take_profit = protective_preview.get("take_profit") if isinstance(protective_preview, dict) else None
     stop_preview = _sanitize_nested(stop) if isinstance(stop, dict) else None
     take_profit_preview = _sanitize_nested(take_profit) if isinstance(take_profit, dict) else None
+    if isinstance(r63_plan, dict):
+        stop_preview = _sanitize_nested(r63_plan.get("stop_loss_payload_preview")) or stop_preview
+        take_profit_preview = _sanitize_nested(r63_plan.get("take_profit_payload_preview")) or take_profit_preview
     stop_reduce = bool((stop_preview or {}).get("reduce_only") is True)
     take_profit_reduce = bool((take_profit_preview or {}).get("reduce_only") is True)
+    if isinstance(r63_plan, dict) and (r63_plan.get("stop_loss_payload_preview") or r63_plan.get("take_profit_payload_preview")):
+        stop_reduce = bool(r63_plan.get("stop_loss_reduce_only_ok"))
+        take_profit_reduce = bool(r63_plan.get("take_profit_reduce_only_ok"))
     reduce_only_ok = stop_reduce and take_profit_reduce
-    close_or_quantity_ok = reduce_only_ok and bool(stop_preview and take_profit_preview)
+    if isinstance(r63_plan, dict) and (r63_plan.get("stop_loss_payload_preview") or r63_plan.get("take_profit_payload_preview")):
+        close_or_quantity_ok = bool(r63_plan.get("close_position_or_quantity_ok"))
+    else:
+        close_or_quantity_ok = reduce_only_ok and bool(stop_preview and take_profit_preview)
     available = (
         protective.get("protective_orders_enabled") is True
         and protective.get("protective_order_mode") == "LIVE_PROTECTIVE_ENABLED"
         and protective.get("protective_stop_supported") is True
         and protective.get("protective_take_profit_supported") is True
         and reduce_only_ok
+        and bool((r63_gate or {}).get("protective_ready_for_live_entry")) is True
     )
     blockers = []
     if profile["protective_orders_required"] is not True:
@@ -346,6 +371,8 @@ def _protective_adapter_status(*, profile: dict[str, Any], preview: dict[str, An
         blockers.append("protective stop-loss and take-profit must be reduce_only")
     if protective.get("protective_order_mode") != "LIVE_PROTECTIVE_ENABLED":
         blockers.append("protective live adapter not armed/verified")
+    if isinstance(r63_plan, dict):
+        blockers.extend(str(item) for item in r63_plan.get("blockers") or [])
     if not available:
         blockers.append("protective live adapter unavailable")
     return {
@@ -358,6 +385,8 @@ def _protective_adapter_status(*, profile: dict[str, Any], preview: dict[str, An
         "reduce_only_required": True,
         "reduce_only_ok": reduce_only_ok,
         "close_position_or_quantity_ok": close_or_quantity_ok,
+        "protective_plan_available": bool((r63_plan or {}).get("available")),
+        "protective_ready_for_live_entry": bool((r63_gate or {}).get("protective_ready_for_live_entry")),
         "blockers": list(dict.fromkeys(blockers)),
     }
 
