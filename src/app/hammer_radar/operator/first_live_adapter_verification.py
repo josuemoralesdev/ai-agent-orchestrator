@@ -19,6 +19,7 @@ from src.app.hammer_radar.execution import binance_futures_connector as connecto
 from src.app.hammer_radar.execution.binance_futures_connector import build_connector_status, build_protective_status
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_readiness import build_first_live_readiness_status
+from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build_first_live_ladder_submit_status
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import build_first_microscopic_live_profile
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
 
@@ -181,7 +182,8 @@ def _evaluate(*, log_dir: str | Path | None, env: Mapping[str, str] | None, pers
     connector = build_connector_status(env=source, log_dir=resolved_log_dir)
     protective = build_protective_status(env=source, log_dir=resolved_log_dir)
     readiness = build_first_live_readiness_status(log_dir=resolved_log_dir, env=source)
-    ladder_status = _ladder_adapter_status(profile=profile, preview=preview)
+    ladder_submit = build_first_live_ladder_submit_status(log_dir=resolved_log_dir, env=source)
+    ladder_status = _ladder_adapter_status(profile=profile, preview=preview, ladder_submit=ladder_submit)
     protective_status = _protective_adapter_status(profile=profile, preview=preview, protective=protective)
     no_naked_entry = _no_naked_entry_status(protective_status=protective_status)
     test_order = _test_order_status(connector=connector)
@@ -263,17 +265,26 @@ def _profile(source: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _ladder_adapter_status(*, profile: dict[str, Any], preview: dict[str, Any]) -> dict[str, Any]:
+def _ladder_adapter_status(*, profile: dict[str, Any], preview: dict[str, Any], ladder_submit: dict[str, Any] | None = None) -> dict[str, Any]:
+    submit_plan = (ladder_submit or {}).get("ladder_submit_plan") if isinstance(ladder_submit, dict) else {}
     aggregate = _aggregate_entry_preview(profile=profile, preview=preview)
+    if isinstance(submit_plan, dict) and submit_plan.get("aggregate_entry_payload_preview") is not None:
+        aggregate = _sanitize_nested(submit_plan.get("aggregate_entry_payload_preview"))
+        aggregate["margin_usdt_total"] = submit_plan.get("planned_margin_usdt")
+        aggregate["notional_usdt_total"] = submit_plan.get("planned_notional_usdt")
     blockers = ["live ladder submit adapter not implemented"]
+    if isinstance(submit_plan, dict):
+        blockers.extend(str(item) for item in submit_plan.get("blockers") or [])
     if profile["entry_mode"] != "LADDER":
         blockers.append("first-live entry_mode must be LADDER")
     if profile["margin_usdt"] > 44.0:
         blockers.append("ladder total margin exceeds 44 USDT")
     if profile["notional_usdt"] > profile["max_notional_usdt"]:
         blockers.append("ladder total notional exceeds max cap")
+    aggregate_only = bool((submit_plan or {}).get("aggregate_preview_only", True))
+    child_orders_available = bool((submit_plan or {}).get("ladder_steps_generated") is True and (submit_plan or {}).get("available") is True)
     return {
-        "available": False,
+        "available": bool(child_orders_available),
         "mode": "LADDER",
         "margin_total_cap_usdt": 44.0,
         "notional_total_cap_usdt": 444.0,
@@ -281,7 +292,10 @@ def _ladder_adapter_status(*, profile: dict[str, Any], preview: dict[str, Any]) 
         "aggregate_entry_payload_preview": aggregate,
         "uses_total_margin_cap": True,
         "per_step_margin_violation": False,
-        "blockers": blockers,
+        "ladder_submit_plan_available": isinstance(submit_plan, dict) and submit_plan.get("quantity_valid") is True,
+        "ladder_child_orders_available": child_orders_available,
+        "aggregate_preview_only": aggregate_only,
+        "blockers": list(dict.fromkeys(blockers)),
     }
 
 
