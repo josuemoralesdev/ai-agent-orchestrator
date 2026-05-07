@@ -45,6 +45,13 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     format_first_live_execution_gates_operator_message,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_live_readiness import (
+    build_first_live_readiness_status,
+    evaluate_and_record_first_live_readiness,
+    format_first_live_readiness_checks_operator_message,
+    format_first_live_readiness_operator_message,
+    list_first_live_readiness_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -96,6 +103,11 @@ HELP_COMMANDS = [
     "FIRST LIVE MOCK <executor_rehearsal_id>",
     "FIRST LIVE EXECUTE <executor_rehearsal_id> FINAL",
     "FIRST LIVE ATTEMPTS",
+    "FIRST LIVE READINESS",
+    "FIRST LIVE CAPS",
+    "FIRST LIVE FUNDS",
+    "FIRST LIVE ADAPTER",
+    "FIRST LIVE READINESS CHECKS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -234,6 +246,46 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_first_microscopic_live_attempt_operator_message(payload),
             payload={"first_microscopic_live_attempt": payload},
             signal_id=payload.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE READINESS":
+        payload = evaluate_and_record_first_live_readiness(log_dir=log_dir)
+        return _result(
+            "first_live_readiness",
+            "ACCEPTED",
+            format_first_live_readiness_operator_message(payload),
+            payload={"first_live_readiness": payload},
+        )
+    if normalized == "FIRST LIVE CAPS":
+        payload = build_first_live_readiness_status(log_dir=log_dir)
+        return _result(
+            "first_live_caps",
+            "ACCEPTED",
+            format_first_live_readiness_operator_message(payload, section="caps"),
+            payload={"first_live_readiness": payload},
+        )
+    if normalized == "FIRST LIVE FUNDS":
+        payload = build_first_live_readiness_status(log_dir=log_dir)
+        return _result(
+            "first_live_funds",
+            "ACCEPTED",
+            format_first_live_readiness_operator_message(payload, section="funds"),
+            payload={"first_live_readiness": payload},
+        )
+    if normalized == "FIRST LIVE ADAPTER":
+        payload = build_first_live_readiness_status(log_dir=log_dir)
+        return _result(
+            "first_live_adapter",
+            "ACCEPTED",
+            format_first_live_readiness_operator_message(payload, section="adapter"),
+            payload={"first_live_readiness": payload},
+        )
+    if normalized == "FIRST LIVE READINESS CHECKS":
+        payload = list_first_live_readiness_checks(log_dir=log_dir)
+        return _result(
+            "first_live_readiness_checks",
+            "ACCEPTED",
+            format_first_live_readiness_checks_operator_message(payload),
+            payload={"first_live_readiness_checks": payload},
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)

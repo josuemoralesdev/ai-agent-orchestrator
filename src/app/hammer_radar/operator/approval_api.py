@@ -99,6 +99,11 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     evaluate_and_record_first_live_execution_gate,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_live_readiness import (
+    build_first_live_readiness_status,
+    evaluate_and_record_first_live_readiness,
+    list_first_live_readiness_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -781,6 +786,21 @@ def first_microscopic_live_attempts(
         status=status,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.get("/live/first-readiness/status")
+def first_live_readiness_status() -> dict:
+    return build_first_live_readiness_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-readiness/check")
+def first_live_readiness_check() -> dict:
+    return evaluate_and_record_first_live_readiness(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-readiness/checks")
+def first_live_readiness_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_readiness_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")
