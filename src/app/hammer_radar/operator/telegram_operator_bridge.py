@@ -66,6 +66,13 @@ from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import (
     format_first_live_ladder_submit_operator_message,
     list_first_live_ladder_submit_checks,
 )
+from src.app.hammer_radar.operator.first_live_protective_adapter import (
+    build_first_live_protective_status,
+    evaluate_and_record_first_live_protective_check,
+    format_first_live_protective_checks_operator_message,
+    format_first_live_protective_operator_message,
+    list_first_live_protective_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -131,6 +138,11 @@ HELP_COMMANDS = [
     "FIRST LIVE LADDER PLAN",
     "FIRST LIVE LADDER PAYLOAD",
     "FIRST LIVE LADDER CHECKS",
+    "FIRST LIVE PROTECTIVE CHECK",
+    "FIRST LIVE STOP CHECK",
+    "FIRST LIVE TAKE PROFIT CHECK",
+    "FIRST LIVE PROTECTIVE PAYLOAD",
+    "FIRST LIVE PROTECTIVE CHECKS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -381,6 +393,46 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_first_live_ladder_submit_checks_operator_message(payload),
             payload={"first_live_ladder_submit_checks": payload},
+        )
+    if normalized == "FIRST LIVE PROTECTIVE CHECK":
+        payload = evaluate_and_record_first_live_protective_check(log_dir=log_dir)
+        return _result(
+            "first_live_protective_check",
+            "ACCEPTED",
+            format_first_live_protective_operator_message(payload),
+            payload={"first_live_protective": payload},
+        )
+    if normalized == "FIRST LIVE STOP CHECK":
+        payload = build_first_live_protective_status(log_dir=log_dir)
+        return _result(
+            "first_live_stop_check",
+            "ACCEPTED",
+            format_first_live_protective_operator_message(payload, section="stop"),
+            payload={"first_live_protective": payload},
+        )
+    if normalized == "FIRST LIVE TAKE PROFIT CHECK":
+        payload = build_first_live_protective_status(log_dir=log_dir)
+        return _result(
+            "first_live_take_profit_check",
+            "ACCEPTED",
+            format_first_live_protective_operator_message(payload, section="take_profit"),
+            payload={"first_live_protective": payload},
+        )
+    if normalized == "FIRST LIVE PROTECTIVE PAYLOAD":
+        payload = build_first_live_protective_status(log_dir=log_dir)
+        return _result(
+            "first_live_protective_payload",
+            "ACCEPTED",
+            format_first_live_protective_operator_message(payload, section="payload"),
+            payload={"first_live_protective": payload},
+        )
+    if normalized == "FIRST LIVE PROTECTIVE CHECKS":
+        payload = list_first_live_protective_checks(log_dir=log_dir)
+        return _result(
+            "first_live_protective_checks",
+            "ACCEPTED",
+            format_first_live_protective_checks_operator_message(payload),
+            payload={"first_live_protective_checks": payload},
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)

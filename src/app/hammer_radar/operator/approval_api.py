@@ -114,6 +114,11 @@ from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import (
     evaluate_and_record_first_live_ladder_submit_check,
     list_first_live_ladder_submit_checks,
 )
+from src.app.hammer_radar.operator.first_live_protective_adapter import (
+    build_first_live_protective_status,
+    evaluate_and_record_first_live_protective_check,
+    list_first_live_protective_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -335,6 +340,15 @@ class FirstLiveLadderSubmitRequest(BaseModel):
     final_confirmation: bool = False
     dry_run: bool = True
     profile: dict | None = None
+
+
+class FirstLiveProtectiveRequest(BaseModel):
+    executor_rehearsal_id: str | None = None
+    execution_intent_id: str | None = None
+    signal_id: str | None = None
+    transport_mode: str | None = None
+    final_confirmation: bool = False
+    dry_run: bool = True
 
 
 class BetrayalShadowTrackRequest(BaseModel):
@@ -861,6 +875,30 @@ def first_live_ladder_submit_check(request: FirstLiveLadderSubmitRequest | None 
 @app.get("/live/first-ladder/checks")
 def first_live_ladder_submit_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_ladder_submit_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-protective/status")
+def first_live_protective_status() -> dict:
+    return build_first_live_protective_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-protective/check")
+def first_live_protective_check(request: FirstLiveProtectiveRequest | None = None) -> dict:
+    request = request or FirstLiveProtectiveRequest()
+    return evaluate_and_record_first_live_protective_check(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-protective/checks")
+def first_live_protective_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_protective_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")
