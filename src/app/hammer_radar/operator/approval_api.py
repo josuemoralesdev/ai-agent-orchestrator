@@ -109,6 +109,11 @@ from src.app.hammer_radar.operator.first_live_readiness import (
     evaluate_and_record_first_live_readiness,
     list_first_live_readiness_checks,
 )
+from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import (
+    build_first_live_ladder_submit_status,
+    evaluate_and_record_first_live_ladder_submit_check,
+    list_first_live_ladder_submit_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -318,6 +323,16 @@ class FirstMicroscopicLiveAttemptRequest(BaseModel):
     signal_id: str | None = None
     final_confirmation: bool = False
     transport_mode: str | None = None
+    dry_run: bool = True
+    profile: dict | None = None
+
+
+class FirstLiveLadderSubmitRequest(BaseModel):
+    executor_rehearsal_id: str | None = None
+    execution_intent_id: str | None = None
+    signal_id: str | None = None
+    transport_mode: str | None = None
+    final_confirmation: bool = False
     dry_run: bool = True
     profile: dict | None = None
 
@@ -821,6 +836,31 @@ def first_live_adapter_check() -> dict:
 @app.get("/live/first-adapter/checks")
 def first_live_adapter_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_adapter_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-ladder/status")
+def first_live_ladder_submit_status() -> dict:
+    return build_first_live_ladder_submit_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-ladder/check")
+def first_live_ladder_submit_check(request: FirstLiveLadderSubmitRequest | None = None) -> dict:
+    request = request or FirstLiveLadderSubmitRequest()
+    return evaluate_and_record_first_live_ladder_submit_check(
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        execution_intent_id=request.execution_intent_id,
+        signal_id=request.signal_id,
+        transport_mode=request.transport_mode,
+        final_confirmation=request.final_confirmation,
+        dry_run=request.dry_run,
+        profile=request.profile,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-ladder/checks")
+def first_live_ladder_submit_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_ladder_submit_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")

@@ -59,6 +59,13 @@ from src.app.hammer_radar.operator.first_live_readiness import (
     format_first_live_readiness_operator_message,
     list_first_live_readiness_checks,
 )
+from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import (
+    build_first_live_ladder_submit_status,
+    evaluate_and_record_first_live_ladder_submit_check,
+    format_first_live_ladder_submit_checks_operator_message,
+    format_first_live_ladder_submit_operator_message,
+    list_first_live_ladder_submit_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -120,6 +127,10 @@ HELP_COMMANDS = [
     "FIRST LIVE PROTECTIVE ADAPTER",
     "FIRST LIVE NO NAKED ENTRY",
     "FIRST LIVE ADAPTER CHECKS",
+    "FIRST LIVE LADDER CHECK",
+    "FIRST LIVE LADDER PLAN",
+    "FIRST LIVE LADDER PAYLOAD",
+    "FIRST LIVE LADDER CHECKS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -338,6 +349,38 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_first_live_adapter_checks_operator_message(payload),
             payload={"first_live_adapter_checks": payload},
+        )
+    if normalized == "FIRST LIVE LADDER CHECK":
+        payload = evaluate_and_record_first_live_ladder_submit_check(log_dir=log_dir)
+        return _result(
+            "first_live_ladder_check",
+            "ACCEPTED",
+            format_first_live_ladder_submit_operator_message(payload),
+            payload={"first_live_ladder_submit": payload},
+        )
+    if normalized == "FIRST LIVE LADDER PLAN":
+        payload = build_first_live_ladder_submit_status(log_dir=log_dir)
+        return _result(
+            "first_live_ladder_plan",
+            "ACCEPTED",
+            format_first_live_ladder_submit_operator_message(payload, section="plan"),
+            payload={"first_live_ladder_submit": payload},
+        )
+    if normalized == "FIRST LIVE LADDER PAYLOAD":
+        payload = build_first_live_ladder_submit_status(log_dir=log_dir)
+        return _result(
+            "first_live_ladder_payload",
+            "ACCEPTED",
+            format_first_live_ladder_submit_operator_message(payload, section="payload"),
+            payload={"first_live_ladder_submit": payload},
+        )
+    if normalized == "FIRST LIVE LADDER CHECKS":
+        payload = list_first_live_ladder_submit_checks(log_dir=log_dir)
+        return _result(
+            "first_live_ladder_checks",
+            "ACCEPTED",
+            format_first_live_ladder_submit_checks_operator_message(payload),
+            payload={"first_live_ladder_submit_checks": payload},
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
