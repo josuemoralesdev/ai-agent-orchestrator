@@ -39,14 +39,17 @@ class FirstLiveReadinessTestCase(unittest.TestCase):
         self.assertFalse(payload["network_allowed"])
         self.assertFalse(payload["secrets_shown"])
 
-    def test_cap_alignment_detects_legacy_conflict(self) -> None:
+    def test_cap_alignment_resolves_legacy_conflict_for_first_live_defaults(self) -> None:
         payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
         caps = payload["cap_status"]
 
-        self.assertTrue(caps["legacy_cap_conflict"])
+        self.assertFalse(caps["legacy_cap_conflict"])
+        self.assertTrue(caps["first_live_cap_semantics_ok"])
+        self.assertTrue(caps["legacy_caps_preserved_for_global_live"])
+        self.assertFalse(caps["legacy_connector_runtime_conflict"])
         self.assertEqual(44.0, caps["legacy_max_position_usd"])
         self.assertEqual(3.0, caps["legacy_max_leverage"])
-        self.assertIn("legacy HAMMER_LIVE_MAX_POSITION_USD", "; ".join(caps["blockers"]))
+        self.assertEqual([], caps["blockers"])
 
     def test_first_live_cap_values(self) -> None:
         payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
@@ -60,6 +63,58 @@ class FirstLiveReadinessTestCase(unittest.TestCase):
         self.assertTrue(caps["margin_cap_ok"])
         self.assertTrue(caps["notional_cap_ok"])
         self.assertTrue(caps["leverage_cap_ok"])
+        self.assertTrue(caps["first_live_margin_cap_ok"])
+        self.assertTrue(caps["first_live_notional_cap_ok"])
+        self.assertTrue(caps["first_live_leverage_cap_ok"])
+
+    def test_global_legacy_caps_preserved(self) -> None:
+        payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
+        caps = payload["cap_status"]
+
+        self.assertTrue(caps["legacy_caps_preserved_for_global_live"])
+        self.assertEqual(44.0, caps["legacy_max_position_usd"])
+        self.assertEqual(3.0, caps["legacy_max_leverage"])
+
+    def test_first_live_notional_cap_fails_above_444(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.first_live_readiness.build_first_microscopic_live_profile",
+            return_value=self._profile_payload(margin_usdt=45.0),
+        ):
+            payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
+
+        caps = payload["cap_status"]
+        self.assertEqual(450.0, caps["profile_notional_usdt"])
+        self.assertFalse(caps["first_live_cap_semantics_ok"])
+        self.assertFalse(caps["first_live_margin_cap_ok"])
+        self.assertFalse(caps["first_live_notional_cap_ok"])
+        self.assertTrue(caps["legacy_cap_conflict"])
+
+    def test_first_live_leverage_cap_fails_above_10(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.first_live_readiness.build_first_microscopic_live_profile",
+            return_value=self._profile_payload(leverage=11),
+        ):
+            payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
+
+        caps = payload["cap_status"]
+        self.assertFalse(caps["first_live_cap_semantics_ok"])
+        self.assertFalse(caps["first_live_leverage_cap_ok"])
+
+    def test_wrong_symbol_mode_and_entry_mode_block(self) -> None:
+        cases = [
+            ({"symbol": "ETHUSDT"}, "profile_symbol"),
+            ({"margin_mode": "CROSS"}, "profile_margin_mode"),
+            ({"entry_mode": "SINGLE"}, "profile_entry_mode"),
+        ]
+        for overrides, field in cases:
+            with self.subTest(field=field), patch(
+                "src.app.hammer_radar.operator.first_live_readiness.build_first_microscopic_live_profile",
+                return_value=self._profile_payload(**overrides),
+            ):
+                payload = build_first_live_readiness_status(log_dir=self.log_dir, env={})
+
+            self.assertFalse(payload["cap_status"]["first_live_cap_semantics_ok"])
+            self.assertTrue(payload["cap_status"]["legacy_cap_conflict"])
 
     def test_env_files_surfaced_without_secrets(self) -> None:
         env = {
@@ -89,6 +144,9 @@ class FirstLiveReadinessTestCase(unittest.TestCase):
         self.assertEqual("44", profile_values["HAMMER_FIRST_LIVE_MARGIN_USDT"])
         self.assertEqual("10", profile_values["HAMMER_FIRST_LIVE_LEVERAGE"])
         self.assertEqual("444", profile_values["HAMMER_FIRST_LIVE_MAX_NOTIONAL_USDT"])
+        self.assertNotIn("HAMMER_LIVE_MAX_POSITION_USD", profile_values)
+        self.assertNotIn("HAMMER_LIVE_MAX_LEVERAGE", profile_values)
+        self.assertIn("first-live scoped", [item for item in plan if item["group"] == "profile_caps"][0]["notes"])
         self.assertEqual("LIVE_ORDER_ENABLED", arming_values["HAMMER_BINANCE_CONNECTOR_MODE"])
         self.assertEqual("DRY_RUN_ONLY", rollback_values["HAMMER_BINANCE_CONNECTOR_MODE"])
         self.assertEqual({}, before)
@@ -119,6 +177,9 @@ class FirstLiveReadinessTestCase(unittest.TestCase):
 
         self.assertEqual("R59", status["phase"])
         self.assertEqual("R59", check["phase"])
+        self.assertIn("first_live_cap_semantics_ok", status["cap_status"])
+        self.assertIn("legacy_caps_preserved_for_global_live", status["cap_status"])
+        self.assertIn("legacy_connector_runtime_conflict", status["cap_status"])
         self.assertEqual("ACCEPTED", checks["result_status"])
         self.assertGreaterEqual(checks["count"], 1)
         self.assertFalse(status["order_placed"])
@@ -138,10 +199,34 @@ class FirstLiveReadinessTestCase(unittest.TestCase):
         self.assertEqual("ACCEPTED", funds["result_status"])
         self.assertEqual("ACCEPTED", adapter["result_status"])
         self.assertEqual("ACCEPTED", checks["result_status"])
+        self.assertIn("first_live_aligned=True", caps["message"])
+        self.assertIn("global_legacy_preserved=True", caps["message"])
         self.assertEqual("REJECTED", raw_yes["result_status"])
         self.assertEqual("BLOCKED", trade_now["result_status"])
         self.assertFalse(trade_now["order_placed"])
         self.assertFalse(trade_now["real_order_placed"])
+
+    @staticmethod
+    def _profile_payload(**overrides: object) -> dict:
+        profile = {
+            "symbol": "BTCUSDT",
+            "margin_usdt": 44.0,
+            "leverage": 10,
+            "max_notional_usdt": 444.0,
+            "margin_mode": "ISOLATED",
+            "entry_mode": "LADDER",
+            "protective_orders_required": True,
+            "one_attempt_only": True,
+        }
+        profile.update(overrides)
+        return {
+            "status": "PROFILE_READY",
+            "phase": "R58",
+            "profile": profile,
+            "order_placed": False,
+            "real_order_placed": False,
+            "secrets_shown": False,
+        }
 
 
 if __name__ == "__main__":

@@ -131,9 +131,11 @@ def format_first_live_readiness_operator_message(payload: dict[str, Any], *, sec
     if section in {"readiness", "caps"}:
         lines.append(
             "caps: "
-            f"notional={cap_status.get('profile_notional_usdt')} margin_ok={cap_status.get('margin_cap_ok')} "
-            f"notional_ok={cap_status.get('notional_cap_ok')} leverage_ok={cap_status.get('leverage_cap_ok')} "
-            f"legacy_conflict={cap_status.get('legacy_cap_conflict')}"
+            f"notional={cap_status.get('profile_notional_usdt')} margin_ok={cap_status.get('first_live_margin_cap_ok')} "
+            f"notional_ok={cap_status.get('first_live_notional_cap_ok')} leverage_ok={cap_status.get('first_live_leverage_cap_ok')} "
+            f"first_live_aligned={cap_status.get('first_live_cap_semantics_ok')} "
+            f"global_legacy_preserved={cap_status.get('legacy_caps_preserved_for_global_live')} "
+            f"runtime_conflict={cap_status.get('legacy_connector_runtime_conflict')}"
         )
     if section in {"readiness", "funds"}:
         lines.append(
@@ -263,33 +265,79 @@ def _cap_status(*, profile: dict[str, Any], connector: dict[str, Any]) -> dict[s
     required_margin_cap = 44.0
     required_max_notional = 444.0
     required_max_leverage = 10
-    legacy_conflict = bool(
-        legacy_max_position is not None
-        and legacy_max_leverage is not None
-        and (legacy_max_position < notional or legacy_max_leverage < float(profile["leverage"]))
+    first_live_margin_cap_ok = float(profile["margin_usdt"]) <= required_margin_cap
+    first_live_notional_cap_ok = notional <= required_max_notional
+    first_live_leverage_cap_ok = float(profile["leverage"]) <= required_max_leverage
+    first_live_profile_shape_ok = (
+        profile.get("symbol") == "BTCUSDT"
+        and profile.get("margin_mode") == "ISOLATED"
+        and profile.get("entry_mode") == "LADDER"
+        and profile.get("one_attempt_only") is True
+        and profile.get("protective_orders_required") is True
     )
+    first_live_cap_semantics_ok = bool(
+        first_live_profile_shape_ok
+        and first_live_margin_cap_ok
+        and first_live_notional_cap_ok
+        and first_live_leverage_cap_ok
+        and float(profile["margin_usdt"]) == required_margin_cap
+        and int(profile["leverage"]) == required_max_leverage
+        and float(profile["max_notional_usdt"]) == required_max_notional
+    )
+    legacy_caps_preserved = legacy_max_position == 44.0 and legacy_max_leverage == 3.0
+    legacy_runtime_conflict = _legacy_connector_runtime_conflict(connector=connector, first_live_semantics_ok=first_live_cap_semantics_ok)
+    legacy_conflict = not first_live_cap_semantics_ok
     blockers = []
-    if legacy_conflict:
-        blockers.append("legacy HAMMER_LIVE_MAX_POSITION_USD/HAMMER_LIVE_MAX_LEVERAGE caps conflict with R58 first-live profile semantics")
-    if float(profile["margin_usdt"]) > required_margin_cap:
+    if not first_live_profile_shape_ok:
+        blockers.append("first-live profile must be BTCUSDT ISOLATED LADDER with protective orders and one-attempt-only")
+    if not first_live_margin_cap_ok:
         blockers.append("first-live margin exceeds required 44 USDT cap")
-    if notional > required_max_notional:
+    if not first_live_notional_cap_ok:
         blockers.append("first-live notional exceeds required 444 USDT cap")
-    if float(profile["leverage"]) > required_max_leverage:
+    if not first_live_leverage_cap_ok:
         blockers.append("first-live leverage exceeds required 10x cap")
+    if not first_live_cap_semantics_ok and not blockers:
+        blockers.append("first-live cap values must be exactly 44 margin, 10x leverage, and 444 max notional")
+    if legacy_runtime_conflict:
+        blockers.append("legacy connector live guard still enforces old max position/leverage on first-live path")
     return {
         "profile_notional_usdt": notional,
-        "margin_cap_ok": float(profile["margin_usdt"]) <= required_margin_cap,
-        "notional_cap_ok": notional <= required_max_notional,
-        "leverage_cap_ok": float(profile["leverage"]) <= required_max_leverage,
+        "margin_cap_ok": first_live_margin_cap_ok,
+        "notional_cap_ok": first_live_notional_cap_ok,
+        "leverage_cap_ok": first_live_leverage_cap_ok,
         "legacy_cap_conflict": legacy_conflict,
+        "legacy_caps_preserved_for_global_live": legacy_caps_preserved,
+        "first_live_cap_semantics_ok": first_live_cap_semantics_ok,
+        "first_live_margin_cap_ok": first_live_margin_cap_ok,
+        "first_live_notional_cap_ok": first_live_notional_cap_ok,
+        "first_live_leverage_cap_ok": first_live_leverage_cap_ok,
+        "legacy_connector_runtime_conflict": legacy_runtime_conflict,
         "legacy_max_position_usd": legacy_max_position,
         "legacy_max_leverage": legacy_max_leverage,
         "required_margin_cap_usdt": required_margin_cap,
         "required_max_notional_usdt": required_max_notional,
         "required_max_leverage": required_max_leverage,
+        "profile_margin_usdt": float(profile["margin_usdt"]),
+        "profile_leverage": int(profile["leverage"]),
+        "profile_max_notional_usdt": float(profile["max_notional_usdt"]),
+        "profile_symbol": profile.get("symbol"),
+        "profile_margin_mode": profile.get("margin_mode"),
+        "profile_entry_mode": profile.get("entry_mode"),
         "blockers": blockers,
     }
+
+
+def _legacy_connector_runtime_conflict(*, connector: dict[str, Any], first_live_semantics_ok: bool) -> bool:
+    if not first_live_semantics_ok:
+        return False
+    blockers = connector.get("blockers") or []
+    cap_blockers = {
+        "HAMMER_LIVE_MAX_POSITION_USD must remain 44",
+        "HAMMER_LIVE_MAX_LEVERAGE must remain 3",
+        "HAMMER_LIVE_MAX_POSITION_USD exceeds 44",
+        "HAMMER_LIVE_MAX_LEVERAGE exceeds 3",
+    }
+    return any(str(blocker) in cap_blockers for blocker in blockers)
 
 
 def _env_status(
@@ -401,6 +449,7 @@ def _manual_env_plan() -> list[dict[str, Any]]:
             "file": ENV_FILES[0],
             "action": "manual edit only",
             "danger_level": "safe_profile_alignment",
+            "notes": "HAMMER_FIRST_LIVE_* values are first-live scoped; do not reinterpret legacy global max position/leverage as first-live notional caps.",
             "values": profile_values,
         },
         {
@@ -470,7 +519,7 @@ def _status(
     gate_statuses: dict[str, str],
     blockers: list[str],
 ) -> str:
-    caps_ok = cap_status["margin_cap_ok"] and cap_status["notional_cap_ok"] and cap_status["leverage_cap_ok"]
+    caps_ok = cap_status["first_live_cap_semantics_ok"] and not cap_status["legacy_connector_runtime_conflict"]
     env_ready = (
         env_status["live_execution_enabled"]
         and env_status["binance_live_enabled"]
@@ -513,7 +562,9 @@ def _operator_action(
     adapter_status: dict[str, Any],
     gate_statuses: dict[str, str],
 ) -> str:
-    if cap_status.get("legacy_cap_conflict") or cap_status.get("blockers"):
+    if cap_status.get("legacy_connector_runtime_conflict"):
+        return "fix connector runtime caps"
+    if not cap_status.get("first_live_cap_semantics_ok") or cap_status.get("blockers"):
         return "fix caps"
     if not funds_status.get("has_required_margin"):
         return "fund account"
