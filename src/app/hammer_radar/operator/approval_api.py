@@ -99,6 +99,11 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     evaluate_and_record_first_live_execution_gate,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_live_adapter_verification import (
+    build_first_live_adapter_status,
+    evaluate_and_record_first_live_adapter_check,
+    list_first_live_adapter_checks,
+)
 from src.app.hammer_radar.operator.first_live_readiness import (
     build_first_live_readiness_status,
     evaluate_and_record_first_live_readiness,
@@ -801,6 +806,21 @@ def first_live_readiness_check() -> dict:
 @app.get("/live/first-readiness/checks")
 def first_live_readiness_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_readiness_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-adapter/status")
+def first_live_adapter_status() -> dict:
+    return build_first_live_adapter_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-adapter/check")
+def first_live_adapter_check() -> dict:
+    return evaluate_and_record_first_live_adapter_check(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-adapter/checks")
+def first_live_adapter_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_adapter_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")

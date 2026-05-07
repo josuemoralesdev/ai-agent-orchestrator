@@ -45,6 +45,13 @@ from src.app.hammer_radar.operator.first_live_execution_gate import (
     format_first_live_execution_gates_operator_message,
     list_first_live_execution_gates,
 )
+from src.app.hammer_radar.operator.first_live_adapter_verification import (
+    build_first_live_adapter_status,
+    evaluate_and_record_first_live_adapter_check,
+    format_first_live_adapter_checks_operator_message,
+    format_first_live_adapter_operator_message,
+    list_first_live_adapter_checks,
+)
 from src.app.hammer_radar.operator.first_live_readiness import (
     build_first_live_readiness_status,
     evaluate_and_record_first_live_readiness,
@@ -108,6 +115,11 @@ HELP_COMMANDS = [
     "FIRST LIVE FUNDS",
     "FIRST LIVE ADAPTER",
     "FIRST LIVE READINESS CHECKS",
+    "FIRST LIVE ADAPTER CHECK",
+    "FIRST LIVE LADDER ADAPTER",
+    "FIRST LIVE PROTECTIVE ADAPTER",
+    "FIRST LIVE NO NAKED ENTRY",
+    "FIRST LIVE ADAPTER CHECKS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -286,6 +298,46 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_first_live_readiness_checks_operator_message(payload),
             payload={"first_live_readiness_checks": payload},
+        )
+    if normalized == "FIRST LIVE ADAPTER CHECK":
+        payload = evaluate_and_record_first_live_adapter_check(log_dir=log_dir)
+        return _result(
+            "first_live_adapter_check",
+            "ACCEPTED",
+            format_first_live_adapter_operator_message(payload),
+            payload={"first_live_adapter_verification": payload},
+        )
+    if normalized == "FIRST LIVE LADDER ADAPTER":
+        payload = build_first_live_adapter_status(log_dir=log_dir)
+        return _result(
+            "first_live_ladder_adapter",
+            "ACCEPTED",
+            format_first_live_adapter_operator_message(payload, section="ladder"),
+            payload={"first_live_adapter_verification": payload},
+        )
+    if normalized == "FIRST LIVE PROTECTIVE ADAPTER":
+        payload = build_first_live_adapter_status(log_dir=log_dir)
+        return _result(
+            "first_live_protective_adapter",
+            "ACCEPTED",
+            format_first_live_adapter_operator_message(payload, section="protective"),
+            payload={"first_live_adapter_verification": payload},
+        )
+    if normalized == "FIRST LIVE NO NAKED ENTRY":
+        payload = build_first_live_adapter_status(log_dir=log_dir)
+        return _result(
+            "first_live_no_naked_entry",
+            "ACCEPTED",
+            format_first_live_adapter_operator_message(payload, section="no_naked_entry"),
+            payload={"first_live_adapter_verification": payload},
+        )
+    if normalized == "FIRST LIVE ADAPTER CHECKS":
+        payload = list_first_live_adapter_checks(log_dir=log_dir)
+        return _result(
+            "first_live_adapter_checks",
+            "ACCEPTED",
+            format_first_live_adapter_checks_operator_message(payload),
+            payload={"first_live_adapter_checks": payload},
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
