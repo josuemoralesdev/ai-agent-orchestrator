@@ -38,6 +38,12 @@ EXECUTION_MODE = "FIRST_LIVE_CHAIN_RUNBOOK_ONLY"
 CHECKS_FILENAME = "first_live_chain_checks.ndjson"
 FAST_RECORD_LIMIT = 100
 FAST_SIGNAL_LIMIT = 50
+FIRST_LIVE_FRESHNESS_POLICY = "strict_first_live"
+FIRST_LIVE_FRESHNESS_CUTOFFS_MINUTES = {
+    "4m": 4.5,
+    "8m": 8.5,
+    "13m": 13.5,
+}
 
 ORDER_PLACED = False
 REAL_ORDER_PLACED = False
@@ -373,15 +379,22 @@ def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
             continue
         timestamp = _clean(record.get("timestamp")) or _timestamp_from_signal_id(signal_id)
         age = _age_minutes_at(timestamp or signal_id, now=now)
-        fresh = age is not None and age <= 30.0
+        timeframe = record.get("timeframe")
+        cutoff = first_live_freshness_cutoff_minutes(timeframe)
+        first_live_fresh = is_first_live_signal_fresh(timeframe=timeframe, age_minutes=age)
+        raw_fresh = _raw_freshness(record, default=(age is not None and age <= 30.0))
         symbol = str(record.get("symbol") or "").upper() or None
         direction = str(record.get("direction") or "").lower() or None
         return {
             "signal_id": signal_id,
             "symbol": symbol,
-            "timeframe": record.get("timeframe"),
+            "timeframe": timeframe,
             "direction": direction,
-            "fresh": fresh,
+            "fresh": first_live_fresh,
+            "raw_fresh": raw_fresh,
+            "first_live_fresh": first_live_fresh,
+            "freshness_cutoff_minutes": cutoff,
+            "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
             "age_minutes": age,
             "matches_first_live_profile": bool(symbol == "BTCUSDT" and direction == "long"),
             "source": "signals_ndjson_recent",
@@ -392,6 +405,10 @@ def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
         "timeframe": None,
         "direction": None,
         "fresh": False,
+        "raw_fresh": False,
+        "first_live_fresh": False,
+        "freshness_cutoff_minutes": None,
+        "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
         "age_minutes": None,
         "matches_first_live_profile": False,
         "source": "signals_ndjson_recent",
@@ -486,14 +503,21 @@ def _phase_statuses_fast(*, chain_state: dict[str, Any], test_order_gate: dict[s
 
 def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
     signal_id = _clean(preview.get("latest_signal_id"))
-    fresh = bool(signal_id and preview.get("status") == "PREVIEW_READY" and str(preview.get("freshness_status") or "fresh").lower() in {"fresh", "ok", "valid"})
+    raw_fresh = bool(signal_id and preview.get("status") == "PREVIEW_READY" and str(preview.get("freshness_status") or "fresh").lower() in {"fresh", "ok", "valid"})
+    age = _age_minutes(signal_id)
+    cutoff = first_live_freshness_cutoff_minutes(preview.get("timeframe"))
+    first_live_fresh = bool(signal_id and raw_fresh and is_first_live_signal_fresh(timeframe=preview.get("timeframe"), age_minutes=age))
     return {
         "signal_id": signal_id,
         "symbol": preview.get("symbol"),
         "timeframe": preview.get("timeframe"),
         "direction": preview.get("direction"),
-        "fresh": fresh,
-        "age_minutes": _age_minutes(signal_id),
+        "fresh": first_live_fresh,
+        "raw_fresh": raw_fresh,
+        "first_live_fresh": first_live_fresh,
+        "freshness_cutoff_minutes": cutoff,
+        "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
+        "age_minutes": age,
         "matches_first_live_profile": _matches_first_live_profile(preview=preview, profile=profile),
         "source": "live_execution_preview" if signal_id else None,
     }
@@ -846,6 +870,25 @@ def _matches_first_live_profile(*, preview: dict[str, Any], profile: dict[str, A
         and profile.get("protective_orders_required") is True
         and profile.get("one_attempt_only") is True
     )
+
+
+def is_first_live_signal_fresh(*, timeframe: object, age_minutes: float | None) -> bool:
+    cutoff = first_live_freshness_cutoff_minutes(timeframe)
+    return bool(cutoff is not None and age_minutes is not None and age_minutes <= cutoff)
+
+
+def first_live_freshness_cutoff_minutes(timeframe: object) -> float | None:
+    key = str(timeframe or "").strip().lower()
+    return FIRST_LIVE_FRESHNESS_CUTOFFS_MINUTES.get(key)
+
+
+def _raw_freshness(record: Mapping[str, Any], *, default: bool) -> bool:
+    if isinstance(record.get("fresh"), bool):
+        return bool(record["fresh"])
+    freshness = record.get("freshness_status")
+    if freshness is not None:
+        return str(freshness).strip().lower() in {"fresh", "ok", "valid"}
+    return bool(default)
 
 
 def _profile(source: Mapping[str, Any]) -> dict[str, Any]:
