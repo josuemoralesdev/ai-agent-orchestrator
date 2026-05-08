@@ -606,7 +606,7 @@ def _next_action(*, current_signal: dict[str, Any], chain_state: dict[str, Any],
     if current_signal.get("fresh") is not True or current_signal.get("matches_first_live_profile") is not True:
         return _action("wait_for_signal", "FIRST LIVE CHAIN", "GET /live/first-chain/status", "fresh BTCUSDT first-live signal is not available")
     if chain_state.get("approval_found") is not True:
-        return _action("approve_signal", f"LIVE APPROVE {signal_id}", f"POST /live-approval/evaluate text='LIVE APPROVE {signal_id}'", "exact human approval is required")
+        return _action("approve_signal", f"LIVE APPROVE {signal_id}", f"POST /operator/live-approval/evaluate text='LIVE APPROVE {signal_id}'", "exact human approval is required")
     if chain_state.get("execution_intent_found") is not True:
         return _action("create_intent", f"LIVE INTENT {signal_id}", "POST /live/execution-intent", "R52 execution intent is required")
     if chain_state.get("executor_rehearsal_found") is not True:
@@ -652,7 +652,7 @@ def _operator_sequence(*, current_signal: dict[str, Any], chain_state: dict[str,
     test_order = test_order_gate.get("test_order_status") if isinstance(test_order_gate.get("test_order_status"), dict) else {}
     return [
         _step(1, "Find fresh first-live signal", "FIRST LIVE CHAIN", "GET /live/first-chain/status", current_signal.get("fresh") is True and current_signal.get("matches_first_live_profile") is True),
-        _step(2, "Approve exact signal", f"LIVE APPROVE {signal_id}" if signal_id else None, "POST /live-approval/evaluate", chain_state.get("approval_found") is True),
+        _step(2, "Approve exact signal", f"LIVE APPROVE {signal_id}" if signal_id else None, "POST /operator/live-approval/evaluate", chain_state.get("approval_found") is True),
         _step(3, "Create execution intent", f"LIVE INTENT {signal_id}" if signal_id else None, "POST /live/execution-intent", chain_state.get("execution_intent_found") is True),
         _step(4, "Run executor rehearsal", f"LIVE REHEARSAL {intent_id}" if intent_id else None, "POST /live/executor-rehearsal", chain_state.get("executor_rehearsal_found") is True),
         _step(5, "Check exact payload readiness", f"FIRST LIVE PAYLOAD READINESS {rehearsal_id}" if rehearsal_id else "FIRST LIVE PAYLOAD READINESS", "GET /live/first-test-order/status", payload_readiness.get("protective_payloads_ready") is True and payload_readiness.get("entry_payload_ready") is True),

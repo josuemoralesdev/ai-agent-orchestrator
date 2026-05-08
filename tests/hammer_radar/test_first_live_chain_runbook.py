@@ -96,6 +96,16 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual(f"LIVE APPROVE {self.signal_id}", payload["next_action"]["telegram_command"])
         self.assertTrue(payload["performance"]["heavy_builders_skipped"])
 
+    def test_approve_signal_api_hint_uses_real_operator_route(self) -> None:
+        self._append_signal()
+        payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("approve_signal", payload["next_action"]["kind"])
+        self.assertIn("/operator/live-approval/evaluate", payload["next_action"]["api_command"])
+        self.assertNotIn("POST /live-approval/evaluate", payload["next_action"]["api_command"])
+        approve_step = payload["operator_sequence"][1]
+        self.assertEqual("POST /operator/live-approval/evaluate", approve_step["api_hint"])
+
     def test_stale_13m_signal_blocked_by_strict_first_live_cutoff(self) -> None:
         self._append_signal(timeframe="13m", age_minutes=20.17, freshness_status="fresh")
         with self._patched_heavy_builders_raise():
@@ -166,6 +176,37 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual("WAITING_FOR_INTENT", payload["status"])
         self.assertEqual("create_intent", payload["next_action"]["kind"])
         self.assertEqual(f"LIVE INTENT {self.signal_id}", payload["next_action"]["telegram_command"])
+
+    def test_chain_advances_after_telegram_live_approve(self) -> None:
+        self._append_signal()
+        before = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        approval = handle_telegram_operator_command(text=f"LIVE APPROVE {self.signal_id}", log_dir=self.log_dir)
+        after = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("approve_signal", before["next_action"]["kind"])
+        self.assertEqual("ACCEPTED", approval["result_status"])
+        self.assertEqual("live_approve", approval["normalized_action"])
+        self.assertFalse(approval["order_placed"])
+        self.assertFalse(approval["real_order_placed"])
+        self.assertFalse(approval["secrets_shown"])
+        self.assertTrue(after["chain_state"]["approval_found"])
+        self.assertEqual("WAITING_FOR_INTENT", after["status"])
+        self.assertEqual("create_intent", after["next_action"]["kind"])
+        self.assertEqual(f"LIVE INTENT {self.signal_id}", after["next_action"]["telegram_command"])
+
+    def test_direct_live_approval_endpoint_exists_and_is_safe(self) -> None:
+        self._append_signal()
+
+        response = self.client.post("/operator/live-approval/evaluate", json={"text": f"LIVE APPROVE {self.signal_id}"})
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("live_approve_exact", payload["normalized_action"])
+        self.assertEqual("ACCEPTED", payload["parse_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
 
     def test_intent_without_rehearsal_waits_for_rehearsal(self) -> None:
         self._append_signal()

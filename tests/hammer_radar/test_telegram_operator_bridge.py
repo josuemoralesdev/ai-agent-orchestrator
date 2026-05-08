@@ -91,6 +91,51 @@ class TelegramOperatorBridgeTestCase(unittest.TestCase):
         self.assertNotIn("LIVE APPROVE", payload["message"])
         self.assertEqual("fast", payload["performance"]["mode"])
 
+    def test_live_approve_command_routes_for_fresh_current_signal(self) -> None:
+        signal_id = self._append_signal(timeframe="13m", age_minutes=5.0)
+
+        payload = self.client.post("/telegram/operator-command", json={"text": f"LIVE APPROVE {signal_id}"}).json()
+
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertEqual("live_approve", payload["normalized_action"])
+        self.assertEqual(signal_id, payload["signal_id"])
+        self.assertNotEqual("unknown", payload["normalized_action"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertTrue((self.log_dir / "live_approval_requests.ndjson").exists())
+
+    def test_live_approve_rejects_missing_signal_id(self) -> None:
+        payload = self.client.post("/telegram/operator-command", json={"text": "LIVE APPROVE"}).json()
+
+        self.assertEqual("REJECTED", payload["result_status"])
+        self.assertEqual("live_approve", payload["normalized_action"])
+        self.assertIn("exact signal_id", payload["message"])
+        self.assertFalse((self.log_dir / "live_approval_requests.ndjson").exists())
+
+    def test_live_approve_rejects_stale_first_live_signal(self) -> None:
+        signal_id = self._append_signal(timeframe="13m", age_minutes=20.17)
+
+        payload = self.client.post("/telegram/operator-command", json={"text": f"LIVE APPROVE {signal_id}"}).json()
+
+        self.assertEqual("REJECTED", payload["result_status"])
+        self.assertEqual("signal is not fresh enough for first-live approval", payload["reason"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse((self.log_dir / "live_approval_requests.ndjson").exists())
+
+    def test_live_approve_rejects_mismatched_signal_id(self) -> None:
+        current_signal_id = self._append_signal(timeframe="13m", age_minutes=5.0)
+        other_signal_id = current_signal_id.replace("BTCUSDT|13m|long|", "BTCUSDT|4m|long|")
+
+        payload = self.client.post("/telegram/operator-command", json={"text": f"LIVE APPROVE {other_signal_id}"}).json()
+
+        self.assertEqual("REJECTED", payload["result_status"])
+        self.assertEqual("signal_id does not match current first-live signal", payload["reason"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse((self.log_dir / "live_approval_requests.ndjson").exists())
+
     def test_first_live_evaluate_records_safely(self) -> None:
         payload = handle_telegram_operator_command(text="FIRST LIVE EVALUATE", log_dir=self.log_dir)
 
