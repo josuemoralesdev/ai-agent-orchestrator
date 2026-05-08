@@ -945,13 +945,13 @@ def first_live_test_order_checks(limit: int = Query(default=20, ge=0), status: s
 
 
 @app.get("/live/first-chain/status")
-def first_live_chain_status() -> dict:
-    return build_first_live_chain_status(log_dir=get_log_dir(use_env=True))
+def first_live_chain_status(detail: str = Query(default="fast")) -> dict:
+    return build_first_live_chain_status(log_dir=get_log_dir(use_env=True), detail=detail)
 
 
 @app.post("/live/first-chain/check")
-def first_live_chain_check() -> dict:
-    return evaluate_and_record_first_live_chain_check(log_dir=get_log_dir(use_env=True))
+def first_live_chain_check(detail: str = Query(default="fast")) -> dict:
+    return evaluate_and_record_first_live_chain_check(log_dir=get_log_dir(use_env=True), detail=detail)
 
 
 @app.get("/live/first-chain/checks")
