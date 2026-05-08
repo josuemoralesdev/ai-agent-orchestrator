@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.archive import get_log_dir, get_signals_path
 from src.app.hammer_radar.operator.first_live_adapter_verification import build_first_live_adapter_status
 from src.app.hammer_radar.operator.first_live_execution_gate import build_first_live_execution_gate
 from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build_first_live_ladder_submit_status
@@ -36,6 +36,8 @@ PHASE = "R65"
 SYSTEM = "money_printing_machine_hammer_radar"
 EXECUTION_MODE = "FIRST_LIVE_CHAIN_RUNBOOK_ONLY"
 CHECKS_FILENAME = "first_live_chain_checks.ndjson"
+FAST_RECORD_LIMIT = 100
+FAST_SIGNAL_LIMIT = 50
 
 ORDER_PLACED = False
 REAL_ORDER_PLACED = False
@@ -48,16 +50,22 @@ def build_first_live_chain_status(
     *,
     log_dir: str | Path | None = None,
     env: Mapping[str, str] | None = None,
+    detail: str = "fast",
 ) -> dict[str, Any]:
-    return _evaluate(log_dir=log_dir, env=env, persist=False)
+    if str(detail or "fast").lower() == "full":
+        return _evaluate_full(log_dir=log_dir, env=env, persist=False)
+    return _evaluate_fast(log_dir=log_dir, env=env, persist=False)
 
 
 def evaluate_and_record_first_live_chain_check(
     *,
     log_dir: str | Path | None = None,
     env: Mapping[str, str] | None = None,
+    detail: str = "fast",
 ) -> dict[str, Any]:
-    return _evaluate(log_dir=log_dir, env=env, persist=True)
+    if str(detail or "fast").lower() == "full":
+        return _evaluate_full(log_dir=log_dir, env=env, persist=True)
+    return _evaluate_fast(log_dir=log_dir, env=env, persist=True)
 
 
 def list_first_live_chain_checks(
@@ -87,20 +95,40 @@ def load_first_live_chain_checks(
     log_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     path = first_live_chain_checks_path(get_log_dir(log_dir, use_env=True))
-    if not path.exists():
-        return []
     records: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            record = json.loads(line)
-            if status is not None and record.get("status") != status:
-                continue
-            records.append(_sanitize_record(record))
-    records = list(reversed(records))
-    return records[:limit] if limit > 0 else records
+    read_limit = limit if limit > 0 else FAST_RECORD_LIMIT
+    for record in read_recent_ndjson_records(path, limit=read_limit):
+        if status is not None and record.get("status") != status:
+            continue
+        records.append(_sanitize_record(record))
+        if limit > 0 and len(records) >= limit:
+            break
+    return records
+
+
+def read_recent_ndjson_records(path: str | Path, *, limit: int = FAST_RECORD_LIMIT, max_bytes: int = 262_144) -> list[dict[str, Any]]:
+    resolved = Path(path)
+    if limit <= 0 or not resolved.exists():
+        return []
+    size = resolved.stat().st_size
+    offset = max(0, size - max_bytes)
+    with resolved.open("rb") as handle:
+        handle.seek(offset)
+        data = handle.read()
+    if offset > 0:
+        data = data.split(b"\n", 1)[-1]
+    lines = [line.strip() for line in data.splitlines() if line.strip()]
+    records: list[dict[str, Any]] = []
+    for line in reversed(lines):
+        try:
+            record = json.loads(line.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+        if len(records) >= limit:
+            break
+    return records
 
 
 def first_live_chain_checks_path(log_dir: str | Path) -> Path:
@@ -174,7 +202,77 @@ def format_first_live_chain_checks_operator_message(payload: dict[str, Any]) -> 
     )
 
 
-def _evaluate(*, log_dir: str | Path | None, env: Mapping[str, str] | None, persist: bool) -> dict[str, Any]:
+def _evaluate_fast(*, log_dir: str | Path | None, env: Mapping[str, str] | None, persist: bool) -> dict[str, Any]:
+    started_at = datetime.now(UTC)
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    created_at = datetime.now(UTC)
+    current_signal = _current_signal_fast(log_dir=resolved_log_dir, now=created_at)
+    signal_id = current_signal.get("signal_id")
+    chain_state = (
+        _chain_state_fast(signal_id=signal_id, log_dir=resolved_log_dir, now=created_at)
+        if current_signal.get("fresh") is True and current_signal.get("matches_first_live_profile") is True
+        else _empty_chain_state()
+    )
+    exact_chain = chain_state.get("exact_chain_resolved") is True
+    test_order_gate = (
+        build_first_live_test_order_status(
+            signal_id=signal_id,
+            execution_intent_id=chain_state.get("execution_intent_id"),
+            executor_rehearsal_id=chain_state.get("executor_rehearsal_id"),
+            log_dir=resolved_log_dir,
+            env=os.environ if env is None else env,
+        )
+        if exact_chain
+        else _fast_test_order_gate_stub()
+    )
+    phase_statuses = _phase_statuses_fast(
+        chain_state=chain_state,
+        test_order_gate=test_order_gate,
+        exact_chain=exact_chain,
+    )
+    next_action = _next_action(current_signal=current_signal, chain_state=chain_state, test_order_gate=test_order_gate)
+    status = _status(next_action=next_action, test_order_gate=test_order_gate)
+    operator_sequence = _operator_sequence(current_signal=current_signal, chain_state=chain_state, test_order_gate=test_order_gate)
+    blockers = _blockers(current_signal=current_signal, chain_state=chain_state, test_order_gate=test_order_gate)
+    duration_ms = round((datetime.now(UTC) - started_at).total_seconds() * 1000, 3)
+    payload = {
+        "status": status,
+        "phase": PHASE,
+        "system": SYSTEM,
+        "execution_mode": EXECUTION_MODE,
+        "created_at": created_at.isoformat(),
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": REAL_ORDER_PLACED,
+        "execution_attempted": EXECUTION_ATTEMPTED,
+        "network_allowed": NETWORK_ALLOWED,
+        "current_signal": current_signal,
+        "chain_state": chain_state,
+        "phase_statuses": phase_statuses,
+        "next_action": next_action,
+        "operator_sequence": operator_sequence,
+        "blockers": blockers,
+        "operator_action": _operator_action(next_action),
+        "performance": {
+            "mode": "fast",
+            "duration_ms": duration_ms,
+            "heavy_builders_skipped": not exact_chain,
+            "ndjson_scan_limited": True,
+            "recent_record_limit": FAST_RECORD_LIMIT,
+            "recent_signal_limit": FAST_SIGNAL_LIMIT,
+        },
+        "secrets_shown": SECRETS_SHOWN,
+        "audit_event_recorded": persist,
+        "first_live_chain_checks_path": str(first_live_chain_checks_path(resolved_log_dir)),
+    }
+    if persist:
+        record = _record(payload)
+        append_first_live_chain_check(record, log_dir=resolved_log_dir)
+        payload["check_id"] = record["check_id"]
+    return _sanitize_nested(payload)
+
+
+def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None, persist: bool) -> dict[str, Any]:
+    started_at = datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     source = os.environ if env is None else env
     created_at = datetime.now(UTC)
@@ -251,6 +349,12 @@ def _evaluate(*, log_dir: str | Path | None, env: Mapping[str, str] | None, pers
         "operator_sequence": operator_sequence,
         "blockers": blockers,
         "operator_action": _operator_action(next_action),
+        "performance": {
+            "mode": "full",
+            "duration_ms": round((datetime.now(UTC) - started_at).total_seconds() * 1000, 3),
+            "heavy_builders_skipped": False,
+            "ndjson_scan_limited": False,
+        },
         "secrets_shown": SECRETS_SHOWN,
         "audit_event_recorded": persist,
         "first_live_chain_checks_path": str(first_live_chain_checks_path(resolved_log_dir)),
@@ -260,6 +364,124 @@ def _evaluate(*, log_dir: str | Path | None, env: Mapping[str, str] | None, pers
         append_first_live_chain_check(record, log_dir=resolved_log_dir)
         payload["check_id"] = record["check_id"]
     return _sanitize_nested(payload)
+
+
+def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
+    for record in read_recent_ndjson_records(get_signals_path(log_dir), limit=FAST_SIGNAL_LIMIT):
+        signal_id = _clean(record.get("signal_id"))
+        if not signal_id:
+            continue
+        timestamp = _clean(record.get("timestamp")) or _timestamp_from_signal_id(signal_id)
+        age = _age_minutes_at(timestamp or signal_id, now=now)
+        fresh = age is not None and age <= 30.0
+        symbol = str(record.get("symbol") or "").upper() or None
+        direction = str(record.get("direction") or "").lower() or None
+        return {
+            "signal_id": signal_id,
+            "symbol": symbol,
+            "timeframe": record.get("timeframe"),
+            "direction": direction,
+            "fresh": fresh,
+            "age_minutes": age,
+            "matches_first_live_profile": bool(symbol == "BTCUSDT" and direction == "long"),
+            "source": "signals_ndjson_recent",
+        }
+    return {
+        "signal_id": None,
+        "symbol": None,
+        "timeframe": None,
+        "direction": None,
+        "fresh": False,
+        "age_minutes": None,
+        "matches_first_live_profile": False,
+        "source": "signals_ndjson_recent",
+    }
+
+
+def _chain_state_fast(*, signal_id: str | None, log_dir: Path, now: datetime) -> dict[str, Any]:
+    approval_found = _approval_found_fast(signal_id, log_dir=log_dir)
+    intent = _latest_intent_fast(signal_id=signal_id, log_dir=log_dir, now=now) if approval_found else None
+    intent_id = _clean((intent or {}).get("execution_intent_id"))
+    intent_found = intent is not None and intent.get("status") == "INTENT_READY" and _intent_unexpired(intent, now=now)
+    rehearsal = (
+        _latest_rehearsal_fast(signal_id=signal_id, execution_intent_id=intent_id, log_dir=log_dir)
+        if intent_found
+        else None
+    )
+    rehearsal_id = _clean((rehearsal or {}).get("executor_rehearsal_id"))
+    rehearsal_found = rehearsal is not None and rehearsal.get("status") == "REHEARSAL_READY"
+    exact_chain_resolved = bool(
+        signal_id
+        and approval_found
+        and intent_found
+        and rehearsal_found
+        and (intent or {}).get("signal_id") == signal_id
+        and (rehearsal or {}).get("signal_id") == signal_id
+        and (rehearsal or {}).get("execution_intent_id") == intent_id
+    )
+    blockers = []
+    if signal_id and not approval_found:
+        blockers.append("exact LIVE APPROVE <signal_id> is missing")
+    if approval_found and not intent_found:
+        blockers.append("R52 execution intent is missing")
+    if intent_found and not rehearsal_found:
+        blockers.append("R53 executor rehearsal is missing")
+    if signal_id and approval_found and intent_found and rehearsal_found and not exact_chain_resolved:
+        blockers.append("approval, intent, and rehearsal ids do not match")
+    return {
+        "approval_found": approval_found,
+        "execution_intent_found": intent_found,
+        "executor_rehearsal_found": rehearsal_found,
+        "exact_chain_resolved": exact_chain_resolved,
+        "execution_intent_id": intent_id,
+        "executor_rehearsal_id": rehearsal_id,
+        "blockers": blockers,
+    }
+
+
+def _empty_chain_state() -> dict[str, Any]:
+    return {
+        "approval_found": False,
+        "execution_intent_found": False,
+        "executor_rehearsal_found": False,
+        "exact_chain_resolved": False,
+        "execution_intent_id": None,
+        "executor_rehearsal_id": None,
+        "blockers": [],
+    }
+
+
+def _fast_test_order_gate_stub() -> dict[str, Any]:
+    return {
+        "status": "EXACT_CHAIN_MISSING",
+        "payload_readiness": {
+            "entry_payload_ready": False,
+            "protective_payloads_ready": False,
+        },
+        "test_order_status": {"test_order_validated_for_signal": False},
+        "live_eligibility": {"eligible_for_manual_env_arming": False},
+        "blockers": [],
+    }
+
+
+def _phase_statuses_fast(*, chain_state: dict[str, Any], test_order_gate: dict[str, Any], exact_chain: bool) -> dict[str, Any]:
+    return {
+        "r50_live_begins": "NOT_EVALUATED_FAST",
+        "r51_preview": "NOT_EVALUATED_FAST",
+        "r52_intent": "INTENT_READY" if chain_state.get("execution_intent_found") is True else "MISSING",
+        "r53_rehearsal": "REHEARSAL_READY" if chain_state.get("executor_rehearsal_found") is True else "MISSING",
+        "r54_arming": "NOT_EVALUATED_FAST",
+        "r55_gate": "NOT_EVALUATED_FAST",
+        "r56_transport": "NOT_EVALUATED_FAST",
+        "r57_runbook": "NOT_EVALUATED_FAST",
+        "r58_profile": "PROFILE_READY",
+        "r59_readiness": "UNKNOWN_FAST",
+        "r60_caps": "READY",
+        "r61_adapter": "ADAPTERS_PARTIAL",
+        "r62_ladder": "LADDER_ADAPTER_PARTIAL" if not exact_chain else "NOT_EVALUATED_FAST",
+        "r63_protective": "PROTECTIVE_PLAN_PARTIAL" if not exact_chain else "NOT_EVALUATED_FAST",
+        "r64_test_order_gate": test_order_gate.get("status") or "EXACT_CHAIN_MISSING",
+    }
 
 
 def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
@@ -489,6 +711,21 @@ def _approval_found(signal_id: str | None, *, log_dir: Path) -> bool:
     return False
 
 
+def _approval_found_fast(signal_id: str | None, *, log_dir: Path) -> bool:
+    if not signal_id:
+        return False
+    from src.app.hammer_radar.operator.live_approval import live_approval_requests_path
+
+    for record in read_recent_ndjson_records(live_approval_requests_path(log_dir), limit=FAST_RECORD_LIMIT):
+        if (
+            record.get("normalized_action") == "live_approve_exact"
+            and record.get("parse_status") == "ACCEPTED"
+            and record.get("signal_id") == signal_id
+        ):
+            return True
+    return False
+
+
 def _latest_intent(*, signal_id: str | None, log_dir: Path, now: datetime) -> dict[str, Any] | None:
     if not signal_id:
         return None
@@ -499,6 +736,22 @@ def _latest_intent(*, signal_id: str | None, log_dir: Path, now: datetime) -> di
     return records[0] if records else None
 
 
+def _latest_intent_fast(*, signal_id: str | None, log_dir: Path, now: datetime) -> dict[str, Any] | None:
+    if not signal_id:
+        return None
+    from src.app.hammer_radar.operator.live_execution_intent import live_execution_intents_path
+
+    fallback = None
+    for record in read_recent_ndjson_records(live_execution_intents_path(log_dir), limit=FAST_RECORD_LIMIT):
+        if record.get("signal_id") != signal_id:
+            continue
+        sanitized = _sanitize_intent_fast(record)
+        fallback = fallback or sanitized
+        if _intent_unexpired(sanitized, now=now):
+            return sanitized
+    return fallback
+
+
 def _latest_rehearsal(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any] | None:
     if not signal_id and not execution_intent_id:
         return None
@@ -507,6 +760,57 @@ def _latest_rehearsal(*, signal_id: str | None, execution_intent_id: str | None,
         if record.get("status") == "REHEARSAL_READY" and record.get("execution_mode") == "REHEARSAL_ONLY":
             return record
     return records[0] if records else None
+
+
+def _latest_rehearsal_fast(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any] | None:
+    if not signal_id and not execution_intent_id:
+        return None
+    from src.app.hammer_radar.operator.live_executor_rehearsal import live_executor_rehearsals_path
+
+    fallback = None
+    for record in read_recent_ndjson_records(live_executor_rehearsals_path(log_dir), limit=FAST_RECORD_LIMIT):
+        if signal_id is not None and record.get("signal_id") != signal_id:
+            continue
+        if execution_intent_id is not None and record.get("execution_intent_id") != execution_intent_id:
+            continue
+        sanitized = _sanitize_rehearsal_fast(record)
+        fallback = fallback or sanitized
+        if sanitized.get("status") == "REHEARSAL_READY" and sanitized.get("execution_mode") == "REHEARSAL_ONLY":
+            return sanitized
+    return fallback
+
+
+def _sanitize_intent_fast(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "execution_intent_id": _clean(record.get("execution_intent_id")),
+        "status": record.get("status"),
+        "execution_mode": record.get("execution_mode"),
+        "signal_id": record.get("signal_id"),
+        "preview_hash": record.get("preview_hash"),
+        "created_at": record.get("created_at"),
+        "expires_at": record.get("expires_at"),
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "secrets_shown": False,
+    }
+
+
+def _sanitize_rehearsal_fast(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "executor_rehearsal_id": _clean(record.get("executor_rehearsal_id")),
+        "execution_intent_id": _clean(record.get("execution_intent_id")),
+        "status": record.get("status"),
+        "execution_mode": record.get("execution_mode"),
+        "signal_id": record.get("signal_id"),
+        "preview_hash": record.get("preview_hash"),
+        "created_at": record.get("created_at"),
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+    }
 
 
 def _intent_unexpired(record: dict[str, Any] | None, *, now: datetime) -> bool:
@@ -615,6 +919,26 @@ def _age_minutes(signal_id: str | None) -> float | None:
         return None
     age = datetime.now(UTC) - parsed
     return max(0.0, round(age.total_seconds() / 60.0, 2))
+
+
+def _age_minutes_at(timestamp_or_signal_id: str | None, *, now: datetime) -> float | None:
+    if not timestamp_or_signal_id:
+        return None
+    timestamp = _timestamp_from_signal_id(timestamp_or_signal_id) or timestamp_or_signal_id
+    parsed = _parse_datetime(timestamp)
+    if parsed is None:
+        return None
+    age = now - parsed
+    return max(0.0, round(age.total_seconds() / 60.0, 2))
+
+
+def _timestamp_from_signal_id(signal_id: str | None) -> str | None:
+    if not signal_id:
+        return None
+    parts = str(signal_id).split("|")
+    if len(parts) != 4:
+        return None
+    return parts[3]
 
 
 def _float(value: Any, default: float) -> float:

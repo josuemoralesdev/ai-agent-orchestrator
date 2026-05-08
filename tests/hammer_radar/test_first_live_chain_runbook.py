@@ -9,10 +9,12 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator.approval_api import app
-from src.app.hammer_radar.operator.first_live_chain_runbook import build_first_live_chain_status
+from src.app.hammer_radar.operator.archive import append_signal
+from src.app.hammer_radar.operator.first_live_chain_runbook import build_first_live_chain_status, read_recent_ndjson_records
 from src.app.hammer_radar.operator.live_approval import append_live_approval_request
 from src.app.hammer_radar.operator.live_execution_intent import append_live_execution_intent
 from src.app.hammer_radar.operator.live_executor_rehearsal import append_live_executor_rehearsal
+from src.app.hammer_radar.operator.models import SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 from src.app.hammer_radar.operator.telegram_operator_bridge import handle_telegram_operator_command
 
@@ -37,6 +39,7 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         payload = self.client.get("/live/first-chain/status").json()
 
         self.assertEqual("R65", payload["phase"])
+        self.assertEqual("fast", payload["performance"]["mode"])
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["real_order_placed"])
         self.assertFalse(payload["network_allowed"])
@@ -80,16 +83,19 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertIn(payload["next_action"]["kind"], {"wait_for_signal", "blocked"})
 
     def test_fresh_signal_without_approval_waits_for_approval(self) -> None:
-        with self._patched_preview(), self._patched_r64():
+        self._append_signal()
+        with self._patched_heavy_builders_raise():
             payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertEqual("WAITING_FOR_APPROVAL", payload["status"])
         self.assertEqual("approve_signal", payload["next_action"]["kind"])
         self.assertEqual(f"LIVE APPROVE {self.signal_id}", payload["next_action"]["telegram_command"])
+        self.assertTrue(payload["performance"]["heavy_builders_skipped"])
 
     def test_approval_without_intent_waits_for_intent(self) -> None:
+        self._append_signal()
         self._append_approval()
-        with self._patched_preview(), self._patched_r64():
+        with self._patched_heavy_builders_raise():
             payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertEqual("WAITING_FOR_INTENT", payload["status"])
@@ -97,9 +103,10 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual(f"LIVE INTENT {self.signal_id}", payload["next_action"]["telegram_command"])
 
     def test_intent_without_rehearsal_waits_for_rehearsal(self) -> None:
+        self._append_signal()
         self._append_approval()
         self._append_intent()
-        with self._patched_preview(), self._patched_r64():
+        with self._patched_heavy_builders_raise():
             payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertEqual("WAITING_FOR_REHEARSAL", payload["status"])
@@ -107,6 +114,7 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual(f"LIVE REHEARSAL {self.intent_id}", payload["next_action"]["telegram_command"])
 
     def test_rehearsal_without_payloads_or_test_order_waits_conservatively(self) -> None:
+        self._append_signal()
         self._append_approval()
         self._append_intent()
         self._append_rehearsal()
@@ -117,6 +125,34 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual("WAITING_FOR_TEST_ORDER", payload["status"])
         self.assertEqual("validate_test_order", payload["next_action"]["kind"])
         self.assertEqual(f"FIRST LIVE TEST ORDER {self.rehearsal_id}", payload["next_action"]["telegram_command"])
+        self.assertFalse(payload["performance"]["heavy_builders_skipped"])
+
+    def test_stale_signal_skips_heavy_payload_builders(self) -> None:
+        self.signal_id = f"BTCUSDT|13m|long|{(datetime.now(UTC) - timedelta(minutes=45)).isoformat()}"
+        self._append_signal()
+        with self._patched_heavy_builders_raise():
+            payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", payload["status"])
+        self.assertEqual("wait_for_signal", payload["next_action"]["kind"])
+        self.assertTrue(payload["performance"]["heavy_builders_skipped"])
+
+    def test_recent_ndjson_records_are_limited(self) -> None:
+        path = self.log_dir / "many.ndjson"
+        with path.open("w", encoding="utf-8") as handle:
+            for index in range(500):
+                handle.write(f'{{"index": {index}}}\n')
+
+        records = read_recent_ndjson_records(path, limit=7)
+
+        self.assertEqual(7, len(records))
+        self.assertEqual([499, 498, 497], [item["index"] for item in records[:3]])
+
+    def test_status_endpoint_fast_budget(self) -> None:
+        payload = self.client.get("/live/first-chain/status").json()
+
+        self.assertEqual("fast", payload["performance"]["mode"])
+        self.assertLess(payload["performance"]["duration_ms"], 2000)
 
     def test_api_endpoints_persist_sanitized_event(self) -> None:
         status = self.client.get("/live/first-chain/status").json()
@@ -142,6 +178,7 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual("ACCEPTED", next_action["result_status"])
         self.assertEqual("ACCEPTED", runbook["result_status"])
         self.assertEqual("ACCEPTED", sequence["result_status"])
+        self.assertEqual("fast", next_action["performance"]["mode"])
         self.assertEqual("ACCEPTED", checks["result_status"])
         self.assertEqual("REJECTED", raw_yes["result_status"])
         self.assertEqual("BLOCKED", trade_now["result_status"])
@@ -185,6 +222,32 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
                 "order_placed": False,
                 "execution_attempted": False,
             },
+            log_dir=self.log_dir,
+        )
+
+    def _append_signal(self) -> None:
+        append_signal(
+            SignalRecord(
+                signal_id=self.signal_id,
+                symbol="BTCUSDT",
+                timeframe="13m",
+                direction="long",
+                timestamp=self.signal_id.split("|")[3],
+                hammer_strength=1.0,
+                hammer_high=101.0,
+                hammer_low=99.0,
+                fib_50=100.0,
+                fib_618=101.0,
+                fib_650=101.5,
+                fib_786=102.0,
+                invalidation=98.0,
+                bias_timeframe="4h",
+                bias_direction="long",
+                bias_aligned=True,
+                same_direction_streak=1,
+                opposite_direction_streak=0,
+                tradable=True,
+            ),
             log_dir=self.log_dir,
         )
 
@@ -242,6 +305,14 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         return patch(
             "src.app.hammer_radar.operator.first_live_chain_runbook.build_first_live_test_order_status",
             return_value=payload or self._r64_payload(),
+        )
+
+    def _patched_heavy_builders_raise(self):
+        return patch.multiple(
+            "src.app.hammer_radar.operator.first_live_chain_runbook",
+            build_first_live_test_order_status=unittest.mock.Mock(side_effect=AssertionError("R64 should be skipped")),
+            build_first_live_ladder_submit_status=unittest.mock.Mock(side_effect=AssertionError("R62 should be skipped")),
+            build_first_live_protective_status=unittest.mock.Mock(side_effect=AssertionError("R63 should be skipped")),
         )
 
     def _r64_payload(self, *, payloads_ready: bool = False, test_order_validated: bool = False) -> dict:

@@ -63,6 +63,20 @@ class TelegramOperatorBridgeTestCase(unittest.TestCase):
                 self.assertFalse(payload["order_placed"])
                 self.assertFalse(payload["real_order_placed"])
 
+    def test_first_live_next_uses_fast_chain_status(self) -> None:
+        with patch.multiple(
+            "src.app.hammer_radar.operator.first_live_chain_runbook",
+            build_first_live_test_order_status=unittest.mock.Mock(side_effect=AssertionError("R64 should be skipped")),
+            build_first_live_ladder_submit_status=unittest.mock.Mock(side_effect=AssertionError("R62 should be skipped")),
+            build_first_live_protective_status=unittest.mock.Mock(side_effect=AssertionError("R63 should be skipped")),
+        ):
+            payload = handle_telegram_operator_command(text="FIRST LIVE NEXT", log_dir=self.log_dir)
+
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertEqual("fast", payload["performance"]["mode"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+
     def test_first_live_evaluate_records_safely(self) -> None:
         payload = handle_telegram_operator_command(text="FIRST LIVE EVALUATE", log_dir=self.log_dir)
 
