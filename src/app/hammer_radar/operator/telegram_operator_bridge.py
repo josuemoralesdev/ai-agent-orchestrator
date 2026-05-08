@@ -80,6 +80,13 @@ from src.app.hammer_radar.operator.first_live_test_order_gate import (
     format_first_live_test_order_gate_operator_message,
     list_first_live_test_order_checks,
 )
+from src.app.hammer_radar.operator.first_live_chain_runbook import (
+    build_first_live_chain_status,
+    evaluate_and_record_first_live_chain_check,
+    format_first_live_chain_checks_operator_message,
+    format_first_live_chain_operator_message,
+    list_first_live_chain_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -155,7 +162,11 @@ HELP_COMMANDS = [
     "FIRST LIVE EXACT CHAIN",
     "FIRST LIVE PAYLOAD READINESS",
     "FIRST LIVE TEST ORDER CHECKS",
+    "FIRST LIVE CHAIN",
+    "FIRST LIVE NEXT",
     "FIRST LIVE RUNBOOK",
+    "FIRST LIVE SEQUENCE",
+    "FIRST LIVE CHAIN CHECKS",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
     "APPROVAL CHALLENGE",
@@ -446,6 +457,41 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_first_live_protective_checks_operator_message(payload),
             payload={"first_live_protective_checks": payload},
         )
+    if normalized == "FIRST LIVE CHAIN CHECKS":
+        payload = list_first_live_chain_checks(log_dir=log_dir)
+        return _result(
+            "first_live_chain_checks",
+            "ACCEPTED",
+            format_first_live_chain_checks_operator_message(payload),
+            payload={"first_live_chain_checks": payload},
+        )
+    if normalized == "FIRST LIVE CHAIN":
+        payload = evaluate_and_record_first_live_chain_check(log_dir=log_dir)
+        return _result(
+            "first_live_chain",
+            "ACCEPTED",
+            format_first_live_chain_operator_message(payload),
+            payload={"first_live_chain": payload},
+            signal_id=(payload.get("current_signal") or {}).get("signal_id"),
+        )
+    if normalized == "FIRST LIVE NEXT":
+        payload = build_first_live_chain_status(log_dir=log_dir)
+        return _result(
+            "first_live_next",
+            "ACCEPTED",
+            format_first_live_chain_operator_message(payload, section="next"),
+            payload={"first_live_chain": payload},
+            signal_id=(payload.get("current_signal") or {}).get("signal_id"),
+        )
+    if normalized in {"FIRST LIVE RUNBOOK", "FIRST LIVE SEQUENCE"}:
+        payload = build_first_live_chain_status(log_dir=log_dir)
+        return _result(
+            "first_live_runbook" if normalized == "FIRST LIVE RUNBOOK" else "first_live_sequence",
+            "ACCEPTED",
+            format_first_live_chain_operator_message(payload, section="runbook" if normalized == "FIRST LIVE RUNBOOK" else "sequence"),
+            payload={"first_live_chain": payload},
+            signal_id=(payload.get("current_signal") or {}).get("signal_id"),
+        )
     if normalized == "FIRST LIVE TEST ORDER CHECKS":
         payload = list_first_live_test_order_checks(log_dir=log_dir)
         return _result(
@@ -481,7 +527,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             payload={"first_live_test_order": payload},
             signal_id=payload.get("signal_id"),
         )
-    if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
+    if normalized in {"LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
         return _result(
             "live_arming_runbook",

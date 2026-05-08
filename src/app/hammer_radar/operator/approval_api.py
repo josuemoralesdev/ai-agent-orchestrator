@@ -124,6 +124,11 @@ from src.app.hammer_radar.operator.first_live_test_order_gate import (
     evaluate_and_record_first_live_test_order_check,
     list_first_live_test_order_checks,
 )
+from src.app.hammer_radar.operator.first_live_chain_runbook import (
+    build_first_live_chain_status,
+    evaluate_and_record_first_live_chain_check,
+    list_first_live_chain_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -937,6 +942,21 @@ def first_live_test_order_check(request: FirstLiveTestOrderRequest | None = None
 @app.get("/live/first-test-order/checks")
 def first_live_test_order_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_test_order_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-chain/status")
+def first_live_chain_status() -> dict:
+    return build_first_live_chain_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-chain/check")
+def first_live_chain_check() -> dict:
+    return evaluate_and_record_first_live_chain_check(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-chain/checks")
+def first_live_chain_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_chain_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")
