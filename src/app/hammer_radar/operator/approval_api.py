@@ -422,6 +422,7 @@ class TelegramChallengeReplyRequest(BaseModel):
 class TelegramPollingOnceRequest(BaseModel):
     dry_run: bool = False
     send_responses: bool = True
+    max_updates: int = Field(default=10, ge=1, le=100)
 
 
 class StrategyPromotionCheckRequest(BaseModel):
@@ -1414,6 +1415,7 @@ def telegram_polling_once(request: TelegramPollingOnceRequest | None = None) -> 
         log_dir=get_log_dir(use_env=True),
         send_responses=request.send_responses,
         dry_run=request.dry_run,
+        max_updates=request.max_updates,
     )
 
 
