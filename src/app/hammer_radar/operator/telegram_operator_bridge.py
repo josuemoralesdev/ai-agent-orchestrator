@@ -17,6 +17,7 @@ from src.app.hammer_radar.execution.binance_futures_connector import build_conne
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_runbook import build_first_live_runbook, evaluate_first_live_runbook
 from src.app.hammer_radar.operator.live_begins import evaluate_and_record_live_begins, format_live_begins_operator_message
+from src.app.hammer_radar.operator.live_approval import evaluate_live_approval_request
 from src.app.hammer_radar.operator.live_execution_preview import (
     evaluate_and_record_live_execution_preview,
     format_live_execution_preview_operator_message,
@@ -114,6 +115,7 @@ from src.app.hammer_radar.operator.live_arming_runbook import (
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
+    LIVE_APPROVE_REJECT_REASON,
     append_operator_action,
     build_operator_action_record,
     parse_operator_action,
@@ -457,6 +459,8 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_first_live_protective_checks_operator_message(payload),
             payload={"first_live_protective_checks": payload},
         )
+    if normalized == "LIVE APPROVE" or normalized.startswith("LIVE APPROVE "):
+        return _handle_live_approve(raw_text=raw_text, source=source, log_dir=log_dir)
     if normalized == "FIRST LIVE CHAIN CHECKS":
         payload = list_first_live_chain_checks(log_dir=log_dir)
         return _result(
@@ -914,6 +918,61 @@ def _handle_paper_intent(*, normalized: str, raw_text: str, source: str, log_dir
         payload={"operator_action": record, "candidate": candidate},
         signal_id=candidate.get("signal_id"),
     )
+
+
+def _handle_live_approve(*, raw_text: str, source: str, log_dir: Path) -> dict[str, Any]:
+    parts = raw_text.split(maxsplit=2)
+    signal_id = parts[2].strip() if len(parts) == 3 else None
+    if not signal_id:
+        return _result("live_approve", "REJECTED", LIVE_APPROVE_REJECT_REASON, reason=LIVE_APPROVE_REJECT_REASON)
+    chain = build_first_live_chain_status(log_dir=log_dir)
+    current_signal = chain.get("current_signal") if isinstance(chain.get("current_signal"), dict) else {}
+    current_signal_id = current_signal.get("signal_id")
+    if not current_signal_id or signal_id != current_signal_id:
+        reason = "signal_id does not match current first-live signal"
+        return _result(
+            "live_approve",
+            "REJECTED",
+            reason,
+            payload={"first_live_chain": chain},
+            signal_id=signal_id,
+            reason=reason,
+            performance=chain.get("performance") if isinstance(chain.get("performance"), dict) else None,
+            next_action=chain.get("next_action") if isinstance(chain.get("next_action"), dict) else None,
+        )
+    if current_signal.get("first_live_fresh") is not True or current_signal.get("fresh") is not True:
+        reason = "signal is not fresh enough for first-live approval"
+        return _result(
+            "live_approve",
+            "REJECTED",
+            reason,
+            payload={"first_live_chain": chain},
+            signal_id=signal_id,
+            reason=reason,
+            performance=chain.get("performance") if isinstance(chain.get("performance"), dict) else None,
+            next_action=chain.get("next_action") if isinstance(chain.get("next_action"), dict) else None,
+        )
+    approval = evaluate_live_approval_request(text=raw_text, source=source, log_dir=log_dir)
+    result_status = "ACCEPTED" if approval.get("parse_status") == "ACCEPTED" else str(approval.get("parse_status") or "REJECTED")
+    message = (
+        f"LIVE APPROVE recorded for {signal_id}. "
+        f"approval_gate_status={approval.get('approval_gate_status', 'UNKNOWN')}. "
+        "Approval is not execution. No order placed."
+    )
+    result = _result(
+        "live_approve",
+        result_status,
+        message,
+        payload={"live_approval": approval, "first_live_chain": chain},
+        signal_id=signal_id,
+        reason=approval.get("parse_reason"),
+        performance=chain.get("performance") if isinstance(chain.get("performance"), dict) else None,
+        next_action=chain.get("next_action") if isinstance(chain.get("next_action"), dict) else None,
+    )
+    result["signal_id"] = signal_id
+    result["request_id"] = approval.get("request_id")
+    result["approval_status"] = approval.get("approval_gate_status")
+    return result
 
 
 def _latest_alert_candidate(log_dir: Path) -> dict[str, Any] | None:
