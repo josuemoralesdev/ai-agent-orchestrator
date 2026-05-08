@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -88,9 +89,73 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
             payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertEqual("WAITING_FOR_APPROVAL", payload["status"])
+        self.assertTrue(payload["current_signal"]["first_live_fresh"])
+        self.assertEqual(13.5, payload["current_signal"]["freshness_cutoff_minutes"])
+        self.assertEqual("strict_first_live", payload["current_signal"]["freshness_policy"])
         self.assertEqual("approve_signal", payload["next_action"]["kind"])
         self.assertEqual(f"LIVE APPROVE {self.signal_id}", payload["next_action"]["telegram_command"])
         self.assertTrue(payload["performance"]["heavy_builders_skipped"])
+
+    def test_stale_13m_signal_blocked_by_strict_first_live_cutoff(self) -> None:
+        self._append_signal(timeframe="13m", age_minutes=20.17, freshness_status="fresh")
+        with self._patched_heavy_builders_raise():
+            payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", payload["status"])
+        self.assertFalse(payload["current_signal"]["fresh"])
+        self.assertTrue(payload["current_signal"]["raw_fresh"])
+        self.assertFalse(payload["current_signal"]["first_live_fresh"])
+        self.assertEqual(13.5, payload["current_signal"]["freshness_cutoff_minutes"])
+        self.assertEqual("wait_for_signal", payload["next_action"]["kind"])
+        self.assertEqual("FIRST LIVE CHAIN", payload["next_action"]["telegram_command"])
+        self.assertNotIn("LIVE APPROVE", str(payload["next_action"]))
+
+    def test_4m_strict_cutoff(self) -> None:
+        self._append_signal(timeframe="4m", age_minutes=4.0)
+        allowed = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self._append_signal(timeframe="4m", age_minutes=5.0)
+        blocked = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertTrue(allowed["current_signal"]["first_live_fresh"])
+        self.assertEqual("WAITING_FOR_APPROVAL", allowed["status"])
+        self.assertEqual(4.5, allowed["current_signal"]["freshness_cutoff_minutes"])
+        self.assertFalse(blocked["current_signal"]["first_live_fresh"])
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", blocked["status"])
+        self.assertEqual("FIRST LIVE CHAIN", blocked["next_action"]["telegram_command"])
+
+    def test_8m_strict_cutoff(self) -> None:
+        self._append_signal(timeframe="8m", age_minutes=8.0)
+        allowed = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self._append_signal(timeframe="8m", age_minutes=9.0)
+        blocked = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertTrue(allowed["current_signal"]["first_live_fresh"])
+        self.assertEqual("WAITING_FOR_APPROVAL", allowed["status"])
+        self.assertEqual(8.5, allowed["current_signal"]["freshness_cutoff_minutes"])
+        self.assertFalse(blocked["current_signal"]["first_live_fresh"])
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", blocked["status"])
+        self.assertEqual("FIRST LIVE CHAIN", blocked["next_action"]["telegram_command"])
+
+    def test_22m_signal_blocked_by_default(self) -> None:
+        self._append_signal(timeframe="22m", age_minutes=5.0, freshness_status="fresh")
+        payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", payload["status"])
+        self.assertFalse(payload["current_signal"]["first_live_fresh"])
+        self.assertIsNone(payload["current_signal"]["freshness_cutoff_minutes"])
+        self.assertEqual("FIRST LIVE CHAIN", payload["next_action"]["telegram_command"])
+
+    def test_source_freshness_label_ignored_when_strict_age_exceeds_cutoff(self) -> None:
+        self._append_signal(timeframe="13m", age_minutes=20.17, freshness_status="fresh")
+        payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertTrue(payload["current_signal"]["raw_fresh"])
+        self.assertFalse(payload["current_signal"]["first_live_fresh"])
+        self.assertFalse(payload["current_signal"]["fresh"])
+        self.assertEqual("wait_for_signal", payload["next_action"]["kind"])
+        self.assertNotIn("LIVE APPROVE", str(payload["next_action"]))
 
     def test_approval_without_intent_waits_for_intent(self) -> None:
         self._append_signal()
@@ -128,8 +193,7 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertFalse(payload["performance"]["heavy_builders_skipped"])
 
     def test_stale_signal_skips_heavy_payload_builders(self) -> None:
-        self.signal_id = f"BTCUSDT|13m|long|{(datetime.now(UTC) - timedelta(minutes=45)).isoformat()}"
-        self._append_signal()
+        self._append_signal(timeframe="13m", age_minutes=45.0)
         with self._patched_heavy_builders_raise():
             payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
@@ -185,6 +249,23 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertFalse(trade_now["order_placed"])
         self.assertFalse(trade_now["real_order_placed"])
 
+    def test_telegram_first_live_next_and_chain_do_not_approve_stale_signal(self) -> None:
+        self._append_signal(timeframe="13m", age_minutes=20.17, freshness_status="fresh")
+
+        next_action = handle_telegram_operator_command(text="FIRST LIVE NEXT", log_dir=self.log_dir)
+        chain = handle_telegram_operator_command(text="FIRST LIVE CHAIN", log_dir=self.log_dir)
+        raw_yes = handle_telegram_operator_command(text="YES", log_dir=self.log_dir)
+        trade_now = handle_telegram_operator_command(text="trade now live", log_dir=self.log_dir)
+
+        self.assertEqual("ACCEPTED", next_action["result_status"])
+        self.assertEqual("wait_for_signal", next_action["next_action"]["kind"])
+        self.assertEqual("FIRST LIVE CHAIN", next_action["next_action"]["telegram_command"])
+        self.assertNotIn("LIVE APPROVE", next_action["message"])
+        self.assertEqual("wait_for_signal", chain["next_action"]["kind"])
+        self.assertNotIn("LIVE APPROVE", chain["message"])
+        self.assertEqual("REJECTED", raw_yes["result_status"])
+        self.assertEqual("BLOCKED", trade_now["result_status"])
+
     def test_secret_hygiene(self) -> None:
         env = {
             "BINANCE_API_KEY": "secret-binance-key",
@@ -225,31 +306,45 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
             log_dir=self.log_dir,
         )
 
-    def _append_signal(self) -> None:
-        append_signal(
-            SignalRecord(
-                signal_id=self.signal_id,
-                symbol="BTCUSDT",
-                timeframe="13m",
-                direction="long",
-                timestamp=self.signal_id.split("|")[3],
-                hammer_strength=1.0,
-                hammer_high=101.0,
-                hammer_low=99.0,
-                fib_50=100.0,
-                fib_618=101.0,
-                fib_650=101.5,
-                fib_786=102.0,
-                invalidation=98.0,
-                bias_timeframe="4h",
-                bias_direction="long",
-                bias_aligned=True,
-                same_direction_streak=1,
-                opposite_direction_streak=0,
-                tradable=True,
-            ),
-            log_dir=self.log_dir,
+    def _append_signal(
+        self,
+        *,
+        timeframe: str = "13m",
+        age_minutes: float = 1.0,
+        freshness_status: str | None = None,
+    ) -> None:
+        timestamp = (datetime.now(UTC) - timedelta(minutes=age_minutes)).isoformat()
+        self.signal_id = f"BTCUSDT|{timeframe}|long|{timestamp}"
+        signal = SignalRecord(
+            signal_id=self.signal_id,
+            symbol="BTCUSDT",
+            timeframe=timeframe,
+            direction="long",
+            timestamp=timestamp,
+            hammer_strength=1.0,
+            hammer_high=101.0,
+            hammer_low=99.0,
+            fib_50=100.0,
+            fib_618=101.0,
+            fib_650=101.5,
+            fib_786=102.0,
+            invalidation=98.0,
+            bias_timeframe="4h",
+            bias_direction="long",
+            bias_aligned=True,
+            same_direction_streak=1,
+            opposite_direction_streak=0,
+            tradable=True,
         )
+        if freshness_status is None:
+            append_signal(signal, log_dir=self.log_dir)
+            return
+        path = self.log_dir / "signals.ndjson"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = signal.to_dict()
+        payload["freshness_status"] = freshness_status
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
     def _append_intent(self) -> None:
         append_live_execution_intent(

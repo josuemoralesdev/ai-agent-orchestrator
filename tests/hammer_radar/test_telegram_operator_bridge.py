@@ -3,14 +3,16 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.archive import append_signal
 from src.app.hammer_radar.operator.live_preflight import PREFLIGHT_READY_BUT_EXECUTION_DISABLED, PROMOTED_STRATEGY_KEY
+from src.app.hammer_radar.operator.models import SignalRecord
 from src.app.hammer_radar.operator.notification_watcher import append_alert_record
 from src.app.hammer_radar.operator.operator_actions import parse_operator_action
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
@@ -76,6 +78,18 @@ class TelegramOperatorBridgeTestCase(unittest.TestCase):
         self.assertEqual("fast", payload["performance"]["mode"])
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["real_order_placed"])
+
+    def test_first_live_next_blocks_stale_13m_approval_command(self) -> None:
+        signal_id = self._append_signal(timeframe="13m", age_minutes=20.17)
+
+        payload = handle_telegram_operator_command(text="FIRST LIVE NEXT", log_dir=self.log_dir)
+
+        self.assertEqual("ACCEPTED", payload["result_status"])
+        self.assertEqual(signal_id, payload["related_signal_id"])
+        self.assertEqual("wait_for_signal", payload["next_action"]["kind"])
+        self.assertEqual("FIRST LIVE CHAIN", payload["next_action"]["telegram_command"])
+        self.assertNotIn("LIVE APPROVE", payload["message"])
+        self.assertEqual("fast", payload["performance"]["mode"])
 
     def test_first_live_evaluate_records_safely(self) -> None:
         payload = handle_telegram_operator_command(text="FIRST LIVE EVALUATE", log_dir=self.log_dir)
@@ -320,6 +334,35 @@ class TelegramOperatorBridgeTestCase(unittest.TestCase):
             },
             log_dir=self.log_dir,
         )
+
+    def _append_signal(self, *, timeframe: str, age_minutes: float) -> str:
+        timestamp = (datetime.now(UTC) - timedelta(minutes=age_minutes)).isoformat()
+        signal_id = f"BTCUSDT|{timeframe}|long|{timestamp}"
+        append_signal(
+            SignalRecord(
+                signal_id=signal_id,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+                direction="long",
+                timestamp=timestamp,
+                hammer_strength=1.0,
+                hammer_high=101.0,
+                hammer_low=99.0,
+                fib_50=100.0,
+                fib_618=101.0,
+                fib_650=101.5,
+                fib_786=102.0,
+                invalidation=98.0,
+                bias_timeframe="4h",
+                bias_direction="long",
+                bias_aligned=True,
+                same_direction_streak=1,
+                opposite_direction_streak=0,
+                tradable=True,
+            ),
+            log_dir=self.log_dir,
+        )
+        return signal_id
 
     @staticmethod
     def _paper_short_candidate() -> dict:

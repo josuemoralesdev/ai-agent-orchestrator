@@ -474,6 +474,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             payload={"first_live_chain": payload},
             signal_id=(payload.get("current_signal") or {}).get("signal_id"),
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            next_action=payload.get("next_action") if isinstance(payload.get("next_action"), dict) else None,
         )
     if normalized == "FIRST LIVE NEXT":
         payload = build_first_live_chain_status(log_dir=log_dir)
@@ -484,6 +485,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             payload={"first_live_chain": payload},
             signal_id=(payload.get("current_signal") or {}).get("signal_id"),
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            next_action=payload.get("next_action") if isinstance(payload.get("next_action"), dict) else None,
         )
     if normalized in {"FIRST LIVE RUNBOOK", "FIRST LIVE SEQUENCE"}:
         payload = build_first_live_chain_status(log_dir=log_dir)
@@ -494,6 +496,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             payload={"first_live_chain": payload},
             signal_id=(payload.get("current_signal") or {}).get("signal_id"),
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            next_action=payload.get("next_action") if isinstance(payload.get("next_action"), dict) else None,
         )
     if normalized == "FIRST LIVE TEST ORDER CHECKS":
         payload = list_first_live_test_order_checks(log_dir=log_dir)
@@ -1008,6 +1011,7 @@ def _result(
     challenge_id: str | None = None,
     reason: str | None = None,
     performance: dict[str, Any] | None = None,
+    next_action: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "normalized_action": normalized_action,
@@ -1025,6 +1029,7 @@ def _result(
         "real_order_placed": False,
         "execution_attempted": False,
         "performance": performance or {},
+        "next_action": next_action or {},
         "secrets_shown": False,
     }
 
