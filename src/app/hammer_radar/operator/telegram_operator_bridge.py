@@ -73,6 +73,13 @@ from src.app.hammer_radar.operator.first_live_protective_adapter import (
     format_first_live_protective_operator_message,
     list_first_live_protective_checks,
 )
+from src.app.hammer_radar.operator.first_live_test_order_gate import (
+    build_first_live_test_order_status,
+    evaluate_and_record_first_live_test_order_check,
+    format_first_live_test_order_checks_operator_message,
+    format_first_live_test_order_gate_operator_message,
+    list_first_live_test_order_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -143,6 +150,11 @@ HELP_COMMANDS = [
     "FIRST LIVE TAKE PROFIT CHECK",
     "FIRST LIVE PROTECTIVE PAYLOAD",
     "FIRST LIVE PROTECTIVE CHECKS",
+    "FIRST LIVE TEST ORDER <executor_rehearsal_id>",
+    "FIRST LIVE TEST ORDER CHECK <executor_rehearsal_id>",
+    "FIRST LIVE EXACT CHAIN",
+    "FIRST LIVE PAYLOAD READINESS",
+    "FIRST LIVE TEST ORDER CHECKS",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE EVALUATE",
     "FIRST LIVE CHALLENGE",
@@ -433,6 +445,41 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_first_live_protective_checks_operator_message(payload),
             payload={"first_live_protective_checks": payload},
+        )
+    if normalized == "FIRST LIVE TEST ORDER CHECKS":
+        payload = list_first_live_test_order_checks(log_dir=log_dir)
+        return _result(
+            "first_live_test_order_checks",
+            "ACCEPTED",
+            format_first_live_test_order_checks_operator_message(payload),
+            payload={"first_live_test_order_checks": payload},
+        )
+    if normalized == "FIRST LIVE TEST ORDER" or normalized.startswith("FIRST LIVE TEST ORDER "):
+        payload = _first_live_test_order_from_command(raw_text=raw_text, normalized=normalized, log_dir=log_dir)
+        return _result(
+            "first_live_test_order",
+            str(payload.get("status") or "BLOCKED"),
+            format_first_live_test_order_gate_operator_message(payload),
+            payload={"first_live_test_order": payload},
+            signal_id=payload.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE EXACT CHAIN":
+        payload = build_first_live_test_order_status(log_dir=log_dir)
+        return _result(
+            "first_live_exact_chain",
+            str(payload.get("status") or "BLOCKED"),
+            format_first_live_test_order_gate_operator_message(payload, section="exact_chain"),
+            payload={"first_live_test_order": payload},
+            signal_id=payload.get("signal_id"),
+        )
+    if normalized == "FIRST LIVE PAYLOAD READINESS":
+        payload = build_first_live_test_order_status(log_dir=log_dir)
+        return _result(
+            "first_live_payload_readiness",
+            str(payload.get("status") or "BLOCKED"),
+            format_first_live_test_order_gate_operator_message(payload, section="payload"),
+            payload={"first_live_test_order": payload},
+            signal_id=payload.get("signal_id"),
         )
     if normalized in {"LIVE RUNBOOK", "FIRST LIVE RUNBOOK", "LIVE ARMING RUNBOOK"}:
         runbook = evaluate_and_record_live_arming_runbook(log_dir=log_dir)
@@ -868,6 +915,22 @@ def _first_live_gate_from_command(*, raw_text: str, normalized: str, log_dir: Pa
         return evaluate_and_record_first_live_execution_gate(executor_rehearsal_id=parts[4].strip(), log_dir=log_dir)
     signal_id = raw_text.split(maxsplit=3)[3].strip() if len(raw_text.split(maxsplit=3)) == 4 else None
     return evaluate_and_record_first_live_execution_gate(signal_id=signal_id, log_dir=log_dir)
+
+
+def _first_live_test_order_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:
+    if normalized in {"FIRST LIVE TEST ORDER", "FIRST LIVE TEST ORDER CHECK"}:
+        rehearsal_id = None
+    elif normalized.startswith("FIRST LIVE TEST ORDER CHECK "):
+        rehearsal_id = raw_text.split(maxsplit=5)[5].strip() if len(raw_text.split(maxsplit=5)) == 6 else None
+    else:
+        rehearsal_id = raw_text.split(maxsplit=4)[4].strip() if len(raw_text.split(maxsplit=4)) == 5 else None
+    return evaluate_and_record_first_live_test_order_check(
+        executor_rehearsal_id=rehearsal_id,
+        transport_mode="DRY_RUN",
+        dry_run=True,
+        final_confirmation=False,
+        log_dir=log_dir,
+    )
 
 
 def _first_live_execute_from_command(*, raw_text: str, normalized: str, log_dir: Path) -> dict[str, Any]:

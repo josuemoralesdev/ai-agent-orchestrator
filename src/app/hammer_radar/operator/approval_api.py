@@ -119,6 +119,11 @@ from src.app.hammer_radar.operator.first_live_protective_adapter import (
     evaluate_and_record_first_live_protective_check,
     list_first_live_protective_checks,
 )
+from src.app.hammer_radar.operator.first_live_test_order_gate import (
+    build_first_live_test_order_status,
+    evaluate_and_record_first_live_test_order_check,
+    list_first_live_test_order_checks,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -349,6 +354,15 @@ class FirstLiveProtectiveRequest(BaseModel):
     transport_mode: str | None = None
     final_confirmation: bool = False
     dry_run: bool = True
+
+
+class FirstLiveTestOrderRequest(BaseModel):
+    signal_id: str | None = None
+    execution_intent_id: str | None = None
+    executor_rehearsal_id: str | None = None
+    transport_mode: str | None = None
+    dry_run: bool = True
+    final_confirmation: bool = False
 
 
 class BetrayalShadowTrackRequest(BaseModel):
@@ -899,6 +913,30 @@ def first_live_protective_check(request: FirstLiveProtectiveRequest | None = Non
 @app.get("/live/first-protective/checks")
 def first_live_protective_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_protective_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-test-order/status")
+def first_live_test_order_status() -> dict:
+    return build_first_live_test_order_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-test-order/check")
+def first_live_test_order_check(request: FirstLiveTestOrderRequest | None = None) -> dict:
+    request = request or FirstLiveTestOrderRequest()
+    return evaluate_and_record_first_live_test_order_check(
+        signal_id=request.signal_id,
+        execution_intent_id=request.execution_intent_id,
+        executor_rehearsal_id=request.executor_rehearsal_id,
+        transport_mode=request.transport_mode,
+        dry_run=request.dry_run,
+        final_confirmation=request.final_confirmation,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/first-test-order/checks")
+def first_live_test_order_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
+    return list_first_live_test_order_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/live/arming/runbook")
