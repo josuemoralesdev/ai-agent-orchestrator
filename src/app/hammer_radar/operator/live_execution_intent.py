@@ -17,7 +17,7 @@ from typing import Any
 from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
-from src.app.hammer_radar.operator.live_approval import load_live_approval_requests
+from src.app.hammer_radar.operator.live_approval import find_valid_live_approval_for_signal, load_live_approval_requests
 from src.app.hammer_radar.operator.live_begins import build_live_begins_status
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
 
@@ -55,7 +55,8 @@ def create_live_execution_intent(
         if normalized_signal_id
         else []
     )
-    approval_status = _approval_status(approvals, signal_id=normalized_signal_id)
+    approval_lookup = find_valid_live_approval_for_signal(normalized_signal_id, log_dir=resolved_log_dir, now=created_at)
+    approval_status = str(approval_lookup.get("approval_status") or _approval_status(approvals, signal_id=normalized_signal_id))
     expires_at = created_at + timedelta(seconds=_ttl_seconds(source))
     checks = _checks(
         signal_id=normalized_signal_id,
@@ -102,6 +103,8 @@ def create_live_execution_intent(
         "signal_id": normalized_signal_id,
         "preview_hash": preview_hash,
         "approval_status": approval_status,
+        "approval_request_id": approval_lookup.get("request_id"),
+        "approval_gate_status": approval_lookup.get("approval_gate_status"),
         "live_begins_status": live_begins.get("status") or "UNKNOWN",
         "preview_status": preview.get("status") or "UNKNOWN",
         "expires_at": expires_at_text if status == "INTENT_READY" else None,
@@ -345,7 +348,9 @@ def _has_exact_approval(records: list[dict[str, Any]], *, signal_id: str | None)
             continue
         if record.get("parse_status") != "ACCEPTED":
             continue
-        if record.get("approval_gate_status") not in {"READY_BUT_EXECUTION_DISABLED", "APPROVED"}:
+        if record.get("approval_gate_status") not in {"READY_BUT_EXECUTION_DISABLED", "APPROVED", "BLOCKED"}:
+            continue
+        if record.get("freshness_status") == "expired":
             continue
         expires_at = _parse_datetime(record.get("expires_at"))
         if expires_at is not None and expires_at <= now:

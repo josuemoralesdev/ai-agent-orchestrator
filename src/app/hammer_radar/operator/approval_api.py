@@ -1441,15 +1441,20 @@ def operator_live_approval_evaluate(request: LiveApprovalEvaluateRequest) -> dic
 @app.get("/operator/live-approval/requests")
 def operator_live_approval_requests(limit: int = Query(default=50, ge=0), signal_id: str | None = None) -> dict:
     log_dir = get_log_dir(use_env=True)
+    records = load_live_approval_requests(limit=limit, signal_id=signal_id, log_dir=log_dir)
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "allow_live_orders": False,
         "global_kill_switch": True,
         "order_placed": ORDER_PLACED,
+        "real_order_placed": False,
         "execution_attempted": False,
         "order_payload_created": False,
+        "secrets_shown": False,
+        "count": len(records),
         "live_approval_requests_path": str(live_approval_requests_path(log_dir)),
-        "live_approval_requests": load_live_approval_requests(limit=limit, signal_id=signal_id, log_dir=log_dir),
+        "live_approval_requests": records,
+        "requests": records,
     }
 
 

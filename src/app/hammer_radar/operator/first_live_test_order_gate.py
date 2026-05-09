@@ -23,7 +23,7 @@ from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build
 from src.app.hammer_radar.operator.first_live_protective_adapter import build_first_live_protective_status
 from src.app.hammer_radar.operator.first_live_readiness import build_first_live_readiness_status
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import build_first_microscopic_live_profile
-from src.app.hammer_radar.operator.live_approval import load_live_approval_requests
+from src.app.hammer_radar.operator.live_approval import find_valid_live_approval_for_signal, load_live_approval_requests
 from src.app.hammer_radar.operator.live_begins import build_live_begins_status
 from src.app.hammer_radar.operator.live_execution_intent import load_live_execution_intents
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
@@ -687,16 +687,7 @@ def _latest_test_order_validation(*, signal_id: str | None, log_dir: Path) -> di
 
 
 def _approval_found(signal_id: str | None, *, log_dir: Path) -> bool:
-    if not signal_id:
-        return False
-    for record in load_live_approval_requests(limit=0, signal_id=signal_id, log_dir=log_dir):
-        if (
-            record.get("normalized_action") == "live_approve_exact"
-            and record.get("parse_status") == "ACCEPTED"
-            and record.get("signal_id") == signal_id
-        ):
-            return True
-    return False
+    return find_valid_live_approval_for_signal(signal_id, log_dir=log_dir).get("approval_found") is True
 
 
 def _signal_fresh(signal_id: str | None, *, preview: dict[str, Any]) -> bool:
