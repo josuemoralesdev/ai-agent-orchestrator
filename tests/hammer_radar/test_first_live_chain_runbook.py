@@ -195,6 +195,22 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         self.assertEqual("create_intent", after["next_action"]["kind"])
         self.assertEqual(f"LIVE INTENT {self.signal_id}", after["next_action"]["telegram_command"])
 
+    def test_chain_advances_after_telegram_live_intent_uses_r68_approval(self) -> None:
+        self._append_signal()
+        self._append_approval()
+        with self._patched_intent_live_begins(), self._patched_intent_preview():
+            intent = handle_telegram_operator_command(text=f"LIVE INTENT {self.signal_id}", log_dir=self.log_dir)
+        after = build_first_live_chain_status(log_dir=self.log_dir, env={})
+
+        self.assertEqual("ACCEPTED", intent["result_status"])
+        self.assertNotEqual("MISSING", intent["payload"]["live_execution_intent"]["approval_status"])
+        self.assertNotIn("exact approval is missing", intent["payload"]["live_execution_intent"]["blockers"])
+        self.assertNotIn("exact approval for signal_id is missing", intent["payload"]["live_execution_intent"]["blockers"])
+        self.assertFalse(intent["order_placed"])
+        self.assertFalse(intent["real_order_placed"])
+        self.assertTrue(after["chain_state"]["execution_intent_found"])
+        self.assertEqual("run_rehearsal", after["next_action"]["kind"])
+
     def test_direct_live_approval_endpoint_exists_and_is_safe(self) -> None:
         self._append_signal()
 
@@ -422,6 +438,46 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
                 "secrets_shown": False,
             },
             log_dir=self.log_dir,
+        )
+
+    def _patched_intent_live_begins(self):
+        return patch(
+            "src.app.hammer_radar.operator.live_execution_intent.build_live_begins_status",
+            return_value={"status": "READY_FOR_OPERATOR_APPROVAL"},
+        )
+
+    def _patched_intent_preview(self):
+        return patch(
+            "src.app.hammer_radar.operator.live_execution_intent.build_live_execution_preview",
+            return_value={
+                "status": "PREVIEW_READY",
+                "phase": "R51",
+                "system": "money_printing_machine_hammer_radar",
+                "execution_mode": "PREVIEW_ONLY",
+                "latest_signal_id": self.signal_id,
+                "symbol": "BTCUSDT",
+                "timeframe": "13m",
+                "direction": "long",
+                "entry": 100.0,
+                "stop": 95.0,
+                "take_profit": 110.0,
+                "order_side": "BUY",
+                "position_side": "LONG",
+                "margin_usdt": 6.0,
+                "leverage": 1.0,
+                "notional_usdt": 6.0,
+                "risk_usdt": 0.3,
+                "quantity": 0.06,
+                "protective_orders_preview": {
+                    "stop_loss": {"trigger_price": 95.0, "side": "SELL", "reduce_only": True},
+                    "take_profit": {"trigger_price": 110.0, "side": "SELL", "reduce_only": True},
+                    "reduce_only": True,
+                    "status": "READY",
+                },
+                "order_placed": False,
+                "real_order_placed": False,
+                "secrets_shown": False,
+            },
         )
 
     def _patched_preview(self):

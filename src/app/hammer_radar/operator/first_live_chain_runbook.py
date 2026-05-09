@@ -23,7 +23,7 @@ from src.app.hammer_radar.operator.first_live_protective_adapter import build_fi
 from src.app.hammer_radar.operator.first_live_readiness import build_first_live_readiness_status
 from src.app.hammer_radar.operator.first_live_test_order_gate import build_first_live_test_order_status
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import build_first_microscopic_live_profile
-from src.app.hammer_radar.operator.live_approval import load_live_approval_requests
+from src.app.hammer_radar.operator.live_approval import find_valid_live_approval_for_signal, load_live_approval_requests
 from src.app.hammer_radar.operator.live_arming_checklist import build_live_arming_status
 from src.app.hammer_radar.operator.live_arming_runbook import build_live_arming_runbook
 from src.app.hammer_radar.operator.live_begins import build_live_begins_status
@@ -723,16 +723,7 @@ def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def _approval_found(signal_id: str | None, *, log_dir: Path) -> bool:
-    if not signal_id:
-        return False
-    for record in load_live_approval_requests(limit=0, signal_id=signal_id, log_dir=log_dir):
-        if (
-            record.get("normalized_action") == "live_approve_exact"
-            and record.get("parse_status") == "ACCEPTED"
-            and record.get("signal_id") == signal_id
-        ):
-            return True
-    return False
+    return find_valid_live_approval_for_signal(signal_id, log_dir=log_dir).get("approval_found") is True
 
 
 def _approval_found_fast(signal_id: str | None, *, log_dir: Path) -> bool:

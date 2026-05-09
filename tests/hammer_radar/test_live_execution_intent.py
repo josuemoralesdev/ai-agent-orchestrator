@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator.approval_api import app
-from src.app.hammer_radar.operator.live_approval import append_live_approval_request
+from src.app.hammer_radar.operator.live_approval import append_live_approval_request, find_valid_live_approval_for_signal
 from src.app.hammer_radar.operator.live_execution_intent import (
     append_live_execution_intent,
     compute_preview_hash,
@@ -53,6 +53,19 @@ class LiveExecutionIntentTestCase(unittest.TestCase):
         self.assertEqual("MISSING", payload["approval_status"])
         self.assertFalse(payload["checks"]["exact_approval_present"])
         self.assertFalse(payload["order_placed"])
+
+    def test_r68_blocked_approval_source_lookup_is_valid_for_exact_signal(self) -> None:
+        signal_id = self._signal_id()
+        self._append_approval(signal_id, approval_gate_status="BLOCKED")
+
+        lookup = find_valid_live_approval_for_signal(signal_id, log_dir=self.log_dir)
+
+        self.assertTrue(lookup["approval_found"])
+        self.assertEqual("APPROVED", lookup["approval_status"])
+        self.assertEqual(f"approval-{signal_id}", lookup["request_id"])
+        self.assertFalse(lookup["order_placed"])
+        self.assertFalse(lookup["real_order_placed"])
+        self.assertFalse(lookup["secrets_shown"])
 
     def test_raw_yes_and_trade_now_live_remain_safe(self) -> None:
         raw_yes = handle_telegram_operator_command(text="YES", log_dir=self.log_dir)
@@ -116,6 +129,38 @@ class LiveExecutionIntentTestCase(unittest.TestCase):
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["real_order_placed"])
         self.assertFalse(payload["execution_attempted"])
+
+    def test_r52_accepts_r68_blocked_approval_record(self) -> None:
+        signal_id = self._signal_id()
+        self._append_approval(signal_id, approval_gate_status="BLOCKED")
+
+        with self._patched_live_begins(), self._patched_preview(self._preview(signal_id)):
+            payload = create_live_execution_intent(signal_id=signal_id, log_dir=self.log_dir)
+
+        self.assertEqual("INTENT_READY", payload["status"])
+        self.assertEqual("APPROVED", payload["approval_status"])
+        self.assertEqual(f"approval-{signal_id}", payload["approval_request_id"])
+        self.assertNotIn("exact approval is missing", payload["blockers"])
+        self.assertNotIn("exact approval for signal_id is missing", payload["blockers"])
+        self.assertIsNotNone(payload["execution_intent_id"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+
+    def test_expired_approval_record_blocks_intent(self) -> None:
+        signal_id = self._signal_id()
+        self._append_approval(
+            signal_id,
+            approval_gate_status="BLOCKED",
+            expires_at=(datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+        )
+
+        with self._patched_live_begins(), self._patched_preview(self._preview(signal_id)):
+            payload = create_live_execution_intent(signal_id=signal_id, log_dir=self.log_dir)
+
+        self.assertEqual("BLOCKED", payload["status"])
+        self.assertEqual("EXPIRED", payload["approval_status"])
+        self.assertIn("approval is missing or expired", payload["blockers"])
+        self.assertIsNone(payload["execution_intent_id"])
 
     def test_idempotency_returns_same_unexpired_intent(self) -> None:
         signal_id = self._signal_id()
@@ -250,17 +295,18 @@ class LiveExecutionIntentTestCase(unittest.TestCase):
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["real_order_placed"])
 
-    def _append_approval(self, signal_id: str) -> None:
+    def _append_approval(self, signal_id: str, *, approval_gate_status: str = "READY_BUT_EXECUTION_DISABLED", expires_at: str | None = None) -> None:
         append_live_approval_request(
             {
                 "request_id": f"approval-{signal_id}",
                 "created_at": datetime.now(UTC).isoformat(),
+                "expires_at": expires_at,
                 "source": "test",
                 "raw_text": f"LIVE APPROVE {signal_id}",
                 "normalized_action": "live_approve_exact",
                 "parse_status": "ACCEPTED",
                 "signal_id": signal_id,
-                "approval_gate_status": "READY_BUT_EXECUTION_DISABLED",
+                "approval_gate_status": approval_gate_status,
                 "order_placed": False,
                 "execution_attempted": False,
                 "secrets_shown": False,

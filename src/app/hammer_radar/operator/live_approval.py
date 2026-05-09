@@ -29,6 +29,8 @@ GLOBAL_KILL_SWITCH = True
 ORDER_PLACED = False
 EXECUTION_ATTEMPTED = False
 ORDER_PAYLOAD_CREATED = False
+VALID_EXACT_APPROVAL_GATE_STATUSES = {"APPROVED", "READY_BUT_EXECUTION_DISABLED", "BLOCKED"}
+INVALID_EXACT_APPROVAL_GATE_STATUSES = {"EXPIRED", "REJECTED", "NOT_FOUND", "NOT_LIVE_ELIGIBLE"}
 
 
 def evaluate_live_approval_request(
@@ -137,6 +139,59 @@ def live_approval_requests_path(log_dir: str | Path) -> Path:
     return Path(log_dir) / LIVE_APPROVAL_REQUESTS_FILENAME
 
 
+def find_valid_live_approval_for_signal(
+    signal_id: str | None,
+    *,
+    log_dir: str | Path,
+    now: datetime | None = None,
+    max_age_minutes: float | None = None,
+) -> dict[str, Any]:
+    resolved_signal_id = str(signal_id or "").strip() or None
+    if not resolved_signal_id:
+        return _approval_lookup_result(approval_found=False, approval_status="MISSING", blockers=["signal_id is required"])
+    resolved_now = (now or datetime.now(UTC)).astimezone(UTC)
+    latest_rejected: dict[str, Any] | None = None
+    latest_expired: dict[str, Any] | None = None
+    latest_blocked: dict[str, Any] | None = None
+    for record in load_live_approval_requests(limit=0, signal_id=resolved_signal_id, log_dir=Path(log_dir)):
+        if record.get("signal_id") != resolved_signal_id:
+            continue
+        if record.get("normalized_action") != "live_approve_exact":
+            continue
+        if record.get("parse_status") != "ACCEPTED":
+            latest_rejected = latest_rejected or record
+            continue
+        expires_at = _parse_datetime(record.get("expires_at"))
+        if expires_at is not None and expires_at <= resolved_now:
+            latest_expired = latest_expired or record
+            continue
+        if max_age_minutes is not None and _record_too_old(record, now=resolved_now, max_age_minutes=max_age_minutes):
+            latest_expired = latest_expired or record
+            continue
+        gate_status = str(record.get("approval_gate_status") or "").upper()
+        if gate_status in INVALID_EXACT_APPROVAL_GATE_STATUSES:
+            if gate_status == "EXPIRED":
+                latest_expired = latest_expired or record
+            else:
+                latest_rejected = latest_rejected or record
+            continue
+        if gate_status in VALID_EXACT_APPROVAL_GATE_STATUSES:
+            return _approval_lookup_result(
+                approval_found=True,
+                approval_status="APPROVED",
+                record=record,
+                blockers=[],
+            )
+        latest_blocked = latest_blocked or record
+    if latest_expired is not None:
+        return _approval_lookup_result(approval_found=False, approval_status="EXPIRED", record=latest_expired, blockers=["exact approval is expired"])
+    if latest_rejected is not None:
+        return _approval_lookup_result(approval_found=False, approval_status="REJECTED", record=latest_rejected, blockers=["exact approval was rejected"])
+    if latest_blocked is not None:
+        return _approval_lookup_result(approval_found=False, approval_status="BLOCKED", record=latest_blocked, blockers=["exact approval is blocked"])
+    return _approval_lookup_result(approval_found=False, approval_status="MISSING", blockers=["exact approval for signal_id is missing"])
+
+
 def _approval_gate_status(
     *,
     parsed: dict[str, Any],
@@ -161,6 +216,49 @@ def _approval_gate_status(
     ):
         return "READY_BUT_EXECUTION_DISABLED"
     return "BLOCKED"
+
+
+def _approval_lookup_result(
+    *,
+    approval_found: bool,
+    approval_status: str,
+    record: dict[str, Any] | None = None,
+    blockers: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "approval_found": approval_found,
+        "approval_status": approval_status,
+        "request_id": (record or {}).get("request_id"),
+        "created_at": (record or {}).get("created_at"),
+        "expires_at": (record or {}).get("expires_at"),
+        "approval_gate_status": (record or {}).get("approval_gate_status"),
+        "parse_status": (record or {}).get("parse_status"),
+        "signal_id": (record or {}).get("signal_id"),
+        "blockers": list(blockers or []),
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "secrets_shown": False,
+    }
+
+
+def _record_too_old(record: dict[str, Any], *, now: datetime, max_age_minutes: float) -> bool:
+    created_at = _parse_datetime(record.get("created_at"))
+    if created_at is None:
+        return True
+    return (now - created_at).total_seconds() > max_age_minutes * 60.0
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _blockers(
