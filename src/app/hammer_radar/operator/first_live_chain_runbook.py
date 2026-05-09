@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir, get_signals_path
 from src.app.hammer_radar.operator.first_live_adapter_verification import build_first_live_adapter_status
+from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
 from src.app.hammer_radar.operator.first_live_execution_gate import build_first_live_execution_gate
 from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build_first_live_ladder_submit_status
 from src.app.hammer_radar.operator.first_live_protective_adapter import build_first_live_protective_status
@@ -213,10 +214,16 @@ def _evaluate_fast(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     created_at = datetime.now(UTC)
     current_signal = _current_signal_fast(log_dir=resolved_log_dir, now=created_at)
+    candidate_queue = build_first_live_candidate_queue(log_dir=resolved_log_dir, env=env, now=created_at)
+    selected_signal_status = candidate_queue.get("selection_status") if isinstance(candidate_queue.get("selection_status"), dict) else {}
+    if selected_signal_status.get("valid") is True and isinstance(selected_signal_status.get("candidate"), dict):
+        current_signal = _current_signal_from_candidate(selected_signal_status["candidate"])
     signal_id = current_signal.get("signal_id")
     chain_state = (
         _chain_state_fast(signal_id=signal_id, log_dir=resolved_log_dir, now=created_at)
-        if current_signal.get("fresh") is True and current_signal.get("matches_first_live_profile") is True
+        if current_signal.get("fresh") is True
+        and current_signal.get("matches_first_live_profile") is True
+        and current_signal.get("live_candidate_allowed", True) is True
         else _empty_chain_state()
     )
     exact_chain = chain_state.get("exact_chain_resolved") is True
@@ -252,6 +259,9 @@ def _evaluate_fast(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
         "execution_attempted": EXECUTION_ATTEMPTED,
         "network_allowed": NETWORK_ALLOWED,
         "current_signal": current_signal,
+        "selected_signal_id": candidate_queue.get("selected_signal_id"),
+        "selected_signal_status": selected_signal_status,
+        "candidate_queue_summary": _candidate_queue_summary(candidate_queue),
         "chain_state": chain_state,
         "phase_statuses": phase_statuses,
         "next_action": next_action,
@@ -286,8 +296,18 @@ def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
     profile_payload = build_first_microscopic_live_profile(log_dir=resolved_log_dir, env=source)
     profile = _profile(profile_payload.get("profile") or {})
     current_signal = _current_signal(preview=preview, profile=profile)
+    candidate_queue = build_first_live_candidate_queue(log_dir=resolved_log_dir, env=source, now=created_at)
+    selected_signal_status = candidate_queue.get("selection_status") if isinstance(candidate_queue.get("selection_status"), dict) else {}
+    if selected_signal_status.get("valid") is True and isinstance(selected_signal_status.get("candidate"), dict):
+        current_signal = _current_signal_from_candidate(selected_signal_status["candidate"])
     signal_id = current_signal.get("signal_id")
-    chain_state = _chain_state(signal_id=signal_id, log_dir=resolved_log_dir, now=created_at)
+    chain_state = (
+        _chain_state(signal_id=signal_id, log_dir=resolved_log_dir, now=created_at)
+        if current_signal.get("fresh") is True
+        and current_signal.get("matches_first_live_profile") is True
+        and current_signal.get("live_candidate_allowed", True) is True
+        else _empty_chain_state()
+    )
     intent_id = chain_state.get("execution_intent_id")
     rehearsal_id = chain_state.get("executor_rehearsal_id")
     test_order_gate = build_first_live_test_order_status(
@@ -349,6 +369,9 @@ def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
         "execution_attempted": EXECUTION_ATTEMPTED,
         "network_allowed": NETWORK_ALLOWED,
         "current_signal": current_signal,
+        "selected_signal_id": candidate_queue.get("selected_signal_id"),
+        "selected_signal_status": selected_signal_status,
+        "candidate_queue_summary": _candidate_queue_summary(candidate_queue),
         "chain_state": chain_state,
         "phase_statuses": phase_statuses,
         "next_action": next_action,
@@ -523,6 +546,33 @@ def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any]) -> dict
     }
 
 
+def _current_signal_from_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "signal_id": candidate.get("signal_id"),
+        "symbol": candidate.get("symbol"),
+        "timeframe": candidate.get("timeframe"),
+        "direction": candidate.get("direction"),
+        "fresh": candidate.get("queue_fresh") is True,
+        "raw_fresh": candidate.get("raw_fresh") is True,
+        "first_live_fresh": candidate.get("queue_fresh") is True,
+        "freshness_cutoff_minutes": candidate.get("queue_freshness_cutoff_minutes"),
+        "freshness_policy": "r71_multi_horizon_queue",
+        "age_minutes": candidate.get("age_minutes"),
+        "matches_first_live_profile": candidate.get("first_live_profile_match") is True,
+        "first_live_profile_match": candidate.get("first_live_profile_match") is True,
+        "live_candidate_allowed": candidate.get("live_candidate_allowed") is True,
+        "policy_status": candidate.get("policy_status"),
+        "horizon": candidate.get("horizon"),
+        "selection_status": (
+            "SELECTED_LIVE_ELIGIBLE"
+            if candidate.get("live_candidate_allowed") is True
+            else "SELECTED_BUT_NOT_LIVE_ELIGIBLE"
+        ),
+        "blockers": candidate.get("blockers") if isinstance(candidate.get("blockers"), list) else [],
+        "source": "r71_selected_candidate_queue",
+    }
+
+
 def _chain_state(*, signal_id: str | None, log_dir: Path, now: datetime) -> dict[str, Any]:
     approval_found = _approval_found(signal_id, log_dir=log_dir)
     intent = _latest_intent(signal_id=signal_id, log_dir=log_dir, now=now)
@@ -603,6 +653,13 @@ def _next_action(*, current_signal: dict[str, Any], chain_state: dict[str, Any],
     signal_id = current_signal.get("signal_id")
     intent_id = chain_state.get("execution_intent_id")
     rehearsal_id = chain_state.get("executor_rehearsal_id")
+    if current_signal.get("source") == "r71_selected_candidate_queue" and current_signal.get("live_candidate_allowed") is not True:
+        return _action(
+            "blocked",
+            "FIRST LIVE SELECTED",
+            "GET /live/first-candidates/status",
+            "SELECTED_BUT_NOT_LIVE_ELIGIBLE: selected signal preserved, but not live-approvable under current policy; review policy or clear selection",
+        )
     if current_signal.get("fresh") is not True or current_signal.get("matches_first_live_profile") is not True:
         return _action("wait_for_signal", "FIRST LIVE CHAIN", "GET /live/first-chain/status", "fresh BTCUSDT first-live signal is not available")
     if chain_state.get("approval_found") is not True:
@@ -641,6 +698,8 @@ def _status(*, next_action: dict[str, Any], test_order_gate: dict[str, Any]) -> 
         return "READY_FOR_MANUAL_ENV_ARMING"
     if kind == "final_review" and test_order_gate.get("status") in {"TEST_ORDER_VALIDATED", "READY_FOR_MANUAL_ENV_ARMING"}:
         return "READY_FOR_FINAL_REVIEW"
+    if kind == "blocked":
+        return "SELECTED_BUT_NOT_LIVE_ELIGIBLE"
     return "BLOCKED"
 
 
@@ -668,6 +727,9 @@ def _blockers(*, current_signal: dict[str, Any], chain_state: dict[str, Any], te
         blockers.append("fresh first-live signal is not available")
     if current_signal.get("matches_first_live_profile") is not True:
         blockers.append("current signal does not match first-live BTCUSDT profile")
+    if current_signal.get("source") == "r71_selected_candidate_queue" and current_signal.get("live_candidate_allowed") is not True:
+        blockers.append("selected signal is preserved but not live-approvable under current policy")
+    blockers.extend(current_signal.get("blockers") or [])
     blockers.extend(chain_state.get("blockers") or [])
     blockers.extend(test_order_gate.get("blockers") or [])
     return list(dict.fromkeys(str(item) for item in blockers if item))
@@ -702,6 +764,9 @@ def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
         "created_at",
         "status",
         "current_signal",
+        "selected_signal_id",
+        "selected_signal_status",
+        "candidate_queue_summary",
         "chain_state",
         "phase_statuses",
         "next_action",
@@ -918,7 +983,30 @@ def _operator_action(next_action: dict[str, Any]) -> str:
         return "check protective payload readiness"
     if kind == "validate_test_order":
         return "validate test-order"
+    if kind == "blocked":
+        return "review selected candidate policy / clear selection"
     return "manual review / keep blocked"
+
+
+def _candidate_queue_summary(candidate_queue: dict[str, Any]) -> dict[str, Any]:
+    buckets = candidate_queue.get("buckets") if isinstance(candidate_queue.get("buckets"), dict) else {}
+    return {
+        "phase": candidate_queue.get("phase"),
+        "execution_mode": candidate_queue.get("execution_mode"),
+        "selected_signal_id": candidate_queue.get("selected_signal_id"),
+        "selection_status": (candidate_queue.get("selection_status") or {}).get("status")
+        if isinstance(candidate_queue.get("selection_status"), dict)
+        else None,
+        "bucket_counts": {
+            name: len(items) if isinstance(items, list) else 0
+            for name, items in buckets.items()
+        },
+        "recommended_next": candidate_queue.get("recommended_next"),
+        "order_placed": False,
+        "real_order_placed": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+    }
 
 
 def _action(kind: str, telegram_command: str | None, api_hint: str | None, reason: str) -> dict[str, Any]:
