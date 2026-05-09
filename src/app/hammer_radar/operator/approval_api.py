@@ -129,6 +129,11 @@ from src.app.hammer_radar.operator.first_live_chain_runbook import (
     evaluate_and_record_first_live_chain_check,
     list_first_live_chain_checks,
 )
+from src.app.hammer_radar.operator.first_live_candidate_queue import (
+    build_first_live_candidate_queue,
+    clear_selected_signal,
+    select_first_live_candidate,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -368,6 +373,17 @@ class FirstLiveTestOrderRequest(BaseModel):
     transport_mode: str | None = None
     dry_run: bool = True
     final_confirmation: bool = False
+
+
+class FirstLiveCandidateSelectRequest(BaseModel):
+    signal_id: str = Field(min_length=1)
+    source: str = "api"
+    reason: str = ""
+
+
+class FirstLiveCandidateClearRequest(BaseModel):
+    source: str = "api"
+    reason: str = ""
 
 
 class BetrayalShadowTrackRequest(BaseModel):
@@ -958,6 +974,31 @@ def first_live_chain_check(detail: str = Query(default="fast")) -> dict:
 @app.get("/live/first-chain/checks")
 def first_live_chain_checks(limit: int = Query(default=20, ge=0), status: str | None = None) -> dict:
     return list_first_live_chain_checks(limit=limit, status=status, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/first-candidates/status")
+def first_live_candidates_status() -> dict:
+    return build_first_live_candidate_queue(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/first-candidates/select")
+def first_live_candidates_select(request: FirstLiveCandidateSelectRequest) -> dict:
+    return select_first_live_candidate(
+        signal_id=request.signal_id,
+        source=request.source,
+        reason=request.reason,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live/first-candidates/clear")
+def first_live_candidates_clear(request: FirstLiveCandidateClearRequest | None = None) -> dict:
+    request = request or FirstLiveCandidateClearRequest()
+    return clear_selected_signal(
+        source=request.source,
+        reason=request.reason,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.get("/live/arming/runbook")

@@ -88,6 +88,13 @@ from src.app.hammer_radar.operator.first_live_chain_runbook import (
     format_first_live_chain_operator_message,
     list_first_live_chain_checks,
 )
+from src.app.hammer_radar.operator.first_live_candidate_queue import (
+    build_first_live_candidate_queue,
+    clear_selected_signal,
+    format_first_live_candidates_operator_message,
+    format_first_live_selected_operator_message,
+    select_first_live_candidate,
+)
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -166,6 +173,10 @@ HELP_COMMANDS = [
     "FIRST LIVE TEST ORDER CHECKS",
     "FIRST LIVE CHAIN",
     "FIRST LIVE NEXT",
+    "FIRST LIVE CANDIDATES",
+    "FIRST LIVE SELECT <signal_id>",
+    "FIRST LIVE SELECTED",
+    "FIRST LIVE CLEAR",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE SEQUENCE",
     "FIRST LIVE CHAIN CHECKS",
@@ -468,6 +479,53 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_first_live_chain_checks_operator_message(payload),
             payload={"first_live_chain_checks": payload},
+        )
+    if normalized == "FIRST LIVE CANDIDATES":
+        payload = build_first_live_candidate_queue(log_dir=log_dir)
+        return _result(
+            "first_live_candidates",
+            "ACCEPTED",
+            format_first_live_candidates_operator_message(payload),
+            payload={"first_live_candidates": payload},
+            signal_id=payload.get("selected_signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            next_action=payload.get("recommended_next") if isinstance(payload.get("recommended_next"), dict) else None,
+        )
+    if normalized == "FIRST LIVE SELECTED":
+        payload = build_first_live_candidate_queue(log_dir=log_dir)
+        return _result(
+            "first_live_selected",
+            "ACCEPTED",
+            format_first_live_selected_operator_message(payload),
+            payload={"first_live_candidates": payload},
+            signal_id=payload.get("selected_signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            next_action=payload.get("recommended_next") if isinstance(payload.get("recommended_next"), dict) else None,
+        )
+    if normalized == "FIRST LIVE CLEAR":
+        payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")
+        return _result(
+            "first_live_clear",
+            "ACCEPTED",
+            "R71 first-live selection cleared. No order placed. real_order_placed=false.",
+            payload={"first_live_candidate_clear": payload},
+        )
+    if normalized == "FIRST LIVE SELECT" or normalized.startswith("FIRST LIVE SELECT "):
+        parts = raw_text.split(maxsplit=3)
+        signal_id = parts[3].strip() if len(parts) == 4 else None
+        payload = select_first_live_candidate(signal_id=signal_id, log_dir=log_dir, source=source, reason="telegram select")
+        result_status = "ACCEPTED" if payload.get("status") == "ACCEPTED" else "REJECTED"
+        message = (
+            f"R71 first-live select: {payload.get('status')} {payload.get('signal_id') or ''}. "
+            f"reason: {payload.get('reason')}. No order placed. real_order_placed=false."
+        )
+        return _result(
+            "first_live_select",
+            result_status,
+            message,
+            payload={"first_live_candidate_select": payload},
+            signal_id=payload.get("signal_id"),
+            reason=payload.get("reason"),
         )
     if normalized == "FIRST LIVE CHAIN":
         payload = evaluate_and_record_first_live_chain_check(log_dir=log_dir)
@@ -942,6 +1000,18 @@ def _handle_live_approve(*, raw_text: str, source: str, log_dir: Path) -> dict[s
         )
     if current_signal.get("first_live_fresh") is not True or current_signal.get("fresh") is not True:
         reason = "signal is not fresh enough for first-live approval"
+        return _result(
+            "live_approve",
+            "REJECTED",
+            reason,
+            payload={"first_live_chain": chain},
+            signal_id=signal_id,
+            reason=reason,
+            performance=chain.get("performance") if isinstance(chain.get("performance"), dict) else None,
+            next_action=chain.get("next_action") if isinstance(chain.get("next_action"), dict) else None,
+        )
+    if current_signal.get("live_candidate_allowed", True) is not True:
+        reason = "selected signal is not live-approvable under current policy"
         return _result(
             "live_approve",
             "REJECTED",
