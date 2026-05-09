@@ -333,6 +333,9 @@ def _find_alert(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] | Non
 def _find_candidate(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] | None:
     if not signal_id:
         return None
+    selected_candidate = _find_selected_higher_timeframe_candidate(signal_id, log_dir=log_dir)
+    if selected_candidate is not None:
+        return selected_candidate
     snapshot = build_live_candidate_snapshot(
         limit=1000,
         since_hours=24,
@@ -349,6 +352,42 @@ def _find_candidate(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] |
         if check.candidate.signal.signal_id == signal_id:
             return _candidate_snapshot(check)
     return None
+
+
+def _find_selected_higher_timeframe_candidate(signal_id: str, *, log_dir: Path) -> dict[str, Any] | None:
+    from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
+
+    queue = build_first_live_candidate_queue(log_dir=log_dir)
+    selection = queue.get("selection_status") if isinstance(queue.get("selection_status"), dict) else {}
+    candidate = selection.get("candidate") if isinstance(selection.get("candidate"), dict) else {}
+    if candidate.get("signal_id") != signal_id:
+        return None
+    if candidate.get("live_candidate_allowed") is not True or candidate.get("higher_timeframe_profile") is not True:
+        return None
+    return {
+        "signal_id": candidate.get("signal_id"),
+        "timestamp": candidate.get("timestamp"),
+        "symbol": candidate.get("symbol"),
+        "timeframe": candidate.get("timeframe"),
+        "direction": candidate.get("direction"),
+        "decision": LIVE_DECISION_ELIGIBLE,
+        "reason": "selected higher-timeframe profile allowed by R72 policy",
+        "score": candidate.get("score"),
+        "tier": candidate.get("tier"),
+        "tradable": True,
+        "reject_reason": None,
+        "entry": candidate.get("entry"),
+        "stop": candidate.get("stop"),
+        "take_profit": candidate.get("take_profit"),
+        "age_minutes": candidate.get("age_minutes"),
+        "freshness_status": "fresh" if candidate.get("queue_fresh") is True else "expired",
+        "suggested_leverage": None,
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": ALLOW_LIVE_ORDERS,
+        "global_kill_switch": GLOBAL_KILL_SWITCH,
+        "higher_timeframe_profile": True,
+        "order_placed": ORDER_PLACED,
+    }
 
 
 def _candidate_snapshot(check: LiveCandidateCheck) -> dict[str, Any]:

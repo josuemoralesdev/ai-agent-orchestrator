@@ -562,6 +562,9 @@ def _current_signal_from_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "first_live_profile_match": candidate.get("first_live_profile_match") is True,
         "live_candidate_allowed": candidate.get("live_candidate_allowed") is True,
         "policy_status": candidate.get("policy_status"),
+        "profile_match_reason": candidate.get("profile_match_reason"),
+        "higher_timeframe_profile": candidate.get("higher_timeframe_profile") is True,
+        "higher_timeframe_policy": candidate.get("higher_timeframe_policy") if isinstance(candidate.get("higher_timeframe_policy"), dict) else None,
         "horizon": candidate.get("horizon"),
         "selection_status": (
             "SELECTED_LIVE_ELIGIBLE"
