@@ -134,6 +134,7 @@ from src.app.hammer_radar.operator.first_live_candidate_queue import (
     clear_selected_signal,
     select_first_live_candidate,
 )
+from src.app.hammer_radar.operator.first_live_higher_timeframe_policy import get_higher_timeframe_live_policy
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -979,6 +980,11 @@ def first_live_chain_checks(limit: int = Query(default=20, ge=0), status: str | 
 @app.get("/live/first-candidates/status")
 def first_live_candidates_status() -> dict:
     return build_first_live_candidate_queue(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/higher-timeframe-policy/status")
+def first_live_higher_timeframe_policy_status() -> dict:
+    return get_higher_timeframe_live_policy()
 
 
 @app.post("/live/first-candidates/select")

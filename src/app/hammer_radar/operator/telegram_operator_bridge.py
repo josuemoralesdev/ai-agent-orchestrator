@@ -95,6 +95,7 @@ from src.app.hammer_radar.operator.first_live_candidate_queue import (
     format_first_live_selected_operator_message,
     select_first_live_candidate,
 )
+from src.app.hammer_radar.operator.first_live_higher_timeframe_policy import get_higher_timeframe_live_policy
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -177,6 +178,7 @@ HELP_COMMANDS = [
     "FIRST LIVE SELECT <signal_id>",
     "FIRST LIVE SELECTED",
     "FIRST LIVE CLEAR",
+    "FIRST LIVE HIGHER POLICY",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE SEQUENCE",
     "FIRST LIVE CHAIN CHECKS",
@@ -501,6 +503,19 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             signal_id=payload.get("selected_signal_id"),
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
             next_action=payload.get("recommended_next") if isinstance(payload.get("recommended_next"), dict) else None,
+        )
+    if normalized == "FIRST LIVE HIGHER POLICY":
+        payload = get_higher_timeframe_live_policy()
+        message = (
+            f"R72 higher-timeframe policy: enabled={payload.get('higher_timeframe_live_allowed')} "
+            f"allowlist={','.join(payload.get('allowed_selected_timeframes') or [])}. "
+            f"profile={payload.get('profile_name')}. No order placed. real_order_placed=false."
+        )
+        return _result(
+            "first_live_higher_policy",
+            "ACCEPTED",
+            message,
+            payload={"higher_timeframe_policy": payload},
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")

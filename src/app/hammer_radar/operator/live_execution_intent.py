@@ -17,6 +17,7 @@ from typing import Any
 from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
 from src.app.hammer_radar.operator.live_approval import find_valid_live_approval_for_signal, load_live_approval_requests
 from src.app.hammer_radar.operator.live_begins import build_live_begins_status
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
@@ -49,6 +50,13 @@ def create_live_execution_intent(
     normalized_signal_id = str(signal_id or "").strip() or None
     live_begins = build_live_begins_status(log_dir=resolved_log_dir, env=source)
     preview = build_live_execution_preview(log_dir=resolved_log_dir, env=source)
+    selected_preview = _selected_higher_timeframe_preview(
+        signal_id=normalized_signal_id,
+        log_dir=resolved_log_dir,
+        env=source,
+    )
+    if selected_preview is not None:
+        preview = selected_preview
     preview_hash = compute_preview_hash(preview) if preview.get("status") != "UNKNOWN" else None
     approvals = (
         load_live_approval_requests(limit=0, signal_id=normalized_signal_id, log_dir=resolved_log_dir)
@@ -201,6 +209,61 @@ def compute_preview_hash(preview: dict[str, Any]) -> str:
     }
     encoded = json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _selected_higher_timeframe_preview(
+    *,
+    signal_id: str | None,
+    log_dir: Path,
+    env: Mapping[str, str],
+) -> dict[str, Any] | None:
+    if not signal_id:
+        return None
+    queue = build_first_live_candidate_queue(log_dir=log_dir, env=env)
+    selection = queue.get("selection_status") if isinstance(queue.get("selection_status"), dict) else {}
+    candidate = selection.get("candidate") if isinstance(selection.get("candidate"), dict) else {}
+    if candidate.get("signal_id") != signal_id:
+        return None
+    if candidate.get("live_candidate_allowed") is not True or candidate.get("higher_timeframe_profile") is not True:
+        return None
+    profile = candidate.get("higher_timeframe_policy", {}).get("profile", {}) if isinstance(candidate.get("higher_timeframe_policy"), dict) else {}
+    margin = _float(profile.get("margin_usdt"), 44.0)
+    leverage = _float(profile.get("leverage"), 10.0)
+    notional = margin * leverage
+    direction = str(candidate.get("direction") or "").lower()
+    return {
+        "status": "PREVIEW_READY",
+        "phase": "R72",
+        "system": SYSTEM,
+        "execution_mode": "SELECTED_HIGHER_TIMEFRAME_PREVIEW_COMPAT",
+        "latest_signal_id": signal_id,
+        "symbol": candidate.get("symbol"),
+        "timeframe": candidate.get("timeframe"),
+        "direction": direction,
+        "freshness_status": "fresh",
+        "entry": candidate.get("entry"),
+        "stop": candidate.get("stop"),
+        "take_profit": candidate.get("take_profit"),
+        "order_side": "BUY" if direction == "long" else "SELL",
+        "position_side": "LONG" if direction == "long" else "SHORT",
+        "margin_usdt": margin,
+        "leverage": leverage,
+        "notional_usdt": notional,
+        "risk_usdt": None,
+        "quantity": None,
+        "protective_orders_preview": {
+            "status": "READY",
+            "protective_orders_required": profile.get("protective_orders_required", True),
+            "reduce_only": True,
+        },
+        "higher_timeframe_profile": True,
+        "profile_name": (candidate.get("higher_timeframe_policy") or {}).get("profile_name")
+        if isinstance(candidate.get("higher_timeframe_policy"), dict)
+        else None,
+        "order_placed": False,
+        "real_order_placed": False,
+        "secrets_shown": False,
+    }
 
 
 def format_live_execution_intent_operator_message(payload: dict[str, Any]) -> str:
@@ -477,3 +540,10 @@ def _parse_datetime(value: object) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def _float(value: object, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default

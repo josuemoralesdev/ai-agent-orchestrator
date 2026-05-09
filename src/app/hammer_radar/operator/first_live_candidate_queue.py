@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from src.app.hammer_radar.operator.archive import get_log_dir, get_signals_path
+from src.app.hammer_radar.operator.first_live_higher_timeframe_policy import (
+    evaluate_higher_timeframe_live_policy,
+    get_higher_timeframe_live_policy,
+)
 from src.app.hammer_radar.operator.strategy_performance import (
     DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES,
     DEFAULT_BLOCKED_TIMEFRAMES,
@@ -78,12 +82,13 @@ def build_first_live_candidate_queue(
     candidates = _queue_candidates(resolved_log_dir, now=created_at)
     buckets = _bucket_candidates(candidates, per_bucket_limit=per_bucket_limit)
     selected_state = load_selected_signal(log_dir=resolved_log_dir)
-    selection_status = _selection_status(selected_state=selected_state, candidates=candidates, log_dir=resolved_log_dir)
+    selection_status = _selection_status(selected_state=selected_state, candidates=candidates, log_dir=resolved_log_dir, env=env, now=created_at)
     selected_signal_id = selection_status.get("selected_signal_id") if selection_status.get("valid") is True else None
     if selection_status.get("status") == "EXPIRED":
         clear_selected_signal(log_dir=resolved_log_dir, source="system", reason="selected signal expired")
         selected_signal_id = None
     policy = _policy(env=env)
+    higher_timeframe_policy = get_higher_timeframe_live_policy(env=env)
     recommended_next = _recommended_next(candidates=candidates, selection_status=selection_status)
     return _sanitize(
         {
@@ -100,6 +105,7 @@ def build_first_live_candidate_queue(
             "buckets": buckets,
             "recommended_next": recommended_next,
             "policy": policy,
+            "higher_timeframe_policy": higher_timeframe_policy,
             "performance": {
                 "mode": "fast",
                 "duration_ms": round((datetime.now(UTC) - started_at).total_seconds() * 1000, 3),
@@ -169,6 +175,7 @@ def clear_selected_signal(
             "network_allowed": False,
             "secrets_shown": False,
             "policy": _policy(env=env),
+            "higher_timeframe_policy": get_higher_timeframe_live_policy(env=env),
         }
     )
 
@@ -334,7 +341,14 @@ def _bucket_candidates(candidates: list[dict[str, Any]], *, per_bucket_limit: in
     return buckets
 
 
-def _selection_status(*, selected_state: dict[str, Any] | None, candidates: list[dict[str, Any]], log_dir: Path) -> dict[str, Any]:
+def _selection_status(
+    *,
+    selected_state: dict[str, Any] | None,
+    candidates: list[dict[str, Any]],
+    log_dir: Path,
+    env: Mapping[str, str] | None,
+    now: datetime,
+) -> dict[str, Any]:
     if not selected_state or not selected_state.get("selected_signal_id"):
         return {"status": "NONE", "valid": False, "selected_signal_id": None, "candidate": None, "reason": "no selected signal"}
     selected_signal_id = str(selected_state.get("selected_signal_id"))
@@ -349,6 +363,7 @@ def _selection_status(*, selected_state: dict[str, Any] | None, candidates: list
             "selection": selected_state,
             "selected_signal_path": str(selected_signal_path(log_dir)),
         }
+    candidate = _candidate_with_selected_policy(candidate, env=env, now=now)
     if candidate.get("live_candidate_allowed") is not True:
         status = "SELECTED_BUT_NOT_LIVE_ELIGIBLE"
     else:
@@ -362,6 +377,31 @@ def _selection_status(*, selected_state: dict[str, Any] | None, candidates: list
         "selection": selected_state,
         "selected_signal_path": str(selected_signal_path(log_dir)),
     }
+
+
+def _candidate_with_selected_policy(candidate: dict[str, Any], *, env: Mapping[str, str] | None, now: datetime) -> dict[str, Any]:
+    selected = {**candidate, "selected": True, "exact_selection": True}
+    if selected.get("policy_status") == "TINY_LIVE_ALLOWED":
+        return selected
+    higher_policy = evaluate_higher_timeframe_live_policy(selected, env=env, now=now)
+    selected["higher_timeframe_policy"] = higher_policy
+    selected["higher_timeframe_profile"] = higher_policy.get("candidate_allowed") is True
+    if higher_policy.get("candidate_allowed") is True:
+        selected["live_candidate_allowed"] = True
+        selected["policy_status"] = "SELECTED_HIGHER_TIMEFRAME_ALLOWED"
+        selected["current_policy_status"] = "SELECTED_HIGHER_TIMEFRAME_ALLOWED"
+        selected["first_live_profile_match"] = True
+        selected["matches_first_live_profile"] = True
+        selected["profile_match_reason"] = "higher_timeframe_policy"
+        selected["blockers"] = []
+    else:
+        selected["live_candidate_allowed"] = False
+        selected["policy_status"] = str(higher_policy.get("candidate_policy_status") or "SELECTED_BUT_NOT_LIVE_ELIGIBLE")
+        selected["current_policy_status"] = selected["policy_status"]
+        selected["blockers"] = list(dict.fromkeys([*(selected.get("blockers") or []), *(higher_policy.get("blockers") or [])]))
+        if higher_policy.get("enable_hint"):
+            selected["enable_hint"] = higher_policy.get("enable_hint")
+    return selected
 
 
 def _recommended_next(*, candidates: list[dict[str, Any]], selection_status: Mapping[str, Any]) -> dict[str, Any]:
@@ -416,6 +456,7 @@ def _selection_result(
         "network_allowed": False,
         "secrets_shown": False,
         "policy": _policy(env=env),
+        "higher_timeframe_policy": get_higher_timeframe_live_policy(env=env),
     }
     return _sanitize(payload)
 
@@ -453,13 +494,16 @@ def is_first_live_signal_fresh(*, timeframe: object, age_minutes: float | None) 
 def _policy(*, env: Mapping[str, str] | None = None) -> dict[str, Any]:
     source = os.environ if env is None else env
     config = load_strategy_audit_config(dict(source))
+    higher_policy = get_higher_timeframe_live_policy(env=env)
     return {
         "live_allowed_timeframes": list(config.allowed_tiny_live_timeframes),
         "allowed_tiny_live_timeframes": list(config.allowed_tiny_live_timeframes),
         "paper_only_timeframes": list(config.paper_only_timeframes),
         "context_only_timeframes": list(config.context_only_timeframes),
         "blocked_timeframes": list(config.blocked_timeframes),
-        "higher_timeframe_live_allowed": _parse_bool(source.get("HAMMER_FIRST_LIVE_HIGHER_TIMEFRAME_LIVE_ALLOWED"), default=False),
+        "higher_timeframe_live_allowed": higher_policy.get("higher_timeframe_live_allowed") is True,
+        "higher_timeframe_allowed_selected_timeframes": higher_policy.get("allowed_selected_timeframes") or [],
+        "higher_timeframe_enable_hint": higher_policy.get("enable_hint"),
         "defaults": {
             "allowed_tiny_live_timeframes": list(DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES),
             "paper_only_timeframes": list(DEFAULT_PAPER_ONLY_TIMEFRAMES),
