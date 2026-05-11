@@ -128,7 +128,9 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         blocked = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertTrue(allowed["current_signal"]["first_live_fresh"])
-        self.assertEqual("WAITING_FOR_APPROVAL", allowed["status"])
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", allowed["status"])
+        self.assertEqual("PAPER_ONLY", allowed["current_signal"]["policy_status"])
+        self.assertNotIn("LIVE APPROVE", str(allowed["next_action"]))
         self.assertEqual(4.5, allowed["current_signal"]["freshness_cutoff_minutes"])
         self.assertFalse(blocked["current_signal"]["first_live_fresh"])
         self.assertEqual("WAITING_FOR_FRESH_SIGNAL", blocked["status"])
@@ -142,7 +144,9 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         blocked = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertTrue(allowed["current_signal"]["first_live_fresh"])
-        self.assertEqual("WAITING_FOR_APPROVAL", allowed["status"])
+        self.assertEqual("WAITING_FOR_FRESH_SIGNAL", allowed["status"])
+        self.assertEqual("PAPER_ONLY", allowed["current_signal"]["policy_status"])
+        self.assertNotIn("LIVE APPROVE", str(allowed["next_action"]))
         self.assertEqual(8.5, allowed["current_signal"]["freshness_cutoff_minutes"])
         self.assertFalse(blocked["current_signal"]["first_live_fresh"])
         self.assertEqual("WAITING_FOR_FRESH_SIGNAL", blocked["status"])

@@ -18,6 +18,10 @@ from uuid import uuid4
 from src.app.hammer_radar.operator.archive import get_log_dir, get_signals_path
 from src.app.hammer_radar.operator.first_live_adapter_verification import build_first_live_adapter_status
 from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
+from src.app.hammer_radar.operator.first_live_timeframe_policy import (
+    evaluate_first_live_timeframe_candidate,
+    get_first_live_timeframe_policy,
+)
 from src.app.hammer_radar.operator.first_live_execution_gate import build_first_live_execution_gate
 from src.app.hammer_radar.operator.first_live_ladder_submit_adapter import build_first_live_ladder_submit_status
 from src.app.hammer_radar.operator.first_live_protective_adapter import build_first_live_protective_status
@@ -44,6 +48,7 @@ FIRST_LIVE_FRESHNESS_CUTOFFS_MINUTES = {
     "4m": 4.5,
     "8m": 8.5,
     "13m": 13.5,
+    "44m": 44.5,
 }
 
 ORDER_PLACED = False
@@ -213,8 +218,8 @@ def _evaluate_fast(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
     started_at = datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     created_at = datetime.now(UTC)
-    current_signal = _current_signal_fast(log_dir=resolved_log_dir, now=created_at)
     candidate_queue = build_first_live_candidate_queue(log_dir=resolved_log_dir, env=env, now=created_at)
+    current_signal = _current_signal_fast(log_dir=resolved_log_dir, now=created_at, env=env)
     selected_signal_status = candidate_queue.get("selection_status") if isinstance(candidate_queue.get("selection_status"), dict) else {}
     if selected_signal_status.get("valid") is True and isinstance(selected_signal_status.get("candidate"), dict):
         current_signal = _current_signal_from_candidate(selected_signal_status["candidate"])
@@ -262,6 +267,7 @@ def _evaluate_fast(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
         "selected_signal_id": candidate_queue.get("selected_signal_id"),
         "selected_signal_status": selected_signal_status,
         "candidate_queue_summary": _candidate_queue_summary(candidate_queue),
+        "unified_timeframe_policy": candidate_queue.get("unified_timeframe_policy") or get_first_live_timeframe_policy(env=env),
         "chain_state": chain_state,
         "phase_statuses": phase_statuses,
         "next_action": next_action,
@@ -295,8 +301,8 @@ def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
     preview = build_live_execution_preview(log_dir=resolved_log_dir, env=source)
     profile_payload = build_first_microscopic_live_profile(log_dir=resolved_log_dir, env=source)
     profile = _profile(profile_payload.get("profile") or {})
-    current_signal = _current_signal(preview=preview, profile=profile)
     candidate_queue = build_first_live_candidate_queue(log_dir=resolved_log_dir, env=source, now=created_at)
+    current_signal = _current_signal(preview=preview, profile=profile, env=source)
     selected_signal_status = candidate_queue.get("selection_status") if isinstance(candidate_queue.get("selection_status"), dict) else {}
     if selected_signal_status.get("valid") is True and isinstance(selected_signal_status.get("candidate"), dict):
         current_signal = _current_signal_from_candidate(selected_signal_status["candidate"])
@@ -372,6 +378,7 @@ def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
         "selected_signal_id": candidate_queue.get("selected_signal_id"),
         "selected_signal_status": selected_signal_status,
         "candidate_queue_summary": _candidate_queue_summary(candidate_queue),
+        "unified_timeframe_policy": candidate_queue.get("unified_timeframe_policy") or get_first_live_timeframe_policy(env=source),
         "chain_state": chain_state,
         "phase_statuses": phase_statuses,
         "next_action": next_action,
@@ -395,7 +402,7 @@ def _evaluate_full(*, log_dir: str | Path | None, env: Mapping[str, str] | None,
     return _sanitize_nested(payload)
 
 
-def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
+def _current_signal_fast(*, log_dir: Path, now: datetime, env: Mapping[str, str] | None) -> dict[str, Any]:
     for record in read_recent_ndjson_records(get_signals_path(log_dir), limit=FAST_SIGNAL_LIMIT):
         signal_id = _clean(record.get("signal_id"))
         if not signal_id:
@@ -408,6 +415,19 @@ def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
         raw_fresh = _raw_freshness(record, default=(age is not None and age <= 30.0))
         symbol = str(record.get("symbol") or "").upper() or None
         direction = str(record.get("direction") or "").lower() or None
+        unified_eval = evaluate_first_live_timeframe_candidate(
+            {
+                "signal_id": signal_id,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "direction": direction,
+                "age_minutes": age,
+                "queue_fresh": first_live_fresh,
+            },
+            env=env,
+            selected=False,
+            now=now,
+        )
         return {
             "signal_id": signal_id,
             "symbol": symbol,
@@ -419,7 +439,21 @@ def _current_signal_fast(*, log_dir: Path, now: datetime) -> dict[str, Any]:
             "freshness_cutoff_minutes": cutoff,
             "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
             "age_minutes": age,
-            "matches_first_live_profile": bool(symbol == "BTCUSDT" and direction == "long"),
+            "matches_first_live_profile": bool(
+                symbol == "BTCUSDT"
+                and direction == "long"
+                and unified_eval.get("live_candidate_allowed") is True
+            ),
+            "first_live_profile_match": unified_eval.get("live_candidate_allowed") is True,
+            "live_candidate_allowed": unified_eval.get("live_candidate_allowed") is True,
+            "policy_status": unified_eval.get("policy_status"),
+            "profile_name": unified_eval.get("profile_name"),
+            "unified_policy_status": unified_eval.get("policy_status"),
+            "unified_policy_category": unified_eval.get("category"),
+            "unified_policy_profile_name": unified_eval.get("profile_name"),
+            "unified_policy_evaluation": unified_eval,
+            "requires_selection": unified_eval.get("requires_selection") is True,
+            "blockers": unified_eval.get("blockers") if isinstance(unified_eval.get("blockers"), list) else [],
             "source": "signals_ndjson_recent",
         }
     return {
@@ -524,12 +558,24 @@ def _phase_statuses_fast(*, chain_state: dict[str, Any], test_order_gate: dict[s
     }
 
 
-def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
+def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any], env: Mapping[str, str] | None) -> dict[str, Any]:
     signal_id = _clean(preview.get("latest_signal_id"))
     raw_fresh = bool(signal_id and preview.get("status") == "PREVIEW_READY" and str(preview.get("freshness_status") or "fresh").lower() in {"fresh", "ok", "valid"})
     age = _age_minutes(signal_id)
     cutoff = first_live_freshness_cutoff_minutes(preview.get("timeframe"))
     first_live_fresh = bool(signal_id and raw_fresh and is_first_live_signal_fresh(timeframe=preview.get("timeframe"), age_minutes=age))
+    unified_eval = evaluate_first_live_timeframe_candidate(
+        {
+            "signal_id": signal_id,
+            "symbol": preview.get("symbol"),
+            "timeframe": preview.get("timeframe"),
+            "direction": preview.get("direction"),
+            "age_minutes": age,
+            "queue_fresh": first_live_fresh,
+        },
+        env=env,
+        selected=False,
+    )
     return {
         "signal_id": signal_id,
         "symbol": preview.get("symbol"),
@@ -541,7 +587,18 @@ def _current_signal(*, preview: dict[str, Any], profile: dict[str, Any]) -> dict
         "freshness_cutoff_minutes": cutoff,
         "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
         "age_minutes": age,
-        "matches_first_live_profile": _matches_first_live_profile(preview=preview, profile=profile),
+        "matches_first_live_profile": _matches_first_live_profile(preview=preview, profile=profile)
+        and unified_eval.get("live_candidate_allowed") is True,
+        "first_live_profile_match": unified_eval.get("live_candidate_allowed") is True,
+        "live_candidate_allowed": unified_eval.get("live_candidate_allowed") is True,
+        "policy_status": unified_eval.get("policy_status"),
+        "profile_name": unified_eval.get("profile_name"),
+        "unified_policy_status": unified_eval.get("policy_status"),
+        "unified_policy_category": unified_eval.get("category"),
+        "unified_policy_profile_name": unified_eval.get("profile_name"),
+        "unified_policy_evaluation": unified_eval,
+        "requires_selection": unified_eval.get("requires_selection") is True,
+        "blockers": unified_eval.get("blockers") if isinstance(unified_eval.get("blockers"), list) else [],
         "source": "live_execution_preview" if signal_id else None,
     }
 
@@ -565,6 +622,13 @@ def _current_signal_from_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "profile_match_reason": candidate.get("profile_match_reason"),
         "higher_timeframe_profile": candidate.get("higher_timeframe_profile") is True,
         "higher_timeframe_policy": candidate.get("higher_timeframe_policy") if isinstance(candidate.get("higher_timeframe_policy"), dict) else None,
+        "unified_timeframe_profile": candidate.get("unified_timeframe_profile") is True,
+        "unified_policy_status": candidate.get("unified_policy_status"),
+        "unified_policy_category": candidate.get("unified_policy_category"),
+        "unified_policy_profile_name": candidate.get("unified_policy_profile_name"),
+        "unified_policy_evaluation": candidate.get("unified_policy_evaluation") if isinstance(candidate.get("unified_policy_evaluation"), dict) else None,
+        "profile_name": candidate.get("profile_name"),
+        "requires_selection": candidate.get("requires_selection") is True,
         "horizon": candidate.get("horizon"),
         "selection_status": (
             "SELECTED_LIVE_ELIGIBLE"

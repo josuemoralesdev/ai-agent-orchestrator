@@ -19,6 +19,10 @@ from src.app.hammer_radar.operator.first_live_higher_timeframe_policy import (
     evaluate_higher_timeframe_live_policy,
     get_higher_timeframe_live_policy,
 )
+from src.app.hammer_radar.operator.first_live_timeframe_policy import (
+    evaluate_first_live_timeframe_candidate,
+    get_first_live_timeframe_policy,
+)
 from src.app.hammer_radar.operator.strategy_performance import (
     DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES,
     DEFAULT_BLOCKED_TIMEFRAMES,
@@ -79,7 +83,7 @@ def build_first_live_candidate_queue(
     started_at = datetime.now(UTC)
     created_at = now or datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
-    candidates = _queue_candidates(resolved_log_dir, now=created_at)
+    candidates = _queue_candidates(resolved_log_dir, now=created_at, env=env)
     buckets = _bucket_candidates(candidates, per_bucket_limit=per_bucket_limit)
     selected_state = load_selected_signal(log_dir=resolved_log_dir)
     selection_status = _selection_status(selected_state=selected_state, candidates=candidates, log_dir=resolved_log_dir, env=env, now=created_at)
@@ -89,6 +93,7 @@ def build_first_live_candidate_queue(
         selected_signal_id = None
     policy = _policy(env=env)
     higher_timeframe_policy = get_higher_timeframe_live_policy(env=env)
+    unified_timeframe_policy = get_first_live_timeframe_policy(env=env)
     recommended_next = _recommended_next(candidates=candidates, selection_status=selection_status)
     return _sanitize(
         {
@@ -105,6 +110,7 @@ def build_first_live_candidate_queue(
             "buckets": buckets,
             "recommended_next": recommended_next,
             "policy": policy,
+            "unified_timeframe_policy": unified_timeframe_policy,
             "higher_timeframe_policy": higher_timeframe_policy,
             "performance": {
                 "mode": "fast",
@@ -175,6 +181,7 @@ def clear_selected_signal(
             "network_allowed": False,
             "secrets_shown": False,
             "policy": _policy(env=env),
+            "unified_timeframe_policy": get_first_live_timeframe_policy(env=env),
             "higher_timeframe_policy": get_higher_timeframe_live_policy(env=env),
         }
     )
@@ -267,7 +274,7 @@ def format_first_live_selected_operator_message(payload: Mapping[str, Any]) -> s
     )
 
 
-def _queue_candidates(log_dir: Path, *, now: datetime) -> list[dict[str, Any]]:
+def _queue_candidates(log_dir: Path, *, now: datetime, env: Mapping[str, str] | None) -> list[dict[str, Any]]:
     seen: set[str] = set()
     candidates: list[dict[str, Any]] = []
     for record in read_recent_ndjson_records(get_signals_path(log_dir), limit=QUEUE_RECORD_LIMIT, max_bytes=1_048_576):
@@ -275,14 +282,14 @@ def _queue_candidates(log_dir: Path, *, now: datetime) -> list[dict[str, Any]]:
         if not signal_id or signal_id in seen:
             continue
         seen.add(signal_id)
-        item = _candidate_item(record, now=now)
+        item = _candidate_item(record, now=now, env=env)
         if item is not None and item["queue_fresh"]:
             candidates.append(item)
     candidates.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
     return candidates
 
 
-def _candidate_item(record: Mapping[str, Any], *, now: datetime) -> dict[str, Any] | None:
+def _candidate_item(record: Mapping[str, Any], *, now: datetime, env: Mapping[str, str] | None) -> dict[str, Any] | None:
     signal_id = _clean(record.get("signal_id"))
     timeframe = _normalize_timeframe(record.get("timeframe"))
     horizon = _horizon(timeframe)
@@ -295,11 +302,24 @@ def _candidate_item(record: Mapping[str, Any], *, now: datetime) -> dict[str, An
     raw_fresh = _raw_freshness(record, default=queue_fresh)
     symbol = str(record.get("symbol") or "").upper() or None
     direction = str(record.get("direction") or "").lower() or None
-    policy_status, blockers = _policy_status(timeframe=timeframe, symbol=symbol, direction=direction)
+    policy_status, blockers = _policy_status(timeframe=timeframe, symbol=symbol, direction=direction, env=env)
     first_live_match = bool(symbol == "BTCUSDT" and direction == "long")
-    live_allowed = bool(queue_fresh and first_live_match and policy_status == "TINY_LIVE_ALLOWED")
-    if policy_status in {"CONTEXT_ONLY", "BLOCKED", "PAPER_ONLY", "HIGHER_TIMEFRAME_REVIEW"}:
-        live_allowed = False
+    unified_eval = evaluate_first_live_timeframe_candidate(
+        {
+            "signal_id": signal_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": direction,
+            "age_minutes": age,
+            "queue_fresh": queue_fresh,
+        },
+        env=env,
+        selected=False,
+        now=now,
+    )
+    policy_status = str(unified_eval.get("policy_status") or policy_status)
+    live_allowed = unified_eval.get("live_candidate_allowed") is True
+    blockers.extend(unified_eval.get("blockers") or [])
     if not first_live_match:
         blockers.append("candidate does not match BTCUSDT long first-live profile")
     if not queue_fresh:
@@ -322,6 +342,12 @@ def _candidate_item(record: Mapping[str, Any], *, now: datetime) -> dict[str, An
         "freshness_policy": FIRST_LIVE_FRESHNESS_POLICY,
         "current_policy_status": policy_status,
         "policy_status": policy_status,
+        "unified_policy_status": policy_status,
+        "unified_policy_category": unified_eval.get("category"),
+        "unified_policy_profile_name": unified_eval.get("profile_name"),
+        "unified_policy_evaluation": unified_eval,
+        "profile_name": unified_eval.get("profile_name"),
+        "requires_selection": unified_eval.get("requires_selection") is True,
         "live_candidate_allowed": live_allowed,
         "entry": _first_float(record, ("entry", "fib_50", "fib_618")),
         "stop": _first_float(record, ("stop", "invalidation", "hammer_low")),
@@ -381,7 +407,33 @@ def _selection_status(
 
 def _candidate_with_selected_policy(candidate: dict[str, Any], *, env: Mapping[str, str] | None, now: datetime) -> dict[str, Any]:
     selected = {**candidate, "selected": True, "exact_selection": True}
-    if selected.get("policy_status") == "TINY_LIVE_ALLOWED":
+    unified_eval = evaluate_first_live_timeframe_candidate(selected, env=env, selected=True, now=now)
+    selected["unified_policy_evaluation"] = unified_eval
+    selected["unified_policy_status"] = unified_eval.get("policy_status")
+    selected["unified_policy_category"] = unified_eval.get("category")
+    selected["unified_policy_profile_name"] = unified_eval.get("profile_name")
+    selected["profile_name"] = unified_eval.get("profile_name")
+    selected["requires_selection"] = unified_eval.get("requires_selection") is True
+    if unified_eval.get("live_candidate_allowed") is True:
+        selected["live_candidate_allowed"] = True
+        selected["policy_status"] = str(unified_eval.get("policy_status"))
+        selected["current_policy_status"] = selected["policy_status"]
+        selected["first_live_profile_match"] = True
+        selected["matches_first_live_profile"] = True
+        selected["profile_match_reason"] = (
+            "higher_timeframe_policy" if unified_eval.get("category") == "higher" else str(unified_eval.get("profile_name") or "unified_timeframe_policy")
+        )
+        selected["unified_timeframe_profile"] = True
+        selected["blockers"] = []
+        if unified_eval.get("category") == "higher":
+            selected["higher_timeframe_profile"] = True
+            selected["higher_timeframe_policy"] = evaluate_higher_timeframe_live_policy(selected, env=env, now=now)
+        return selected
+    if unified_eval.get("category") != "higher":
+        selected["live_candidate_allowed"] = False
+        selected["policy_status"] = str(unified_eval.get("policy_status") or "SELECTED_BUT_NOT_LIVE_ELIGIBLE")
+        selected["current_policy_status"] = selected["policy_status"]
+        selected["blockers"] = list(dict.fromkeys([*(selected.get("blockers") or []), *(unified_eval.get("blockers") or [])]))
         return selected
     higher_policy = evaluate_higher_timeframe_live_policy(selected, env=env, now=now)
     selected["higher_timeframe_policy"] = higher_policy
@@ -398,7 +450,7 @@ def _candidate_with_selected_policy(candidate: dict[str, Any], *, env: Mapping[s
         selected["live_candidate_allowed"] = False
         selected["policy_status"] = str(higher_policy.get("candidate_policy_status") or "SELECTED_BUT_NOT_LIVE_ELIGIBLE")
         selected["current_policy_status"] = selected["policy_status"]
-        selected["blockers"] = list(dict.fromkeys([*(selected.get("blockers") or []), *(higher_policy.get("blockers") or [])]))
+        selected["blockers"] = list(dict.fromkeys([*(selected.get("blockers") or []), *(unified_eval.get("blockers") or []), *(higher_policy.get("blockers") or [])]))
         if higher_policy.get("enable_hint"):
             selected["enable_hint"] = higher_policy.get("enable_hint")
     return selected
@@ -461,8 +513,8 @@ def _selection_result(
     return _sanitize(payload)
 
 
-def _policy_status(*, timeframe: str, symbol: str | None, direction: str | None) -> tuple[str, list[str]]:
-    config = load_strategy_audit_config()
+def _policy_status(*, timeframe: str, symbol: str | None, direction: str | None, env: Mapping[str, str] | None = None) -> tuple[str, list[str]]:
+    config = load_strategy_audit_config(dict(os.environ if env is None else env))
     blockers: list[str] = []
     if symbol != "BTCUSDT":
         blockers.append("symbol is not BTCUSDT")
@@ -504,6 +556,8 @@ def _policy(*, env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "higher_timeframe_live_allowed": higher_policy.get("higher_timeframe_live_allowed") is True,
         "higher_timeframe_allowed_selected_timeframes": higher_policy.get("allowed_selected_timeframes") or [],
         "higher_timeframe_enable_hint": higher_policy.get("enable_hint"),
+        "micro_live_allowed": get_first_live_timeframe_policy(env=env).get("micro_live_allowed") is True,
+        "micro_live_timeframes": get_first_live_timeframe_policy(env=env).get("micro_live_timeframes") or [],
         "defaults": {
             "allowed_tiny_live_timeframes": list(DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES),
             "paper_only_timeframes": list(DEFAULT_PAPER_ONLY_TIMEFRAMES),
