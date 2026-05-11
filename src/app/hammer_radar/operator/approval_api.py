@@ -169,6 +169,11 @@ from src.app.hammer_radar.operator.funded_tiny_live_readiness import (
     build_funded_tiny_live_readiness_runbook,
     build_funded_tiny_live_readiness_status,
 )
+from src.app.hammer_radar.operator.post_funding_balance_verification import (
+    build_post_funding_balance_runbook,
+    build_post_funding_balance_status,
+    evaluate_and_record_post_funding_balance_check,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -334,6 +339,10 @@ class LiveExecutionIntentRequest(BaseModel):
 class LivePolicyDryChainRequest(BaseModel):
     scenario: str = "micro"
     signal_id: str | None = None
+
+
+class PostFundingBalanceRequest(BaseModel):
+    available_usdt: float | None = None
 
 
 class LiveExecutorRehearsalRequest(BaseModel):
@@ -1062,6 +1071,25 @@ def live_funding_readiness_runbook() -> dict:
 @app.post("/live/funding-readiness/check")
 def live_funding_readiness_check() -> dict:
     return build_funded_tiny_live_readiness_check(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/funding-balance/status")
+def live_funding_balance_status() -> dict:
+    return build_post_funding_balance_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/funding-balance/runbook")
+def live_funding_balance_runbook() -> dict:
+    return build_post_funding_balance_runbook()
+
+
+@app.post("/live/funding-balance/check")
+def live_funding_balance_check(request: PostFundingBalanceRequest | None = None) -> dict:
+    request = request or PostFundingBalanceRequest()
+    return evaluate_and_record_post_funding_balance_check(
+        available_usdt=request.available_usdt,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.post("/live/first-candidates/select")
