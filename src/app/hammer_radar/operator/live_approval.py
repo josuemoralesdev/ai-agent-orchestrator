@@ -8,6 +8,7 @@ network.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.exchange_dry_run import build_current_exchange_dry_run
+from src.app.hammer_radar.operator.first_live_timeframe_policy import evaluate_first_live_timeframe_candidate
 from src.app.hammer_radar.operator.inspect import LIVE_DECISION_ELIGIBLE, LiveCandidateCheck, build_live_candidate_snapshot
 from src.app.hammer_radar.operator.live_safety import build_current_live_safety
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
@@ -303,11 +305,25 @@ def _blockers(
 
 
 def _candidate_live_eligible(candidate: dict[str, Any]) -> bool:
+    unified_eval = evaluate_first_live_timeframe_candidate(
+        {
+            "signal_id": candidate.get("signal_id"),
+            "symbol": candidate.get("symbol"),
+            "timeframe": candidate.get("timeframe"),
+            "direction": candidate.get("direction"),
+            "age_minutes": candidate.get("age_minutes"),
+            "queue_fresh": candidate.get("freshness_status") == "fresh",
+            "selected": candidate.get("unified_timeframe_profile") is True,
+        },
+        env=os.environ,
+        selected=candidate.get("unified_timeframe_profile") is True,
+    )
     return (
         candidate.get("symbol") == PROTOCOL["symbol"]
         and candidate.get("direction") == "long"
         and candidate.get("decision") == LIVE_DECISION_ELIGIBLE
         and candidate.get("freshness_status") == "fresh"
+        and unified_eval.get("approval_allowed") is True
     )
 
 
@@ -333,7 +349,7 @@ def _find_alert(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] | Non
 def _find_candidate(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] | None:
     if not signal_id:
         return None
-    selected_candidate = _find_selected_higher_timeframe_candidate(signal_id, log_dir=log_dir)
+    selected_candidate = _find_selected_unified_timeframe_candidate(signal_id, log_dir=log_dir)
     if selected_candidate is not None:
         return selected_candidate
     snapshot = build_live_candidate_snapshot(
@@ -354,7 +370,7 @@ def _find_candidate(signal_id: str | None, *, log_dir: Path) -> dict[str, Any] |
     return None
 
 
-def _find_selected_higher_timeframe_candidate(signal_id: str, *, log_dir: Path) -> dict[str, Any] | None:
+def _find_selected_unified_timeframe_candidate(signal_id: str, *, log_dir: Path) -> dict[str, Any] | None:
     from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
 
     queue = build_first_live_candidate_queue(log_dir=log_dir)
@@ -362,8 +378,9 @@ def _find_selected_higher_timeframe_candidate(signal_id: str, *, log_dir: Path) 
     candidate = selection.get("candidate") if isinstance(selection.get("candidate"), dict) else {}
     if candidate.get("signal_id") != signal_id:
         return None
-    if candidate.get("live_candidate_allowed") is not True or candidate.get("higher_timeframe_profile") is not True:
+    if candidate.get("live_candidate_allowed") is not True or candidate.get("unified_timeframe_profile") is not True:
         return None
+    profile_name = candidate.get("unified_policy_profile_name") or candidate.get("profile_name")
     return {
         "signal_id": candidate.get("signal_id"),
         "timestamp": candidate.get("timestamp"),
@@ -371,7 +388,7 @@ def _find_selected_higher_timeframe_candidate(signal_id: str, *, log_dir: Path) 
         "timeframe": candidate.get("timeframe"),
         "direction": candidate.get("direction"),
         "decision": LIVE_DECISION_ELIGIBLE,
-        "reason": "selected higher-timeframe profile allowed by R72 policy",
+        "reason": f"selected unified timeframe profile allowed by R73 policy: {profile_name}",
         "score": candidate.get("score"),
         "tier": candidate.get("tier"),
         "tradable": True,
@@ -385,7 +402,10 @@ def _find_selected_higher_timeframe_candidate(signal_id: str, *, log_dir: Path) 
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "allow_live_orders": ALLOW_LIVE_ORDERS,
         "global_kill_switch": GLOBAL_KILL_SWITCH,
-        "higher_timeframe_profile": True,
+        "higher_timeframe_profile": candidate.get("higher_timeframe_profile") is True,
+        "unified_timeframe_profile": True,
+        "profile_name": profile_name,
+        "policy_status": candidate.get("unified_policy_status") or candidate.get("policy_status"),
         "order_placed": ORDER_PLACED,
     }
 

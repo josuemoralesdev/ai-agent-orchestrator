@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_candidate_queue import build_first_live_candidate_queue
+from src.app.hammer_radar.operator.first_live_timeframe_policy import evaluate_first_live_timeframe_candidate
 from src.app.hammer_radar.operator.live_approval import find_valid_live_approval_for_signal, load_live_approval_requests
 from src.app.hammer_radar.operator.live_begins import build_live_begins_status
 from src.app.hammer_radar.operator.live_execution_preview import build_live_execution_preview
@@ -50,7 +51,7 @@ def create_live_execution_intent(
     normalized_signal_id = str(signal_id or "").strip() or None
     live_begins = build_live_begins_status(log_dir=resolved_log_dir, env=source)
     preview = build_live_execution_preview(log_dir=resolved_log_dir, env=source)
-    selected_preview = _selected_higher_timeframe_preview(
+    selected_preview = _selected_unified_timeframe_preview(
         signal_id=normalized_signal_id,
         log_dir=resolved_log_dir,
         env=source,
@@ -211,7 +212,7 @@ def compute_preview_hash(preview: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _selected_higher_timeframe_preview(
+def _selected_unified_timeframe_preview(
     *,
     signal_id: str | None,
     log_dir: Path,
@@ -224,18 +225,19 @@ def _selected_higher_timeframe_preview(
     candidate = selection.get("candidate") if isinstance(selection.get("candidate"), dict) else {}
     if candidate.get("signal_id") != signal_id:
         return None
-    if candidate.get("live_candidate_allowed") is not True or candidate.get("higher_timeframe_profile") is not True:
+    if candidate.get("live_candidate_allowed") is not True or candidate.get("unified_timeframe_profile") is not True:
         return None
-    profile = candidate.get("higher_timeframe_policy", {}).get("profile", {}) if isinstance(candidate.get("higher_timeframe_policy"), dict) else {}
+    unified_eval = candidate.get("unified_policy_evaluation") if isinstance(candidate.get("unified_policy_evaluation"), dict) else {}
+    profile = unified_eval.get("profile") if isinstance(unified_eval.get("profile"), dict) else {}
     margin = _float(profile.get("margin_usdt"), 44.0)
     leverage = _float(profile.get("leverage"), 10.0)
     notional = margin * leverage
     direction = str(candidate.get("direction") or "").lower()
     return {
         "status": "PREVIEW_READY",
-        "phase": "R72",
+        "phase": "R73",
         "system": SYSTEM,
-        "execution_mode": "SELECTED_HIGHER_TIMEFRAME_PREVIEW_COMPAT",
+        "execution_mode": "SELECTED_UNIFIED_TIMEFRAME_PREVIEW_COMPAT",
         "latest_signal_id": signal_id,
         "symbol": candidate.get("symbol"),
         "timeframe": candidate.get("timeframe"),
@@ -256,10 +258,10 @@ def _selected_higher_timeframe_preview(
             "protective_orders_required": profile.get("protective_orders_required", True),
             "reduce_only": True,
         },
-        "higher_timeframe_profile": True,
-        "profile_name": (candidate.get("higher_timeframe_policy") or {}).get("profile_name")
-        if isinstance(candidate.get("higher_timeframe_policy"), dict)
-        else None,
+        "higher_timeframe_profile": candidate.get("higher_timeframe_profile") is True,
+        "unified_timeframe_profile": True,
+        "profile_name": unified_eval.get("profile_name") or candidate.get("profile_name"),
+        "policy_status": unified_eval.get("policy_status") or candidate.get("policy_status"),
         "order_placed": False,
         "real_order_placed": False,
         "secrets_shown": False,
@@ -313,6 +315,18 @@ def _checks(
     log_dir: Path,
 ) -> dict[str, bool]:
     preview_signal_id = preview.get("latest_signal_id")
+    freshness_text = str(preview.get("freshness_status") or "").lower()
+    policy_eval = evaluate_first_live_timeframe_candidate(
+        {
+            "signal_id": signal_id,
+            "symbol": preview.get("symbol"),
+            "timeframe": preview.get("timeframe"),
+            "direction": preview.get("direction"),
+            "queue_fresh": freshness_text in {"fresh", "ok", "valid"} or (freshness_text == "" and preview.get("status") == "PREVIEW_READY"),
+            "selected": preview.get("unified_timeframe_profile") is True,
+        },
+        selected=preview.get("unified_timeframe_profile") is True,
+    )
     return {
         "signal_id_present": bool(signal_id),
         "exact_approval_present": approval_status == "APPROVED",
@@ -322,7 +336,8 @@ def _checks(
         "preview_matches_signal": bool(signal_id) and preview_signal_id == signal_id,
         "preview_hash_valid": bool(preview_hash),
         "live_begins_allows_intent": live_begins.get("status") in {"READY_FOR_OPERATOR_APPROVAL", "ELIGIBLE_TINY_LIVE"},
-        "preview_allows_intent": preview.get("status") == "PREVIEW_READY",
+        "preview_allows_intent": preview.get("status") == "PREVIEW_READY" and policy_eval.get("approval_allowed") is True,
+        "timeframe_policy_allows_intent": policy_eval.get("approval_allowed") is True,
         "idempotency_clear": _idempotency_clear(signal_id=signal_id, preview_hash=preview_hash, log_dir=log_dir),
     }
 
@@ -362,6 +377,8 @@ def _blockers(
         blockers.append(f"live begins is {live_begins.get('status', 'UNKNOWN')}")
     if not checks["preview_allows_intent"]:
         blockers.append(f"execution preview is {preview.get('status', 'UNKNOWN')}")
+    if not checks.get("timeframe_policy_allows_intent", False):
+        blockers.append("unified timeframe policy does not allow intent")
     changed = _active_changed_preview_exists(signal_id=signal_id, preview_hash=preview_hash, log_dir=log_dir, now=datetime.now(UTC))
     if changed:
         blockers.append("preview changed for signal_id; re-approval required")

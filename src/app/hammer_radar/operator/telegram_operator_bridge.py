@@ -96,6 +96,7 @@ from src.app.hammer_radar.operator.first_live_candidate_queue import (
     select_first_live_candidate,
 )
 from src.app.hammer_radar.operator.first_live_higher_timeframe_policy import get_higher_timeframe_live_policy
+from src.app.hammer_radar.operator.first_live_timeframe_policy import get_first_live_timeframe_policy
 from src.app.hammer_radar.operator.first_microscopic_live_attempt import (
     build_first_microscopic_live_profile,
     build_first_microscopic_live_status,
@@ -178,6 +179,8 @@ HELP_COMMANDS = [
     "FIRST LIVE SELECT <signal_id>",
     "FIRST LIVE SELECTED",
     "FIRST LIVE CLEAR",
+    "FIRST LIVE TIMEFRAME POLICY",
+    "FIRST LIVE MICRO POLICY",
     "FIRST LIVE HIGHER POLICY",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE SEQUENCE",
@@ -516,6 +519,40 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             message,
             payload={"higher_timeframe_policy": payload},
+        )
+    if normalized == "FIRST LIVE TIMEFRAME POLICY":
+        payload = get_first_live_timeframe_policy()
+        matrix = payload.get("matrix") if isinstance(payload.get("matrix"), dict) else {}
+        compact = ", ".join(
+            f"{tf}:{(row or {}).get('enabled_status') if tf in payload.get('micro_live_timeframes', []) and payload.get('micro_live_allowed') else (row or {}).get('default_status')}"
+            for tf, row in matrix.items()
+        )
+        message = (
+            f"R73 timeframe policy: micro_enabled={payload.get('micro_live_allowed')} "
+            f"higher_enabled={payload.get('higher_timeframe_live_allowed')} "
+            f"tiny={','.join(payload.get('tiny_live_timeframes') or [])}. "
+            f"matrix={compact}. No order placed. real_order_placed=false."
+        )
+        return _result(
+            "first_live_timeframe_policy",
+            "ACCEPTED",
+            message,
+            payload={"unified_timeframe_policy": payload},
+        )
+    if normalized == "FIRST LIVE MICRO POLICY":
+        payload = get_first_live_timeframe_policy()
+        message = (
+            f"R73 micro policy: enabled={payload.get('micro_live_allowed')} "
+            f"timeframes={','.join(payload.get('micro_live_timeframes') or [])} "
+            "default=paper-only; enable hint="
+            f"{(payload.get('enable_hints') or {}).get('micro') or 'already enabled'}. "
+            "No order placed. real_order_placed=false."
+        )
+        return _result(
+            "first_live_micro_policy",
+            "ACCEPTED",
+            message,
+            payload={"unified_timeframe_policy": payload},
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")

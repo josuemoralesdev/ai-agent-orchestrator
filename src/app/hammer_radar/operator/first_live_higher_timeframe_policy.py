@@ -12,6 +12,10 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from src.app.hammer_radar.operator.first_live_timeframe_policy import (
+    evaluate_first_live_timeframe_candidate,
+    get_first_live_timeframe_policy,
+)
 from src.app.hammer_radar.operator.strategy_performance import (
     DEFAULT_BLOCKED_TIMEFRAMES,
     DEFAULT_CONTEXT_ONLY_TIMEFRAMES,
@@ -61,12 +65,10 @@ REQUIRES = {
 
 def get_higher_timeframe_live_policy(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     source = os.environ if env is None else env
+    unified = get_first_live_timeframe_policy(env=source)
     audit = load_strategy_audit_config(dict(source))
-    enabled = _parse_bool(source.get(ENV_HIGHER_TIMEFRAME_ALLOWED), default=False)
-    allowlist = _parse_timeframes(
-        source.get(ENV_HIGHER_TIMEFRAME_ALLOWLIST),
-        default=DEFAULT_ALLOWED_SELECTED_TIMEFRAMES,
-    )
+    enabled = unified["higher_timeframe_live_allowed"]
+    allowlist = tuple(unified["higher_timeframe_live_timeframes"])
     return _sanitize(
         {
             "status": "OK",
@@ -88,6 +90,7 @@ def get_higher_timeframe_live_policy(env: Mapping[str, str] | None = None) -> di
                 "automatic_size_ramp_enabled": False,
                 "note": "R72 keeps higher-timeframe sizing on first-live defaults.",
             },
+            "unified_timeframe_policy": unified,
             "enable_hint": (
                 f"set {ENV_HIGHER_TIMEFRAME_ALLOWED}=true and {ENV_HIGHER_TIMEFRAME_ALLOWLIST}=444m,4H"
                 if not enabled
@@ -108,6 +111,7 @@ def evaluate_higher_timeframe_live_policy(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     policy = get_higher_timeframe_live_policy(env=env)
+    unified_eval = evaluate_first_live_timeframe_candidate(candidate, env=env, selected=True, now=now)
     created_at = now or datetime.now(UTC)
     candidate = candidate or {}
     timeframe = _normalize_timeframe(candidate.get("timeframe"))
@@ -151,14 +155,7 @@ def evaluate_higher_timeframe_live_policy(
         status = "BLOCKED"
         blockers.append("timeframe is not supported by higher-timeframe profile")
 
-    candidate_allowed = bool(
-        status == "SELECTED_HIGHER_TIMEFRAME_ALLOWED"
-        and policy["higher_timeframe_live_allowed"] is True
-        and selected
-        and queue_fresh
-        and symbol == "BTCUSDT"
-        and direction == "long"
-    )
+    candidate_allowed = bool(unified_eval.get("live_candidate_allowed") is True and unified_eval.get("category") == "higher")
     if not candidate_allowed and status == "SELECTED_HIGHER_TIMEFRAME_ALLOWED":
         status = "SELECTED_BUT_NOT_LIVE_ELIGIBLE"
 
@@ -170,6 +167,7 @@ def evaluate_higher_timeframe_live_policy(
             "candidate_timeframe": timeframe,
             "candidate_allowed": candidate_allowed,
             "candidate_policy_status": status,
+            "unified_timeframe_evaluation": unified_eval,
             "blockers": list(dict.fromkeys(blockers)),
             "near_expiration_warning": _near_expiration_warning(candidate),
             "order_placed": ORDER_PLACED,
