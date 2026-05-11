@@ -164,6 +164,11 @@ from src.app.hammer_radar.operator.live_policy_dry_chain_smoke import (
     build_policy_armed_dry_chain_smoke_status,
     run_policy_armed_dry_chain_smoke,
 )
+from src.app.hammer_radar.operator.funded_tiny_live_readiness import (
+    build_funded_tiny_live_readiness_check,
+    build_funded_tiny_live_readiness_runbook,
+    build_funded_tiny_live_readiness_status,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -1042,6 +1047,21 @@ def live_policy_dry_chain_check(request: LivePolicyDryChainRequest | None = None
         log_dir=get_log_dir(use_env=True),
         persist=True,
     )
+
+
+@app.get("/live/funding-readiness/status")
+def live_funding_readiness_status() -> dict:
+    return build_funded_tiny_live_readiness_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/funding-readiness/runbook")
+def live_funding_readiness_runbook() -> dict:
+    return build_funded_tiny_live_readiness_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/funding-readiness/check")
+def live_funding_readiness_check() -> dict:
+    return build_funded_tiny_live_readiness_check(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/live/first-candidates/select")

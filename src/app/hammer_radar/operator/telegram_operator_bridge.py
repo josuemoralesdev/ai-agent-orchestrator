@@ -132,6 +132,12 @@ from src.app.hammer_radar.operator.live_policy_dry_chain_smoke import (
     format_policy_armed_dry_chain_operator_message,
     run_policy_armed_dry_chain_smoke,
 )
+from src.app.hammer_radar.operator.funded_tiny_live_readiness import (
+    build_funded_tiny_live_readiness_check,
+    build_funded_tiny_live_readiness_runbook,
+    build_funded_tiny_live_readiness_status,
+    format_funded_tiny_live_readiness_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -221,6 +227,9 @@ HELP_COMMANDS = [
     "LIVE MICRO DRY SMOKE",
     "LIVE HIGHER DRY SMOKE",
     "LIVE POLICY DRY RUNBOOK",
+    "LIVE FUNDING READINESS",
+    "LIVE FUNDING RUNBOOK",
+    "LIVE FUNDING CHECK",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -636,6 +645,30 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_policy_armed_dry_chain_operator_message(payload, section="runbook"),
             payload={"live_policy_dry_chain_runbook": payload},
+        )
+    if normalized == "LIVE FUNDING READINESS":
+        payload = build_funded_tiny_live_readiness_status(log_dir=log_dir)
+        return _result(
+            "live_funding_readiness",
+            "ACCEPTED",
+            format_funded_tiny_live_readiness_operator_message(payload),
+            payload={"funded_tiny_live_readiness": payload},
+        )
+    if normalized == "LIVE FUNDING RUNBOOK":
+        payload = build_funded_tiny_live_readiness_runbook(log_dir=log_dir)
+        return _result(
+            "live_funding_runbook",
+            "ACCEPTED",
+            format_funded_tiny_live_readiness_operator_message(payload, section="runbook"),
+            payload={"funded_tiny_live_readiness_runbook": payload},
+        )
+    if normalized == "LIVE FUNDING CHECK":
+        payload = build_funded_tiny_live_readiness_check(log_dir=log_dir)
+        return _result(
+            "live_funding_check",
+            "ACCEPTED",
+            format_funded_tiny_live_readiness_operator_message(payload),
+            payload={"funded_tiny_live_readiness_check": payload},
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")
