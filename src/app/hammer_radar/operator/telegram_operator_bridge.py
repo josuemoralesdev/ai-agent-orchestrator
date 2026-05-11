@@ -121,6 +121,11 @@ from src.app.hammer_radar.operator.live_arming_runbook import (
     format_live_blockers_operator_message,
     list_live_arming_runbooks,
 )
+from src.app.hammer_radar.operator.live_policy_arming import (
+    build_live_policy_arming_runbook,
+    build_live_policy_arming_status,
+    format_live_policy_arming_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -202,6 +207,10 @@ HELP_COMMANDS = [
     "LIVE ARMING",
     "FIRST LIVE ARMING",
     "LIVE ARMING CHECKS",
+    "LIVE POLICY ARMING",
+    "LIVE POLICY RUNBOOK",
+    "LIVE MICRO ARMING",
+    "LIVE HIGHER ARMING",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -553,6 +562,38 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             message,
             payload={"unified_timeframe_policy": payload},
+        )
+    if normalized == "LIVE POLICY ARMING":
+        payload = build_live_policy_arming_status()
+        return _result(
+            "live_policy_arming",
+            "ACCEPTED",
+            format_live_policy_arming_operator_message(payload),
+            payload={"live_policy_arming": payload},
+        )
+    if normalized == "LIVE POLICY RUNBOOK":
+        payload = build_live_policy_arming_runbook()
+        return _result(
+            "live_policy_runbook",
+            "ACCEPTED",
+            format_live_policy_arming_operator_message(payload, section="runbook"),
+            payload={"live_policy_arming_runbook": payload},
+        )
+    if normalized == "LIVE MICRO ARMING":
+        payload = build_live_policy_arming_status()
+        return _result(
+            "live_micro_arming",
+            "ACCEPTED",
+            format_live_policy_arming_operator_message(payload, section="micro"),
+            payload={"live_policy_arming": payload},
+        )
+    if normalized == "LIVE HIGHER ARMING":
+        payload = build_live_policy_arming_status()
+        return _result(
+            "live_higher_arming",
+            "ACCEPTED",
+            format_live_policy_arming_operator_message(payload, section="higher"),
+            payload={"live_policy_arming": payload},
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")

@@ -154,6 +154,11 @@ from src.app.hammer_radar.operator.live_arming_runbook import (
     evaluate_and_record_live_arming_runbook,
     list_live_arming_runbooks,
 )
+from src.app.hammer_radar.operator.live_policy_arming import (
+    build_live_policy_arming_runbook,
+    build_live_policy_arming_status,
+    evaluate_and_record_live_policy_arming_check,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -991,6 +996,21 @@ def first_live_higher_timeframe_policy_status() -> dict:
 @app.get("/live/timeframe-policy/status")
 def first_live_timeframe_policy_status() -> dict:
     return get_first_live_timeframe_policy()
+
+
+@app.get("/live/policy-arming/status")
+def live_policy_arming_status() -> dict:
+    return build_live_policy_arming_status()
+
+
+@app.get("/live/policy-arming/runbook")
+def live_policy_arming_runbook() -> dict:
+    return build_live_policy_arming_runbook()
+
+
+@app.post("/live/policy-arming/check")
+def live_policy_arming_check() -> dict:
+    return evaluate_and_record_live_policy_arming_check(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/live/first-candidates/select")
