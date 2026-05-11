@@ -138,6 +138,12 @@ from src.app.hammer_radar.operator.funded_tiny_live_readiness import (
     build_funded_tiny_live_readiness_status,
     format_funded_tiny_live_readiness_operator_message,
 )
+from src.app.hammer_radar.operator.post_funding_balance_verification import (
+    build_post_funding_balance_runbook,
+    build_post_funding_balance_status,
+    evaluate_and_record_post_funding_balance_check,
+    format_post_funding_balance_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -230,6 +236,9 @@ HELP_COMMANDS = [
     "LIVE FUNDING READINESS",
     "LIVE FUNDING RUNBOOK",
     "LIVE FUNDING CHECK",
+    "LIVE BALANCE READINESS",
+    "LIVE BALANCE RUNBOOK",
+    "LIVE BALANCE CHECK <amount>",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -669,6 +678,39 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_funded_tiny_live_readiness_operator_message(payload),
             payload={"funded_tiny_live_readiness_check": payload},
+        )
+    if normalized == "LIVE BALANCE READINESS":
+        payload = build_post_funding_balance_status(log_dir=log_dir)
+        return _result(
+            "live_balance_readiness",
+            "ACCEPTED",
+            format_post_funding_balance_operator_message(payload),
+            payload={"post_funding_balance": payload},
+        )
+    if normalized == "LIVE BALANCE RUNBOOK":
+        payload = build_post_funding_balance_runbook()
+        return _result(
+            "live_balance_runbook",
+            "ACCEPTED",
+            format_post_funding_balance_operator_message(payload, section="runbook"),
+            payload={"post_funding_balance_runbook": payload},
+        )
+    if normalized == "LIVE BALANCE CHECK" or normalized.startswith("LIVE BALANCE CHECK "):
+        parts = raw_text.split(maxsplit=3)
+        if len(parts) != 4:
+            reason = "LIVE BALANCE CHECK requires an amount"
+            return _result("live_balance_check", "REJECTED", reason, reason=reason)
+        try:
+            amount = float(parts[3].strip())
+        except ValueError:
+            reason = "LIVE BALANCE CHECK amount must be numeric"
+            return _result("live_balance_check", "REJECTED", reason, reason=reason)
+        payload = evaluate_and_record_post_funding_balance_check(available_usdt=amount, log_dir=log_dir)
+        return _result(
+            "live_balance_check",
+            "ACCEPTED",
+            format_post_funding_balance_operator_message(payload),
+            payload={"post_funding_balance_check": payload},
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")
