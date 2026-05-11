@@ -159,6 +159,11 @@ from src.app.hammer_radar.operator.live_policy_arming import (
     build_live_policy_arming_status,
     evaluate_and_record_live_policy_arming_check,
 )
+from src.app.hammer_radar.operator.live_policy_dry_chain_smoke import (
+    build_policy_armed_dry_chain_runbook,
+    build_policy_armed_dry_chain_smoke_status,
+    run_policy_armed_dry_chain_smoke,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -319,6 +324,11 @@ class LiveExecutionIntentRequest(BaseModel):
     signal_id: str | None = None
     approval_code: str | None = None
     dry_run: bool = True
+
+
+class LivePolicyDryChainRequest(BaseModel):
+    scenario: str = "micro"
+    signal_id: str | None = None
 
 
 class LiveExecutorRehearsalRequest(BaseModel):
@@ -1011,6 +1021,27 @@ def live_policy_arming_runbook() -> dict:
 @app.post("/live/policy-arming/check")
 def live_policy_arming_check() -> dict:
     return evaluate_and_record_live_policy_arming_check(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/policy-dry-chain/status")
+def live_policy_dry_chain_status() -> dict:
+    return build_policy_armed_dry_chain_smoke_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/policy-dry-chain/runbook")
+def live_policy_dry_chain_runbook() -> dict:
+    return build_policy_armed_dry_chain_runbook()
+
+
+@app.post("/live/policy-dry-chain/check")
+def live_policy_dry_chain_check(request: LivePolicyDryChainRequest | None = None) -> dict:
+    request = request or LivePolicyDryChainRequest()
+    return run_policy_armed_dry_chain_smoke(
+        scenario=request.scenario,
+        signal_id=request.signal_id,
+        log_dir=get_log_dir(use_env=True),
+        persist=True,
+    )
 
 
 @app.post("/live/first-candidates/select")
