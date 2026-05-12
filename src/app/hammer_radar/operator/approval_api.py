@@ -174,6 +174,11 @@ from src.app.hammer_radar.operator.post_funding_balance_verification import (
     build_post_funding_balance_status,
     evaluate_and_record_post_funding_balance_check,
 )
+from src.app.hammer_radar.operator.rehearsal_test_order_protective_readiness import (
+    build_rehearsal_test_order_protective_check,
+    build_rehearsal_test_order_protective_runbook,
+    build_rehearsal_test_order_protective_status,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -342,6 +347,12 @@ class LivePolicyDryChainRequest(BaseModel):
 
 
 class PostFundingBalanceRequest(BaseModel):
+    available_usdt: float | None = None
+
+
+class RehearsalTestOrderProtectiveReadinessRequest(BaseModel):
+    signal_id: str | None = None
+    execution_intent_id: str | None = None
     available_usdt: float | None = None
 
 
@@ -1087,6 +1098,27 @@ def live_funding_balance_runbook() -> dict:
 def live_funding_balance_check(request: PostFundingBalanceRequest | None = None) -> dict:
     request = request or PostFundingBalanceRequest()
     return evaluate_and_record_post_funding_balance_check(
+        available_usdt=request.available_usdt,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live/rehearsal-readiness/status")
+def live_rehearsal_readiness_status() -> dict:
+    return build_rehearsal_test_order_protective_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/rehearsal-readiness/runbook")
+def live_rehearsal_readiness_runbook() -> dict:
+    return build_rehearsal_test_order_protective_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/rehearsal-readiness/check")
+def live_rehearsal_readiness_check(request: RehearsalTestOrderProtectiveReadinessRequest | None = None) -> dict:
+    request = request or RehearsalTestOrderProtectiveReadinessRequest()
+    return build_rehearsal_test_order_protective_check(
+        signal_id=request.signal_id,
+        execution_intent_id=request.execution_intent_id,
         available_usdt=request.available_usdt,
         log_dir=get_log_dir(use_env=True),
     )
