@@ -730,6 +730,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_rehearsal_test_order_protective_operator_message(payload),
             payload={"rehearsal_test_order_protective_readiness": payload},
             signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
         )
     if normalized == "LIVE REHEARSAL RUNBOOK":
         payload = build_rehearsal_test_order_protective_runbook(log_dir=log_dir)
@@ -739,6 +740,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_rehearsal_test_order_protective_operator_message(payload, section="runbook"),
             payload={"rehearsal_test_order_protective_runbook": payload},
             signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
         )
     if normalized == "LIVE REHEARSAL CHECK":
         payload = build_rehearsal_test_order_protective_check(log_dir=log_dir)
@@ -748,6 +750,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_rehearsal_test_order_protective_operator_message(payload),
             payload={"rehearsal_test_order_protective_check": payload},
             signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
         )
     if normalized == "LIVE PROTECTIVE READINESS":
         payload = build_rehearsal_test_order_protective_status(log_dir=log_dir)
@@ -757,6 +760,7 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_rehearsal_test_order_protective_operator_message(payload, section="protective"),
             payload={"rehearsal_test_order_protective_readiness": payload},
             signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")

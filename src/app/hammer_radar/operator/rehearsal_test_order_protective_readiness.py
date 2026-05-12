@@ -9,25 +9,28 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from src.app.hammer_radar.execution.binance_futures_connector import load_connector_attempts
+from src.app.hammer_radar.execution.binance_futures_connector import connector_attempts_path, load_connector_attempts
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_chain_runbook import build_first_live_chain_status
 from src.app.hammer_radar.operator.first_live_protective_adapter import (
     build_first_live_protective_status,
+    first_live_protective_checks_path,
     load_first_live_protective_checks,
 )
 from src.app.hammer_radar.operator.first_live_test_order_gate import (
     build_first_live_test_order_status,
+    first_live_test_order_checks_path,
     load_first_live_test_order_checks,
 )
-from src.app.hammer_radar.operator.live_execution_intent import load_live_execution_intents
-from src.app.hammer_radar.operator.live_executor_rehearsal import load_live_executor_rehearsals
+from src.app.hammer_radar.operator.live_execution_intent import live_execution_intents_path, load_live_execution_intents
+from src.app.hammer_radar.operator.live_executor_rehearsal import live_executor_rehearsals_path, load_live_executor_rehearsals
 from src.app.hammer_radar.operator.post_funding_balance_verification import (
     build_post_funding_balance_status,
     evaluate_manual_balance,
@@ -37,6 +40,9 @@ PHASE = "R78"
 SYSTEM = "money_printing_machine_hammer_radar"
 EXECUTION_MODE = "REHEARSAL_TEST_ORDER_PROTECTIVE_READINESS_ONLY"
 CHECKS_FILENAME = "rehearsal_test_order_protective_readiness_checks.ndjson"
+FAST_MAX_LINES_PER_FILE = 500
+FAST_MAX_BYTES_PER_FILE = 262_144
+FAST_TIME_BUDGET_MS = 1000.0
 
 ORDER_PLACED = False
 REAL_ORDER_PLACED = False
@@ -49,8 +55,9 @@ def build_rehearsal_test_order_protective_status(
     *,
     env: Mapping[str, str] | None = None,
     log_dir: str | Path | None = None,
+    detail: str = "fast",
 ) -> dict[str, Any]:
-    return _evaluate(signal_id=None, execution_intent_id=None, available_usdt=None, env=env, log_dir=log_dir, persist=False)
+    return _evaluate(signal_id=None, execution_intent_id=None, available_usdt=None, env=env, log_dir=log_dir, persist=False, detail=detail)
 
 
 def build_rehearsal_test_order_protective_check(
@@ -60,6 +67,7 @@ def build_rehearsal_test_order_protective_check(
     available_usdt: object | None = None,
     env: Mapping[str, str] | None = None,
     log_dir: str | Path | None = None,
+    detail: str = "fast",
 ) -> dict[str, Any]:
     return _evaluate(
         signal_id=signal_id,
@@ -68,6 +76,7 @@ def build_rehearsal_test_order_protective_check(
         env=env,
         log_dir=log_dir,
         persist=True,
+        detail=detail,
     )
 
 
@@ -76,7 +85,7 @@ def build_rehearsal_test_order_protective_runbook(
     env: Mapping[str, str] | None = None,
     log_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    status = build_rehearsal_test_order_protective_status(env=env, log_dir=log_dir)
+    status = build_rehearsal_test_order_protective_status(env=env, log_dir=log_dir, detail="fast")
     return _sanitize(
         {
             **status,
@@ -111,16 +120,46 @@ def load_rehearsal_test_order_protective_checks(
     log_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     path = rehearsal_test_order_protective_checks_path(get_log_dir(log_dir, use_env=True))
-    if not path.exists():
-        return []
     records: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line:
-                records.append(_sanitize(json.loads(line)))
-    records = list(reversed(records))
+    read_limit = limit if limit > 0 else FAST_MAX_LINES_PER_FILE
+    for record in read_recent_ndjson(path, max_lines=read_limit):
+        records.append(_sanitize(record))
+        if limit > 0 and len(records) >= limit:
+            break
     return records[:limit] if limit > 0 else records
+
+
+def read_recent_ndjson(
+    path: str | Path,
+    *,
+    max_lines: int = FAST_MAX_LINES_PER_FILE,
+    max_bytes: int = FAST_MAX_BYTES_PER_FILE,
+    sanitize_records: bool = True,
+) -> list[dict[str, Any]]:
+    resolved = Path(path)
+    if max_lines <= 0 or not resolved.exists():
+        return []
+    try:
+        size = resolved.stat().st_size
+        offset = max(0, size - max_bytes)
+        with resolved.open("rb") as handle:
+            handle.seek(offset)
+            data = handle.read()
+    except OSError:
+        return []
+    if offset > 0:
+        data = data.split(b"\n", 1)[-1]
+    records: list[dict[str, Any]] = []
+    for line in reversed([item.strip() for item in data.splitlines() if item.strip()]):
+        try:
+            record = json.loads(line.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(record, dict):
+            records.append(_sanitize(record) if sanitize_records else record)
+        if len(records) >= max_lines:
+            break
+    return records
 
 
 def rehearsal_test_order_protective_checks_path(log_dir: str | Path) -> Path:
@@ -191,7 +230,115 @@ def _evaluate(
     env: Mapping[str, str] | None,
     log_dir: str | Path | None,
     persist: bool,
+    detail: str,
 ) -> dict[str, Any]:
+    if str(detail or "fast").lower() == "full":
+        return _evaluate_full(
+            signal_id=signal_id,
+            execution_intent_id=execution_intent_id,
+            available_usdt=available_usdt,
+            env=env,
+            log_dir=log_dir,
+            persist=persist,
+        )
+    return _evaluate_fast(
+        signal_id=signal_id,
+        execution_intent_id=execution_intent_id,
+        available_usdt=available_usdt,
+        env=env,
+        log_dir=log_dir,
+        persist=persist,
+    )
+
+
+def _evaluate_fast(
+    *,
+    signal_id: str | None,
+    execution_intent_id: str | None,
+    available_usdt: object | None,
+    env: Mapping[str, str] | None,
+    log_dir: str | Path | None,
+    persist: bool,
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    source = os.environ if env is None else env
+    created_at = datetime.now(UTC).isoformat()
+    warnings: list[str] = []
+    funding = _compact_funding(
+        evaluate_manual_balance(available_usdt, env=source, log_dir=resolved_log_dir)
+        if available_usdt is not None
+        else build_post_funding_balance_status(env=source, log_dir=resolved_log_dir)
+    )
+    chain_state = _chain_state_fast(signal_id=signal_id, execution_intent_id=execution_intent_id, log_dir=resolved_log_dir)
+    rehearsal_status = _rehearsal_status(chain_state=chain_state)
+    test_order_status = _test_order_status_fast(chain_state=chain_state, log_dir=resolved_log_dir)
+    protective_status = _protective_status_fast(chain_state=chain_state, log_dir=resolved_log_dir)
+    no_naked_entry_status = _no_naked_entry_status(protective_status=protective_status)
+    safety = _safety_scan_fast(chain_state=chain_state, log_dir=resolved_log_dir)
+    blockers = _blockers(safety=safety, no_naked_entry_status=no_naked_entry_status, funding=funding)
+    warnings.extend(_warnings(funding=funding, first_chain={}))
+    if _budget_exceeded(started):
+        warnings.append("r78 fast status returned partial result due time budget")
+    status = _status(
+        chain_state=chain_state,
+        test_order_status=test_order_status,
+        protective_status=protective_status,
+        no_naked_entry_status=no_naked_entry_status,
+        blockers=blockers,
+    )
+    payload = _sanitize(
+        {
+            "status": status,
+            "phase": PHASE,
+            "system": SYSTEM,
+            "execution_mode": EXECUTION_MODE,
+            "created_at": created_at,
+            "order_placed": ORDER_PLACED,
+            "real_order_placed": REAL_ORDER_PLACED,
+            "execution_attempted": EXECUTION_ATTEMPTED,
+            "network_allowed": NETWORK_ALLOWED,
+            "secrets_shown": SECRETS_SHOWN,
+            "funding_balance_status": funding,
+            "chain_state": chain_state,
+            "rehearsal_status": rehearsal_status,
+            "test_order_status": test_order_status,
+            "protective_status": protective_status,
+            "no_naked_entry_status": no_naked_entry_status,
+            "required_next_steps": _required_next_steps(status, chain_state=chain_state),
+            "blockers": blockers,
+            "warnings": list(dict.fromkeys(warnings)),
+            "performance": {
+                "mode": "fast",
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "bounded_scans": True,
+                "max_lines_per_file": FAST_MAX_LINES_PER_FILE,
+                "heavy_builders_skipped": True,
+                "time_budget_ms": FAST_TIME_BUDGET_MS,
+            },
+            "audit_event_recorded": persist,
+            "rehearsal_test_order_protective_readiness_checks_path": str(
+                rehearsal_test_order_protective_checks_path(resolved_log_dir)
+            ),
+        }
+    )
+    if persist:
+        record = _record(payload)
+        append_rehearsal_test_order_protective_check(record, log_dir=resolved_log_dir)
+        payload["check_id"] = record["check_id"]
+    return _sanitize(payload)
+
+
+def _evaluate_full(
+    *,
+    signal_id: str | None,
+    execution_intent_id: str | None,
+    available_usdt: object | None,
+    env: Mapping[str, str] | None,
+    log_dir: str | Path | None,
+    persist: bool,
+) -> dict[str, Any]:
+    started = time.perf_counter()
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     source = os.environ if env is None else env
     created_at = datetime.now(UTC).isoformat()
@@ -246,6 +393,13 @@ def _evaluate(
             "required_next_steps": _required_next_steps(status, chain_state=chain_state),
             "blockers": blockers,
             "warnings": warnings,
+            "performance": {
+                "mode": "full",
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "bounded_scans": False,
+                "max_lines_per_file": None,
+                "heavy_builders_skipped": False,
+            },
             "audit_event_recorded": persist,
             "rehearsal_test_order_protective_readiness_checks_path": str(
                 rehearsal_test_order_protective_checks_path(resolved_log_dir)
@@ -304,6 +458,69 @@ def _chain_state(
         "first_chain_next_action": first_chain.get("next_action") if isinstance(first_chain.get("next_action"), dict) else {},
         "blockers": _chain_blockers(intent_found=intent_found, rehearsal_found=rehearsal_found),
     }
+
+
+def _chain_state_fast(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any]:
+    requested_signal = _clean(signal_id)
+    requested_intent_id = _clean(execution_intent_id)
+    intent = _latest_recent_intent(signal_id=requested_signal, execution_intent_id=requested_intent_id, log_dir=log_dir)
+    resolved_signal = _clean((intent or {}).get("signal_id") or requested_signal)
+    resolved_intent_id = _clean((intent or {}).get("execution_intent_id") or requested_intent_id)
+    rehearsal = _latest_recent_rehearsal(signal_id=resolved_signal, execution_intent_id=resolved_intent_id, log_dir=log_dir)
+    resolved_rehearsal_id = _clean((rehearsal or {}).get("executor_rehearsal_id"))
+    intent_found = intent is not None and intent.get("status") == "INTENT_READY"
+    rehearsal_found = rehearsal is not None and rehearsal.get("status") == "REHEARSAL_READY"
+    exact_chain_resolved = bool(
+        resolved_signal
+        and intent_found
+        and rehearsal_found
+        and (rehearsal or {}).get("execution_intent_id") == resolved_intent_id
+        and (rehearsal or {}).get("signal_id") == resolved_signal
+    )
+    return {
+        "requested_signal_id": requested_signal,
+        "requested_execution_intent_id": requested_intent_id,
+        "signal_id": resolved_signal,
+        "execution_intent_id": resolved_intent_id,
+        "executor_rehearsal_id": resolved_rehearsal_id,
+        "approval_found": None,
+        "execution_intent_found": intent_found,
+        "execution_intent_status": (intent or {}).get("status") or "MISSING",
+        "executor_rehearsal_found": rehearsal_found,
+        "executor_rehearsal_status": (rehearsal or {}).get("status") or "MISSING",
+        "exact_chain_resolved": exact_chain_resolved,
+        "first_chain_status": "NOT_EVALUATED_FAST",
+        "first_chain_next_action": {},
+        "blockers": _chain_blockers(intent_found=intent_found, rehearsal_found=rehearsal_found),
+    }
+
+
+def _latest_recent_intent(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any] | None:
+    records = read_recent_ndjson(live_execution_intents_path(log_dir))
+    fallback = None
+    for record in records:
+        if execution_intent_id is not None and record.get("execution_intent_id") != execution_intent_id:
+            continue
+        if signal_id is not None and record.get("signal_id") != signal_id:
+            continue
+        fallback = fallback or record
+        if record.get("status") == "INTENT_READY":
+            return record
+    return fallback
+
+
+def _latest_recent_rehearsal(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any] | None:
+    records = read_recent_ndjson(live_executor_rehearsals_path(log_dir))
+    fallback = None
+    for record in records:
+        if execution_intent_id is not None and record.get("execution_intent_id") != execution_intent_id:
+            continue
+        if signal_id is not None and record.get("signal_id") != signal_id:
+            continue
+        fallback = fallback or record
+        if record.get("status") == "REHEARSAL_READY":
+            return record
+    return fallback
 
 
 def _resolve_intent(*, signal_id: str | None, execution_intent_id: str | None, log_dir: Path) -> dict[str, Any] | None:
@@ -388,6 +605,42 @@ def _latest_test_order_validation(*, signal_id: str | None, log_dir: Path) -> di
     return None
 
 
+def _test_order_status_fast(*, chain_state: Mapping[str, Any], log_dir: Path) -> dict[str, Any]:
+    signal_id = _clean(chain_state.get("signal_id"))
+    validation = _latest_test_order_validation_fast(signal_id=signal_id, log_dir=log_dir)
+    validated = validation is not None
+    blockers = [] if validated else ["successful test-order validation required for exact signal"]
+    return {
+        "status": "TEST_ORDER_VALIDATED" if validated else "NOT_VALIDATED_FAST",
+        "test_order_required": True,
+        "test_order_path_available": True,
+        "test_order_network_enabled": False,
+        "test_order_validated_for_signal": validated,
+        "test_order_validation_id": (validation or {}).get("attempt_id"),
+        "validated_signal_id": (validation or {}).get("signal_id"),
+        "payload_readiness": {},
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+        "blockers": blockers,
+    }
+
+
+def _latest_test_order_validation_fast(*, signal_id: str | None, log_dir: Path) -> dict[str, Any] | None:
+    if not signal_id:
+        return None
+    for record in read_recent_ndjson(connector_attempts_path(log_dir), sanitize_records=False):
+        if record.get("signal_id") != signal_id or record.get("endpoint") != "test_order":
+            continue
+        if record.get("order_placed") is True or record.get("real_order_placed") is True:
+            continue
+        if record.get("status") in {"TEST_ORDER_SENT", "TEST_ORDER_MOCK_VALIDATED", "TEST_ORDER_VALIDATED"}:
+            return record
+    return None
+
+
 def _protective_status(*, chain_state: Mapping[str, Any], log_dir: Path, env: Mapping[str, str]) -> dict[str, Any]:
     signal_id = _clean(chain_state.get("signal_id"))
     rehearsal_id = _clean(chain_state.get("executor_rehearsal_id"))
@@ -424,8 +677,47 @@ def _protective_status(*, chain_state: Mapping[str, Any], log_dir: Path, env: Ma
     }
 
 
+def _protective_status_fast(*, chain_state: Mapping[str, Any], log_dir: Path) -> dict[str, Any]:
+    latest = _latest_protective_check_fast(log_dir=log_dir)
+    latest_plan = latest.get("protective_plan") if isinstance(latest.get("protective_plan"), dict) else {}
+    latest_gate = latest.get("protective_gate") if isinstance(latest.get("protective_gate"), dict) else {}
+    stop_ready = latest_plan.get("stop_loss_available") is True
+    take_ready = latest_plan.get("take_profit_available") is True
+    protective_ready = latest_plan.get("available") is True or (stop_ready and take_ready)
+    return {
+        "status": latest.get("status") or ("PROTECTIVE_PLAN_READY" if protective_ready else "NOT_READY_FAST"),
+        "protective_required": True,
+        "protective_payloads_ready": protective_ready,
+        "stop_loss_ready": stop_ready,
+        "take_profit_ready": take_ready,
+        "entry_allowed_without_protective": latest_gate.get("entry_allowed_without_protective") is True,
+        "naked_entry_blocked": latest_gate.get("naked_entry_blocked") is not False,
+        "protective_gate": latest_gate,
+        "blockers": [] if protective_ready else ["protective stop-loss/take-profit readiness not found in recent checks"],
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+    }
+
+
+def _latest_protective_check_fast(*, log_dir: Path) -> dict[str, Any]:
+    for record in read_recent_ndjson(first_live_protective_checks_path(log_dir)):
+        return record
+    return {}
+
+
 def _latest_protective_ready_check(*, log_dir: Path) -> dict[str, Any]:
     for record in load_first_live_protective_checks(limit=0, log_dir=log_dir):
+        plan = record.get("protective_plan") if isinstance(record.get("protective_plan"), dict) else {}
+        if plan.get("available") is True:
+            return record
+    return {}
+
+
+def _latest_protective_ready_check_fast(*, log_dir: Path) -> dict[str, Any]:
+    for record in read_recent_ndjson(first_live_protective_checks_path(log_dir)):
         plan = record.get("protective_plan") if isinstance(record.get("protective_plan"), dict) else {}
         if plan.get("available") is True:
             return record
@@ -461,6 +753,26 @@ def _safety_scan(*, chain_state: Mapping[str, Any], log_dir: Path) -> dict[str, 
         if _matches_chain(record, chain_state) and (record.get("real_order_placed") is True or record.get("order_placed") is True):
             unsafe_records.append({"source": "first_live_test_order_check", "id": record.get("check_id"), "status": record.get("status")})
     for record in load_first_live_protective_checks(limit=50, log_dir=log_dir):
+        if record.get("real_order_placed") is True or record.get("order_placed") is True:
+            unsafe_records.append({"source": "first_live_protective_check", "id": record.get("check_id"), "status": record.get("status")})
+    return {
+        "unsafe_order_record_found": bool(unsafe_records),
+        "unsafe_records": unsafe_records[:10],
+    }
+
+
+def _safety_scan_fast(*, chain_state: Mapping[str, Any], log_dir: Path) -> dict[str, Any]:
+    signal_id = _clean(chain_state.get("signal_id"))
+    unsafe_records = []
+    for record in read_recent_ndjson(connector_attempts_path(log_dir), sanitize_records=False):
+        if signal_id is not None and record.get("signal_id") != signal_id:
+            continue
+        if record.get("real_order_placed") is True or record.get("order_placed") is True:
+            unsafe_records.append({"source": "connector_attempt", "id": record.get("attempt_id"), "status": record.get("status")})
+    for record in read_recent_ndjson(first_live_test_order_checks_path(log_dir), max_lines=100, sanitize_records=False):
+        if _matches_chain(record, chain_state) and (record.get("real_order_placed") is True or record.get("order_placed") is True):
+            unsafe_records.append({"source": "first_live_test_order_check", "id": record.get("check_id"), "status": record.get("status")})
+    for record in read_recent_ndjson(first_live_protective_checks_path(log_dir), max_lines=100, sanitize_records=False):
         if record.get("real_order_placed") is True or record.get("order_placed") is True:
             unsafe_records.append({"source": "first_live_protective_check", "id": record.get("check_id"), "status": record.get("status")})
     return {
@@ -509,6 +821,33 @@ def _blockers(*, safety: Mapping[str, Any], no_naked_entry_status: Mapping[str, 
     if funding.get("status") == "BLOCKED":
         blockers.extend(str(item) for item in funding.get("blockers") or [])
     return list(dict.fromkeys(item for item in blockers if item))
+
+
+def _compact_funding(payload: Mapping[str, Any]) -> dict[str, Any]:
+    balance = payload.get("balance_status") if isinstance(payload.get("balance_status"), dict) else {}
+    return _sanitize(
+        {
+            "status": payload.get("status"),
+            "phase": payload.get("phase"),
+            "execution_mode": payload.get("execution_mode"),
+            "balance_source": payload.get("balance_source"),
+            "available_usdt": balance.get("available_usdt"),
+            "buffer_usdt": balance.get("buffer_usdt"),
+            "enough_for_first_margin": balance.get("enough_for_first_margin"),
+            "preferred_buffer_ok": balance.get("preferred_buffer_ok"),
+            "blockers": payload.get("blockers") if isinstance(payload.get("blockers"), list) else [],
+            "warnings": payload.get("warnings") if isinstance(payload.get("warnings"), list) else [],
+            "order_placed": False,
+            "real_order_placed": False,
+            "execution_attempted": False,
+            "network_allowed": False,
+            "secrets_shown": False,
+        }
+    )
+
+
+def _budget_exceeded(started: float) -> bool:
+    return (time.perf_counter() - started) * 1000 >= FAST_TIME_BUDGET_MS
 
 
 def _warnings(*, funding: Mapping[str, Any], first_chain: Mapping[str, Any]) -> list[str]:

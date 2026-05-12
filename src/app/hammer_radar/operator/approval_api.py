@@ -1104,8 +1104,8 @@ def live_funding_balance_check(request: PostFundingBalanceRequest | None = None)
 
 
 @app.get("/live/rehearsal-readiness/status")
-def live_rehearsal_readiness_status() -> dict:
-    return build_rehearsal_test_order_protective_status(log_dir=get_log_dir(use_env=True))
+def live_rehearsal_readiness_status(detail: str = Query(default="fast")) -> dict:
+    return build_rehearsal_test_order_protective_status(log_dir=get_log_dir(use_env=True), detail=detail)
 
 
 @app.get("/live/rehearsal-readiness/runbook")
@@ -1114,14 +1114,42 @@ def live_rehearsal_readiness_runbook() -> dict:
 
 
 @app.post("/live/rehearsal-readiness/check")
-def live_rehearsal_readiness_check(request: RehearsalTestOrderProtectiveReadinessRequest | None = None) -> dict:
+def live_rehearsal_readiness_check(
+    request: RehearsalTestOrderProtectiveReadinessRequest | None = None,
+    detail: str = Query(default="fast"),
+) -> dict:
     request = request or RehearsalTestOrderProtectiveReadinessRequest()
     return build_rehearsal_test_order_protective_check(
         signal_id=request.signal_id,
         execution_intent_id=request.execution_intent_id,
         available_usdt=request.available_usdt,
         log_dir=get_log_dir(use_env=True),
+        detail=detail,
     )
+
+
+@app.get("/live/operator-performance/status")
+def live_operator_performance_status() -> dict:
+    return {
+        "status": "OK",
+        "phase": "R78.1",
+        "system": "money_printing_machine_hammer_radar",
+        "execution_mode": "PERFORMANCE_HOTFIX_ONLY",
+        "recent_routes": [
+            "/live/rehearsal-readiness/status",
+            "/live/rehearsal-readiness/check",
+            "/telegram/operator-command FIRST LIVE NEXT",
+        ],
+        "notes": [
+            "Use curl --max-time 5 for operator endpoints",
+            "R78 default mode is fast",
+        ],
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+    }
 
 
 @app.post("/live/first-candidates/select")
