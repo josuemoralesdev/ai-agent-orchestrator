@@ -150,6 +150,12 @@ from src.app.hammer_radar.operator.rehearsal_test_order_protective_readiness imp
     build_rehearsal_test_order_protective_status,
     format_rehearsal_test_order_protective_operator_message,
 )
+from src.app.hammer_radar.operator.final_protected_live_gate_review import (
+    build_final_protected_live_gate_check,
+    build_final_protected_live_gate_runbook,
+    build_final_protected_live_gate_status,
+    format_final_protected_live_gate_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -249,6 +255,10 @@ HELP_COMMANDS = [
     "LIVE REHEARSAL RUNBOOK",
     "LIVE REHEARSAL CHECK",
     "LIVE PROTECTIVE READINESS",
+    "LIVE FINAL GATE",
+    "LIVE FINAL STATUS",
+    "LIVE FINAL CHECK",
+    "LIVE FINAL RUNBOOK",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -760,6 +770,33 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_rehearsal_test_order_protective_operator_message(payload, section="protective"),
             payload={"rehearsal_test_order_protective_readiness": payload},
             signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+        )
+    if normalized in {"LIVE FINAL GATE", "LIVE FINAL STATUS"}:
+        payload = build_final_protected_live_gate_status(log_dir=log_dir)
+        return _result(
+            "live_final_gate",
+            "ACCEPTED",
+            format_final_protected_live_gate_operator_message(payload),
+            payload={"final_protected_live_gate": payload},
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+        )
+    if normalized == "LIVE FINAL CHECK":
+        payload = build_final_protected_live_gate_check(log_dir=log_dir)
+        return _result(
+            "live_final_check",
+            "ACCEPTED",
+            format_final_protected_live_gate_operator_message(payload),
+            payload={"final_protected_live_gate_check": payload},
+            performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+        )
+    if normalized == "LIVE FINAL RUNBOOK":
+        payload = build_final_protected_live_gate_runbook(log_dir=log_dir)
+        return _result(
+            "live_final_runbook",
+            "ACCEPTED",
+            format_final_protected_live_gate_operator_message(payload, section="runbook"),
+            payload={"final_protected_live_gate_runbook": payload},
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
         )
     if normalized == "FIRST LIVE CLEAR":
