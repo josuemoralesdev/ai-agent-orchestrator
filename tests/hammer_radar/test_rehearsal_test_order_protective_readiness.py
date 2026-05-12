@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.execution.binance_futures_connector import append_connector_attempt
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.first_live_protective_adapter import append_first_live_protective_check
 from src.app.hammer_radar.operator.live_execution_intent import append_live_execution_intent
 from src.app.hammer_radar.operator.live_executor_rehearsal import append_live_executor_rehearsal
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
@@ -46,6 +47,7 @@ class RehearsalTestOrderProtectiveReadinessTestCase(unittest.TestCase):
         self.assertFalse(payload["execution_attempted"])
         self.assertFalse(payload["network_allowed"])
         self.assertFalse(payload["secrets_shown"])
+        self.assertEqual("fast", payload["performance"]["mode"])
 
     def test_intent_exists_but_no_rehearsal_ready_for_rehearsal(self) -> None:
         self._append_intent()
@@ -85,9 +87,9 @@ class RehearsalTestOrderProtectiveReadinessTestCase(unittest.TestCase):
         self._append_intent()
         self._append_rehearsal()
         self._append_test_order_validated()
+        self._append_protective_ready_check()
 
-        with self._patched_protective_ready():
-            payload = build_rehearsal_test_order_protective_check(execution_intent_id=self.intent_id, log_dir=self.log_dir, env={})
+        payload = build_rehearsal_test_order_protective_check(execution_intent_id=self.intent_id, log_dir=self.log_dir, env={})
 
         self.assertEqual("READY_FOR_FINAL_MANUAL_GATE", payload["status"])
         self.assertTrue(payload["protective_status"]["stop_loss_ready"])
@@ -111,9 +113,9 @@ class RehearsalTestOrderProtectiveReadinessTestCase(unittest.TestCase):
         self._append_intent()
         self._append_rehearsal()
         self._append_test_order_validated()
+        self._append_protective_ready_check(entry_allowed_without_protective=True)
 
-        with self._patched_protective_ready(entry_allowed_without_protective=True):
-            payload = build_rehearsal_test_order_protective_check(execution_intent_id=self.intent_id, log_dir=self.log_dir, env={})
+        payload = build_rehearsal_test_order_protective_check(execution_intent_id=self.intent_id, log_dir=self.log_dir, env={})
 
         self.assertEqual("BLOCKED", payload["status"])
         self.assertTrue(payload["no_naked_entry_status"]["entry_allowed_without_protective"])
@@ -247,6 +249,34 @@ class RehearsalTestOrderProtectiveReadinessTestCase(unittest.TestCase):
                 "secrets_shown": False,
                 "payload_preview": None,
                 "sanitized_signed_request": None,
+            },
+            log_dir=self.log_dir,
+        )
+
+    def _append_protective_ready_check(self, *, entry_allowed_without_protective: bool = False) -> None:
+        append_first_live_protective_check(
+            {
+                "check_id": "protective-r78",
+                "phase": "R63",
+                "event_type": "first_live_protective_adapter_check",
+                "created_at": datetime.now(UTC).isoformat(),
+                "status": "PROTECTIVE_PLAN_READY",
+                "protective_plan": {
+                    "available": True,
+                    "stop_loss_available": True,
+                    "take_profit_available": True,
+                    "blockers": [],
+                },
+                "protective_gate": {
+                    "entry_allowed_without_protective": entry_allowed_without_protective,
+                    "naked_entry_blocked": not entry_allowed_without_protective,
+                },
+                "blockers": [],
+                "order_placed": False,
+                "real_order_placed": False,
+                "execution_attempted": False,
+                "network_allowed": False,
+                "secrets_shown": False,
             },
             log_dir=self.log_dir,
         )
