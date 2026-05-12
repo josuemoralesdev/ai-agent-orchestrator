@@ -144,6 +144,12 @@ from src.app.hammer_radar.operator.post_funding_balance_verification import (
     evaluate_and_record_post_funding_balance_check,
     format_post_funding_balance_operator_message,
 )
+from src.app.hammer_radar.operator.rehearsal_test_order_protective_readiness import (
+    build_rehearsal_test_order_protective_check,
+    build_rehearsal_test_order_protective_runbook,
+    build_rehearsal_test_order_protective_status,
+    format_rehearsal_test_order_protective_operator_message,
+)
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -239,6 +245,10 @@ HELP_COMMANDS = [
     "LIVE BALANCE READINESS",
     "LIVE BALANCE RUNBOOK",
     "LIVE BALANCE CHECK <amount>",
+    "LIVE REHEARSAL READINESS",
+    "LIVE REHEARSAL RUNBOOK",
+    "LIVE REHEARSAL CHECK",
+    "LIVE PROTECTIVE READINESS",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -711,6 +721,42 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "ACCEPTED",
             format_post_funding_balance_operator_message(payload),
             payload={"post_funding_balance_check": payload},
+        )
+    if normalized == "LIVE REHEARSAL READINESS":
+        payload = build_rehearsal_test_order_protective_status(log_dir=log_dir)
+        return _result(
+            "live_rehearsal_readiness",
+            "ACCEPTED",
+            format_rehearsal_test_order_protective_operator_message(payload),
+            payload={"rehearsal_test_order_protective_readiness": payload},
+            signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+        )
+    if normalized == "LIVE REHEARSAL RUNBOOK":
+        payload = build_rehearsal_test_order_protective_runbook(log_dir=log_dir)
+        return _result(
+            "live_rehearsal_runbook",
+            "ACCEPTED",
+            format_rehearsal_test_order_protective_operator_message(payload, section="runbook"),
+            payload={"rehearsal_test_order_protective_runbook": payload},
+            signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+        )
+    if normalized == "LIVE REHEARSAL CHECK":
+        payload = build_rehearsal_test_order_protective_check(log_dir=log_dir)
+        return _result(
+            "live_rehearsal_check",
+            "ACCEPTED",
+            format_rehearsal_test_order_protective_operator_message(payload),
+            payload={"rehearsal_test_order_protective_check": payload},
+            signal_id=(payload.get("chain_state") or {}).get("signal_id"),
+        )
+    if normalized == "LIVE PROTECTIVE READINESS":
+        payload = build_rehearsal_test_order_protective_status(log_dir=log_dir)
+        return _result(
+            "live_protective_readiness",
+            "ACCEPTED",
+            format_rehearsal_test_order_protective_operator_message(payload, section="protective"),
+            payload={"rehearsal_test_order_protective_readiness": payload},
+            signal_id=(payload.get("chain_state") or {}).get("signal_id"),
         )
     if normalized == "FIRST LIVE CLEAR":
         payload = clear_selected_signal(log_dir=log_dir, source=source, reason="telegram clear")
