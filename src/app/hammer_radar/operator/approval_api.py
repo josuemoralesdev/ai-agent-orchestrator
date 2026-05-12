@@ -179,6 +179,11 @@ from src.app.hammer_radar.operator.rehearsal_test_order_protective_readiness imp
     build_rehearsal_test_order_protective_runbook,
     build_rehearsal_test_order_protective_status,
 )
+from src.app.hammer_radar.operator.final_protected_live_gate_review import (
+    build_final_protected_live_gate_check,
+    build_final_protected_live_gate_runbook,
+    build_final_protected_live_gate_status,
+)
 from src.app.hammer_radar.operator.live_preflight import (
     build_promoted_strategy_preflight,
     evaluate_and_record_live_preflight,
@@ -354,6 +359,12 @@ class RehearsalTestOrderProtectiveReadinessRequest(BaseModel):
     signal_id: str | None = None
     execution_intent_id: str | None = None
     available_usdt: float | None = None
+
+
+class FinalProtectedLiveGateRequest(BaseModel):
+    available_usdt: float | None = None
+    signal_id: str | None = None
+    execution_intent_id: str | None = None
 
 
 class LiveExecutorRehearsalRequest(BaseModel):
@@ -1150,6 +1161,27 @@ def live_operator_performance_status() -> dict:
         "network_allowed": False,
         "secrets_shown": False,
     }
+
+
+@app.get("/live/final-gate/status")
+def live_final_gate_status() -> dict:
+    return build_final_protected_live_gate_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live/final-gate/runbook")
+def live_final_gate_runbook() -> dict:
+    return build_final_protected_live_gate_runbook(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live/final-gate/check")
+def live_final_gate_check(request: FinalProtectedLiveGateRequest | None = None) -> dict:
+    request = request or FinalProtectedLiveGateRequest()
+    return build_final_protected_live_gate_check(
+        available_usdt=request.available_usdt,
+        signal_id=request.signal_id,
+        execution_intent_id=request.execution_intent_id,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.post("/live/first-candidates/select")
