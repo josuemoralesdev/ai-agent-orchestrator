@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.betrayal_candle_archive import load_archive_candles
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     OUTCOMES_FILENAME,
     RESOLVED_STATUSES,
@@ -333,7 +334,7 @@ def load_resolved_betrayal_shadow_records(*, log_dir: str | Path | None = None) 
 
 def load_local_candles(*, log_dir: str | Path | None = None) -> list[dict[str, Any]]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
-    candles: list[dict[str, Any]] = []
+    candles: list[dict[str, Any]] = load_archive_candles(log_dir=resolved_log_dir)
     for filename in CANDLE_FILENAMES:
         path = resolved_log_dir / filename
         if not path.exists():

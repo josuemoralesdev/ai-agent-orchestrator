@@ -42,6 +42,8 @@ paper_candles.ndjson
 
 No network fetch is allowed. If local candles are missing, the record stays `SHADOW_NO_DATA`.
 
+R81.2 adds a local candle archive bridge. When `candle_archive/*.ndjson` records are present, the resolver reads those archive candles before falling back to flat local candle files.
+
 ## Resolution Rules
 
 - If take-profit is hit first: `SHADOW_WIN`
