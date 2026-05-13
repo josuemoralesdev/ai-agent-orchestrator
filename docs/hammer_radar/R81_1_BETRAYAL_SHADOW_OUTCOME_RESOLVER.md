@@ -44,6 +44,8 @@ No network fetch is allowed. If local candles are missing, the record stays `SHA
 
 R81.2 adds a local candle archive bridge. When `candle_archive/*.ndjson` records are present, the resolver reads those archive candles before falling back to flat local candle files.
 
+R81.4 adds strict timestamp alignment on top of candle availability. A candle can only resolve a shadow record when it matches symbol/timeframe and falls between the original `signal_timestamp` and the deterministic forward evaluation window. Candle coverage alone is not enough.
+
 ## Resolution Rules
 
 - If take-profit is hit first: `SHADOW_WIN`
@@ -51,8 +53,33 @@ R81.2 adds a local candle archive bridge. When `candle_archive/*.ndjson` records
 - If neither level is hit in available candles: `SHADOW_OPEN`
 - If candle data is missing: `SHADOW_NO_DATA`
 - If required record fields are missing: `SHADOW_UNRESOLVED`
+- If candles exist but none align with the signal window: `SHADOW_NO_DATA` with `no_temporally_aligned_candles`
 
 The resolver computes `shadow_pnl_pct` and `true_inverse_pnl_pct` from the shadow direction, entry, and exit price.
+
+## R81.4 Temporal Alignment
+
+R81.4 was added after unsafe smoke output showed April 2026 shadow signals being resolved from May 13, 2026 archive candles. Those persisted rows are treated as invalid evidence.
+
+The resolver now annotates resolution output with:
+
+```text
+signal_timestamp
+resolved_candle_timestamp
+evaluation_window_start
+evaluation_window_end
+temporal_alignment_ok
+temporal_alignment_status
+resolution_blockers
+```
+
+The default evaluation window is:
+
+```text
+signal_timestamp through signal_timestamp + max(3 * timeframe duration, 60 minutes)
+```
+
+Persisted resolver rows that fail this check are not merged into R81 validation sample counts. They remain visible in resolution summaries as invalid/quarantined evidence instead of being deleted.
 
 ## Conservative Tie Behavior
 

@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     SHADOW_WIN,
     load_betrayal_shadow_outcomes,
 )
+from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_MINUTES
 
 PHASE = "R81.1"
 SYSTEM = "money_printing_machine_hammer_radar"
@@ -39,6 +40,11 @@ CANDLE_FILENAMES = (
     "paper_candles.ndjson",
 )
 UNRESOLVED_STATUSES = {SHADOW_OPEN, SHADOW_NO_DATA, SHADOW_UNRESOLVED}
+EVALUATION_WINDOW_MULTIPLIER = 3
+MIN_EVALUATION_WINDOW_MINUTES = 60
+TEMPORAL_ALIGNMENT_OK = "TEMPORAL_ALIGNMENT_OK"
+TEMPORAL_ALIGNMENT_INVALID = "TEMPORAL_ALIGNMENT_INVALID"
+TEMPORAL_ALIGNMENT_MISSING_DATA = "TEMPORAL_ALIGNMENT_MISSING_DATA"
 
 LIVE_EXECUTION_ENABLED = False
 ALLOW_LIVE_ORDERS = False
@@ -74,8 +80,17 @@ def resolve_betrayal_shadow_outcomes(
     )
     if limit > 0:
         source_records = source_records[:limit]
-    existing_resolutions = load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=False)
-    existing_ids = {str(record.get("shadow_outcome_id")) for record in existing_resolutions}
+    existing_resolutions = annotate_resolution_records(
+        load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=False)
+    )
+    existing_valid_ids = {
+        str(record.get("shadow_outcome_id"))
+        for record in existing_resolutions
+        if record.get("temporal_alignment_ok") is True
+    }
+    invalid_resolution_records = sum(
+        1 for record in existing_resolutions if record.get("temporal_alignment_ok") is False
+    )
     candles = load_local_candles(log_dir=resolved_log_dir)
 
     resolution_records: list[dict[str, Any]] = []
@@ -86,7 +101,7 @@ def resolve_betrayal_shadow_outcomes(
     unresolved = 0
 
     for record in source_records:
-        if str(record.get("shadow_status")) in RESOLVED_STATUSES or str(record.get("shadow_outcome_id")) in existing_ids:
+        if str(record.get("shadow_status")) in RESOLVED_STATUSES or str(record.get("shadow_outcome_id")) in existing_valid_ids:
             already_resolved += 1
             continue
         result = resolve_shadow_record(record, candles=candles, generated_at=generated_at)
@@ -133,6 +148,7 @@ def resolve_betrayal_shadow_outcomes(
             "still_open_records": still_open,
             "no_data_records": no_data,
             "unresolved_records": unresolved,
+            "invalid_resolution_records": invalid_resolution_records,
             "resolution_summary": _resolution_summary(combined_records),
             "timeframe_summary": _group_summary(combined_records, ("timeframe",)),
             "direction_entry_mode_summary": _group_summary(
@@ -142,6 +158,7 @@ def resolve_betrayal_shadow_outcomes(
             "target_summary": {
                 "222m": _target_summary(combined_records, "222m"),
                 "88m": _target_summary(combined_records, "88m"),
+                "55m": _target_summary(combined_records, "55m"),
             },
             "records": resolution_records,
             "blockers": sorted(set(blockers)),
@@ -164,9 +181,13 @@ def resolve_shadow_record(
 ) -> dict[str, Any]:
     generated_at = generated_at or datetime.now(UTC)
     blockers = _record_blockers(record)
+    candidate_candles = _candidate_symbol_timeframe_candles(record, candles)
     matching_candles = _matching_candles(record, candles)
     if not matching_candles:
-        blockers.append("no local candle data found after signal timestamp")
+        if candidate_candles:
+            blockers.append("no_temporally_aligned_candles")
+        else:
+            blockers.append("no local candle data found for symbol/timeframe")
         return _unresolved_result(record, status=SHADOW_NO_DATA, blockers=blockers, generated_at=generated_at)
     if blockers:
         return _unresolved_result(record, status=SHADOW_UNRESOLVED, blockers=blockers, generated_at=generated_at)
@@ -188,6 +209,7 @@ def resolve_shadow_record(
                 exit_price=stop,
                 close_reason="stop",
                 candle_timestamp=candle_timestamp,
+                alignment=is_candle_temporally_valid_for_shadow_record(record, candle),
                 generated_at=generated_at,
             )
         if take_profit_hit:
@@ -197,6 +219,7 @@ def resolve_shadow_record(
                 exit_price=take_profit,
                 close_reason="take_profit",
                 candle_timestamp=candle_timestamp,
+                alignment=is_candle_temporally_valid_for_shadow_record(record, candle),
                 generated_at=generated_at,
             )
     return _unresolved_result(
@@ -216,11 +239,12 @@ def build_betrayal_shadow_resolutions_payload(
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     records = load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=True)
+    records = annotate_resolution_records(records)
     records = _filter_plain_records(records, symbol=symbol, timeframe=timeframe)
     if limit > 0:
         records = records[:limit]
     all_records = _filter_plain_records(
-        load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=False),
+        annotate_resolution_records(load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=False)),
         symbol=symbol,
         timeframe=timeframe,
     )
@@ -269,9 +293,10 @@ def build_betrayal_shadow_resolve_text(
         f"no_data_records: {payload.get('no_data_records')}",
         f"still_open_records: {payload.get('still_open_records')}",
         f"unresolved_records: {payload.get('unresolved_records')}",
+        f"invalid_resolution_records: {payload.get('invalid_resolution_records', 0)}",
         "target_summary:",
     ]
-    for target in ("222m", "88m"):
+    for target in ("222m", "88m", "55m"):
         summary = target_summary.get(target) if isinstance(target_summary.get(target), dict) else {}
         lines.append(
             f"  {target}: resolved={summary.get('resolved_records', 0)} "
@@ -316,7 +341,9 @@ def merge_shadow_records_with_resolutions(
     resolution_records: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     by_id = {str(record.get("shadow_outcome_id")): dict(record) for record in shadow_records}
-    for resolution in resolution_records:
+    for resolution in annotate_resolution_records(resolution_records):
+        if resolution.get("temporal_alignment_ok") is False:
+            continue
         shadow_id = str(resolution.get("shadow_outcome_id"))
         merged = dict(by_id.get(shadow_id, {}))
         merged.update(resolution)
@@ -330,6 +357,45 @@ def load_resolved_betrayal_shadow_records(*, log_dir: str | Path | None = None) 
         load_betrayal_shadow_outcomes(log_dir=resolved_log_dir, newest_first=False),
         load_betrayal_shadow_resolutions(log_dir=resolved_log_dir, newest_first=False),
     )
+
+
+def load_betrayal_shadow_resolution_quality_summary(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    records = annotate_resolution_records(load_betrayal_shadow_resolutions(log_dir=log_dir, newest_first=False))
+    return {
+        "persisted_resolution_records": len(records),
+        "temporally_valid_resolved_records": sum(
+            1
+            for record in records
+            if record.get("shadow_status") in RESOLVED_STATUSES and record.get("temporal_alignment_ok") is True
+        ),
+        "temporally_invalid_resolved_records": sum(
+            1
+            for record in records
+            if record.get("shadow_status") in RESOLVED_STATUSES and record.get("temporal_alignment_ok") is False
+        ),
+        "invalid_resolution_records": sum(
+            1
+            for record in records
+            if record.get("shadow_status") in RESOLVED_STATUSES and record.get("temporal_alignment_ok") is False
+        ),
+    }
+
+
+def annotate_resolution_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    annotated = []
+    for record in records:
+        payload = dict(record)
+        if payload.get("shadow_status") in RESOLVED_STATUSES or payload.get("resolved_candle_timestamp"):
+            alignment = validate_resolution_temporal_alignment(payload)
+            payload.update(alignment)
+            if alignment["ok"] is False:
+                blockers = list(payload.get("resolution_blockers") or [])
+                blockers.extend(alignment["blockers"])
+                payload["resolution_blockers"] = sorted(set(blockers))
+            payload["temporal_alignment_ok"] = alignment["ok"]
+            payload["temporal_alignment_status"] = alignment["status"]
+        annotated.append(payload)
+    return annotated
 
 
 def load_local_candles(*, log_dir: str | Path | None = None) -> list[dict[str, Any]]:
@@ -349,6 +415,71 @@ def load_local_candles(*, log_dir: str | Path | None = None) -> list[dict[str, A
                     candles.append(candle)
     candles.sort(key=lambda candle: str(candle.get("timestamp") or candle.get("open_time") or candle.get("close_time") or ""))
     return candles
+
+
+def is_candle_temporally_valid_for_shadow_record(
+    record: Mapping[str, Any],
+    candle: Mapping[str, Any],
+) -> dict[str, Any]:
+    window = _evaluation_window(record)
+    candle_time = _parse_timestamp(_candle_timestamp(candle))
+    blockers = []
+    if window["start"] is None or window["end"] is None:
+        blockers.append("missing_signal_timestamp")
+    if candle_time is None:
+        blockers.append("missing_candle_timestamp")
+    if str(candle.get("symbol") or record.get("symbol") or "") != str(record.get("symbol") or ""):
+        blockers.append("candle_symbol_mismatch")
+    if str(candle.get("timeframe") or record.get("timeframe") or "") != str(record.get("timeframe") or ""):
+        blockers.append("candle_timeframe_mismatch")
+    if candle_time is not None and window["start"] is not None and candle_time < window["start"]:
+        blockers.append("candle_before_signal_timestamp")
+    if candle_time is not None and window["end"] is not None and candle_time > window["end"]:
+        blockers.append("candle_after_evaluation_window")
+    if blockers:
+        return {
+            "ok": False,
+            "status": TEMPORAL_ALIGNMENT_INVALID,
+            "blockers": blockers,
+            "evaluation_window_start": _format_dt(window["start"]),
+            "evaluation_window_end": _format_dt(window["end"]),
+        }
+    return {
+        "ok": True,
+        "status": TEMPORAL_ALIGNMENT_OK,
+        "blockers": [],
+        "evaluation_window_start": _format_dt(window["start"]),
+        "evaluation_window_end": _format_dt(window["end"]),
+    }
+
+
+def validate_resolution_temporal_alignment(record: Mapping[str, Any]) -> dict[str, Any]:
+    window = _evaluation_window(record)
+    resolved_time = _parse_timestamp(str(record.get("resolved_candle_timestamp") or ""))
+    blockers = []
+    if window["start"] is None or window["end"] is None:
+        blockers.append("missing_signal_timestamp")
+    if resolved_time is None:
+        blockers.append("missing_resolved_candle_timestamp")
+    if resolved_time is not None and window["start"] is not None and resolved_time < window["start"]:
+        blockers.append("resolved_candle_before_signal_timestamp")
+    if resolved_time is not None and window["end"] is not None and resolved_time > window["end"]:
+        blockers.append("resolved_candle_after_evaluation_window")
+    if blockers:
+        return {
+            "ok": False,
+            "status": TEMPORAL_ALIGNMENT_INVALID,
+            "blockers": blockers,
+            "evaluation_window_start": _format_dt(window["start"]),
+            "evaluation_window_end": _format_dt(window["end"]),
+        }
+    return {
+        "ok": True,
+        "status": TEMPORAL_ALIGNMENT_OK,
+        "blockers": [],
+        "evaluation_window_start": _format_dt(window["start"]),
+        "evaluation_window_end": _format_dt(window["end"]),
+    }
 
 
 def _candidate_records(
@@ -386,22 +517,23 @@ def _filter_plain_records(
     return filtered
 
 
-def _matching_candles(record: Mapping[str, Any], candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    signal_time = _parse_timestamp(str(record.get("signal_timestamp") or ""))
-    if signal_time is None:
-        return []
+def _candidate_symbol_timeframe_candles(record: Mapping[str, Any], candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     symbol = str(record.get("symbol") or "")
     timeframe = str(record.get("timeframe") or "")
-    matched = []
-    for candle in candles:
-        candle_time = _parse_timestamp(str(candle.get("timestamp") or candle.get("open_time") or candle.get("close_time") or ""))
-        if candle_time is None or candle_time <= signal_time:
-            continue
-        if str(candle.get("symbol") or symbol) != symbol:
-            continue
-        if str(candle.get("timeframe") or timeframe) != timeframe:
-            continue
-        matched.append(candle)
+    return [
+        candle
+        for candle in candles
+        if str(candle.get("symbol") or symbol) == symbol and str(candle.get("timeframe") or timeframe) == timeframe
+    ]
+
+
+def _matching_candles(record: Mapping[str, Any], candles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    matched = [
+        candle
+        for candle in _candidate_symbol_timeframe_candles(record, candles)
+        if is_candle_temporally_valid_for_shadow_record(record, candle)["ok"] is True
+    ]
+    matched.sort(key=lambda candle: _candle_timestamp(candle))
     return matched
 
 
@@ -421,6 +553,7 @@ def _unresolved_result(
     generated_at: datetime,
 ) -> dict[str, Any]:
     payload = dict(record)
+    window = _evaluation_window(record)
     payload.update(
         {
             "resolver_phase": PHASE,
@@ -428,6 +561,10 @@ def _unresolved_result(
             "resolved_at": None,
             "resolution_status": status,
             "shadow_status": status,
+            "evaluation_window_start": _format_dt(window["start"]),
+            "evaluation_window_end": _format_dt(window["end"]),
+            "temporal_alignment_ok": False,
+            "temporal_alignment_status": TEMPORAL_ALIGNMENT_MISSING_DATA,
             "resolution_blockers": blockers,
             **_safety_fields(),
         }
@@ -442,6 +579,7 @@ def _resolved_result(
     exit_price: float,
     close_reason: str,
     candle_timestamp: str,
+    alignment: Mapping[str, Any],
     generated_at: datetime,
 ) -> dict[str, Any]:
     direction = str(record.get("shadow_direction") or "")
@@ -455,6 +593,10 @@ def _resolved_result(
             "resolved_at": generated_at.isoformat(),
             "resolution_status": status,
             "resolved_candle_timestamp": candle_timestamp,
+            "evaluation_window_start": alignment.get("evaluation_window_start"),
+            "evaluation_window_end": alignment.get("evaluation_window_end"),
+            "temporal_alignment_ok": alignment.get("ok") is True,
+            "temporal_alignment_status": alignment.get("status"),
             "shadow_status": status,
             "shadow_exit_price": round(float(exit_price), 4),
             "shadow_close_reason": close_reason,
@@ -465,7 +607,7 @@ def _resolved_result(
                 "original_better": status == SHADOW_LOSS,
                 "inconclusive": False,
             },
-            "resolution_blockers": [],
+            "resolution_blockers": list(alignment.get("blockers") or []),
             **_safety_fields(),
         }
     )
@@ -476,11 +618,21 @@ def _resolution_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     wins = sum(1 for record in records if record.get("shadow_status") == SHADOW_WIN)
     losses = sum(1 for record in records if record.get("shadow_status") == SHADOW_LOSS)
     resolved = sum(1 for record in records if record.get("shadow_status") in RESOLVED_STATUSES)
+    invalid = sum(
+        1
+        for record in records
+        if record.get("shadow_status") in RESOLVED_STATUSES and record.get("temporal_alignment_ok") is False
+    )
     no_data = sum(1 for record in records if record.get("shadow_status") == SHADOW_NO_DATA)
     unresolved = sum(1 for record in records if record.get("shadow_status") in {SHADOW_OPEN, SHADOW_UNRESOLVED})
     return {
         "total_records": len(records),
         "resolved_records": resolved,
+        "temporally_valid_resolved_records": sum(
+            1 for record in records if record.get("shadow_status") in RESOLVED_STATUSES and record.get("temporal_alignment_ok") is not False
+        ),
+        "temporally_invalid_resolved_records": invalid,
+        "invalid_resolution_records": invalid,
         "wins": wins,
         "losses": losses,
         "no_data_records": no_data,
@@ -529,6 +681,40 @@ def _valid_candle(candle: Mapping[str, Any]) -> bool:
     return all(candle.get(key) is not None for key in ("high", "low")) and bool(
         candle.get("timestamp") or candle.get("open_time") or candle.get("close_time")
     )
+
+
+def _evaluation_window(record: Mapping[str, Any]) -> dict[str, datetime | None]:
+    signal_time = _parse_timestamp(str(record.get("signal_timestamp") or ""))
+    if signal_time is None:
+        return {"start": None, "end": None}
+    timeframe_minutes = _timeframe_minutes(str(record.get("timeframe") or ""))
+    window_minutes = max(timeframe_minutes * EVALUATION_WINDOW_MULTIPLIER, MIN_EVALUATION_WINDOW_MINUTES)
+    return {"start": signal_time, "end": signal_time + timedelta(minutes=window_minutes)}
+
+
+def _timeframe_minutes(timeframe: str) -> int:
+    if timeframe in TIMEFRAME_MINUTES:
+        return int(TIMEFRAME_MINUTES[timeframe])
+    normalized = timeframe.strip()
+    if normalized.endswith("m"):
+        try:
+            return int(normalized[:-1])
+        except ValueError:
+            return MIN_EVALUATION_WINDOW_MINUTES
+    if normalized.endswith("H"):
+        try:
+            return int(normalized[:-1]) * 60
+        except ValueError:
+            return MIN_EVALUATION_WINDOW_MINUTES
+    return MIN_EVALUATION_WINDOW_MINUTES
+
+
+def _candle_timestamp(candle: Mapping[str, Any]) -> str:
+    return str(candle.get("timestamp") or candle.get("open_time") or candle.get("close_time") or "")
+
+
+def _format_dt(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
 
 
 def _parse_timestamp(value: str) -> datetime | None:
