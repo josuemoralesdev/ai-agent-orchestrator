@@ -41,6 +41,10 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     track_betrayal_shadow_outcomes,
 )
 from src.app.hammer_radar.operator.betrayal_inverse_validation import build_betrayal_inverse_validation
+from src.app.hammer_radar.operator.betrayal_candle_archive import (
+    build_betrayal_candle_archive,
+    build_betrayal_candle_archive_status,
+)
 from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
     build_betrayal_shadow_resolutions_payload,
     resolve_betrayal_shadow_outcomes,
@@ -459,6 +463,15 @@ class BetrayalShadowResolveRequest(BaseModel):
     timeframe: str | None = None
     dry_run: bool = True
     write: bool = False
+    since_hours: int | None = None
+
+
+class BetrayalCandleArchiveRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    symbol: str | None = None
+    timeframe: str | None = None
+    limit: int = 0
     since_hours: int | None = None
 
 
@@ -1415,6 +1428,32 @@ def betrayal_shadow_resolutions(
 ) -> dict:
     return build_betrayal_shadow_resolutions_payload(
         limit=limit,
+        symbol=symbol,
+        timeframe=timeframe,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/betrayal-shadow/candle-archive/build")
+def betrayal_shadow_candle_archive_build(request: BetrayalCandleArchiveRequest | None = None) -> dict:
+    request = request or BetrayalCandleArchiveRequest()
+    return build_betrayal_candle_archive(
+        dry_run=request.dry_run,
+        write=request.write,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        limit=request.limit,
+        since_hours=request.since_hours,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/betrayal-shadow/candle-archive/status")
+def betrayal_shadow_candle_archive_status(
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> dict:
+    return build_betrayal_candle_archive_status(
         symbol=symbol,
         timeframe=timeframe,
         log_dir=get_log_dir(use_env=True),

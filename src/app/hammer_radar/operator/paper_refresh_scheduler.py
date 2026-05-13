@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.betrayal_candle_archive import build_betrayal_candle_archive
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import track_betrayal_shadow_outcomes
 from src.app.hammer_radar.operator.betrayal_shadow_resolver import resolve_betrayal_shadow_outcomes
 from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_candidate
@@ -40,6 +41,7 @@ TASK_ETH_PAPER_CANDIDATE = "eth_paper_candidate"
 TASK_ETH_PAPER_OUTCOME = "eth_paper_outcome"
 TASK_BETRAYAL_SHADOW_TRACK = "betrayal_shadow_track"
 TASK_BETRAYAL_SHADOW_RESOLVE = "betrayal_shadow_resolve"
+TASK_BETRAYAL_CANDLE_ARCHIVE = "betrayal_candle_archive"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -50,7 +52,7 @@ DEFAULT_TASKS = [
     TASK_BETRAYAL_SHADOW_TRACK,
     TASK_NOTIFICATION_CHECK,
 ]
-AVAILABLE_TASKS = (*DEFAULT_TASKS, TASK_BETRAYAL_SHADOW_RESOLVE)
+AVAILABLE_TASKS = (*DEFAULT_TASKS, TASK_BETRAYAL_SHADOW_RESOLVE, TASK_BETRAYAL_CANDLE_ARCHIVE)
 
 
 @dataclass(frozen=True)
@@ -260,6 +262,24 @@ def run_refresh_task(
             detail={
                 "scanned_records": result.get("scanned_records"),
                 "newly_resolved_records": result.get("newly_resolved_records"),
+                "dry_run": result.get("dry_run"),
+                "write": result.get("write"),
+            },
+        )
+    if task == TASK_BETRAYAL_CANDLE_ARCHIVE:
+        result = build_betrayal_candle_archive(
+            limit=100,
+            since_hours=24,
+            dry_run=True,
+            write=False,
+            log_dir=log_dir,
+        )
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candles_found": result.get("candles_found"),
+                "candles_written": result.get("candles_written"),
                 "dry_run": result.get("dry_run"),
                 "write": result.get("write"),
             },

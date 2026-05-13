@@ -626,6 +626,19 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "betrayal-candle-archive":
+        from src.app.hammer_radar.operator.betrayal_candle_archive import build_betrayal_candle_archive_text
+
+        print(
+            build_betrayal_candle_archive_text(
+                symbol=args.symbol,
+                timeframe=args.timeframe,
+                limit=args.limit,
+                since_hours=args.since_hours,
+                write=args.write,
+                log_dir=args.log_dir,
+            )
+        )
     elif args.command == "betrayal-strategy-audit":
         from src.app.hammer_radar.operator.betrayal_strategy_audit import (
             build_betrayal_strategy_audit,
@@ -960,6 +973,13 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_shadow_resolve_parser.add_argument("--timeframe", default=None)
     betrayal_shadow_resolve_parser.add_argument("--since-hours", type=int, default=None)
     betrayal_shadow_resolve_parser.add_argument("--write", action="store_true")
+
+    betrayal_candle_archive_parser = subparsers.add_parser("betrayal-candle-archive", parents=[parent])
+    betrayal_candle_archive_parser.add_argument("--symbol", default=None)
+    betrayal_candle_archive_parser.add_argument("--timeframe", default=None)
+    betrayal_candle_archive_parser.add_argument("--limit", type=int, default=0)
+    betrayal_candle_archive_parser.add_argument("--since-hours", type=int, default=None)
+    betrayal_candle_archive_parser.add_argument("--write", action="store_true")
 
     subparsers.add_parser("betrayal-strategy-audit", parents=[parent])
     subparsers.add_parser("betrayal-inverse-validation", parents=[parent])

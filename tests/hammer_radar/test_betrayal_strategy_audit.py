@@ -19,6 +19,10 @@ from src.app.hammer_radar.operator.betrayal_inverse_validation import (
     TRUE_INVERSE_VALIDATED_PRIMARY,
     build_betrayal_inverse_validation,
 )
+from src.app.hammer_radar.operator.betrayal_candle_archive import (
+    build_betrayal_candle_archive,
+    build_betrayal_candle_archive_status,
+)
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     OUTCOMES_FILENAME,
     SHADOW_LOSS,
@@ -497,6 +501,161 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("scanned_records: 1", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r81_2_candle_archive_payload_returns_safe_fields(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        payload = build_betrayal_candle_archive(log_dir=self.log_dir)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R81.2", payload["phase"])
+        self.assertEqual("BETRAYAL_CANDLE_ARCHIVE_REPLAY_BRIDGE_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual(1, payload["candles_found"])
+        self.assertEqual(0, payload["candles_written"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r81_2_dry_run_and_write_false_do_not_write_archive_files(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        dry_run = build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=True, write=True)
+        no_write = build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=False, write=False)
+
+        self.assertEqual(1, dry_run["candles_found"])
+        self.assertEqual(1, no_write["candles_found"])
+        self.assertFalse((self.log_dir / "candle_archive").exists())
+
+    def test_r81_2_write_true_writes_local_archive_only_and_dedupes(self) -> None:
+        self._write_candles(
+            [
+                self._candle("222m", high=106.0, low=99.0),
+                self._candle("222m", high=106.0, low=99.0),
+            ]
+        )
+
+        payload = build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=False, write=True)
+        second = build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=False, write=True)
+
+        archive_path = self.log_dir / "candle_archive" / "BTCUSDT_222m.ndjson"
+        self.assertTrue(archive_path.exists())
+        self.assertEqual(1, payload["candles_written"])
+        self.assertEqual(0, second["candles_written"])
+        self.assertEqual(1, len(self._read_jsonl(archive_path)))
+
+    def test_r81_2_archive_status_reports_available_candles(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+        build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=False, write=True)
+
+        payload = build_betrayal_candle_archive_status(log_dir=self.log_dir)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual(1, payload["available"][0]["candle_count"])
+        self.assertEqual("222m", payload["available"][0]["timeframe"])
+
+    def test_r81_2_missing_archive_keeps_resolver_no_data_behavior(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(0, payload["newly_resolved_records"])
+        self.assertEqual(1, payload["no_data_records"])
+
+    def test_r81_2_resolver_consumes_archive_candles(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+        build_betrayal_candle_archive(log_dir=self.log_dir, dry_run=False, write=True)
+        (self.log_dir / "candles.ndjson").unlink()
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(1, payload["newly_resolved_records"])
+        self.assertEqual(SHADOW_WIN, payload["records"][0]["shadow_status"])
+
+    def test_r81_2_archive_tp_sl_and_same_candle_resolution_paths(self) -> None:
+        for high, low, expected in ((106.0, 99.0, SHADOW_WIN), (101.0, 94.0, SHADOW_LOSS), (106.0, 94.0, SHADOW_LOSS)):
+            with self.subTest(high=high, low=low):
+                temp_dir = tempfile.TemporaryDirectory()
+                case_dir = Path(temp_dir.name)
+                self._write_shadow_records_to(case_dir, [self._unresolved_shadow_record("222m", index=0)])
+                self._write_candles_to(case_dir, [self._candle("222m", high=high, low=low)])
+                build_betrayal_candle_archive(log_dir=case_dir, dry_run=False, write=True)
+                (case_dir / "candles.ndjson").unlink()
+
+                payload = resolve_betrayal_shadow_outcomes(log_dir=case_dir)
+
+                self.assertEqual(expected, payload["records"][0]["shadow_status"])
+                temp_dir.cleanup()
+
+    def test_r81_2_target_coverage_reports_222m_88m_and_55m(self) -> None:
+        self._write_shadow_records(
+            [
+                self._unresolved_shadow_record("222m", index=0),
+                self._unresolved_shadow_record("88m", index=1),
+                self._unresolved_shadow_record("55m", index=2),
+            ]
+        )
+        self._write_candles(
+            [
+                self._candle("222m", high=106.0, low=99.0),
+                self._candle("88m", high=106.0, low=99.0),
+                self._candle("55m", high=106.0, low=99.0),
+            ]
+        )
+
+        payload = build_betrayal_candle_archive(log_dir=self.log_dir)
+
+        self.assertEqual(1, payload["target_coverage"]["222m"]["covered_records"])
+        self.assertEqual(1, payload["target_coverage"]["88m"]["covered_records"])
+        self.assertEqual(1, payload["target_coverage"]["55m"]["covered_records"])
+
+    def test_r81_2_api_endpoints_are_safe(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        build_response = self.client.post(
+            "/betrayal-shadow/candle-archive/build",
+            json={"dry_run": True, "write": False, "limit": 20},
+        )
+        status_response = self.client.get("/betrayal-shadow/candle-archive/status")
+
+        self.assertEqual(200, build_response.status_code)
+        self.assertEqual(200, status_response.status_code)
+        self.assertEqual("R81.2", build_response.json()["phase"])
+        self.assertFalse(build_response.json()["order_placed"])
+        self.assertFalse(build_response.json()["network_allowed"])
+        self.assertFalse(status_response.json()["order_placed"])
+
+    def test_r81_2_cli_command_exists(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-candle-archive",
+                "--limit",
+                "20",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R81.2 betrayal candle archive: OK", result.stdout)
+        self.assertIn("candles_found: 1", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -585,13 +744,21 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(sample_count, len(pnl_values))
 
     def _write_shadow_records(self, records: list[dict]) -> None:
-        path = self.log_dir / OUTCOMES_FILENAME
+        self._write_shadow_records_to(self.log_dir, records)
+
+    @staticmethod
+    def _write_shadow_records_to(log_dir: Path, records: list[dict]) -> None:
+        path = log_dir / OUTCOMES_FILENAME
         with path.open("w", encoding="utf-8") as handle:
             for record in records:
                 handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     def _write_candles(self, records: list[dict]) -> None:
-        path = self.log_dir / "candles.ndjson"
+        self._write_candles_to(self.log_dir, records)
+
+    @staticmethod
+    def _write_candles_to(log_dir: Path, records: list[dict]) -> None:
+        path = log_dir / "candles.ndjson"
         with path.open("w", encoding="utf-8") as handle:
             for record in records:
                 handle.write(json.dumps(record, sort_keys=True) + "\n")
