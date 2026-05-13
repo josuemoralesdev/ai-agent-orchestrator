@@ -18,6 +18,7 @@ from typing import Any
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import track_betrayal_shadow_outcomes
+from src.app.hammer_radar.operator.betrayal_shadow_resolver import resolve_betrayal_shadow_outcomes
 from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_candidate
 from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
@@ -38,6 +39,7 @@ TASK_MULTI_SYMBOL_SCAN = "multi_symbol_scan"
 TASK_ETH_PAPER_CANDIDATE = "eth_paper_candidate"
 TASK_ETH_PAPER_OUTCOME = "eth_paper_outcome"
 TASK_BETRAYAL_SHADOW_TRACK = "betrayal_shadow_track"
+TASK_BETRAYAL_SHADOW_RESOLVE = "betrayal_shadow_resolve"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -48,7 +50,7 @@ DEFAULT_TASKS = [
     TASK_BETRAYAL_SHADOW_TRACK,
     TASK_NOTIFICATION_CHECK,
 ]
-AVAILABLE_TASKS = tuple(DEFAULT_TASKS)
+AVAILABLE_TASKS = (*DEFAULT_TASKS, TASK_BETRAYAL_SHADOW_RESOLVE)
 
 
 @dataclass(frozen=True)
@@ -242,6 +244,24 @@ def run_refresh_task(
                 "updated": result.get("updated"),
                 "candidate_count": result.get("candidate_count"),
                 "shadow_only": result.get("shadow_only"),
+            },
+        )
+    if task == TASK_BETRAYAL_SHADOW_RESOLVE:
+        result = resolve_betrayal_shadow_outcomes(
+            limit=50,
+            since_hours=24,
+            dry_run=True,
+            write=False,
+            log_dir=log_dir,
+        )
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "scanned_records": result.get("scanned_records"),
+                "newly_resolved_records": result.get("newly_resolved_records"),
+                "dry_run": result.get("dry_run"),
+                "write": result.get("write"),
             },
         )
     if task == TASK_NOTIFICATION_CHECK:

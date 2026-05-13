@@ -19,7 +19,16 @@ from src.app.hammer_radar.operator.betrayal_inverse_validation import (
     TRUE_INVERSE_VALIDATED_PRIMARY,
     build_betrayal_inverse_validation,
 )
-from src.app.hammer_radar.operator.betrayal_shadow_outcomes import OUTCOMES_FILENAME, SHADOW_LOSS, SHADOW_WIN
+from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
+    OUTCOMES_FILENAME,
+    SHADOW_LOSS,
+    SHADOW_NO_DATA,
+    SHADOW_WIN,
+)
+from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
+    RESOLUTIONS_FILENAME,
+    resolve_betrayal_shadow_outcomes,
+)
 from src.app.hammer_radar.operator.betrayal_strategy_audit import (
     BETRAYAL_PRIMARY_CANDIDATE,
     BETRAYAL_REJECTED,
@@ -330,6 +339,164 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(2, aggregate["true_inverse_sample_count"])
         self.assertEqual(1, direction["true_inverse_sample_count"])
 
+    def test_r81_1_resolver_payload_returns_safe_fields_and_no_data_without_candles(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, limit=10)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R81.1", payload["phase"])
+        self.assertEqual("BETRAYAL_SHADOW_OUTCOME_RESOLVER_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual(1, payload["scanned_records"])
+        self.assertEqual(0, payload["newly_resolved_records"])
+        self.assertEqual(1, payload["no_data_records"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r81_1_dry_run_and_write_false_do_not_persist(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        dry_run = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=True, write=True)
+        no_write = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=False, write=False)
+
+        self.assertEqual(1, dry_run["newly_resolved_records"])
+        self.assertEqual(1, no_write["newly_resolved_records"])
+        self.assertFalse((self.log_dir / RESOLUTIONS_FILENAME).exists())
+
+    def test_r81_1_write_true_persists_resolution_output_only_when_explicit(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=False, write=True)
+
+        self.assertTrue(payload["persisted"])
+        self.assertEqual(1, payload["newly_resolved_records"])
+        records = self._read_jsonl(self.log_dir / RESOLUTIONS_FILENAME)
+        self.assertEqual(1, len(records))
+        self.assertEqual(SHADOW_WIN, records[0]["shadow_status"])
+        self.assertFalse(records[0]["order_placed"])
+
+    def test_r81_1_tp_first_resolves_as_win(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        record = payload["records"][0]
+        self.assertEqual(SHADOW_WIN, record["shadow_status"])
+        self.assertEqual(5.0, record["shadow_pnl_pct"])
+
+    def test_r81_1_sl_first_resolves_as_loss(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=101.0, low=94.0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        record = payload["records"][0]
+        self.assertEqual(SHADOW_LOSS, record["shadow_status"])
+        self.assertEqual(-5.0, record["shadow_pnl_pct"])
+
+    def test_r81_1_same_candle_tp_sl_ambiguity_is_conservative_loss(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=94.0)])
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        record = payload["records"][0]
+        self.assertEqual(SHADOW_LOSS, record["shadow_status"])
+        self.assertEqual("stop", record["shadow_close_reason"])
+
+    def test_r81_1_already_resolved_records_are_not_duplicated(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        first = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=False, write=True)
+        second = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=False, write=True)
+
+        self.assertEqual(1, first["newly_resolved_records"])
+        self.assertEqual(0, second["newly_resolved_records"])
+        self.assertEqual(1, second["already_resolved_records"])
+        self.assertEqual(1, len(self._read_jsonl(self.log_dir / RESOLUTIONS_FILENAME)))
+
+    def test_r81_1_timeframe_aggregation_works_for_222m_and_88m(self) -> None:
+        self._write_shadow_records(
+            [
+                self._unresolved_shadow_record("222m", index=0),
+                self._unresolved_shadow_record("88m", index=1),
+            ]
+        )
+        self._write_candles(
+            [
+                self._candle("222m", high=106.0, low=99.0),
+                self._candle("88m", high=106.0, low=99.0),
+            ]
+        )
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(1, payload["target_summary"]["222m"]["resolved_records"])
+        self.assertEqual(1, payload["target_summary"]["88m"]["resolved_records"])
+
+    def test_r81_validation_consumes_resolver_output(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+        resolve_betrayal_shadow_outcomes(log_dir=self.log_dir, dry_run=False, write=True)
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(1, primary["true_inverse_sample_count"])
+        self.assertEqual(INSUFFICIENT_TRUE_INVERSE_OUTCOMES, primary["validation_status"])
+
+    def test_r81_1_api_endpoints_are_safe(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+
+        resolve_response = self.client.post(
+            "/betrayal-shadow/resolve",
+            json={"dry_run": True, "write": False, "limit": 20},
+        )
+        resolutions_response = self.client.get("/betrayal-shadow/resolutions")
+
+        self.assertEqual(200, resolve_response.status_code)
+        self.assertEqual(200, resolutions_response.status_code)
+        self.assertFalse(resolve_response.json()["order_placed"])
+        self.assertFalse(resolve_response.json()["network_allowed"])
+        self.assertFalse(resolutions_response.json()["order_placed"])
+
+    def test_r81_1_cli_command_exists(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-shadow-resolve",
+                "--limit",
+                "20",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R81.1 betrayal shadow resolver: OK", result.stdout)
+        self.assertIn("scanned_records: 1", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -422,6 +589,53 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         with path.open("w", encoding="utf-8") as handle:
             for record in records:
                 handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    def _write_candles(self, records: list[dict]) -> None:
+        path = self.log_dir / "candles.ndjson"
+        with path.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    @staticmethod
+    def _read_jsonl(path: Path) -> list[dict]:
+        with path.open("r", encoding="utf-8") as handle:
+            return [json.loads(line) for line in handle if line.strip()]
+
+    @staticmethod
+    def _unresolved_shadow_record(timeframe: str, *, index: int) -> dict:
+        return {
+            "shadow_outcome_id": f"shadow-{timeframe}-{index}",
+            "created_at": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "original_signal_id": f"signal-{timeframe}-{index}",
+            "original_direction": "short",
+            "shadow_direction": "long",
+            "symbol": "BTCUSDT",
+            "timeframe": timeframe,
+            "signal_timestamp": "2026-05-01T00:00:00+00:00",
+            "shadow_entry": 100.0,
+            "shadow_stop": 95.0,
+            "shadow_take_profit": 105.0,
+            "shadow_status": SHADOW_NO_DATA,
+            "shadow_pnl_pct": None,
+            "shadow_pnl_usd": None,
+            "comparison": {"inconclusive": True, "shadow_better": False, "original_better": False},
+            "live_execution_enabled": False,
+            "order_placed": False,
+            "shadow_only": True,
+        }
+
+    @staticmethod
+    def _candle(timeframe: str, *, high: float, low: float) -> dict:
+        return {
+            "symbol": "BTCUSDT",
+            "timeframe": timeframe,
+            "timestamp": "2026-05-01T00:01:00+00:00",
+            "open": 100.0,
+            "high": high,
+            "low": low,
+            "close": 100.0,
+        }
 
     @staticmethod
     def _shadow_record(

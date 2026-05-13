@@ -36,6 +36,8 @@ True inverse validation reads `betrayal_shadow_outcomes.ndjson` records and summ
 
 Naive inverse evidence and true inverse paper outcomes are reported separately.
 
+R81.1 adds `betrayal_shadow_resolutions.ndjson` as an append-only resolver output. R81 validation reads those resolution records together with the base shadow records, with resolver records overriding matching `shadow_outcome_id` records for summary purposes.
+
 ## Source Targets
 
 R81 sources candidates from:
