@@ -21,8 +21,8 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     SHADOW_OPEN,
     SHADOW_UNRESOLVED,
     SHADOW_WIN,
-    load_betrayal_shadow_outcomes,
 )
+from src.app.hammer_radar.operator.betrayal_shadow_resolver import load_resolved_betrayal_shadow_records
 from src.app.hammer_radar.operator.betrayal_strategy_audit import (
     BETRAYAL_PRIMARY_CANDIDATE,
     BETRAYAL_WATCHLIST,
@@ -69,7 +69,7 @@ def build_betrayal_inverse_validation(
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     generated_at = datetime.now(UTC).isoformat()
     audit = build_betrayal_strategy_audit(log_dir=resolved_log_dir)
-    records = load_betrayal_shadow_outcomes(log_dir=resolved_log_dir, newest_first=False)
+    records = load_resolved_betrayal_shadow_records(log_dir=resolved_log_dir)
 
     aggregate_candidates = [
         *_list_field(audit, "timeframe_aggregate_primary_candidates"),

@@ -41,6 +41,10 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     track_betrayal_shadow_outcomes,
 )
 from src.app.hammer_radar.operator.betrayal_inverse_validation import build_betrayal_inverse_validation
+from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
+    build_betrayal_shadow_resolutions_payload,
+    resolve_betrayal_shadow_outcomes,
+)
 from src.app.hammer_radar.operator.betrayal_strategy_audit import build_betrayal_strategy_audit
 from src.app.hammer_radar.operator.exchange_dry_run import (
     build_current_exchange_dry_run,
@@ -447,6 +451,15 @@ class BetrayalShadowTrackRequest(BaseModel):
     since_hours: int = 24
     symbol: str | None = None
     min_betrayal_score: int = 50
+
+
+class BetrayalShadowResolveRequest(BaseModel):
+    limit: int = 0
+    symbol: str | None = None
+    timeframe: str | None = None
+    dry_run: bool = True
+    write: bool = False
+    since_hours: int | None = None
 
 
 class NotificationCheckRequest(BaseModel):
@@ -1376,6 +1389,34 @@ def betrayal_shadow_track(request: BetrayalShadowTrackRequest | None = None) -> 
         since_hours=request.since_hours,
         symbol=request.symbol,
         min_betrayal_score=request.min_betrayal_score,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/betrayal-shadow/resolve")
+def betrayal_shadow_resolve(request: BetrayalShadowResolveRequest | None = None) -> dict:
+    request = request or BetrayalShadowResolveRequest()
+    return resolve_betrayal_shadow_outcomes(
+        limit=request.limit,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        dry_run=request.dry_run,
+        write=request.write,
+        since_hours=request.since_hours,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/betrayal-shadow/resolutions")
+def betrayal_shadow_resolutions(
+    limit: int = Query(default=50, ge=0),
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> dict:
+    return build_betrayal_shadow_resolutions_payload(
+        limit=limit,
+        symbol=symbol,
+        timeframe=timeframe,
         log_dir=get_log_dir(use_env=True),
     )
 

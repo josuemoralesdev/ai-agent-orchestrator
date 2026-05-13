@@ -613,6 +613,19 @@ def main() -> int:
                 log_dir=args.log_dir,
             )
         )
+    elif args.command == "betrayal-shadow-resolve":
+        from src.app.hammer_radar.operator.betrayal_shadow_resolver import build_betrayal_shadow_resolve_text
+
+        print(
+            build_betrayal_shadow_resolve_text(
+                limit=args.limit,
+                symbol=args.symbol,
+                timeframe=args.timeframe,
+                since_hours=args.since_hours,
+                write=args.write,
+                log_dir=args.log_dir,
+            )
+        )
     elif args.command == "betrayal-strategy-audit":
         from src.app.hammer_radar.operator.betrayal_strategy_audit import (
             build_betrayal_strategy_audit,
@@ -940,6 +953,13 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_shadow_outcomes_parser.add_argument("--limit", type=int, default=50)
     betrayal_shadow_outcomes_parser.add_argument("--symbol", default=None)
     betrayal_shadow_outcomes_parser.add_argument("--status", default=None)
+
+    betrayal_shadow_resolve_parser = subparsers.add_parser("betrayal-shadow-resolve", parents=[parent])
+    betrayal_shadow_resolve_parser.add_argument("--limit", type=int, default=0)
+    betrayal_shadow_resolve_parser.add_argument("--symbol", default=None)
+    betrayal_shadow_resolve_parser.add_argument("--timeframe", default=None)
+    betrayal_shadow_resolve_parser.add_argument("--since-hours", type=int, default=None)
+    betrayal_shadow_resolve_parser.add_argument("--write", action="store_true")
 
     subparsers.add_parser("betrayal-strategy-audit", parents=[parent])
     subparsers.add_parser("betrayal-inverse-validation", parents=[parent])
