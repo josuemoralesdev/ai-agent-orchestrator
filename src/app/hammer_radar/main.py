@@ -35,6 +35,7 @@ from src.app.hammer_radar.operator import (
     load_signals,
 )
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.betrayal_candle_capture import capture_resampled_frames
 from src.app.hammer_radar.operator.strategy_config import TIMEFRAME_CONFIGS, load_strategy_config
 from src.app.hammer_radar.signal_engine import attach_bias, compute_bias_direction, extract_signal
 
@@ -86,6 +87,7 @@ def run(sleep_seconds: float = 3.0) -> None:
                         timeframe_label: reader.get_resampled(resample_rule)
                         for resample_rule, timeframe_label in TIMEFRAMES
                     }
+                    capture_resampled_frames(resampled_frames, symbol="BTCUSDT", log_dir=log_dir)
                     for _resample_rule, timeframe_label in TIMEFRAMES:
                         resampled = resampled_frames[timeframe_label]
                         annotated = annotate_hammers(resampled)

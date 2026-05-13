@@ -45,6 +45,11 @@ from src.app.hammer_radar.operator.betrayal_candle_archive import (
     build_betrayal_candle_archive,
     build_betrayal_candle_archive_status,
 )
+from src.app.hammer_radar.operator.betrayal_candle_capture import (
+    SOURCE_MODE_LOCAL_ONLY,
+    backfill_betrayal_candle_capture,
+    build_betrayal_candle_capture_status,
+)
 from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
     build_betrayal_shadow_resolutions_payload,
     resolve_betrayal_shadow_outcomes,
@@ -473,6 +478,16 @@ class BetrayalCandleArchiveRequest(BaseModel):
     timeframe: str | None = None
     limit: int = 0
     since_hours: int | None = None
+
+
+class BetrayalCandleCaptureRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    symbol: str | None = None
+    timeframe: str | None = None
+    limit: int = 0
+    since_hours: int | None = None
+    source_mode: str = SOURCE_MODE_LOCAL_ONLY
 
 
 class NotificationCheckRequest(BaseModel):
@@ -1454,6 +1469,33 @@ def betrayal_shadow_candle_archive_status(
     timeframe: str | None = None,
 ) -> dict:
     return build_betrayal_candle_archive_status(
+        symbol=symbol,
+        timeframe=timeframe,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/betrayal-shadow/candle-capture/backfill")
+def betrayal_shadow_candle_capture_backfill(request: BetrayalCandleCaptureRequest | None = None) -> dict:
+    request = request or BetrayalCandleCaptureRequest()
+    return backfill_betrayal_candle_capture(
+        dry_run=request.dry_run,
+        write=request.write,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        limit=request.limit,
+        since_hours=request.since_hours,
+        source_mode=request.source_mode,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/betrayal-shadow/candle-capture/status")
+def betrayal_shadow_candle_capture_status(
+    symbol: str | None = None,
+    timeframe: str | None = None,
+) -> dict:
+    return build_betrayal_candle_capture_status(
         symbol=symbol,
         timeframe=timeframe,
         log_dir=get_log_dir(use_env=True),
