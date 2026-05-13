@@ -157,8 +157,9 @@ class FirstLiveChainRunbookTestCase(unittest.TestCase):
         payload = build_first_live_chain_status(log_dir=self.log_dir, env={})
 
         self.assertEqual("WAITING_FOR_FRESH_SIGNAL", payload["status"])
-        self.assertFalse(payload["current_signal"]["first_live_fresh"])
-        self.assertIsNone(payload["current_signal"]["freshness_cutoff_minutes"])
+        self.assertTrue(payload["current_signal"]["first_live_fresh"])
+        self.assertEqual(22.5, payload["current_signal"]["freshness_cutoff_minutes"])
+        self.assertEqual("ACTIVE_SELECTED_REVIEW_DISABLED", payload["current_signal"]["policy_status"])
         self.assertEqual("FIRST LIVE CHAIN", payload["next_action"]["telegram_command"])
 
     def test_source_freshness_label_ignored_when_strict_age_exceeds_cutoff(self) -> None:

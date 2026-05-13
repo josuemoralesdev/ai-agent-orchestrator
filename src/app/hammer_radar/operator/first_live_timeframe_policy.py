@@ -19,17 +19,21 @@ EXECUTION_MODE = "POLICY_MATRIX_ONLY_NO_ORDER"
 ENV_MICRO_LIVE_ALLOWED = "HAMMER_MICRO_LIVE_ALLOWED"
 ENV_MICRO_LIVE_TIMEFRAMES = "HAMMER_MICRO_LIVE_TIMEFRAMES"
 ENV_TINY_LIVE_TIMEFRAMES = "HAMMER_TINY_LIVE_TIMEFRAMES"
+ENV_ACTIVE_TIMEFRAME_ALLOWED = "HAMMER_ACTIVE_TIMEFRAME_LIVE_ALLOWED"
+ENV_ACTIVE_TIMEFRAME_ALLOWLIST = "HAMMER_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES"
 ENV_HIGHER_TIMEFRAME_ALLOWED = "HAMMER_HIGHER_TIMEFRAME_LIVE_ALLOWED"
 ENV_HIGHER_TIMEFRAME_ALLOWLIST = "HAMMER_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES"
 
 DEFAULT_MICRO_LIVE_TIMEFRAMES = ("4m", "8m")
 DEFAULT_TINY_LIVE_TIMEFRAMES = ("13m", "44m")
+DEFAULT_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES = ("22m", "55m")
 DEFAULT_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES = ("444m", "4H")
 CONTEXT_ONLY_TIMEFRAMES = ("88m", "888m", "13H", "13D")
-BLOCKED_TIMEFRAMES = ("22m", "55m", "222m")
+BLOCKED_TIMEFRAMES = ("222m",)
 
 ORDER_PLACED = False
 REAL_ORDER_PLACED = False
+EXECUTION_ATTEMPTED = False
 NETWORK_ALLOWED = False
 SECRETS_SHOWN = False
 
@@ -57,18 +61,26 @@ FRESHNESS_CUTOFFS_MINUTES = {
     "4m": 4.5,
     "8m": 8.5,
     "13m": 13.5,
+    "22m": 22.5,
     "44m": 44.5,
+    "55m": 55.5,
     "444m": 444.5,
     "4H": 240.5,
+    "4h": 240.5,
 }
 
 
 def get_first_live_timeframe_policy(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     source = os.environ if env is None else env
     micro_live_allowed = _parse_bool(source.get(ENV_MICRO_LIVE_ALLOWED), default=False)
+    active_timeframe_live_allowed = _parse_bool(source.get(ENV_ACTIVE_TIMEFRAME_ALLOWED), default=False)
     higher_timeframe_live_allowed = _parse_bool(source.get(ENV_HIGHER_TIMEFRAME_ALLOWED), default=False)
     micro_live_timeframes = _parse_timeframes(source.get(ENV_MICRO_LIVE_TIMEFRAMES), default=DEFAULT_MICRO_LIVE_TIMEFRAMES)
     tiny_live_timeframes = _parse_timeframes(source.get(ENV_TINY_LIVE_TIMEFRAMES), default=DEFAULT_TINY_LIVE_TIMEFRAMES)
+    active_timeframe_live_timeframes = _parse_timeframes(
+        source.get(ENV_ACTIVE_TIMEFRAME_ALLOWLIST),
+        default=DEFAULT_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES,
+    )
     higher_timeframe_live_timeframes = _parse_timeframes(
         source.get(ENV_HIGHER_TIMEFRAME_ALLOWLIST),
         default=DEFAULT_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES,
@@ -88,6 +100,15 @@ def get_first_live_timeframe_policy(env: Mapping[str, str] | None = None) -> dic
             "requires_explicit_selection": False,
             "freshness_cutoffs_minutes": {tf: FRESHNESS_CUTOFFS_MINUTES[tf] for tf in tiny_live_timeframes if tf in FRESHNESS_CUTOFFS_MINUTES},
         },
+        "ACTIVE_SELECTED_REVIEW": {
+            **BASE_PROFILE,
+            "profile_name": "ACTIVE_SELECTED_REVIEW",
+            "timeframes": list(active_timeframe_live_timeframes),
+            "requires_explicit_selection": True,
+            "freshness_cutoffs_minutes": {
+                tf: FRESHNESS_CUTOFFS_MINUTES[tf] for tf in active_timeframe_live_timeframes if tf in FRESHNESS_CUTOFFS_MINUTES
+            },
+        },
         "SELECTED_HIGHER_TIMEFRAME_REVIEW": {
             **BASE_PROFILE,
             "profile_name": "SELECTED_HIGHER_TIMEFRAME_REVIEW",
@@ -103,6 +124,16 @@ def get_first_live_timeframe_policy(env: Mapping[str, str] | None = None) -> dic
         "8m": {"category": "micro", "default_status": "PAPER_ONLY", "enabled_status": "MICRO_SELECTED_ALLOWED"},
         "13m": {"category": "tiny", "default_status": "TINY_LIVE_ALLOWED"},
         "44m": {"category": "tiny", "default_status": "TINY_LIVE_ALLOWED"},
+        "22m": {
+            "category": "active",
+            "default_status": "ACTIVE_SELECTED_REVIEW_DISABLED",
+            "enabled_status": "ACTIVE_SELECTED_ALLOWED",
+        },
+        "55m": {
+            "category": "active",
+            "default_status": "ACTIVE_SELECTED_REVIEW_DISABLED",
+            "enabled_status": "ACTIVE_SELECTED_ALLOWED",
+        },
         "444m": {
             "category": "higher",
             "default_status": "SELECTED_BUT_NOT_LIVE_ELIGIBLE",
@@ -124,6 +155,8 @@ def get_first_live_timeframe_policy(env: Mapping[str, str] | None = None) -> dic
             "micro_live_allowed": micro_live_allowed,
             "micro_live_timeframes": list(micro_live_timeframes),
             "tiny_live_timeframes": list(tiny_live_timeframes),
+            "active_timeframe_live_allowed": active_timeframe_live_allowed,
+            "active_timeframe_live_timeframes": list(active_timeframe_live_timeframes),
             "higher_timeframe_live_allowed": higher_timeframe_live_allowed,
             "higher_timeframe_live_timeframes": list(higher_timeframe_live_timeframes),
             "profiles": profiles,
@@ -133,12 +166,16 @@ def get_first_live_timeframe_policy(env: Mapping[str, str] | None = None) -> dic
                 "micro": f"set {ENV_MICRO_LIVE_ALLOWED}=true and {ENV_MICRO_LIVE_TIMEFRAMES}=4m,8m"
                 if not micro_live_allowed
                 else None,
+                "active_timeframe": f"set {ENV_ACTIVE_TIMEFRAME_ALLOWED}=true and {ENV_ACTIVE_TIMEFRAME_ALLOWLIST}=22m,55m"
+                if not active_timeframe_live_allowed
+                else None,
                 "higher_timeframe": f"set {ENV_HIGHER_TIMEFRAME_ALLOWED}=true and {ENV_HIGHER_TIMEFRAME_ALLOWLIST}=444m,4H"
                 if not higher_timeframe_live_allowed
                 else None,
             },
             "order_placed": ORDER_PLACED,
             "real_order_placed": REAL_ORDER_PLACED,
+            "execution_attempted": EXECUTION_ATTEMPTED,
             "network_allowed": NETWORK_ALLOWED,
             "secrets_shown": SECRETS_SHOWN,
         }
@@ -165,7 +202,7 @@ def evaluate_first_live_timeframe_candidate(
     first_live_match = symbol == "BTCUSDT" and direction == "long"
     blockers: list[str] = []
     category = _category(timeframe, policy)
-    requires_selection = category in {"micro", "higher"}
+    requires_selection = category in {"micro", "active", "higher"}
     profile_name: str | None = None
     profile: dict[str, Any] | None = None
 
@@ -179,6 +216,13 @@ def evaluate_first_live_timeframe_candidate(
     elif category == "tiny":
         profile_name = "TINY_LIVE_REVIEW"
         policy_status = "TINY_LIVE_ALLOWED"
+    elif category == "active":
+        profile_name = "ACTIVE_SELECTED_REVIEW"
+        if policy["active_timeframe_live_allowed"] and timeframe in policy["active_timeframe_live_timeframes"]:
+            policy_status = "ACTIVE_SELECTED_ALLOWED"
+        else:
+            policy_status = "ACTIVE_SELECTED_REVIEW_DISABLED"
+            blockers.append("active timeframe live policy is disabled or timeframe is not allowlisted")
     elif category == "higher":
         profile_name = "SELECTED_HIGHER_TIMEFRAME_REVIEW"
         if policy["higher_timeframe_live_allowed"] and timeframe in policy["higher_timeframe_live_timeframes"]:
@@ -207,7 +251,7 @@ def evaluate_first_live_timeframe_candidate(
     live_candidate_allowed = bool(
         first_live_match
         and queue_fresh is True
-        and policy_status in {"MICRO_SELECTED_ALLOWED", "TINY_LIVE_ALLOWED", "SELECTED_HIGHER_TIMEFRAME_ALLOWED"}
+        and policy_status in {"MICRO_SELECTED_ALLOWED", "TINY_LIVE_ALLOWED", "ACTIVE_SELECTED_ALLOWED", "SELECTED_HIGHER_TIMEFRAME_ALLOWED"}
         and (not requires_selection or is_selected)
     )
     approval_allowed = live_candidate_allowed
@@ -232,6 +276,7 @@ def evaluate_first_live_timeframe_candidate(
             "evaluated_at": (now or datetime.now(UTC)).isoformat(),
             "order_placed": ORDER_PLACED,
             "real_order_placed": REAL_ORDER_PLACED,
+            "execution_attempted": EXECUTION_ATTEMPTED,
             "network_allowed": NETWORK_ALLOWED,
             "secrets_shown": SECRETS_SHOWN,
         }
@@ -245,6 +290,8 @@ def _category(timeframe: str | None, policy: Mapping[str, Any]) -> str:
         return "micro"
     if timeframe in policy.get("tiny_live_timeframes", []) or timeframe in DEFAULT_TINY_LIVE_TIMEFRAMES:
         return "tiny"
+    if timeframe in policy.get("active_timeframe_live_timeframes", []) or timeframe in DEFAULT_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES:
+        return "active"
     if timeframe in policy.get("higher_timeframe_live_timeframes", []) or timeframe in DEFAULT_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES:
         return "higher"
     if timeframe in CONTEXT_ONLY_TIMEFRAMES:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -216,6 +217,7 @@ HELP_COMMANDS = [
     "FIRST LIVE CLEAR",
     "FIRST LIVE TIMEFRAME POLICY",
     "FIRST LIVE MICRO POLICY",
+    "FIRST LIVE ACTIVE POLICY",
     "FIRST LIVE HIGHER POLICY",
     "FIRST LIVE RUNBOOK",
     "FIRST LIVE SEQUENCE",
@@ -240,6 +242,7 @@ HELP_COMMANDS = [
     "LIVE POLICY ARMING",
     "LIVE POLICY RUNBOOK",
     "LIVE MICRO ARMING",
+    "LIVE ACTIVE ARMING",
     "LIVE HIGHER ARMING",
     "LIVE POLICY DRY SMOKE",
     "LIVE MICRO DRY SMOKE",
@@ -581,17 +584,34 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
         payload = get_first_live_timeframe_policy()
         matrix = payload.get("matrix") if isinstance(payload.get("matrix"), dict) else {}
         compact = ", ".join(
-            f"{tf}:{(row or {}).get('enabled_status') if tf in payload.get('micro_live_timeframes', []) and payload.get('micro_live_allowed') else (row or {}).get('default_status')}"
+            f"{tf}:{_timeframe_policy_row_status(tf, row, payload)}"
             for tf, row in matrix.items()
         )
         message = (
             f"R73 timeframe policy: micro_enabled={payload.get('micro_live_allowed')} "
+            f"active_enabled={payload.get('active_timeframe_live_allowed')} "
             f"higher_enabled={payload.get('higher_timeframe_live_allowed')} "
-            f"tiny={','.join(payload.get('tiny_live_timeframes') or [])}. "
+            f"tiny={','.join(payload.get('tiny_live_timeframes') or [])} "
+            f"active={','.join(payload.get('active_timeframe_live_timeframes') or [])}. "
             f"matrix={compact}. No order placed. real_order_placed=false."
         )
         return _result(
             "first_live_timeframe_policy",
+            "ACCEPTED",
+            message,
+            payload={"unified_timeframe_policy": payload},
+        )
+    if normalized == "FIRST LIVE ACTIVE POLICY":
+        payload = get_first_live_timeframe_policy()
+        message = (
+            f"R79.1 active timeframe policy: enabled={payload.get('active_timeframe_live_allowed')} "
+            f"timeframes={','.join(payload.get('active_timeframe_live_timeframes') or [])} "
+            "default=selected-review-disabled; enable hint="
+            f"{(payload.get('enable_hints') or {}).get('active_timeframe') or 'already enabled'}. "
+            "No order placed. real_order_placed=false."
+        )
+        return _result(
+            "first_live_active_policy",
             "ACCEPTED",
             message,
             payload={"unified_timeframe_policy": payload},
@@ -633,6 +653,14 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             "live_micro_arming",
             "ACCEPTED",
             format_live_policy_arming_operator_message(payload, section="micro"),
+            payload={"live_policy_arming": payload},
+        )
+    if normalized == "LIVE ACTIVE ARMING":
+        payload = build_live_policy_arming_status()
+        return _result(
+            "live_active_arming",
+            "ACCEPTED",
+            format_live_policy_arming_operator_message(payload, section="active"),
             payload={"live_policy_arming": payload},
         )
     if normalized == "LIVE HIGHER ARMING":
@@ -1425,6 +1453,18 @@ def _first_live_execute_from_command(*, raw_text: str, normalized: str, log_dir:
         dry_run=True,
         log_dir=log_dir,
     )
+
+
+def _timeframe_policy_row_status(tf: str, row: Any, payload: Mapping[str, Any]) -> str | None:
+    row = row if isinstance(row, dict) else {}
+    category = row.get("category")
+    if category == "micro" and payload.get("micro_live_allowed") and tf in (payload.get("micro_live_timeframes") or []):
+        return row.get("enabled_status")
+    if category == "active" and payload.get("active_timeframe_live_allowed") and tf in (payload.get("active_timeframe_live_timeframes") or []):
+        return row.get("enabled_status")
+    if category == "higher" and payload.get("higher_timeframe_live_allowed") and tf in (payload.get("higher_timeframe_live_timeframes") or []):
+        return row.get("enabled_status")
+    return row.get("default_status")
 
 
 def _result(

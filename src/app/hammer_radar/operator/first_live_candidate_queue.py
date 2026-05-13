@@ -40,6 +40,8 @@ FIRST_LIVE_FRESHNESS_CUTOFFS_MINUTES = {
     "4m": 4.5,
     "8m": 8.5,
     "13m": 13.5,
+    "22m": 22.5,
+    "55m": 55.5,
 }
 
 ORDER_PLACED = False
@@ -523,6 +525,14 @@ def _policy_status(*, timeframe: str, symbol: str | None, direction: str | None,
     if timeframe in config.context_only_timeframes:
         blockers.append("timeframe is context-only until explicitly promoted")
         return "CONTEXT_ONLY", blockers
+    unified_policy = get_first_live_timeframe_policy(env=env)
+    active_timeframes = set(unified_policy.get("active_timeframe_live_timeframes") or [])
+    active_timeframes.update(tf for tf, row in (unified_policy.get("matrix") or {}).items() if isinstance(row, dict) and row.get("category") == "active")
+    if timeframe in active_timeframes:
+        if unified_policy.get("active_timeframe_live_allowed") is True and timeframe in set(unified_policy.get("active_timeframe_live_timeframes") or []):
+            return "ACTIVE_SELECTED_ALLOWED", blockers
+        blockers.append("active timeframe live policy is disabled or timeframe is not allowlisted")
+        return "ACTIVE_SELECTED_REVIEW_DISABLED", blockers
     if timeframe in config.blocked_timeframes:
         blockers.append("timeframe is blocked from live by strategy audit defaults")
         return "BLOCKED", blockers
@@ -547,6 +557,7 @@ def _policy(*, env: Mapping[str, str] | None = None) -> dict[str, Any]:
     source = os.environ if env is None else env
     config = load_strategy_audit_config(dict(source))
     higher_policy = get_higher_timeframe_live_policy(env=env)
+    unified_policy = get_first_live_timeframe_policy(env=env)
     return {
         "live_allowed_timeframes": list(config.allowed_tiny_live_timeframes),
         "allowed_tiny_live_timeframes": list(config.allowed_tiny_live_timeframes),
@@ -556,8 +567,11 @@ def _policy(*, env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "higher_timeframe_live_allowed": higher_policy.get("higher_timeframe_live_allowed") is True,
         "higher_timeframe_allowed_selected_timeframes": higher_policy.get("allowed_selected_timeframes") or [],
         "higher_timeframe_enable_hint": higher_policy.get("enable_hint"),
-        "micro_live_allowed": get_first_live_timeframe_policy(env=env).get("micro_live_allowed") is True,
-        "micro_live_timeframes": get_first_live_timeframe_policy(env=env).get("micro_live_timeframes") or [],
+        "micro_live_allowed": unified_policy.get("micro_live_allowed") is True,
+        "micro_live_timeframes": unified_policy.get("micro_live_timeframes") or [],
+        "active_timeframe_live_allowed": unified_policy.get("active_timeframe_live_allowed") is True,
+        "active_timeframe_live_timeframes": unified_policy.get("active_timeframe_live_timeframes") or [],
+        "active_timeframe_enable_hint": (unified_policy.get("enable_hints") or {}).get("active_timeframe"),
         "defaults": {
             "allowed_tiny_live_timeframes": list(DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES),
             "paper_only_timeframes": list(DEFAULT_PAPER_ONLY_TIMEFRAMES),

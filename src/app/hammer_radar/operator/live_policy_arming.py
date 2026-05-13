@@ -45,12 +45,17 @@ MICRO_CHANGES = [
     "HAMMER_MICRO_LIVE_ALLOWED=true",
     "HAMMER_MICRO_LIVE_TIMEFRAMES=4m,8m",
 ]
+ACTIVE_CHANGES = [
+    "HAMMER_ACTIVE_TIMEFRAME_LIVE_ALLOWED=true",
+    "HAMMER_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES=22m,55m",
+]
 HIGHER_CHANGES = [
     "HAMMER_HIGHER_TIMEFRAME_LIVE_ALLOWED=true",
     "HAMMER_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES=444m,4H",
 ]
 ROLLBACK_CHANGES = [
     "HAMMER_MICRO_LIVE_ALLOWED=false",
+    "HAMMER_ACTIVE_TIMEFRAME_LIVE_ALLOWED=false",
     "HAMMER_HIGHER_TIMEFRAME_LIVE_ALLOWED=false",
 ]
 
@@ -66,11 +71,14 @@ def build_live_policy_arming_status(
     policy_env = {
         "micro_live_allowed": policy["micro_live_allowed"],
         "micro_live_timeframes": list(policy["micro_live_timeframes"]),
+        "active_timeframe_live_allowed": policy["active_timeframe_live_allowed"],
+        "active_timeframe_live_timeframes": list(policy["active_timeframe_live_timeframes"]),
         "higher_timeframe_live_allowed": policy["higher_timeframe_live_allowed"],
         "higher_timeframe_live_timeframes": list(policy["higher_timeframe_live_timeframes"]),
     }
     policy_only_ready = bool(
         policy_env["micro_live_timeframes"]
+        and policy_env["active_timeframe_live_timeframes"]
         and policy_env["higher_timeframe_live_timeframes"]
         and execution_env["live_execution_enabled"] is False
         and execution_env["allow_live_orders"] is False
@@ -92,7 +100,7 @@ def build_live_policy_arming_status(
                 "policy_only": {
                     "ready": policy_only_ready,
                     "description": (
-                        "allows FIRST LIVE NEXT to offer approval for selected micro/higher candidates, "
+                        "allows FIRST LIVE NEXT to offer approval for selected micro/active/higher candidates, "
                         "but no live order execution"
                     ),
                 },
@@ -123,13 +131,14 @@ def build_live_policy_arming_runbook(
             "runbook_name": "R74_POLICY_ARMING_RUNBOOK",
             "manual_steps": [
                 "Edit the env file used by hammer-approval-api.service; do not paste secrets into chat.",
-                "Add only the policy env switches needed for micro, higher timeframe, or both.",
+                "Add only the policy env switches needed for micro, active timeframe, higher timeframe, or a combined plan.",
                 "Restart hammer-approval-api.service and hammer-telegram-polling.service manually.",
                 "Run the smoke commands and verify policy booleans changed while order flags remain false.",
                 "Use rollback changes and restart both services if policy arming must be disabled.",
             ],
             "plans": {
                 "micro": build_live_policy_arming_plan(target="micro", env=env),
+                "active": build_live_policy_arming_plan(target="active", env=env),
                 "higher": build_live_policy_arming_plan(target="higher", env=env),
                 "both": build_live_policy_arming_plan(target="both", env=env),
             },
@@ -145,11 +154,13 @@ def build_live_policy_arming_plan(
     normalized = str(target or "both").strip().lower()
     if normalized == "micro":
         changes = list(MICRO_CHANGES)
+    elif normalized == "active":
+        changes = list(ACTIVE_CHANGES)
     elif normalized == "higher":
         changes = list(HIGHER_CHANGES)
     else:
         normalized = "both"
-        changes = [*MICRO_CHANGES, *HIGHER_CHANGES]
+        changes = [*MICRO_CHANGES, *ACTIVE_CHANGES, *HIGHER_CHANGES]
     return _sanitize(
         {
             "status": "OK",
@@ -247,12 +258,22 @@ def format_live_policy_arming_operator_message(payload: Mapping[str, Any], *, se
                 "manual change: HAMMER_HIGHER_TIMEFRAME_LIVE_ALLOWED=true; HAMMER_HIGHER_TIMEFRAME_LIVE_TIMEFRAMES=444m,4H",
             ]
         )
+    if section == "active":
+        return "\n".join(
+            [
+                f"R74 active timeframe policy arming: enabled={policy_env.get('active_timeframe_live_allowed')}",
+                "POLICY_ONLY. No order placed. real_order_placed=false.",
+                f"timeframes: {','.join(policy_env.get('active_timeframe_live_timeframes') or [])}",
+                "manual change: HAMMER_ACTIVE_TIMEFRAME_LIVE_ALLOWED=true; HAMMER_ACTIVE_TIMEFRAME_LIVE_TIMEFRAMES=22m,55m",
+            ]
+        )
     return "\n".join(
         [
             "R74 live policy arming: OK",
             "POLICY_ONLY. No order placed. real_order_placed=false.",
             (
                 f"policy: micro={policy_env.get('micro_live_allowed')} "
+                f"active={policy_env.get('active_timeframe_live_allowed')} "
                 f"higher={policy_env.get('higher_timeframe_live_allowed')}"
             ),
             (

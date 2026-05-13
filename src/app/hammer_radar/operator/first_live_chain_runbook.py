@@ -48,7 +48,10 @@ FIRST_LIVE_FRESHNESS_CUTOFFS_MINUTES = {
     "4m": 4.5,
     "8m": 8.5,
     "13m": 13.5,
+    "22m": 22.5,
     "44m": 44.5,
+    "55m": 55.5,
+    "4h": 240.5,
 }
 
 ORDER_PLACED = False
