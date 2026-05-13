@@ -624,6 +624,17 @@ def main() -> int:
                 build_betrayal_strategy_audit(log_dir=args.log_dir)
             )
         )
+    elif args.command == "betrayal-inverse-validation":
+        from src.app.hammer_radar.operator.betrayal_inverse_validation import (
+            build_betrayal_inverse_validation,
+            format_betrayal_inverse_validation_text,
+        )
+
+        print(
+            format_betrayal_inverse_validation_text(
+                build_betrayal_inverse_validation(log_dir=args.log_dir)
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -931,6 +942,7 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_shadow_outcomes_parser.add_argument("--status", default=None)
 
     subparsers.add_parser("betrayal-strategy-audit", parents=[parent])
+    subparsers.add_parser("betrayal-inverse-validation", parents=[parent])
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

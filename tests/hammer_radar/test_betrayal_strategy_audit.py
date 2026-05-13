@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -11,6 +12,14 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator import archive
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator.betrayal_inverse_validation import (
+    INSUFFICIENT_TRUE_INVERSE_OUTCOMES,
+    TRUE_INVERSE_NO_DATA,
+    TRUE_INVERSE_REJECTED,
+    TRUE_INVERSE_VALIDATED_PRIMARY,
+    build_betrayal_inverse_validation,
+)
+from src.app.hammer_radar.operator.betrayal_shadow_outcomes import OUTCOMES_FILENAME, SHADOW_LOSS, SHADOW_WIN
 from src.app.hammer_radar.operator.betrayal_strategy_audit import (
     BETRAYAL_PRIMARY_CANDIDATE,
     BETRAYAL_REJECTED,
@@ -194,6 +203,133 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
                 self.assertFalse(payload["live_execution_enabled"])
                 self.assertFalse(payload["order_placed"])
 
+    def test_r81_endpoint_returns_safe_fields_and_aggregate_targets_without_true_inverse_records(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._seed_group("watch-88m", "88m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+
+        response = self.client.get("/strategy-performance/betrayal-inverse-validation")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R81", payload["phase"])
+        self.assertEqual("TRUE_INVERSE_PAPER_OUTCOME_VALIDATION_ONLY_NO_ORDER", payload["execution_mode"])
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        watchlist = self._find(payload["timeframe_aggregate_validations"], timeframe="88m")
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, primary["source_recommendation"])
+        self.assertEqual(BETRAYAL_WATCHLIST, watchlist["source_recommendation"])
+        self.assertEqual(TRUE_INVERSE_NO_DATA, primary["validation_status"])
+        self.assertEqual(TRUE_INVERSE_NO_DATA, watchlist["validation_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r81_cli_report_includes_aggregate_targets_and_no_order_note(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._seed_group("watch-88m", "88m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-inverse-validation",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R81 true inverse validation: OK", result.stdout)
+        self.assertIn("TIMEFRAME AGGREGATE TRUE INVERSE VALIDATION", result.stdout)
+        self.assertIn("DIRECTION / ENTRY-MODE TRUE INVERSE VALIDATION", result.stdout)
+        self.assertIn("222m aggregate", result.stdout)
+        self.assertIn("88m aggregate", result.stdout)
+        self.assertIn("TRUE_INVERSE_NO_DATA", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r81_true_inverse_sample_below_threshold_is_insufficient(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records(
+            [
+                self._shadow_record("222m", index=index, status=SHADOW_WIN, pnl_pct=0.2)
+                for index in range(5)
+            ]
+        )
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(5, primary["true_inverse_sample_count"])
+        self.assertEqual(INSUFFICIENT_TRUE_INVERSE_OUTCOMES, primary["validation_status"])
+        self.assertFalse(primary["live_execution_enabled"])
+        self.assertFalse(primary["order_placed"])
+
+    def test_r81_true_inverse_passing_sample_can_validate_primary_in_fixture(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        records = [
+            self._shadow_record("222m", index=index, status=SHADOW_WIN, pnl_pct=0.3)
+            for index in range(18)
+        ]
+        records.extend(
+            self._shadow_record("222m", index=index + 18, status=SHADOW_LOSS, pnl_pct=-0.1)
+            for index in range(12)
+        )
+        self._write_shadow_records(records)
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(30, primary["true_inverse_sample_count"])
+        self.assertEqual(60.0, primary["true_inverse_win_rate_pct"])
+        self.assertEqual(TRUE_INVERSE_VALIDATED_PRIMARY, primary["validation_status"])
+        self.assertFalse(primary["real_order_placed"])
+
+    def test_r81_true_inverse_failed_sample_is_rejected(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        records = [
+            self._shadow_record("222m", index=index, status=SHADOW_WIN, pnl_pct=0.1)
+            for index in range(10)
+        ]
+        records.extend(
+            self._shadow_record("222m", index=index + 10, status=SHADOW_LOSS, pnl_pct=-0.2)
+            for index in range(20)
+        )
+        self._write_shadow_records(records)
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(30, primary["true_inverse_sample_count"])
+        self.assertEqual(TRUE_INVERSE_REJECTED, primary["validation_status"])
+        self.assertIn("true_inverse_win_rate_pct below minimum 55.0", primary["blockers"])
+
+    def test_r81_aggregates_by_timeframe_and_direction(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records(
+            [
+                self._shadow_record("222m", index=0, status=SHADOW_WIN, pnl_pct=0.2, original_direction="long", shadow_direction="short"),
+                self._shadow_record("222m", index=1, status=SHADOW_WIN, pnl_pct=0.2, original_direction="short", shadow_direction="long"),
+            ]
+        )
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir, min_true_inverse_sample=1)
+
+        aggregate = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        direction = self._find(payload["direction_entry_mode_validations"], timeframe="222m")
+        self.assertEqual(2, aggregate["true_inverse_sample_count"])
+        self.assertEqual(1, direction["true_inverse_sample_count"])
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -280,6 +416,41 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             archive.append_signal(signal, log_dir=self.log_dir)
             archive.append_outcome(outcome, log_dir=self.log_dir)
         self.assertEqual(sample_count, len(pnl_values))
+
+    def _write_shadow_records(self, records: list[dict]) -> None:
+        path = self.log_dir / OUTCOMES_FILENAME
+        with path.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    @staticmethod
+    def _shadow_record(
+        timeframe: str,
+        *,
+        index: int,
+        status: str,
+        pnl_pct: float,
+        original_direction: str = "long",
+        shadow_direction: str = "short",
+    ) -> dict:
+        return {
+            "shadow_outcome_id": f"shadow-{timeframe}-{index}",
+            "created_at": datetime.now(UTC).isoformat(),
+            "source": "test",
+            "original_signal_id": f"signal-{timeframe}-{index}",
+            "original_direction": original_direction,
+            "shadow_direction": shadow_direction,
+            "symbol": "BTCUSDT",
+            "timeframe": timeframe,
+            "signal_timestamp": datetime.now(UTC).isoformat(),
+            "shadow_status": status,
+            "shadow_pnl_pct": pnl_pct,
+            "shadow_pnl_usd": None,
+            "comparison": {"shadow_better": status == SHADOW_WIN, "original_better": status == SHADOW_LOSS},
+            "live_execution_enabled": False,
+            "order_placed": False,
+            "shadow_only": True,
+        }
 
 
 if __name__ == "__main__":
