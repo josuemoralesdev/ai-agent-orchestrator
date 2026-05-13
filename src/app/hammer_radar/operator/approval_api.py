@@ -40,6 +40,7 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     build_betrayal_shadow_outcomes_payload,
     track_betrayal_shadow_outcomes,
 )
+from src.app.hammer_radar.operator.betrayal_strategy_audit import build_betrayal_strategy_audit
 from src.app.hammer_radar.operator.exchange_dry_run import (
     build_current_exchange_dry_run,
     build_exchange_dry_run,
@@ -1420,6 +1421,11 @@ def strategy_performance_entry_modes() -> dict:
 @app.get("/strategy-performance/live-eligibility")
 def strategy_performance_live_eligibility() -> dict:
     return build_live_eligibility_matrix(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/strategy-performance/betrayal-audit")
+def strategy_performance_betrayal_audit() -> dict:
+    return build_betrayal_strategy_audit(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/strategy-promotion/status")
