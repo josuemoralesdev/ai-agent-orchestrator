@@ -14,6 +14,7 @@ from typing import Any
 
 from src.app.hammer_radar.operator.strategy_performance import (
     build_live_eligibility_matrix,
+    build_strategy_timeframe_summary,
 )
 
 PHASE = "R80"
@@ -51,17 +52,36 @@ def build_betrayal_strategy_audit(
     min_sample: int = DEFAULT_MIN_SAMPLE,
 ) -> dict[str, Any]:
     generated_at = datetime.now(UTC).isoformat()
-    source = build_live_eligibility_matrix(log_dir=log_dir)
-    rows = source.get("recommendations") if isinstance(source.get("recommendations"), list) else []
-    audited_rows = [
-        build_betrayal_strategy_row(row, min_sample=min_sample)
-        for row in rows
-        if _has_group_identity(row)
+    direction_source = build_live_eligibility_matrix(log_dir=log_dir)
+    aggregate_source = build_strategy_timeframe_summary(log_dir=log_dir)
+    direction_rows = (
+        direction_source.get("recommendations")
+        if isinstance(direction_source.get("recommendations"), list)
+        else []
+    )
+    aggregate_rows = (
+        aggregate_source.get("timeframes")
+        if isinstance(aggregate_source.get("timeframes"), list)
+        else []
+    )
+    timeframe_aggregate_rows = [
+        build_betrayal_strategy_row(row, min_sample=min_sample, audit_scope="timeframe_aggregate")
+        for row in aggregate_rows
+        if _has_timeframe_identity(row)
     ]
-    audited_rows.sort(key=_sort_key)
-    primary = [row for row in audited_rows if row["recommendation"] == BETRAYAL_PRIMARY_CANDIDATE]
-    watchlist = [row for row in audited_rows if row["recommendation"] == BETRAYAL_WATCHLIST]
-    rejected = [row for row in audited_rows if row["recommendation"] not in {BETRAYAL_PRIMARY_CANDIDATE, BETRAYAL_WATCHLIST}]
+    direction_entry_mode_rows = [
+        build_betrayal_strategy_row(row, min_sample=min_sample, audit_scope="direction_entry_mode")
+        for row in direction_rows
+        if _has_direction_entry_mode_identity(row)
+    ]
+    timeframe_aggregate_rows.sort(key=_sort_key)
+    direction_entry_mode_rows.sort(key=_sort_key)
+    aggregate_primary = _filter_recommendation(timeframe_aggregate_rows, BETRAYAL_PRIMARY_CANDIDATE)
+    aggregate_watchlist = _filter_recommendation(timeframe_aggregate_rows, BETRAYAL_WATCHLIST)
+    aggregate_rejected = _filter_rejected(timeframe_aggregate_rows)
+    direction_primary = _filter_recommendation(direction_entry_mode_rows, BETRAYAL_PRIMARY_CANDIDATE)
+    direction_watchlist = _filter_recommendation(direction_entry_mode_rows, BETRAYAL_WATCHLIST)
+    direction_rejected = _filter_rejected(direction_entry_mode_rows)
     return _sanitize(
         {
             "status": "OK",
@@ -69,7 +89,7 @@ def build_betrayal_strategy_audit(
             "system": SYSTEM,
             "execution_mode": EXECUTION_MODE,
             "generated_at": generated_at,
-            "archive_log_dir": source.get("archive_log_dir"),
+            "archive_log_dir": direction_source.get("archive_log_dir"),
             "config": {
                 "min_sample": int(min_sample),
                 "primary": {
@@ -94,12 +114,27 @@ def build_betrayal_strategy_audit(
                     "betrayal_total_pnl_pct": "-original_total_pnl_pct",
                 },
             },
-            "leaderboard": audited_rows,
-            "primary_candidates": primary,
-            "watchlist_candidates": watchlist,
-            "rejected_candidates": rejected,
+            "timeframe_aggregate_leaderboard": timeframe_aggregate_rows,
+            "timeframe_aggregate_primary_candidates": aggregate_primary,
+            "timeframe_aggregate_watchlist_candidates": aggregate_watchlist,
+            "timeframe_aggregate_rejected_candidates": aggregate_rejected,
+            "direction_entry_mode_leaderboard": direction_entry_mode_rows,
+            "direction_entry_mode_primary_candidates": direction_primary,
+            "direction_entry_mode_watchlist_candidates": direction_watchlist,
+            "direction_entry_mode_rejected_candidates": direction_rejected,
+            "leaderboard": direction_entry_mode_rows,
+            "primary_candidates": direction_primary,
+            "watchlist_candidates": direction_watchlist,
+            "rejected_candidates": direction_rejected,
+            "backward_compatibility": {
+                "leaderboard": "direction_entry_mode_leaderboard",
+                "primary_candidates": "direction_entry_mode_primary_candidates",
+                "watchlist_candidates": "direction_entry_mode_watchlist_candidates",
+                "rejected_candidates": "direction_entry_mode_rejected_candidates",
+            },
             "notes": [
                 "R80 is paper/shadow/audit only.",
+                "R80.2 separates timeframe aggregate betrayal candidates from direction/entry-mode betrayal candidates.",
                 NO_ORDER_NOTE,
                 "This reinforces the normal strategy promotion system and does not replace 13m/44m long promotion review.",
                 "Do not treat BETRAYAL_PRIMARY_CANDIDATE or BETRAYAL_WATCHLIST as live-ready.",
@@ -109,7 +144,12 @@ def build_betrayal_strategy_audit(
     )
 
 
-def build_betrayal_strategy_row(row: Mapping[str, Any], *, min_sample: int = DEFAULT_MIN_SAMPLE) -> dict[str, Any]:
+def build_betrayal_strategy_row(
+    row: Mapping[str, Any],
+    *,
+    min_sample: int = DEFAULT_MIN_SAMPLE,
+    audit_scope: str | None = None,
+) -> dict[str, Any]:
     sample_count = _int(row.get("sample_count"))
     original_win_rate = _float(row.get("win_rate_pct"))
     original_avg_pnl = _float(row.get("avg_pnl_pct"))
@@ -119,6 +159,9 @@ def build_betrayal_strategy_row(row: Mapping[str, Any], *, min_sample: int = DEF
     betrayal_total_pnl = round(-original_total_pnl, 4)
     original_direction = str(row.get("direction") or "")
     betrayal_direction = invert_direction(original_direction)
+    resolved_audit_scope = audit_scope or (
+        "direction_entry_mode" if row.get("direction") or row.get("entry_mode") else "timeframe_aggregate"
+    )
     blockers = _blockers(
         sample_count=sample_count,
         min_sample=min_sample,
@@ -139,6 +182,7 @@ def build_betrayal_strategy_row(row: Mapping[str, Any], *, min_sample: int = DEF
     )
     return _sanitize(
         {
+            "audit_scope": resolved_audit_scope,
             "timeframe": row.get("timeframe"),
             "original_direction": original_direction or None,
             "betrayal_direction": betrayal_direction,
@@ -184,19 +228,35 @@ def invert_direction(direction: object) -> str | None:
 
 
 def format_betrayal_strategy_audit_text(payload: Mapping[str, Any]) -> str:
-    primary = payload.get("primary_candidates") if isinstance(payload.get("primary_candidates"), list) else []
-    watchlist = payload.get("watchlist_candidates") if isinstance(payload.get("watchlist_candidates"), list) else []
-    rejected = payload.get("rejected_candidates") if isinstance(payload.get("rejected_candidates"), list) else []
+    aggregate_primary = _list_field(payload, "timeframe_aggregate_primary_candidates")
+    aggregate_watchlist = _list_field(payload, "timeframe_aggregate_watchlist_candidates")
+    aggregate_rejected = _list_field(payload, "timeframe_aggregate_rejected_candidates")
+    direction_primary = _list_field(payload, "direction_entry_mode_primary_candidates")
+    direction_watchlist = _list_field(payload, "direction_entry_mode_watchlist_candidates")
+    direction_rejected = _list_field(payload, "direction_entry_mode_rejected_candidates")
     lines = [
         f"R80 betrayal strategy audit: {payload.get('status')}",
         "BETRAYAL_STRATEGY_AUDIT_ONLY_NO_ORDER",
         "No order placed. real_order_placed=false execution_attempted=false network_allowed=false secrets_shown=false.",
-        f"primary_candidates: {len(primary)}",
+        "",
+        "TIMEFRAME AGGREGATE BETRAYAL",
+        f"primary candidates: {len(aggregate_primary)}",
     ]
-    lines.extend(_format_rows(primary[:5]))
-    lines.append(f"watchlist_candidates: {len(watchlist)}")
-    lines.extend(_format_rows(watchlist[:5]))
-    lines.append(f"rejected_candidates: {len(rejected)}")
+    lines.extend(_format_rows(aggregate_primary[:5]))
+    lines.append(f"watchlist candidates: {len(aggregate_watchlist)}")
+    lines.extend(_format_rows(aggregate_watchlist[:5]))
+    lines.append(f"rejected candidates: {len(aggregate_rejected)}")
+    lines.extend(
+        [
+            "",
+            "DIRECTION / ENTRY-MODE BETRAYAL",
+            f"primary candidates: {len(direction_primary)}",
+        ]
+    )
+    lines.extend(_format_rows(direction_primary[:5]))
+    lines.append(f"watchlist candidates: {len(direction_watchlist)}")
+    lines.extend(_format_rows(direction_watchlist[:5]))
+    lines.append(f"rejected candidates: {len(direction_rejected)}")
     lines.append(NO_ORDER_NOTE)
     return "\n".join(lines)
 
@@ -208,15 +268,25 @@ def _format_rows(rows: list[Mapping[str, Any]]) -> list[str]:
     for row in rows:
         betrayal = row.get("betrayal") if isinstance(row.get("betrayal"), dict) else {}
         original = row.get("original") if isinstance(row.get("original"), dict) else {}
+        group = _format_group_identity(row)
         formatted.append(
             "  "
             f"{row.get('recommendation')} "
-            f"{row.get('timeframe')} {row.get('original_direction')}->{row.get('betrayal_direction')} "
-            f"{row.get('entry_mode')} samples={row.get('sample_count')} "
+            f"{group} samples={row.get('sample_count')} "
             f"orig_win={original.get('win_rate_pct')} betrayal_win={betrayal.get('win_rate_pct')} "
             f"betrayal_total={betrayal.get('total_pnl_pct')}"
         )
     return formatted
+
+
+def _format_group_identity(row: Mapping[str, Any]) -> str:
+    timeframe = row.get("timeframe")
+    original_direction = row.get("original_direction")
+    betrayal_direction = row.get("betrayal_direction")
+    entry_mode = row.get("entry_mode")
+    if original_direction or betrayal_direction or entry_mode:
+        return f"{timeframe} {original_direction}->{betrayal_direction} {entry_mode}"
+    return f"{timeframe} aggregate"
 
 
 def _recommendation(
@@ -296,7 +366,28 @@ def _operator_note(recommendation: str) -> str:
     return "Rejected for betrayal audit; keep normal strategy evaluation unchanged."
 
 
-def _has_group_identity(row: Mapping[str, Any]) -> bool:
+def _list_field(payload: Mapping[str, Any], key: str) -> list:
+    value = payload.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _filter_recommendation(rows: list[Mapping[str, Any]], recommendation: str) -> list[Mapping[str, Any]]:
+    return [row for row in rows if row["recommendation"] == recommendation]
+
+
+def _filter_rejected(rows: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [
+        row
+        for row in rows
+        if row["recommendation"] not in {BETRAYAL_PRIMARY_CANDIDATE, BETRAYAL_WATCHLIST}
+    ]
+
+
+def _has_timeframe_identity(row: Mapping[str, Any]) -> bool:
+    return bool(row.get("timeframe"))
+
+
+def _has_direction_entry_mode_identity(row: Mapping[str, Any]) -> bool:
     return bool(row.get("timeframe") and row.get("direction") and row.get("entry_mode"))
 
 

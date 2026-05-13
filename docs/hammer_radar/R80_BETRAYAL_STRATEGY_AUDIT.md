@@ -19,6 +19,51 @@ Recent inspection showed:
 
 Under R80 rules, matching `222m` evidence is a `BETRAYAL_PRIMARY_CANDIDATE`; matching `88m` evidence is a `BETRAYAL_WATCHLIST`.
 
+## R80.2 Aggregate Surface Hotfix
+
+R80.2 separates two betrayal audit layers that answer different operator questions:
+
+- Timeframe aggregate betrayal audit: "Is the whole timeframe behaving like an anti-signal?"
+- Direction/entry-mode betrayal audit: "Is a specific direction and entry mode behaving like an anti-signal?"
+
+The API now exposes explicit aggregate fields:
+
+```text
+timeframe_aggregate_leaderboard
+timeframe_aggregate_primary_candidates
+timeframe_aggregate_watchlist_candidates
+timeframe_aggregate_rejected_candidates
+```
+
+It also exposes explicit direction/entry-mode fields:
+
+```text
+direction_entry_mode_leaderboard
+direction_entry_mode_primary_candidates
+direction_entry_mode_watchlist_candidates
+direction_entry_mode_rejected_candidates
+```
+
+The legacy fields remain for compatibility:
+
+```text
+leaderboard
+primary_candidates
+watchlist_candidates
+rejected_candidates
+```
+
+In R80.2 those legacy fields refer to direction/entry-mode candidates. Operators should use `timeframe_aggregate_*` fields when validating aggregate timeframe anti-signal candidates.
+
+With current matching aggregate evidence:
+
+- `222m` is surfaced under `timeframe_aggregate_primary_candidates`.
+- `88m` is surfaced under `timeframe_aggregate_watchlist_candidates`.
+
+Direction/entry-mode rows such as `4m long->short fib_618`, `4m long->short fib_650`, `13m short->long`, and `8m short->long` remain useful audit rows, but they are not the same as aggregate timeframe candidates.
+
+R80.2 reinforces the normal strategy promotion system. It does not replace the existing `13m` / `44m` long promotion review, active timeframe review, rehearsal gates, protected live gate review, or human approval requirements.
+
 ## Naive Inverse Metrics
 
 R80 computes:
@@ -63,6 +108,8 @@ Rejected or not betrayal:
 
 R80 does not replace the existing promotion-ready `BTCUSDT|13m|long|ladder_close_50_618` path. It reads the same performance rows and adds an inverse audit view. Normal long promotion rules, active timeframe review, rehearsal, test order, protective readiness, final gate, and manual arming rules remain unchanged.
 
+Naive inverse metrics remain paper/shadow/audit evidence only. A candidate must still collect true inverse paper outcomes before any live eligibility discussion.
+
 ## No-Order Guarantees
 
 R80 payloads keep:
@@ -88,8 +135,10 @@ curl --max-time 5 -s http://127.0.0.1:8015/strategy-performance/betrayal-audit \
   | jq '{
     status,
     phase,
-    primary_candidates,
-    watchlist_candidates,
+    timeframe_aggregate_primary_candidates,
+    timeframe_aggregate_watchlist_candidates,
+    direction_entry_mode_primary_candidates,
+    direction_entry_mode_watchlist_candidates,
     order_placed,
     real_order_placed,
     execution_attempted,

@@ -86,12 +86,39 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
 
         payload = build_betrayal_strategy_audit(log_dir=self.log_dir)
 
-        primary = self._find(payload["primary_candidates"], timeframe="222m")
-        watchlist = self._find(payload["watchlist_candidates"], timeframe="88m")
-        rejected_normal = self._find(payload["rejected_candidates"], timeframe="13m")
-        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, primary["recommendation"])
-        self.assertEqual(BETRAYAL_WATCHLIST, watchlist["recommendation"])
-        self.assertEqual(BETRAYAL_REJECTED, rejected_normal["recommendation"])
+        aggregate_primary = self._find(payload["timeframe_aggregate_primary_candidates"], timeframe="222m")
+        aggregate_watchlist = self._find(payload["timeframe_aggregate_watchlist_candidates"], timeframe="88m")
+        aggregate_rejected_normal = self._find(payload["timeframe_aggregate_rejected_candidates"], timeframe="13m")
+        direction_primary = self._find(payload["direction_entry_mode_primary_candidates"], timeframe="222m")
+        direction_watchlist = self._find(payload["direction_entry_mode_watchlist_candidates"], timeframe="88m")
+        direction_rejected_normal = self._find(payload["direction_entry_mode_rejected_candidates"], timeframe="13m")
+        legacy_primary = self._find(payload["primary_candidates"], timeframe="222m")
+        legacy_watchlist = self._find(payload["watchlist_candidates"], timeframe="88m")
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, aggregate_primary["recommendation"])
+        self.assertEqual("timeframe_aggregate", aggregate_primary["audit_scope"])
+        self.assertIsNone(aggregate_primary["original_direction"])
+        self.assertIsNone(aggregate_primary["entry_mode"])
+        self.assertEqual(BETRAYAL_WATCHLIST, aggregate_watchlist["recommendation"])
+        self.assertEqual("timeframe_aggregate", aggregate_watchlist["audit_scope"])
+        self.assertEqual(BETRAYAL_REJECTED, aggregate_rejected_normal["recommendation"])
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, direction_primary["recommendation"])
+        self.assertEqual("direction_entry_mode", direction_primary["audit_scope"])
+        self.assertEqual(BETRAYAL_WATCHLIST, direction_watchlist["recommendation"])
+        self.assertEqual("direction_entry_mode", direction_watchlist["audit_scope"])
+        self.assertEqual(BETRAYAL_REJECTED, direction_rejected_normal["recommendation"])
+        self.assertEqual(direction_primary, legacy_primary)
+        self.assertEqual(direction_watchlist, legacy_watchlist)
+        for key in (
+            "timeframe_aggregate_leaderboard",
+            "timeframe_aggregate_primary_candidates",
+            "timeframe_aggregate_watchlist_candidates",
+            "timeframe_aggregate_rejected_candidates",
+            "direction_entry_mode_leaderboard",
+            "direction_entry_mode_primary_candidates",
+            "direction_entry_mode_watchlist_candidates",
+            "direction_entry_mode_rejected_candidates",
+        ):
+            self.assertIn(key, payload)
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["allow_live_orders"])
         self.assertTrue(payload["global_kill_switch"])
@@ -111,6 +138,8 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         payload = response.json()
         self.assertEqual("OK", payload["status"])
         self.assertEqual("R80", payload["phase"])
+        aggregate_primary = self._find(payload["timeframe_aggregate_primary_candidates"], timeframe="222m")
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, aggregate_primary["recommendation"])
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["real_order_placed"])
         self.assertFalse(payload["execution_attempted"])
@@ -138,8 +167,14 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         )
 
         self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("TIMEFRAME AGGREGATE BETRAYAL", result.stdout)
+        self.assertIn("DIRECTION / ENTRY-MODE BETRAYAL", result.stdout)
         self.assertIn("BETRAYAL_PRIMARY_CANDIDATE", result.stdout)
         self.assertIn("BETRAYAL_WATCHLIST", result.stdout)
+        self.assertIn("222m aggregate", result.stdout)
+        self.assertIn("88m aggregate", result.stdout)
+        self.assertIn("222m long->short ladder_close_50_618", result.stdout)
+        self.assertIn("88m long->short ladder_close_50_618", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     def test_existing_strategy_performance_and_betrayal_shadow_endpoints_still_pass(self) -> None:
