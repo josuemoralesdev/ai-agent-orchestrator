@@ -36,6 +36,7 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
 )
 from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
     RESOLUTIONS_FILENAME,
+    build_betrayal_shadow_resolutions_payload,
     resolve_betrayal_shadow_outcomes,
 )
 from src.app.hammer_radar.operator.betrayal_strategy_audit import (
@@ -783,6 +784,191 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertTrue(payload["capture_hook_exists"])
         self.assertEqual(1, payload["target_coverage"]["222m"]["covered_records"])
 
+    def test_r81_4_candle_before_signal_timestamp_cannot_resolve(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles(
+            [
+                self._candle_at(
+                    "222m",
+                    timestamp="2026-04-30T23:59:00+00:00",
+                    high=106.0,
+                    low=99.0,
+                )
+            ]
+        )
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(0, payload["newly_resolved_records"])
+        self.assertEqual(1, payload["no_data_records"])
+        self.assertIn("no_temporally_aligned_candles", payload["blockers"])
+        self.assertEqual(0, payload["target_summary"]["222m"]["resolved_records"])
+
+    def test_r81_4_april_signal_cannot_resolve_from_may_candle(self) -> None:
+        april_signal = self._unresolved_shadow_record("222m", index=0)
+        april_signal["signal_timestamp"] = "2026-04-29T12:00:00+00:00"
+        self._write_shadow_records([april_signal])
+        self._write_candles(
+            [
+                self._candle_at(
+                    "222m",
+                    timestamp="2026-05-13T12:00:00+00:00",
+                    high=106.0,
+                    low=99.0,
+                )
+            ]
+        )
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(0, payload["newly_resolved_records"])
+        self.assertEqual(1, payload["no_data_records"])
+        self.assertIn("no_temporally_aligned_candles", payload["blockers"])
+        self.assertEqual(0, payload["resolution_summary"]["resolved_records"])
+
+    def test_r81_4_candle_after_evaluation_window_cannot_resolve(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("88m", index=0)])
+        self._write_candles(
+            [
+                self._candle_at(
+                    "88m",
+                    timestamp="2026-05-02T00:00:00+00:00",
+                    high=106.0,
+                    low=99.0,
+                )
+            ]
+        )
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(0, payload["newly_resolved_records"])
+        self.assertEqual(1, payload["no_data_records"])
+        self.assertIn("no_temporally_aligned_candles", payload["blockers"])
+
+    def test_r81_4_valid_aligned_candles_resolve_win_and_loss_with_temporal_fields(self) -> None:
+        for high, low, expected in ((106.0, 99.0, SHADOW_WIN), (101.0, 94.0, SHADOW_LOSS)):
+            with self.subTest(expected=expected):
+                temp_dir = tempfile.TemporaryDirectory()
+                case_dir = Path(temp_dir.name)
+                self._write_shadow_records_to(case_dir, [self._unresolved_shadow_record("222m", index=0)])
+                self._write_candles_to(case_dir, [self._candle("222m", high=high, low=low)])
+
+                payload = resolve_betrayal_shadow_outcomes(log_dir=case_dir)
+
+                record = payload["records"][0]
+                self.assertEqual(expected, record["shadow_status"])
+                self.assertTrue(record["temporal_alignment_ok"])
+                self.assertEqual("TEMPORAL_ALIGNMENT_OK", record["temporal_alignment_status"])
+                self.assertEqual("2026-05-01T00:00:00+00:00", record["evaluation_window_start"])
+                self.assertEqual("2026-05-01T11:06:00+00:00", record["evaluation_window_end"])
+                temp_dir.cleanup()
+
+    def test_r81_4_persisted_unsafe_resolution_is_not_counted_by_r81_validation(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        shadow = self._unresolved_shadow_record("222m", index=0)
+        shadow["signal_timestamp"] = "2026-04-29T12:00:00+00:00"
+        self._write_shadow_records([shadow])
+        self._write_resolutions(
+            [
+                self._resolution_record(
+                    "222m",
+                    index=0,
+                    signal_timestamp="2026-04-29T12:00:00+00:00",
+                    resolved_candle_timestamp="2026-05-13T12:00:00+00:00",
+                )
+            ]
+        )
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir, min_true_inverse_sample=1)
+        resolutions = build_betrayal_shadow_resolutions_payload(log_dir=self.log_dir)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(0, primary["true_inverse_sample_count"])
+        self.assertEqual(1, payload["true_inverse_summary"]["invalid_resolution_records"])
+        self.assertEqual(0, payload["true_inverse_summary"]["resolved_shadow_records"])
+        self.assertEqual(1, resolutions["summary"]["invalid_resolution_records"])
+        self.assertFalse(resolutions["records"][0]["temporal_alignment_ok"])
+        self.assertIn("resolved_candle_after_evaluation_window", resolutions["records"][0]["resolution_blockers"])
+
+    def test_r81_4_persisted_safe_resolution_is_counted_by_r81_validation(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_resolutions(
+            [
+                self._resolution_record(
+                    "222m",
+                    index=0,
+                    signal_timestamp="2026-05-01T00:00:00+00:00",
+                    resolved_candle_timestamp="2026-05-01T00:01:00+00:00",
+                )
+            ]
+        )
+
+        payload = build_betrayal_inverse_validation(log_dir=self.log_dir, min_true_inverse_sample=1)
+
+        primary = self._find(payload["timeframe_aggregate_validations"], timeframe="222m")
+        self.assertEqual(1, primary["true_inverse_sample_count"])
+        self.assertEqual(TRUE_INVERSE_VALIDATED_PRIMARY, primary["validation_status"])
+        self.assertEqual(1, payload["true_inverse_summary"]["temporally_valid_resolved_records"])
+        self.assertEqual(0, payload["true_inverse_summary"]["invalid_resolution_records"])
+
+    def test_r81_4_api_resolutions_show_temporal_alignment_fields(self) -> None:
+        self._write_resolutions(
+            [
+                self._resolution_record(
+                    "222m",
+                    index=0,
+                    signal_timestamp="2026-04-29T12:00:00+00:00",
+                    resolved_candle_timestamp="2026-05-13T12:00:00+00:00",
+                )
+            ]
+        )
+
+        response = self.client.get("/betrayal-shadow/resolutions?limit=20")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual(1, payload["summary"]["invalid_resolution_records"])
+        self.assertFalse(payload["records"][0]["temporal_alignment_ok"])
+        self.assertEqual("TEMPORAL_ALIGNMENT_INVALID", payload["records"][0]["temporal_alignment_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["network_allowed"])
+
+    def test_r81_4_cli_prints_invalid_resolution_counts(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        shadow = self._unresolved_shadow_record("222m", index=0)
+        shadow["signal_timestamp"] = "2026-04-29T12:00:00+00:00"
+        self._write_shadow_records([shadow])
+        self._write_resolutions(
+            [
+                self._resolution_record(
+                    "222m",
+                    index=0,
+                    signal_timestamp="2026-04-29T12:00:00+00:00",
+                    resolved_candle_timestamp="2026-05-13T12:00:00+00:00",
+                )
+            ]
+        )
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-inverse-validation",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("invalid_resolution_records: 1", result.stdout)
+        self.assertIn("samples=0", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -921,10 +1107,19 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
 
     @staticmethod
     def _candle(timeframe: str, *, high: float, low: float) -> dict:
+        return BetrayalStrategyAuditTestCase._candle_at(
+            timeframe,
+            timestamp="2026-05-01T00:01:00+00:00",
+            high=high,
+            low=low,
+        )
+
+    @staticmethod
+    def _candle_at(timeframe: str, *, timestamp: str, high: float, low: float) -> dict:
         return {
             "symbol": "BTCUSDT",
             "timeframe": timeframe,
-            "timestamp": "2026-05-01T00:01:00+00:00",
+            "timestamp": timestamp,
             "open": 100.0,
             "high": high,
             "low": low,
@@ -954,6 +1149,50 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             "shadow_status": status,
             "shadow_pnl_pct": pnl_pct,
             "shadow_pnl_usd": None,
+            "comparison": {"shadow_better": status == SHADOW_WIN, "original_better": status == SHADOW_LOSS},
+            "live_execution_enabled": False,
+            "order_placed": False,
+            "shadow_only": True,
+        }
+
+    def _write_resolutions(self, records: list[dict]) -> None:
+        path = self.log_dir / RESOLUTIONS_FILENAME
+        with path.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    @staticmethod
+    def _resolution_record(
+        timeframe: str,
+        *,
+        index: int,
+        signal_timestamp: str,
+        resolved_candle_timestamp: str,
+        status: str = SHADOW_WIN,
+        pnl_pct: float = 5.0,
+    ) -> dict:
+        return {
+            "shadow_outcome_id": f"shadow-{timeframe}-{index}",
+            "created_at": signal_timestamp,
+            "resolver_phase": "R81.1",
+            "resolver_source": "test",
+            "original_signal_id": f"signal-{timeframe}-{index}",
+            "original_direction": "short",
+            "shadow_direction": "long",
+            "symbol": "BTCUSDT",
+            "timeframe": timeframe,
+            "signal_timestamp": signal_timestamp,
+            "resolved_at": resolved_candle_timestamp,
+            "resolved_candle_timestamp": resolved_candle_timestamp,
+            "resolution_status": status,
+            "shadow_status": status,
+            "shadow_entry": 100.0,
+            "shadow_stop": 95.0,
+            "shadow_take_profit": 105.0,
+            "shadow_exit_price": 105.0 if status == SHADOW_WIN else 95.0,
+            "shadow_close_reason": "take_profit" if status == SHADOW_WIN else "stop",
+            "shadow_pnl_pct": pnl_pct,
+            "true_inverse_pnl_pct": pnl_pct,
             "comparison": {"shadow_better": status == SHADOW_WIN, "original_better": status == SHADOW_LOSS},
             "live_execution_enabled": False,
             "order_placed": False,

@@ -22,7 +22,10 @@ from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     SHADOW_UNRESOLVED,
     SHADOW_WIN,
 )
-from src.app.hammer_radar.operator.betrayal_shadow_resolver import load_resolved_betrayal_shadow_records
+from src.app.hammer_radar.operator.betrayal_shadow_resolver import (
+    load_betrayal_shadow_resolution_quality_summary,
+    load_resolved_betrayal_shadow_records,
+)
 from src.app.hammer_radar.operator.betrayal_strategy_audit import (
     BETRAYAL_PRIMARY_CANDIDATE,
     BETRAYAL_WATCHLIST,
@@ -70,6 +73,7 @@ def build_betrayal_inverse_validation(
     generated_at = datetime.now(UTC).isoformat()
     audit = build_betrayal_strategy_audit(log_dir=resolved_log_dir)
     records = load_resolved_betrayal_shadow_records(log_dir=resolved_log_dir)
+    resolution_quality = load_betrayal_shadow_resolution_quality_summary(log_dir=resolved_log_dir)
 
     aggregate_candidates = [
         *_list_field(audit, "timeframe_aggregate_primary_candidates"),
@@ -147,7 +151,11 @@ def build_betrayal_inverse_validation(
                     _list_field(audit, "direction_entry_mode_watchlist_candidates")
                 ),
             },
-            "true_inverse_summary": _true_inverse_summary(records=records, validations=validations),
+            "true_inverse_summary": _true_inverse_summary(
+                records=records,
+                validations=validations,
+                resolution_quality=resolution_quality,
+            ),
             "timeframe_aggregate_validations": timeframe_aggregate_validations,
             "direction_entry_mode_validations": direction_entry_mode_validations,
             "primary_validations": primary_validations,
@@ -220,6 +228,7 @@ def format_betrayal_inverse_validation_text(payload: Mapping[str, Any]) -> str:
         "No order placed. real_order_placed=false execution_attempted=false network_allowed=false secrets_shown=false.",
         f"total_shadow_records: {summary.get('total_shadow_records', 0)}",
         f"resolved_shadow_records: {summary.get('resolved_shadow_records', 0)}",
+        f"invalid_resolution_records: {summary.get('invalid_resolution_records', 0)}",
         "",
         "TIMEFRAME AGGREGATE TRUE INVERSE VALIDATION",
     ]
@@ -328,11 +337,24 @@ def _validation_status(
     return TRUE_INVERSE_REJECTED
 
 
-def _true_inverse_summary(*, records: list[dict], validations: list[dict]) -> dict[str, Any]:
+def _true_inverse_summary(
+    *,
+    records: list[dict],
+    validations: list[dict],
+    resolution_quality: Mapping[str, Any],
+) -> dict[str, Any]:
     resolved = [record for record in records if record.get("shadow_status") in RESOLVED_STATUSES]
     return {
         "total_shadow_records": len(records),
         "resolved_shadow_records": len(resolved),
+        "persisted_resolution_records": int(resolution_quality.get("persisted_resolution_records") or 0),
+        "temporally_valid_resolved_records": int(
+            resolution_quality.get("temporally_valid_resolved_records") or 0
+        ),
+        "temporally_invalid_resolved_records": int(
+            resolution_quality.get("temporally_invalid_resolved_records") or 0
+        ),
+        "invalid_resolution_records": int(resolution_quality.get("invalid_resolution_records") or 0),
         "validation_targets": len(validations),
         "validated_primary": sum(
             1 for row in validations if row.get("validation_status") == TRUE_INVERSE_VALIDATED_PRIMARY
