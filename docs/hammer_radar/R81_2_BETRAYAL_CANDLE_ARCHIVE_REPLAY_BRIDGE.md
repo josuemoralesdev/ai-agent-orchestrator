@@ -20,6 +20,8 @@ no_data_records=20
 
 R81.2 fixes the local replay data plumbing. If candle-shaped local NDJSON exists, it can be normalized into a replay archive. If data is absent, R81.2 reports missing coverage and does not invent candles.
 
+R81.3 adds the safe capture/backfill source that can populate this archive from Hammer Radar runtime resampled OHLC frames.
+
 ## Archive Format
 
 Archive path:
@@ -61,6 +63,8 @@ candle_archive/*.ndjson
 ```
 
 Non-candle logs such as positions, signals, scanner summaries, and market intelligence metadata are not converted unless they contain complete OHLC candle fields.
+
+R81.3 also writes runtime resampled candles directly into `candle_archive/` during Hammer Radar operation through `capture_resampled_frames(...)`.
 
 ## Dry-Run vs Write
 

@@ -23,6 +23,11 @@ from src.app.hammer_radar.operator.betrayal_candle_archive import (
     build_betrayal_candle_archive,
     build_betrayal_candle_archive_status,
 )
+from src.app.hammer_radar.operator.betrayal_candle_capture import (
+    backfill_betrayal_candle_capture,
+    build_betrayal_candle_capture_status,
+    capture_candles,
+)
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     OUTCOMES_FILENAME,
     SHADOW_LOSS,
@@ -655,6 +660,128 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("R81.2 betrayal candle archive: OK", result.stdout)
         self.assertIn("candles_found: 1", result.stdout)
         self.assertIn("No order placed", result.stdout)
+
+    def test_r81_3_capture_backfill_payload_safety_and_no_source_zero(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+
+        payload = backfill_betrayal_candle_capture(log_dir=self.log_dir)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R81.3", payload["phase"])
+        self.assertEqual("SAFE_CANDLE_CAPTURE_BACKFILL_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual("LOCAL_ONLY", payload["source_mode"])
+        self.assertEqual(0, payload["candles_found"])
+        self.assertEqual(0, payload["candles_written"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r81_3_dry_run_and_write_false_do_not_write(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        dry_run = backfill_betrayal_candle_capture(log_dir=self.log_dir, dry_run=True, write=True)
+        no_write = backfill_betrayal_candle_capture(log_dir=self.log_dir, dry_run=False, write=False)
+
+        self.assertEqual(1, dry_run["candles_found"])
+        self.assertEqual(1, no_write["candles_found"])
+        self.assertFalse((self.log_dir / "candle_archive").exists())
+
+    def test_r81_3_write_true_writes_archive_and_skips_duplicates(self) -> None:
+        self._write_candles(
+            [
+                self._candle("222m", high=106.0, low=99.0),
+                self._candle("222m", high=106.0, low=99.0),
+            ]
+        )
+
+        payload = backfill_betrayal_candle_capture(log_dir=self.log_dir, dry_run=False, write=True)
+        second = backfill_betrayal_candle_capture(log_dir=self.log_dir, dry_run=False, write=True)
+
+        self.assertEqual(1, payload["candles_written"])
+        self.assertEqual(0, second["candles_written"])
+        self.assertEqual(1, len(self._read_jsonl(self.log_dir / "candle_archive" / "BTCUSDT_222m.ndjson")))
+
+    def test_r81_3_target_coverage_before_after_works(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        payload = backfill_betrayal_candle_capture(log_dir=self.log_dir, dry_run=True, write=False)
+
+        self.assertEqual(0, payload["target_coverage_before"]["222m"]["covered_records"])
+        self.assertEqual(1, payload["target_coverage_after"]["222m"]["covered_records"])
+
+    def test_r81_3_capture_candles_writes_local_archive(self) -> None:
+        payload = capture_candles([self._candle("222m", high=106.0, low=99.0)], log_dir=self.log_dir)
+
+        self.assertEqual(1, payload["candles_written"])
+        self.assertTrue((self.log_dir / "candle_archive" / "BTCUSDT_222m.ndjson").exists())
+        self.assertFalse(payload["order_placed"])
+
+    def test_r81_3_resolver_can_resolve_after_capture_created_archive(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        capture_candles([self._candle("222m", high=106.0, low=99.0)], log_dir=self.log_dir)
+
+        payload = resolve_betrayal_shadow_outcomes(log_dir=self.log_dir)
+
+        self.assertEqual(1, payload["newly_resolved_records"])
+        self.assertEqual(SHADOW_WIN, payload["records"][0]["shadow_status"])
+
+    def test_r81_3_api_endpoints_are_safe(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        backfill_response = self.client.post(
+            "/betrayal-shadow/candle-capture/backfill",
+            json={"dry_run": True, "write": False, "limit": 20, "source_mode": "LOCAL_ONLY"},
+        )
+        status_response = self.client.get("/betrayal-shadow/candle-capture/status")
+
+        self.assertEqual(200, backfill_response.status_code)
+        self.assertEqual(200, status_response.status_code)
+        self.assertEqual("R81.3", backfill_response.json()["phase"])
+        self.assertFalse(backfill_response.json()["order_placed"])
+        self.assertFalse(backfill_response.json()["network_allowed"])
+        self.assertTrue(status_response.json()["capture_hook_exists"])
+
+    def test_r81_3_cli_command_exists(self) -> None:
+        self._write_candles([self._candle("222m", high=106.0, low=99.0)])
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-candle-capture",
+                "--limit",
+                "20",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R81.3 betrayal candle capture: OK", result.stdout)
+        self.assertIn("source_mode: LOCAL_ONLY", result.stdout)
+        self.assertIn("candles_found: 1", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r81_3_capture_status_reports_hook_and_coverage(self) -> None:
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        capture_candles([self._candle("222m", high=106.0, low=99.0)], log_dir=self.log_dir)
+
+        payload = build_betrayal_candle_capture_status(log_dir=self.log_dir)
+
+        self.assertTrue(payload["capture_hook_exists"])
+        self.assertEqual(1, payload["target_coverage"]["222m"]["covered_records"])
 
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
