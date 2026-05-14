@@ -240,6 +240,7 @@ from src.app.hammer_radar.operator.market_intelligence import (
 )
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
+from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.multi_symbol_scanner import (
     build_multi_symbol_scans_payload,
     build_multi_symbol_summary,
@@ -1584,6 +1585,20 @@ def strategy_performance_miro_fish_quality_gate(
         timeframe=timeframe,
         family=family,
         limit=limit,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/preflight")
+def live_arming_preflight(
+    symbol: str = "BTCUSDT",
+    timeframe: str | None = None,
+    candidate_id: str | None = None,
+) -> dict:
+    return build_live_arming_preflight(
+        symbol=symbol,
+        timeframe=timeframe,
+        candidate_id=candidate_id,
         log_dir=get_log_dir(use_env=True),
     )
 

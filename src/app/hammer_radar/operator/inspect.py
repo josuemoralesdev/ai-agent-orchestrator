@@ -708,6 +708,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-arming-preflight":
+        from src.app.hammer_radar.operator.live_arming_preflight import (
+            build_live_arming_preflight,
+            format_live_arming_preflight_text,
+        )
+
+        print(
+            format_live_arming_preflight_text(
+                build_live_arming_preflight(
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1049,6 +1065,11 @@ def _build_parser() -> argparse.ArgumentParser:
     miro_fish_quality_gate_parser.add_argument("--timeframe", default=None)
     miro_fish_quality_gate_parser.add_argument("--family", default=None)
     miro_fish_quality_gate_parser.add_argument("--limit", type=int, default=120)
+
+    live_arming_preflight_parser = subparsers.add_parser("live-arming-preflight", parents=[parent])
+    live_arming_preflight_parser.add_argument("--symbol", default="BTCUSDT")
+    live_arming_preflight_parser.add_argument("--timeframe", default=None)
+    live_arming_preflight_parser.add_argument("--candidate-id", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

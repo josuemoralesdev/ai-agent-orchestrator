@@ -26,6 +26,7 @@ from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_out
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
+from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.multi_symbol_scanner import scan_watchlist
 from src.app.hammer_radar.operator.notification_watcher import check_notifications, notification_status
 
@@ -48,6 +49,7 @@ TASK_BETRAYAL_CANDLE_ARCHIVE = "betrayal_candle_archive"
 TASK_BETRAYAL_CANDLE_CAPTURE = "betrayal_candle_capture"
 TASK_MARKOV_REGIME_GATE = "markov_regime_gate"
 TASK_MIRO_FISH_QUALITY_GATE = "miro_fish_quality_gate"
+TASK_LIVE_ARMING_PREFLIGHT = "live_arming_preflight"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -65,6 +67,7 @@ AVAILABLE_TASKS = (
     TASK_BETRAYAL_CANDLE_CAPTURE,
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
+    TASK_LIVE_ARMING_PREFLIGHT,
 )
 
 
@@ -337,6 +340,17 @@ def run_refresh_task(
                 "normal_candidate_gates": len(result.get("normal_candidate_quality_gates") or []),
                 "betrayal_candidate_gates": len(result.get("betrayal_candidate_quality_gates") or []),
                 "supported_candidates": len(result.get("top_supported_candidates") or []),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_LIVE_ARMING_PREFLIGHT:
+        result = build_live_arming_preflight(log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "final_preflight_status": result.get("final_preflight_status"),
+                "selected_candidate_id": (result.get("top_candidate_preflight") or {}).get("candidate_id"),
                 "execution_mode": result.get("execution_mode"),
             },
         )
