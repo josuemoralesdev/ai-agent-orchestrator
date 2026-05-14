@@ -11,7 +11,9 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator.approval_api import app
 from src.app.hammer_radar.operator.paper_refresh_scheduler import (
+    AVAILABLE_TASKS,
     DEFAULT_TASKS,
+    TASK_MARKOV_REGIME_GATE,
     build_refresh_runs_payload,
     load_refresh_runs,
     run_refresh_sequence,
@@ -51,6 +53,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
             ],
             list(DEFAULT_TASKS),
         )
+        self.assertIn(TASK_MARKOV_REGIME_GATE, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_MARKOV_REGIME_GATE, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -132,6 +136,30 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
             )
 
         self.assertFalse(mocked.call_args.kwargs["use_network"])
+
+    def test_optional_markov_regime_gate_task_is_read_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_markov_regime_gate",
+            return_value={
+                "normal_candidate_regime_gates": [{}],
+                "betrayal_candidate_regime_gates": [{}],
+                "regime_summary": {"13m": {}},
+                "execution_mode": "MARKOV_REGIME_GATE_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_MARKOV_REGIME_GATE],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_MARKOV_REGIME_GATE], record["completed_tasks"])
+        self.assertEqual("MARKOV_REGIME_GATE_ONLY_NO_ORDER", record["task_results"][TASK_MARKOV_REGIME_GATE]["detail"]["execution_mode"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
 
     def test_api_paper_refresh_status_works(self) -> None:
         response = self.client.get("/paper-refresh/status")

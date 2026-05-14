@@ -47,6 +47,20 @@ from src.app.hammer_radar.operator.betrayal_strategy_audit import (
     build_betrayal_strategy_row,
     invert_direction,
 )
+from src.app.hammer_radar.operator.markov_regime_gate import (
+    BEAR_TREND,
+    BULL_TREND,
+    HIGH_VOLATILITY,
+    INSUFFICIENT_DATA,
+    LOW_VOLATILITY,
+    RANGE,
+    REGIME_NEUTRAL_OR_INSUFFICIENT_DATA,
+    REGIME_PENDING_MORE_CANDLES,
+    REGIME_REJECTS_CANDIDATE,
+    REGIME_SUPPORTS_CANDIDATE,
+    build_markov_regime_gate,
+    classify_markov_regime,
+)
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -969,6 +983,137 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("invalid_resolution_records: 1", result.stdout)
         self.assertIn("samples=0", result.stdout)
 
+    def test_r82_regime_payload_returns_safe_fields_and_insufficient_data(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+
+        payload = build_markov_regime_gate(log_dir=self.log_dir)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R82", payload["phase"])
+        self.assertEqual("MARKOV_REGIME_GATE_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual(INSUFFICIENT_DATA, payload["regime_summary"]["13m"]["current_regime"])
+        gate = self._find(payload["normal_candidate_regime_gates"], timeframe="13m")
+        self.assertEqual(REGIME_PENDING_MORE_CANDLES, gate["gate_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r82_bullish_candles_support_long_normal_candidate(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_markov_regime_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["normal_candidate_regime_gates"], timeframe="13m", direction="long")
+        self.assertEqual(BULL_TREND, gate["current_regime"])
+        self.assertEqual(REGIME_SUPPORTS_CANDIDATE, gate["gate_status"])
+
+    def test_r82_bearish_candles_reject_long_and_support_short_context(self) -> None:
+        self._seed_group("normal-13m-long", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._seed_group("normal-13m-short", "13m", "short", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [105, 104, 103, 102, 101, 100])
+
+        payload = build_markov_regime_gate(log_dir=self.log_dir)
+
+        long_gate = self._find(payload["normal_candidate_regime_gates"], timeframe="13m", direction="long")
+        short_gate = self._find(payload["normal_candidate_regime_gates"], timeframe="13m", direction="short")
+        self.assertEqual(BEAR_TREND, long_gate["current_regime"])
+        self.assertEqual(REGIME_REJECTS_CANDIDATE, long_gate["gate_status"])
+        self.assertEqual(REGIME_SUPPORTS_CANDIDATE, short_gate["gate_status"])
+
+    def test_r82_range_and_high_volatility_regimes_are_classified(self) -> None:
+        self._capture_close_series("44m", [100, 100.1, 99.9, 100.05, 99.95, 100.0], range_width=0.7)
+        self._capture_close_series("55m", [100, 108, 94, 112, 90, 116], range_width=6.0)
+
+        range_payload = classify_markov_regime(symbol="BTCUSDT", timeframe="44m", log_dir=self.log_dir)
+        high_vol_payload = classify_markov_regime(symbol="BTCUSDT", timeframe="55m", log_dir=self.log_dir)
+
+        self.assertIn(range_payload["current_regime"], {RANGE, LOW_VOLATILITY})
+        self.assertEqual(HIGH_VOLATILITY, high_vol_payload["current_regime"])
+
+    def test_r82_transition_summary_is_deterministic(self) -> None:
+        self._capture_close_series("13m", [100, 101, 102, 101.8, 102.4, 103.2])
+
+        first = classify_markov_regime(symbol="BTCUSDT", timeframe="13m", log_dir=self.log_dir)
+        second = classify_markov_regime(symbol="BTCUSDT", timeframe="13m", log_dir=self.log_dir)
+
+        self.assertEqual(first["transition_summary"], second["transition_summary"])
+        self.assertIn("matrix", first["transition_summary"])
+
+    def test_r82_betrayal_aggregate_candidates_are_gated_without_live_readiness(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._seed_group("watch-88m", "88m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+        self._seed_group("watch-55m", "55m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+        self._write_shadow_records(
+            [
+                self._unresolved_shadow_record("222m", index=0),
+                self._unresolved_shadow_record("88m", index=1),
+                self._unresolved_shadow_record("55m", index=2),
+            ]
+        )
+        for timeframe in ("222m", "88m", "55m"):
+            self._capture_close_series(timeframe, [100, 101, 102, 103, 104, 105])
+
+        payload = build_markov_regime_gate(log_dir=self.log_dir)
+
+        gate_222 = self._find(payload["aggregate_candidate_regime_gates"], timeframe="222m")
+        gate_88 = self._find(payload["aggregate_candidate_regime_gates"], timeframe="88m")
+        gate_55 = self._find(payload["aggregate_candidate_regime_gates"], timeframe="55m")
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, gate_222["source_recommendation"])
+        self.assertEqual(BETRAYAL_WATCHLIST, gate_88["source_recommendation"])
+        self.assertEqual(BETRAYAL_WATCHLIST, gate_55["source_recommendation"])
+        for gate in (gate_222, gate_88, gate_55):
+            self.assertEqual(REGIME_NEUTRAL_OR_INSUFFICIENT_DATA, gate["gate_status"])
+            self.assertIn("true_inverse_validation_pending", gate["blockers"])
+            self.assertIn("aggregate_betrayal_direction_context_only", gate["blockers"])
+            self.assertFalse(gate["order_placed"])
+            self.assertFalse(gate["real_order_placed"])
+
+    def test_r82_api_endpoint_is_safe(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        response = self.client.get("/strategy-performance/markov-regime-gate")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R82", payload["phase"])
+        self.assertEqual(BULL_TREND, payload["regime_summary"]["13m"]["current_regime"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r82_cli_command_exists(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "markov-regime-gate",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R82 Markov Regime Gate: OK", result.stdout)
+        self.assertIn("NORMAL CANDIDATE GATES", result.stdout)
+        self.assertIn("BETRAYAL CANDIDATE GATES", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -1160,6 +1305,25 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         with path.open("w", encoding="utf-8") as handle:
             for record in records:
                 handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    def _capture_close_series(self, timeframe: str, closes: list[float], *, range_width: float = 0.2) -> None:
+        base_time = datetime(2026, 5, 1, tzinfo=UTC)
+        candles = []
+        for index, close in enumerate(closes):
+            candles.append(
+                {
+                    "symbol": "BTCUSDT",
+                    "timeframe": timeframe,
+                    "timestamp": (base_time + timedelta(minutes=index)).isoformat(),
+                    "open_time": (base_time + timedelta(minutes=index)).isoformat(),
+                    "open": close,
+                    "high": close + range_width,
+                    "low": close - range_width,
+                    "close": close,
+                    "volume": 1.0,
+                }
+            )
+        capture_candles(candles, log_dir=self.log_dir)
 
     @staticmethod
     def _resolution_record(
