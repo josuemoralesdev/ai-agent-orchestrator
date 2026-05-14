@@ -239,6 +239,7 @@ from src.app.hammer_radar.operator.market_intelligence import (
     evaluate_ethbtc_rotation,
 )
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
+from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.multi_symbol_scanner import (
     build_multi_symbol_scans_payload,
     build_multi_symbol_summary,
@@ -1566,6 +1567,22 @@ def strategy_performance_markov_regime_gate(
     return build_markov_regime_gate(
         symbol=symbol,
         timeframe=timeframe,
+        limit=limit,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/strategy-performance/miro-fish-quality-gate")
+def strategy_performance_miro_fish_quality_gate(
+    symbol: str = "BTCUSDT",
+    timeframe: str | None = None,
+    family: str | None = None,
+    limit: int = Query(default=120, ge=0),
+) -> dict:
+    return build_miro_fish_quality_gate(
+        symbol=symbol,
+        timeframe=timeframe,
+        family=family,
         limit=limit,
         log_dir=get_log_dir(use_env=True),
     )

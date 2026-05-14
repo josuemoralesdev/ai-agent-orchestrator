@@ -691,6 +691,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "miro-fish-quality-gate":
+        from src.app.hammer_radar.operator.miro_fish_quality_gate import (
+            build_miro_fish_quality_gate,
+            format_miro_fish_quality_gate_text,
+        )
+
+        print(
+            format_miro_fish_quality_gate_text(
+                build_miro_fish_quality_gate(
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    family=args.family,
+                    limit=args.limit,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1026,6 +1043,12 @@ def _build_parser() -> argparse.ArgumentParser:
     markov_regime_gate_parser.add_argument("--symbol", default="BTCUSDT")
     markov_regime_gate_parser.add_argument("--timeframe", default=None)
     markov_regime_gate_parser.add_argument("--limit", type=int, default=120)
+
+    miro_fish_quality_gate_parser = subparsers.add_parser("miro-fish-quality-gate", parents=[parent])
+    miro_fish_quality_gate_parser.add_argument("--symbol", default="BTCUSDT")
+    miro_fish_quality_gate_parser.add_argument("--timeframe", default=None)
+    miro_fish_quality_gate_parser.add_argument("--family", default=None)
+    miro_fish_quality_gate_parser.add_argument("--limit", type=int, default=120)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
