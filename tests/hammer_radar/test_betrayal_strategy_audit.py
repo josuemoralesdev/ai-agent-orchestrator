@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -87,6 +88,15 @@ from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist_status,
     live_env_arming_checklists_path,
     load_live_env_arming_checklists,
+)
+from src.app.hammer_radar.operator.live_env_boundary_review import (
+    EXECUTION_BOUNDARY_INTACT,
+    LIVE_ENV_ARMING_NOT_ALLOWED_YET,
+    TOGGLE_KILL_SWITCH_ON,
+    TOGGLE_LOCKED_FALSE,
+    TOGGLE_NOT_FOUND,
+    build_live_env_boundary_review,
+    live_env_boundary_report_path,
 )
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
@@ -1786,6 +1796,103 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R86 Live Env Arming Checklist: OK", result.stdout)
         self.assertIn("executable: False", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r87_boundary_review_reports_safe_defaults_and_execution_boundary(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_env_boundary_review(log_dir=self.log_dir, env={})
+
+        self.assertEqual("R87", payload["phase"])
+        self.assertEqual(LIVE_ENV_ARMING_NOT_ALLOWED_YET, payload["boundary_status"])
+        self.assertEqual("BLOCKED_BY_MISSING_OPERATOR_APPROVAL", payload["source_preflight_status"])
+        self.assertEqual("TICKET_APPROVAL_REQUIRED", payload["source_ticket_status"])
+        self.assertEqual(CHECKLIST_REQUIRED, payload["source_checklist_status"])
+        self.assertEqual(EXECUTION_BOUNDARY_INTACT, payload["execution_boundary_review"]["boundary_status"])
+        self.assertTrue(all(row["toggle_status"] == TOGGLE_NOT_FOUND for row in payload["live_toggle_review"]))
+        self.assertIn("no Binance calls", payload["forbidden_actions"])
+        self.assertIn("no env mutation", payload["forbidden_actions"])
+        self.assertIn("R83 top candidate still supports", payload["future_arming_requirements"][0])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r87_boundary_review_reports_locked_toggle_states(self) -> None:
+        self._seed_supported_13m_long()
+        env = {
+            "HAMMER_BINANCE_LIVE_ENABLED": "false",
+            "HAMMER_LIVE_EXECUTION_ENABLED": "false",
+            "HAMMER_ALLOW_LIVE_ORDERS": "false",
+            "HAMMER_GLOBAL_KILL_SWITCH": "true",
+        }
+
+        payload = build_live_env_boundary_review(log_dir=self.log_dir, env=env)
+        statuses = {row["toggle_name"]: row["toggle_status"] for row in payload["live_toggle_review"]}
+
+        self.assertEqual(TOGGLE_LOCKED_FALSE, statuses["HAMMER_BINANCE_LIVE_ENABLED"])
+        self.assertEqual(TOGGLE_LOCKED_FALSE, statuses["HAMMER_LIVE_EXECUTION_ENABLED"])
+        self.assertEqual(TOGGLE_LOCKED_FALSE, statuses["HAMMER_ALLOW_LIVE_ORDERS"])
+        self.assertEqual(TOGGLE_KILL_SWITCH_ON, statuses["HAMMER_GLOBAL_KILL_SWITCH"])
+
+    def test_r87_boundary_review_write_false_and_dry_run_do_not_write(self) -> None:
+        self._seed_supported_13m_long()
+
+        dry_run = build_live_env_boundary_review(log_dir=self.log_dir, dry_run=True, write=True, env={})
+        no_write = build_live_env_boundary_review(log_dir=self.log_dir, dry_run=False, write=False, env={})
+
+        self.assertFalse(dry_run["report_written"])
+        self.assertFalse(no_write["report_written"])
+        self.assertFalse(live_env_boundary_report_path(self.log_dir).exists())
+
+    def test_r87_boundary_review_write_true_writes_local_json_only(self) -> None:
+        self._seed_supported_13m_long()
+        before_env = dict(os.environ)
+
+        payload = build_live_env_boundary_review(log_dir=self.log_dir, dry_run=False, write=True, env={})
+
+        self.assertTrue(payload["report_written"])
+        self.assertTrue(live_env_boundary_report_path(self.log_dir).exists())
+        self.assertEqual(before_env, dict(os.environ))
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+    def test_r87_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.get("/live-arming/env-boundary-review")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R87", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+        report = self.client.post("/live-arming/env-boundary-review/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r87_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-env-boundary-review",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R87 Live Env Boundary Review: OK", result.stdout)
+        self.assertIn("execution_boundary_status: EXECUTION_BOUNDARY_INTACT", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod

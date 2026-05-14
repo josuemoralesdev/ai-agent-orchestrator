@@ -28,6 +28,7 @@ from src.app.hammer_radar.operator.market_intelligence import build_market_intel
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import build_live_env_arming_checklist
+from src.app.hammer_radar.operator.live_env_boundary_review import build_live_env_boundary_review
 from src.app.hammer_radar.operator.multi_symbol_scanner import scan_watchlist
 from src.app.hammer_radar.operator.notification_watcher import check_notifications, notification_status
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
@@ -56,6 +57,7 @@ TASK_LIVE_ARMING_PREFLIGHT = "live_arming_preflight"
 TASK_TINY_LIVE_RISK_CONTRACT = "tiny_live_risk_contract"
 TASK_TINY_LIVE_TICKET_BUILDER = "tiny_live_ticket_builder"
 TASK_LIVE_ENV_ARMING_CHECKLIST = "live_env_arming_checklist"
+TASK_LIVE_ENV_BOUNDARY_REVIEW = "live_env_boundary_review"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -77,6 +79,7 @@ AVAILABLE_TASKS = (
     TASK_TINY_LIVE_RISK_CONTRACT,
     TASK_TINY_LIVE_TICKET_BUILDER,
     TASK_LIVE_ENV_ARMING_CHECKLIST,
+    TASK_LIVE_ENV_BOUNDARY_REVIEW,
 )
 
 
@@ -398,6 +401,19 @@ def run_refresh_task(
                 "manual_funding_status": result.get("manual_funding_status"),
                 "live_env_arming_status": result.get("live_env_arming_status"),
                 "checklist_written": result.get("checklist_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_LIVE_ENV_BOUNDARY_REVIEW:
+        result = build_live_env_boundary_review(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "boundary_status": result.get("boundary_status"),
+                "source_preflight_status": result.get("source_preflight_status"),
+                "report_written": result.get("report_written"),
                 "execution_mode": result.get("execution_mode"),
             },
         )
