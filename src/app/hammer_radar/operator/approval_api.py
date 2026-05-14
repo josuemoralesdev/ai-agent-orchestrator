@@ -241,6 +241,7 @@ from src.app.hammer_radar.operator.market_intelligence import (
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
+from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
 from src.app.hammer_radar.operator.multi_symbol_scanner import (
     build_multi_symbol_scans_payload,
     build_multi_symbol_summary,
@@ -1601,6 +1602,13 @@ def live_arming_preflight(
         candidate_id=candidate_id,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.get("/live-arming/risk-contract")
+def live_arming_risk_contract(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_tiny_live_risk_contract_payload(candidate_id=candidate_id)
 
 
 @app.get("/strategy-promotion/status")

@@ -18,6 +18,11 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import (
     MIRO_FISH_SUPPORTS_CANDIDATE,
     build_miro_fish_quality_gate,
 )
+from src.app.hammer_radar.operator.tiny_live_risk_contract import (
+    FUNDING_CONFIG_PRESENT as RISK_FUNDING_CONFIG_PRESENT,
+    RISK_CONTRACT_VALID_FOR_PREFLIGHT,
+    build_tiny_live_risk_contract_payload,
+)
 
 PHASE = "R84"
 SYSTEM = "money_printing_machine_hammer_radar"
@@ -37,6 +42,8 @@ BLOCKED_BY_BETRAYAL_PENDING = "BLOCKED_BY_BETRAYAL_PENDING"
 PREFLIGHT_OPERATOR_REVIEW_ONLY = "PREFLIGHT_OPERATOR_REVIEW_ONLY"
 
 RISK_CONTRACT_COMPLETE = "RISK_CONTRACT_COMPLETE"
+RISK_CONTRACT_PRESENT = "RISK_CONTRACT_PRESENT"
+RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS = "RISK_CONTRACT_VALID_FOR_PREFLIGHT"
 RISK_CONTRACT_MISSING = "RISK_CONTRACT_MISSING"
 RISK_CONTRACT_INVALID = "RISK_CONTRACT_INVALID"
 
@@ -94,9 +101,9 @@ def build_live_arming_preflight(
         and (candidate_id is None or row.get("candidate_id") == candidate_id)
     ]
     candidate = supported[0] if supported else None
-    risk_contract = build_risk_contract(candidate=candidate, env=source)
     live_env = build_live_env_preflight(env=source)
-    funding = build_funding_preflight(env=source, live_env=live_env)
+    risk_contract = build_risk_contract(candidate=candidate, env=source)
+    funding = build_funding_preflight(env=source, live_env=live_env, risk_contract=risk_contract)
     approval = build_operator_approval_preflight(candidate=candidate)
     top_candidate = _top_candidate_preflight(
         candidate=candidate,
@@ -105,7 +112,17 @@ def build_live_arming_preflight(
         live_env=live_env,
         approval=approval,
     )
-    blockers = list(dict.fromkeys([*top_candidate.get("blockers", []), *risk_contract.get("blockers", []), *funding.get("blockers", []), *live_env.get("blockers", [])]))
+    blockers = list(
+        dict.fromkeys(
+            [
+                *top_candidate.get("blockers", []),
+                *risk_contract.get("blockers", []),
+                *funding.get("blockers", []),
+                *live_env.get("blockers", []),
+                *approval.get("blockers", []),
+            ]
+        )
+    )
     final_status = _final_status(
         candidate=candidate,
         risk_contract=risk_contract,
@@ -129,6 +146,7 @@ def build_live_arming_preflight(
                 "default_max_loss_usdt": DEFAULT_MAX_LOSS_USDT,
                 "default_max_position_notional_usdt": DEFAULT_MAX_POSITION_NOTIONAL_USDT,
                 "network_check": "disabled",
+                "risk_contract_source": risk_contract.get("risk_contract_source"),
             },
             "candidate_source_summary": {
                 "phase": quality.get("phase"),
@@ -154,6 +172,12 @@ def build_live_arming_preflight(
 
 
 def build_risk_contract(*, candidate: Mapping[str, Any] | None, env: Mapping[str, str]) -> dict[str, Any]:
+    candidate_id = str(candidate.get("candidate_id") or "") if candidate else ""
+    config_payload = build_tiny_live_risk_contract_payload(candidate_id=candidate_id or "missing_candidate")
+    config_contract = config_payload.get("risk_contract") if isinstance(config_payload.get("risk_contract"), dict) else {}
+    config_validation = config_payload.get("validation") if isinstance(config_payload.get("validation"), dict) else {}
+    if candidate is not None and config_validation.get("validation_status") == RISK_CONTRACT_VALID_FOR_PREFLIGHT:
+        return _risk_contract_from_config(candidate=candidate, config_payload=config_payload)
     stop_price = _float_or_none(env.get("HAMMER_R84_STOP_PRICE"))
     take_profit_price = _float_or_none(env.get("HAMMER_R84_TAKE_PROFIT_PRICE"))
     stop_distance = _float_or_none(env.get("HAMMER_R84_STOP_DISTANCE_PCT"))
@@ -193,6 +217,9 @@ def build_risk_contract(*, candidate: Mapping[str, Any] | None, env: Mapping[str
     return _sanitize(
         {
             "risk_contract_status": status,
+            "risk_contract_source": "env_fallback",
+            "risk_contract_loaded": False,
+            "risk_contract_validation": config_validation,
             "symbol": candidate.get("symbol") if candidate else None,
             "timeframe": candidate.get("timeframe") if candidate else None,
             "direction": candidate.get("direction") if candidate else None,
@@ -218,7 +245,29 @@ def build_risk_contract(*, candidate: Mapping[str, Any] | None, env: Mapping[str
     )
 
 
-def build_funding_preflight(*, env: Mapping[str, str], live_env: Mapping[str, Any]) -> dict[str, Any]:
+def build_funding_preflight(
+    *,
+    env: Mapping[str, str],
+    live_env: Mapping[str, Any],
+    risk_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    if risk_contract.get("funding_config_loaded") is True:
+        present = risk_contract.get("funding_status") == FUNDING_CONFIG_PRESENT
+        return _sanitize(
+            {
+                "funding_status": FUNDING_CONFIG_PRESENT if present else FUNDING_CONFIG_MISSING,
+                "funding_check_mode": risk_contract.get("funding_check_mode"),
+                "funding_config_present": present,
+                "funding_config_loaded": True,
+                "account_balance_checked": False,
+                "account_balance_source": "not_checked_no_network",
+                "effective_max_margin_usdt": risk_contract.get("max_margin_usdt"),
+                "effective_max_loss_usdt": risk_contract.get("max_loss_usdt"),
+                "network_allowed": False,
+                "blockers": [] if present else ["funding_config_missing"],
+                **_safety_fields(),
+            }
+        )
     present = _env_bool(env.get("HAMMER_R84_FUNDING_CONFIG_PRESENT"), default=False)
     blockers = []
     if live_env.get("live_env_status") == LIVE_ENV_UNSAFE_FOR_PREFLIGHT:
@@ -234,7 +283,11 @@ def build_funding_preflight(*, env: Mapping[str, str], live_env: Mapping[str, An
             "funding_status": status,
             "funding_check_mode": FUNDING_CHECK_DEFERRED_NO_NETWORK,
             "funding_config_present": present,
+            "funding_config_loaded": False,
             "account_balance_checked": False,
+            "account_balance_source": "not_checked_no_network",
+            "effective_max_margin_usdt": None,
+            "effective_max_loss_usdt": None,
             "network_allowed": False,
             "blockers": blockers,
             **_safety_fields(),
@@ -325,12 +378,14 @@ def _top_candidate_preflight(
     blockers = []
     if candidate is None:
         blockers.append("no_supported_miro_fish_candidate")
-    if risk_contract.get("risk_contract_status") != RISK_CONTRACT_COMPLETE:
+    if risk_contract.get("risk_contract_status") not in {RISK_CONTRACT_COMPLETE, RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS}:
         blockers.append("risk_contract_incomplete")
     if funding.get("funding_status") != FUNDING_CONFIG_PRESENT:
         blockers.append("funding_config_not_ready")
     if live_env.get("live_env_status") != LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT:
         blockers.append("live_env_locks_unsafe")
+    if approval.get("approval_status") == MISSING_OPERATOR_APPROVAL:
+        blockers.append("missing_operator_approval")
     return _sanitize(
         {
             "candidate_id": candidate.get("candidate_id") if candidate else None,
@@ -366,7 +421,7 @@ def _final_status(
         return BLOCKED_BY_STRATEGY_QUALITY
     if risk_contract.get("risk_contract_status") == BLOCKED_BY_POSITION_SIZE:
         return BLOCKED_BY_POSITION_SIZE
-    if risk_contract.get("risk_contract_status") != RISK_CONTRACT_COMPLETE:
+    if risk_contract.get("risk_contract_status") not in {RISK_CONTRACT_COMPLETE, RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS}:
         return BLOCKED_BY_MISSING_RISK_CONTRACT
     if funding.get("funding_status") != FUNDING_CONFIG_PRESENT:
         return BLOCKED_BY_FUNDING_CONFIG
@@ -374,7 +429,55 @@ def _final_status(
         if live_env.get("configured_global_kill_switch") is False:
             return BLOCKED_BY_KILL_SWITCH
         return BLOCKED_BY_LIVE_ENV_LOCKS
-    return READY_FOR_OPERATOR_LIVE_ARMING_REVIEW
+    return BLOCKED_BY_MISSING_OPERATOR_APPROVAL
+
+
+def _risk_contract_from_config(
+    *,
+    candidate: Mapping[str, Any],
+    config_payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    contract = config_payload.get("risk_contract") if isinstance(config_payload.get("risk_contract"), dict) else {}
+    funding = config_payload.get("funding_config") if isinstance(config_payload.get("funding_config"), dict) else {}
+    validation = config_payload.get("validation") if isinstance(config_payload.get("validation"), dict) else {}
+    return _sanitize(
+        {
+            "risk_contract_status": RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS,
+            "risk_contract_source": config_payload.get("config_path"),
+            "risk_contract_loaded": True,
+            "risk_contract_validation": validation,
+            "funding_config_loaded": True,
+            "funding_status": FUNDING_CONFIG_PRESENT
+            if funding.get("funding_status") == RISK_FUNDING_CONFIG_PRESENT
+            else FUNDING_CONFIG_MISSING,
+            "funding_check_mode": funding.get("funding_check_mode"),
+            "symbol": contract.get("symbol") or candidate.get("symbol"),
+            "timeframe": contract.get("timeframe") or candidate.get("timeframe"),
+            "direction": contract.get("direction") or candidate.get("direction"),
+            "entry_mode": contract.get("entry_mode") or candidate.get("entry_mode"),
+            "entry_price_source": contract.get("entry_price_source"),
+            "stop_price": contract.get("stop_price"),
+            "take_profit_price": contract.get("take_profit_price"),
+            "stop_distance_pct": contract.get("stop_distance_pct"),
+            "take_profit_distance_pct": contract.get("take_profit_distance_pct"),
+            "risk_reward_ratio": contract.get("risk_reward_ratio"),
+            "max_position_notional_usdt": contract.get("max_position_notional_usdt"),
+            "max_margin_usdt": contract.get("max_margin_usdt"),
+            "max_loss_usdt": contract.get("max_loss_usdt"),
+            "leverage": contract.get("leverage"),
+            "margin_mode": contract.get("margin_mode"),
+            "reduce_only_allowed": contract.get("reduce_only_allowed") is True,
+            "protective_stop_required": contract.get("protective_stop_required") is True,
+            "take_profit_required": contract.get("take_profit_required") is True,
+            "order_type": contract.get("order_type"),
+            "effective_max_margin_usdt": contract.get("max_margin_usdt"),
+            "effective_max_loss_usdt": contract.get("max_loss_usdt"),
+            "effective_leverage": contract.get("leverage"),
+            "effective_margin_mode": contract.get("margin_mode"),
+            "blockers": [],
+            **_safety_fields(),
+        }
+    )
 
 
 def _float_or_none(value: object) -> float | None:

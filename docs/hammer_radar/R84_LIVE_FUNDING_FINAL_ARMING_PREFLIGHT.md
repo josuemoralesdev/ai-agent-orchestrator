@@ -74,6 +74,20 @@ If stop or take-profit risk fields are missing, R84 returns:
 BLOCKED_BY_MISSING_RISK_CONTRACT
 ```
 
+R84.1 adds the local non-secret config surface at:
+
+```text
+configs/hammer_radar/tiny_live_risk_contracts.json
+```
+
+For the current 13m long candidate, a valid R84.1 config changes the risk status to:
+
+```text
+RISK_CONTRACT_VALID_FOR_PREFLIGHT
+```
+
+This is still only preflight evidence. The contract keeps `order_type=not_created` and does not create an executable ticket or payload.
+
 ## Funding And Local Config
 
 R84 does not call Binance or account balance endpoints. Funding is local/config-only and reports:
@@ -88,6 +102,16 @@ Missing local funding config blocks review readiness with:
 ```text
 BLOCKED_BY_FUNDING_CONFIG
 ```
+
+R84.1 supplies local-only funding metadata:
+
+```text
+funding_config_present=true
+funding_check_mode=LOCAL_CONFIG_ONLY_NO_NETWORK
+account_balance_checked=false
+```
+
+That lets R84 report `FUNDING_CONFIG_PRESENT` without checking Binance balance or using secrets. The operator must still manually confirm available USDT before any later approval phase.
 
 ## Kill Switch And Live Env
 
@@ -131,6 +155,14 @@ approval_status=MISSING_OPERATOR_APPROVAL
 
 `READY_FOR_OPERATOR_LIVE_ARMING_REVIEW` is still review-only. It does not execute, approve, or build a live ticket.
 
+After R84.1 config is valid, the conservative expected final state is:
+
+```text
+final_preflight_status=BLOCKED_BY_MISSING_OPERATOR_APPROVAL
+```
+
+The risk and local funding blockers are cleared, but exact operator approval remains unsatisfied.
+
 ## Preflight Statuses
 
 - `READY_FOR_OPERATOR_LIVE_ARMING_REVIEW`
@@ -172,6 +204,14 @@ CLI preflight:
 .venv/bin/python -m src.app.hammer_radar.operator.inspect \
   --log-dir logs/hammer_radar_forward \
   live-arming-preflight
+```
+
+R84.1 risk contract:
+
+```text
+.venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract
 ```
 
 R83 quality context:
@@ -219,4 +259,4 @@ curl -s http://127.0.0.1:8015/live-arming/preflight | jq '
 
 ## Next Phase Recommendation
 
-R85 should add Exact Operator Approval + Tiny Live Ticket Builder only after R84 risk contract fields are complete. R85 must still be explicit, local, operator-approved, and protective-order aware before any later live execution phase is considered.
+R85 should add Exact Operator Approval + Non-Executable Tiny Live Ticket Builder only after R84.1 risk contract fields are complete. R85 must still be explicit, local, operator-approved, and protective-order aware before any later live execution phase is considered.

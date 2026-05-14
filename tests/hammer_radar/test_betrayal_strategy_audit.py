@@ -71,11 +71,15 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import (
     build_miro_fish_quality_gate,
 )
 from src.app.hammer_radar.operator.live_arming_preflight import (
-    BLOCKED_BY_FUNDING_CONFIG,
-    BLOCKED_BY_MISSING_RISK_CONTRACT,
+    BLOCKED_BY_MISSING_OPERATOR_APPROVAL,
     BLOCKED_BY_STRATEGY_QUALITY,
-    READY_FOR_OPERATOR_LIVE_ARMING_REVIEW,
     build_live_arming_preflight,
+)
+from src.app.hammer_radar.operator.tiny_live_risk_contract import (
+    RISK_CONTRACT_INVALID,
+    RISK_CONTRACT_VALID_FOR_PREFLIGHT,
+    build_tiny_live_risk_contract_payload,
+    validate_risk_contract,
 )
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
@@ -1290,7 +1294,9 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual("LIVE_ARMING_PREFLIGHT_ONLY_NO_ORDER", payload["execution_mode"])
         self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["top_candidate_preflight"]["candidate_id"])
         self.assertEqual("MIRO_FISH_SUPPORTS_CANDIDATE", payload["top_candidate_preflight"]["miro_fish_status"])
-        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
+        self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["allow_live_orders"])
         self.assertTrue(payload["global_kill_switch"])
@@ -1313,39 +1319,41 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
         self.assertIsNone(payload["top_candidate_preflight"]["candidate_id"])
 
-    def test_r84_missing_risk_fields_returns_missing_risk_contract(self) -> None:
+    def test_r84_1_default_config_removes_missing_risk_contract_blocker(self) -> None:
         self._seed_supported_13m_long()
 
         payload = build_live_arming_preflight(log_dir=self.log_dir)
 
-        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
-        self.assertEqual("RISK_CONTRACT_MISSING", payload["risk_contract"]["risk_contract_status"])
-        self.assertIn("missing_stop_price_or_stop_distance_pct", payload["risk_contract"]["blockers"])
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
+        self.assertNotIn("missing_stop_price_or_stop_distance_pct", payload["risk_contract"]["blockers"])
         self.assertFalse(payload["order_payload_created"])
 
-    def test_r84_valid_local_risk_contract_can_move_to_operator_review_ready(self) -> None:
+    def test_r84_valid_local_risk_contract_blocks_on_missing_operator_approval(self) -> None:
         self._seed_supported_13m_long()
 
         payload = build_live_arming_preflight(log_dir=self.log_dir, env=self._r84_ready_env())
 
-        self.assertEqual(READY_FOR_OPERATOR_LIVE_ARMING_REVIEW, payload["final_preflight_status"])
-        self.assertEqual("RISK_CONTRACT_COMPLETE", payload["risk_contract"]["risk_contract_status"])
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
         self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
         self.assertEqual("LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT", payload["live_env_preflight"]["live_env_status"])
         self.assertEqual("MISSING_OPERATOR_APPROVAL", payload["operator_approval_preflight"]["approval_status"])
         self.assertFalse(payload["order_payload_created"])
         self.assertFalse(payload["execution_attempted"])
 
-    def test_r84_missing_funding_config_returns_funding_blocker(self) -> None:
+    def test_r84_1_local_funding_config_is_recognized_without_network(self) -> None:
         self._seed_supported_13m_long()
         env = self._r84_ready_env()
         env["HAMMER_R84_FUNDING_CONFIG_PRESENT"] = "false"
 
         payload = build_live_arming_preflight(log_dir=self.log_dir, env=env)
 
-        self.assertEqual(BLOCKED_BY_FUNDING_CONFIG, payload["final_preflight_status"])
-        self.assertEqual("FUNDING_CONFIG_MISSING", payload["funding_preflight"]["funding_status"])
-        self.assertIn("funding_config_missing", payload["funding_preflight"]["blockers"])
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
+        self.assertEqual("LOCAL_CONFIG_ONLY_NO_NETWORK", payload["funding_preflight"]["funding_check_mode"])
+        self.assertNotIn("funding_config_missing", payload["funding_preflight"]["blockers"])
+        self.assertFalse(payload["network_allowed"])
 
     def test_r84_live_env_disabled_and_kill_switch_reported_safe_for_review(self) -> None:
         self._seed_supported_13m_long()
@@ -1381,7 +1389,8 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual("R84", payload["phase"])
-        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["order_payload_created"])
         self.assertFalse(payload["network_allowed"])
@@ -1409,6 +1418,99 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("R84 Live Arming Preflight: OK", result.stdout)
         self.assertIn("risk_contract_status:", result.stdout)
         self.assertIn("final_preflight_status:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r84_1_risk_contract_config_loads_and_validates(self) -> None:
+        payload = build_tiny_live_risk_contract_payload()
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R84.1", payload["phase"])
+        self.assertEqual("TINY_LIVE_RISK_CONTRACT_CONFIG_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["candidate_id"])
+        self.assertEqual(RISK_CONTRACT_VALID_FOR_PREFLIGHT, payload["validation"]["validation_status"])
+        self.assertEqual("LOCAL_CONFIG_ONLY_NO_NETWORK", payload["funding_config"]["funding_check_mode"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r84_1_risk_contract_rejects_mismatched_candidate(self) -> None:
+        payload = build_tiny_live_risk_contract_payload(candidate_id="normal|BTCUSDT|13m|short|ladder_close_50_618")
+
+        self.assertEqual("RISK_CONTRACT_NOT_FOUND", payload["validation"]["validation_status"])
+        self.assertIn("risk_contract_not_found", payload["validation"]["blockers"])
+
+    def test_r84_1_missing_stop_or_take_profit_blocks(self) -> None:
+        contract = self._valid_r84_contract()
+        contract.pop("stop_distance_pct")
+        contract.pop("take_profit_distance_pct")
+
+        validation = validate_risk_contract(contract, candidate_id=contract["candidate_id"])
+
+        self.assertEqual(RISK_CONTRACT_INVALID, validation["validation_status"])
+        self.assertIn("missing_stop_price_or_stop_distance_pct", validation["blockers"])
+        self.assertIn("missing_take_profit_price_or_take_profit_distance_pct", validation["blockers"])
+
+    def test_r84_1_caps_leverage_and_margin_mode_are_validated(self) -> None:
+        cases = (
+            ("max_margin_usdt", 45.0, "max_margin_usdt outside tiny-live cap"),
+            ("max_loss_usdt", 5.0, "max_loss_usdt outside tiny-live cap"),
+            ("leverage", None, "leverage missing or unsafe"),
+            ("margin_mode", "CROSSED", "margin_mode must be ISOLATED_REQUIRED"),
+        )
+        for key, value, blocker in cases:
+            with self.subTest(key=key):
+                contract = self._valid_r84_contract()
+                contract[key] = value
+
+                validation = validate_risk_contract(contract, candidate_id=contract["candidate_id"])
+
+                self.assertEqual(RISK_CONTRACT_INVALID, validation["validation_status"])
+                self.assertIn(blocker, validation["blockers"])
+
+    def test_r84_1_preflight_uses_config_and_blocks_only_missing_operator_approval(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir)
+
+        self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
+        self.assertTrue(payload["risk_contract"]["risk_contract_loaded"])
+        self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
+        self.assertEqual("MISSING_OPERATOR_APPROVAL", payload["operator_approval_preflight"]["approval_status"])
+        self.assertIn("missing_operator_approval", payload["blockers"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+    def test_r84_1_api_endpoint_is_safe(self) -> None:
+        response = self.client.get("/live-arming/risk-contract")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R84.1", payload["phase"])
+        self.assertEqual(RISK_CONTRACT_VALID_FOR_PREFLIGHT, payload["validation"]["validation_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+    def test_r84_1_cli_command_exists(self) -> None:
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "tiny-live-risk-contract",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R84.1 Tiny Live Risk Contract: OK", result.stdout)
+        self.assertIn("validation_status: RISK_CONTRACT_VALID_FOR_PREFLIGHT", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod
@@ -1641,6 +1743,30 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             "HAMMER_LIVE_EXECUTION_ENABLED": "false",
             "HAMMER_ALLOW_LIVE_ORDERS": "false",
             "HAMMER_GLOBAL_KILL_SWITCH": "true",
+        }
+
+    @staticmethod
+    def _valid_r84_contract() -> dict:
+        return {
+            "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+            "symbol": "BTCUSDT",
+            "timeframe": "13m",
+            "direction": "long",
+            "entry_mode": "ladder_close_50_618",
+            "enabled_for_preflight": True,
+            "entry_price_source": "operator_supplied_or_future_ticket_builder",
+            "stop_distance_pct": 0.35,
+            "take_profit_distance_pct": 0.7,
+            "risk_reward_ratio": 2.0,
+            "max_position_notional_usdt": 44.0,
+            "max_margin_usdt": 44.0,
+            "max_loss_usdt": 4.44,
+            "leverage": 1,
+            "margin_mode": "ISOLATED_REQUIRED",
+            "reduce_only_allowed": True,
+            "protective_stop_required": True,
+            "take_profit_required": True,
+            "order_type": "not_created",
         }
 
     @staticmethod
