@@ -17,6 +17,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_TINY_LIVE_RISK_CONTRACT,
+    TASK_TINY_LIVE_TICKET_BUILDER,
     build_refresh_runs_payload,
     load_refresh_runs,
     run_refresh_sequence,
@@ -64,6 +65,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_LIVE_ARMING_PREFLIGHT, DEFAULT_TASKS)
         self.assertIn(TASK_TINY_LIVE_RISK_CONTRACT, AVAILABLE_TASKS)
         self.assertNotIn(TASK_TINY_LIVE_RISK_CONTRACT, DEFAULT_TASKS)
+        self.assertIn(TASK_TINY_LIVE_TICKET_BUILDER, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_TINY_LIVE_TICKET_BUILDER, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -246,6 +249,33 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
             "TINY_LIVE_RISK_CONTRACT_CONFIG_ONLY_NO_ORDER",
             record["task_results"][TASK_TINY_LIVE_RISK_CONTRACT]["detail"]["execution_mode"],
         )
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_tiny_live_ticket_builder_task_is_read_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_tiny_live_ticket",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "ticket_status": "TICKET_APPROVAL_REQUIRED",
+                "operator_approval_status": "MISSING_OPERATOR_APPROVAL",
+                "ticket_written": False,
+                "execution_mode": "EXACT_OPERATOR_APPROVAL_NON_EXECUTABLE_TICKET_BUILDER_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_TINY_LIVE_TICKET_BUILDER],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_TINY_LIVE_TICKET_BUILDER], record["completed_tasks"])
+        detail = record["task_results"][TASK_TINY_LIVE_TICKET_BUILDER]["detail"]
+        self.assertEqual("TICKET_APPROVAL_REQUIRED", detail["ticket_status"])
+        self.assertFalse(detail["ticket_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 

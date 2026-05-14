@@ -334,6 +334,8 @@ def build_operator_approval_preflight(*, candidate: Mapping[str, Any] | None) ->
             "exact_risk_contract_required": True,
             "approval_token_required": True,
             "approval_record_required": True,
+            "ticket_required": True,
+            "ticket_builder_status": "R85_NON_EXECUTABLE_TICKET_REQUIRED",
             "approval_status": MISSING_OPERATOR_APPROVAL,
             "candidate_id": candidate.get("candidate_id") if candidate else None,
             "blockers": ["missing_operator_approval"],

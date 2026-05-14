@@ -163,6 +163,8 @@ final_preflight_status=BLOCKED_BY_MISSING_OPERATOR_APPROVAL
 
 The risk and local funding blockers are cleared, but exact operator approval remains unsatisfied.
 
+R85 adds a separate non-executable ticket builder for that approval review artifact. R84 remains a preflight surface and does not become an execution approval when a ticket exists.
+
 ## Preflight Statuses
 
 - `READY_FOR_OPERATOR_LIVE_ARMING_REVIEW`
@@ -259,4 +261,4 @@ curl -s http://127.0.0.1:8015/live-arming/preflight | jq '
 
 ## Next Phase Recommendation
 
-R85 should add Exact Operator Approval + Non-Executable Tiny Live Ticket Builder only after R84.1 risk contract fields are complete. R85 must still be explicit, local, operator-approved, and protective-order aware before any later live execution phase is considered.
+R85 adds Exact Operator Approval + Non-Executable Tiny Live Ticket Builder after R84.1 risk contract fields are complete. The next phase should be R86 Live Env Arming Checklist + Manual Funding Confirmation, still with no execution unless a later phase explicitly authorizes that path.
