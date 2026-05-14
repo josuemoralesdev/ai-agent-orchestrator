@@ -242,6 +242,10 @@ from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
+from src.app.hammer_radar.operator.tiny_live_ticket_builder import (
+    build_tiny_live_ticket,
+    build_tiny_live_tickets_payload,
+)
 from src.app.hammer_radar.operator.multi_symbol_scanner import (
     build_multi_symbol_scans_payload,
     build_multi_symbol_summary,
@@ -357,6 +361,14 @@ class LiveConnectorSubmitRequest(BaseModel):
     ticket_id: str = Field(min_length=1)
     operator: str = Field(min_length=1)
     notes: str = ""
+
+
+class TinyLiveTicketBuildRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+    approval_phrase: str | None = None
+    operator_note: str | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -1609,6 +1621,27 @@ def live_arming_risk_contract(
     candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
 ) -> dict:
     return build_tiny_live_risk_contract_payload(candidate_id=candidate_id)
+
+
+@app.post("/live-arming/ticket/build")
+def live_arming_ticket_build(request: TinyLiveTicketBuildRequest | None = None) -> dict:
+    request = request or TinyLiveTicketBuildRequest()
+    return build_tiny_live_ticket(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        approval_phrase=request.approval_phrase,
+        operator_note=request.operator_note,
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/tickets")
+def live_arming_tickets(
+    limit: int = Query(default=20, ge=0),
+    candidate_id: str | None = None,
+) -> dict:
+    return build_tiny_live_tickets_payload(limit=limit, candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/strategy-promotion/status")

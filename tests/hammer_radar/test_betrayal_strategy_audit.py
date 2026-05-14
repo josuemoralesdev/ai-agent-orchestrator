@@ -81,6 +81,17 @@ from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     build_tiny_live_risk_contract_payload,
     validate_risk_contract,
 )
+from src.app.hammer_radar.operator.tiny_live_ticket_builder import (
+    MISSING_OPERATOR_APPROVAL,
+    OPERATOR_APPROVAL_INVALID,
+    OPERATOR_APPROVAL_RECORDED_FOR_REVIEW,
+    TICKET_APPROVAL_REQUIRED,
+    TICKET_CREATED_FOR_OPERATOR_REVIEW,
+    build_tiny_live_ticket,
+    load_tiny_live_tickets,
+    risk_contract_hash,
+    tiny_live_tickets_path,
+)
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -1511,6 +1522,132 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R84.1 Tiny Live Risk Contract: OK", result.stdout)
         self.assertIn("validation_status: RISK_CONTRACT_VALID_FOR_PREFLIGHT", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r85_ticket_builder_dry_run_does_not_write(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R85", payload["phase"])
+        self.assertEqual(TICKET_APPROVAL_REQUIRED, payload["ticket_status"])
+        self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["candidate_id"])
+        self.assertEqual(MISSING_OPERATOR_APPROVAL, payload["operator_approval_status"])
+        self.assertFalse(payload["ticket_written"])
+        self.assertFalse(tiny_live_tickets_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r85_ticket_contains_deterministic_risk_hash_and_snapshots(self) -> None:
+        self._seed_supported_13m_long()
+
+        first = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+        second = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(first["risk_contract_hash"], second["risk_contract_hash"])
+        self.assertEqual(risk_contract_hash(first["risk_contract_snapshot"]), first["risk_contract_hash"])
+        self.assertEqual("BTCUSDT", first["risk_contract_snapshot"]["symbol"])
+        self.assertEqual("FUNDING_CONFIG_PRESENT", first["funding_config_snapshot"]["funding_status"])
+        self.assertEqual("LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT", first["live_env_snapshot"]["live_env_status"])
+        self.assertIn(first["risk_contract_hash"], first["approval_phrase_required"])
+
+    def test_r85_write_false_does_not_write_ticket(self) -> None:
+        self._seed_supported_13m_long()
+        dry_run = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+
+        payload = build_tiny_live_ticket(
+            approval_phrase=dry_run["approval_phrase_required"],
+            dry_run=False,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual("TICKET_DRY_RUN_ONLY", payload["ticket_status"])
+        self.assertFalse(payload["ticket_written"])
+        self.assertFalse(tiny_live_tickets_path(self.log_dir).exists())
+
+    def test_r85_write_true_appends_non_executable_ticket_only(self) -> None:
+        self._seed_supported_13m_long()
+        dry_run = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+
+        payload = build_tiny_live_ticket(
+            approval_phrase=dry_run["approval_phrase_required"],
+            operator_note="review fixture only",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(TICKET_CREATED_FOR_OPERATOR_REVIEW, payload["ticket_status"])
+        self.assertEqual(OPERATOR_APPROVAL_RECORDED_FOR_REVIEW, payload["operator_approval_status"])
+        self.assertTrue(payload["ticket_written"])
+        records = load_tiny_live_tickets(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(payload["ticket_id"], records[0]["ticket_id"])
+        self.assertFalse(records[0]["executable"])
+        self.assertFalse(records[0]["order_payload_created"])
+        self.assertFalse(records[0]["execution_attempted"])
+        self.assertFalse(records[0]["network_allowed"])
+
+    def test_r85_wrong_approval_phrase_is_invalid_and_non_executable(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_tiny_live_ticket(
+            approval_phrase="APPROVE_TINY_LIVE_REVIEW wrong",
+            dry_run=True,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(OPERATOR_APPROVAL_INVALID, payload["operator_approval_status"])
+        self.assertIn("operator_approval_invalid", payload["blockers"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r85_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.post("/live-arming/ticket/build", json={"dry_run": True, "write": False})
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R85", payload["phase"])
+        self.assertEqual(TICKET_APPROVAL_REQUIRED, payload["ticket_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        tickets_response = self.client.get("/live-arming/tickets")
+        self.assertEqual(200, tickets_response.status_code)
+        tickets_payload = tickets_response.json()
+        self.assertEqual("R85", tickets_payload["phase"])
+        self.assertEqual([], tickets_payload["tickets"])
+
+    def test_r85_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "tiny-live-ticket",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R85 Tiny Live Ticket Builder: OK", result.stdout)
+        self.assertIn("executable: False", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod

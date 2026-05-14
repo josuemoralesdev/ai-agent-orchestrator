@@ -30,6 +30,7 @@ from src.app.hammer_radar.operator.live_arming_preflight import build_live_armin
 from src.app.hammer_radar.operator.multi_symbol_scanner import scan_watchlist
 from src.app.hammer_radar.operator.notification_watcher import check_notifications, notification_status
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
+from src.app.hammer_radar.operator.tiny_live_ticket_builder import build_tiny_live_ticket
 
 LIVE_EXECUTION_ENABLED = False
 ORDER_PLACED = False
@@ -52,6 +53,7 @@ TASK_MARKOV_REGIME_GATE = "markov_regime_gate"
 TASK_MIRO_FISH_QUALITY_GATE = "miro_fish_quality_gate"
 TASK_LIVE_ARMING_PREFLIGHT = "live_arming_preflight"
 TASK_TINY_LIVE_RISK_CONTRACT = "tiny_live_risk_contract"
+TASK_TINY_LIVE_TICKET_BUILDER = "tiny_live_ticket_builder"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -71,6 +73,7 @@ AVAILABLE_TASKS = (
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_LIVE_ARMING_PREFLIGHT,
     TASK_TINY_LIVE_RISK_CONTRACT,
+    TASK_TINY_LIVE_TICKET_BUILDER,
 )
 
 
@@ -365,6 +368,19 @@ def run_refresh_task(
             detail={
                 "candidate_id": result.get("candidate_id"),
                 "validation_status": (result.get("validation") or {}).get("validation_status"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_TINY_LIVE_TICKET_BUILDER:
+        result = build_tiny_live_ticket(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "ticket_status": result.get("ticket_status"),
+                "approval_status": result.get("operator_approval_status"),
+                "ticket_written": result.get("ticket_written"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

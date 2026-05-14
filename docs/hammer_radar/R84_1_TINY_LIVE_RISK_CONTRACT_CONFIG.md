@@ -191,4 +191,4 @@ curl -s http://127.0.0.1:8015/live-arming/risk-contract | jq '
 
 ## Next Phase Recommendation
 
-R85 should add Exact Operator Approval + Non-Executable Tiny Live Ticket Builder. It should require exact candidate identity, exact risk contract acknowledgement, and explicit operator approval while still producing no executable order payload unless a later phase authorizes that path.
+R85 adds Exact Operator Approval + Non-Executable Tiny Live Ticket Builder. It requires exact candidate identity, exact risk contract hash acknowledgement, and explicit operator review approval while still producing no executable order payload.

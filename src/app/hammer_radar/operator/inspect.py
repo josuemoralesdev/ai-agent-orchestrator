@@ -735,6 +735,24 @@ def main() -> int:
                 build_tiny_live_risk_contract_payload(candidate_id=args.candidate_id)
             )
         )
+    elif args.command == "tiny-live-ticket":
+        from src.app.hammer_radar.operator.tiny_live_ticket_builder import (
+            build_tiny_live_ticket,
+            format_tiny_live_ticket_text,
+        )
+
+        print(
+            format_tiny_live_ticket_text(
+                build_tiny_live_ticket(
+                    candidate_id=args.candidate_id,
+                    approval_phrase=args.approval_phrase,
+                    operator_note=args.operator_note,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1087,6 +1105,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--candidate-id",
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
+
+    tiny_live_ticket_parser = subparsers.add_parser("tiny-live-ticket", parents=[parent])
+    tiny_live_ticket_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    tiny_live_ticket_parser.add_argument("--write", action="store_true")
+    tiny_live_ticket_parser.add_argument("--approval-phrase", default=None)
+    tiny_live_ticket_parser.add_argument("--operator-note", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
