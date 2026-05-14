@@ -61,6 +61,15 @@ from src.app.hammer_radar.operator.markov_regime_gate import (
     build_markov_regime_gate,
     classify_markov_regime,
 )
+from src.app.hammer_radar.operator.miro_fish_quality_gate import (
+    FISH_BLOCKED,
+    FISH_PASS,
+    MIRO_FISH_BLOCKED,
+    MIRO_FISH_NEEDS_MORE_EVIDENCE,
+    MIRO_FISH_REJECTS_CANDIDATE,
+    MIRO_FISH_SUPPORTS_CANDIDATE,
+    build_miro_fish_quality_gate,
+)
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -1114,6 +1123,156 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("BETRAYAL CANDIDATE GATES", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r83_payload_safety_fields_and_deterministic_votes(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        first = build_miro_fish_quality_gate(log_dir=self.log_dir)
+        second = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        first_gate = self._find(first["normal_candidate_quality_gates"], timeframe="13m", direction="long")
+        second_gate = self._find(second["normal_candidate_quality_gates"], timeframe="13m", direction="long")
+        self.assertEqual("OK", first["status"])
+        self.assertEqual("R83", first["phase"])
+        self.assertEqual("MIRO_FISH_QUALITY_GATE_ONLY_NO_ORDER", first["execution_mode"])
+        self.assertEqual(first_gate["fish_votes"], second_gate["fish_votes"])
+        self.assertFalse(first["live_execution_enabled"])
+        self.assertFalse(first["allow_live_orders"])
+        self.assertTrue(first["global_kill_switch"])
+        self.assertFalse(first["order_placed"])
+        self.assertFalse(first["real_order_placed"])
+        self.assertFalse(first["execution_attempted"])
+        self.assertFalse(first["order_payload_created"])
+        self.assertFalse(first["network_allowed"])
+        self.assertFalse(first["secrets_shown"])
+
+    def test_r83_normal_13m_long_can_receive_support_under_bullish_regime(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["normal_candidate_quality_gates"], timeframe="13m", direction="long")
+        self.assertEqual(MIRO_FISH_SUPPORTS_CANDIDATE, gate["final_quality_status"])
+        self.assertIn(gate, payload["top_supported_candidates"])
+        self.assertEqual(FISH_PASS, self._fish_vote(gate, "Evidence Fish")["vote_status"])
+        self.assertEqual(FISH_PASS, self._fish_vote(gate, "Regime Fish")["vote_status"])
+
+    def test_r83_normal_13m_short_is_rejected_under_bullish_regime(self) -> None:
+        self._seed_group("normal-13m-short", "13m", "short", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["normal_candidate_quality_gates"], timeframe="13m", direction="short")
+        self.assertEqual(MIRO_FISH_REJECTS_CANDIDATE, gate["final_quality_status"])
+        self.assertEqual("REGIME_REJECTS_CANDIDATE", gate["markov_gate_status"])
+        self.assertIn("regime_rejects_candidate", gate["blockers"])
+
+    def test_r83_44m_long_insufficient_source_is_not_strongly_supported(self) -> None:
+        self._seed_group("normal-44m", "44m", "long", "ladder_close_50_618", wins=2, losses=0, total_pnl=2.0)
+        self._capture_close_series("44m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["normal_candidate_quality_gates"], timeframe="44m", direction="long")
+        self.assertEqual(MIRO_FISH_NEEDS_MORE_EVIDENCE, gate["final_quality_status"])
+        self.assertIn("source_evidence_insufficient", gate["blockers"])
+
+    def test_r83_betrayal_aggregates_are_blocked_while_true_inverse_pending(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._seed_group("watch-88m", "88m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+        self._seed_group("watch-55m", "55m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+        self._write_shadow_records(
+            [
+                self._unresolved_shadow_record("222m", index=0),
+                self._unresolved_shadow_record("88m", index=1),
+                self._unresolved_shadow_record("55m", index=2),
+            ]
+        )
+        for timeframe in ("222m", "88m", "55m"):
+            self._capture_close_series(timeframe, [100, 101, 102, 103, 104, 105])
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        for timeframe in ("222m", "88m", "55m"):
+            gate = self._find(payload["betrayal_candidate_quality_gates"], timeframe=timeframe, audit_scope="timeframe_aggregate")
+            self.assertEqual(MIRO_FISH_BLOCKED, gate["final_quality_status"])
+            self.assertEqual(FISH_BLOCKED, self._fish_vote(gate, "Betrayal Fish")["vote_status"])
+            self.assertIn("true_inverse_validation_pending", gate["blockers"])
+            self.assertIn("aggregate_betrayal_direction_context_only", gate["blockers"])
+
+    def test_r83_direction_entry_mode_betrayal_cannot_bypass_true_inverse_pending(self) -> None:
+        self._seed_group("direction-4m", "4m", "long", "fib_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records([self._unresolved_shadow_record("4m", index=0)])
+        self._capture_close_series("4m", [100, 99, 98, 97, 96, 95])
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["betrayal_candidate_quality_gates"], timeframe="4m", audit_scope="direction_entry_mode")
+        self.assertEqual(MIRO_FISH_BLOCKED, gate["final_quality_status"])
+        self.assertIn("true_inverse_validation_pending", gate["blockers"])
+
+    def test_r83_invalid_persisted_resolution_blocks_data_integrity_fish(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+        self._write_resolutions(
+            [
+                self._resolution_record(
+                    "222m",
+                    index=0,
+                    signal_timestamp="2026-04-29T12:00:00+00:00",
+                    resolved_candle_timestamp="2026-05-13T12:00:00+00:00",
+                )
+            ]
+        )
+
+        payload = build_miro_fish_quality_gate(log_dir=self.log_dir)
+
+        gate = self._find(payload["normal_candidate_quality_gates"], timeframe="13m", direction="long")
+        self.assertEqual(MIRO_FISH_BLOCKED, gate["final_quality_status"])
+        self.assertEqual(FISH_BLOCKED, self._fish_vote(gate, "Data Integrity Fish")["vote_status"])
+        self.assertIn("invalid_resolution_records_present", gate["blockers"])
+
+    def test_r83_api_endpoint_is_safe(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        response = self.client.get("/strategy-performance/miro-fish-quality-gate")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R83", payload["phase"])
+        self.assertGreaterEqual(len(payload["normal_candidate_quality_gates"]), 1)
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r83_cli_command_exists(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "miro-fish-quality-gate",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R83 Miro Fish Quality Gate: OK", result.stdout)
+        self.assertIn("COMMITTEE SUMMARY", result.stdout)
+        self.assertIn("TOP SUPPORTED CANDIDATES", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -1324,6 +1483,13 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
                 }
             )
         capture_candles(candles, log_dir=self.log_dir)
+
+    @staticmethod
+    def _fish_vote(gate: dict, fish: str) -> dict:
+        for vote in gate["fish_votes"]:
+            if vote["fish"] == fish:
+                return vote
+        raise AssertionError(f"fish vote not found: {fish}")
 
     @staticmethod
     def _resolution_record(

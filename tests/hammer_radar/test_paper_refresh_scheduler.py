@@ -14,6 +14,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     AVAILABLE_TASKS,
     DEFAULT_TASKS,
     TASK_MARKOV_REGIME_GATE,
+    TASK_MIRO_FISH_QUALITY_GATE,
     build_refresh_runs_payload,
     load_refresh_runs,
     run_refresh_sequence,
@@ -55,6 +56,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         )
         self.assertIn(TASK_MARKOV_REGIME_GATE, AVAILABLE_TASKS)
         self.assertNotIn(TASK_MARKOV_REGIME_GATE, DEFAULT_TASKS)
+        self.assertIn(TASK_MIRO_FISH_QUALITY_GATE, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_MIRO_FISH_QUALITY_GATE, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -158,6 +161,33 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         mocked.assert_called_once()
         self.assertEqual([TASK_MARKOV_REGIME_GATE], record["completed_tasks"])
         self.assertEqual("MARKOV_REGIME_GATE_ONLY_NO_ORDER", record["task_results"][TASK_MARKOV_REGIME_GATE]["detail"]["execution_mode"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_miro_fish_quality_gate_task_is_read_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_miro_fish_quality_gate",
+            return_value={
+                "normal_candidate_quality_gates": [{}],
+                "betrayal_candidate_quality_gates": [{}],
+                "top_supported_candidates": [{}],
+                "execution_mode": "MIRO_FISH_QUALITY_GATE_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_MIRO_FISH_QUALITY_GATE],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_MIRO_FISH_QUALITY_GATE], record["completed_tasks"])
+        self.assertEqual(
+            "MIRO_FISH_QUALITY_GATE_ONLY_NO_ORDER",
+            record["task_results"][TASK_MIRO_FISH_QUALITY_GATE]["detail"]["execution_mode"],
+        )
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 
