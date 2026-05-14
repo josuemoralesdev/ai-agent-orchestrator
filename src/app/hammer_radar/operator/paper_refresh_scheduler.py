@@ -27,6 +27,7 @@ from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
+from src.app.hammer_radar.operator.live_env_arming_checklist import build_live_env_arming_checklist
 from src.app.hammer_radar.operator.multi_symbol_scanner import scan_watchlist
 from src.app.hammer_radar.operator.notification_watcher import check_notifications, notification_status
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
@@ -54,6 +55,7 @@ TASK_MIRO_FISH_QUALITY_GATE = "miro_fish_quality_gate"
 TASK_LIVE_ARMING_PREFLIGHT = "live_arming_preflight"
 TASK_TINY_LIVE_RISK_CONTRACT = "tiny_live_risk_contract"
 TASK_TINY_LIVE_TICKET_BUILDER = "tiny_live_ticket_builder"
+TASK_LIVE_ENV_ARMING_CHECKLIST = "live_env_arming_checklist"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -74,6 +76,7 @@ AVAILABLE_TASKS = (
     TASK_LIVE_ARMING_PREFLIGHT,
     TASK_TINY_LIVE_RISK_CONTRACT,
     TASK_TINY_LIVE_TICKET_BUILDER,
+    TASK_LIVE_ENV_ARMING_CHECKLIST,
 )
 
 
@@ -381,6 +384,20 @@ def run_refresh_task(
                 "ticket_status": result.get("ticket_status"),
                 "approval_status": result.get("operator_approval_status"),
                 "ticket_written": result.get("ticket_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_LIVE_ENV_ARMING_CHECKLIST:
+        result = build_live_env_arming_checklist(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "checklist_status": result.get("checklist_status"),
+                "manual_funding_status": result.get("manual_funding_status"),
+                "live_env_arming_status": result.get("live_env_arming_status"),
+                "checklist_written": result.get("checklist_written"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

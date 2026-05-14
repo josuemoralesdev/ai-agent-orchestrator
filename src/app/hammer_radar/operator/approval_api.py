@@ -241,6 +241,10 @@ from src.app.hammer_radar.operator.market_intelligence import (
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
+from src.app.hammer_radar.operator.live_env_arming_checklist import (
+    build_live_env_arming_checklist,
+    build_live_env_arming_checklist_status,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
 from src.app.hammer_radar.operator.tiny_live_ticket_builder import (
     build_tiny_live_ticket,
@@ -368,6 +372,18 @@ class TinyLiveTicketBuildRequest(BaseModel):
     write: bool = False
     candidate_id: str | None = None
     approval_phrase: str | None = None
+    operator_note: str | None = None
+
+
+class LiveEnvChecklistConfirmRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+    risk_contract_hash: str | None = None
+    manual_funding_phrase: str | None = None
+    live_env_review_phrase: str | None = None
+    max_loss_ack_phrase: str | None = None
+    exact_candidate_ack_phrase: str | None = None
     operator_note: str | None = None
 
 
@@ -1642,6 +1658,31 @@ def live_arming_tickets(
     candidate_id: str | None = None,
 ) -> dict:
     return build_tiny_live_tickets_payload(limit=limit, candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live-arming/checklist/confirm")
+def live_arming_checklist_confirm(request: LiveEnvChecklistConfirmRequest | None = None) -> dict:
+    request = request or LiveEnvChecklistConfirmRequest()
+    return build_live_env_arming_checklist(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        risk_contract_hash=request.risk_contract_hash,
+        manual_funding_phrase=request.manual_funding_phrase,
+        live_env_review_phrase=request.live_env_review_phrase,
+        max_loss_ack_phrase=request.max_loss_ack_phrase,
+        exact_candidate_ack_phrase=request.exact_candidate_ack_phrase,
+        operator_note=request.operator_note,
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/checklist/status")
+def live_arming_checklist_status(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+    limit: int = Query(default=20, ge=0),
+) -> dict:
+    return build_live_env_arming_checklist_status(candidate_id=candidate_id, limit=limit, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/strategy-promotion/status")

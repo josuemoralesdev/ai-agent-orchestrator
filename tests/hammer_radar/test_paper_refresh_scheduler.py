@@ -14,6 +14,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     AVAILABLE_TASKS,
     DEFAULT_TASKS,
     TASK_LIVE_ARMING_PREFLIGHT,
+    TASK_LIVE_ENV_ARMING_CHECKLIST,
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_TINY_LIVE_RISK_CONTRACT,
@@ -67,6 +68,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_TINY_LIVE_RISK_CONTRACT, DEFAULT_TASKS)
         self.assertIn(TASK_TINY_LIVE_TICKET_BUILDER, AVAILABLE_TASKS)
         self.assertNotIn(TASK_TINY_LIVE_TICKET_BUILDER, DEFAULT_TASKS)
+        self.assertIn(TASK_LIVE_ENV_ARMING_CHECKLIST, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_LIVE_ENV_ARMING_CHECKLIST, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -276,6 +279,34 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_TINY_LIVE_TICKET_BUILDER]["detail"]
         self.assertEqual("TICKET_APPROVAL_REQUIRED", detail["ticket_status"])
         self.assertFalse(detail["ticket_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_live_env_arming_checklist_task_is_read_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_live_env_arming_checklist",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "checklist_status": "CHECKLIST_BLOCKED_BY_MISSING_CONFIRMATIONS",
+                "manual_funding_status": "MANUAL_FUNDING_CONFIRMATION_REQUIRED",
+                "live_env_arming_status": "LIVE_ENV_ARMING_CONFIRMATION_REQUIRED",
+                "checklist_written": False,
+                "execution_mode": "LIVE_ENV_ARMING_CHECKLIST_MANUAL_FUNDING_CONFIRMATION_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_LIVE_ENV_ARMING_CHECKLIST],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_LIVE_ENV_ARMING_CHECKLIST], record["completed_tasks"])
+        detail = record["task_results"][TASK_LIVE_ENV_ARMING_CHECKLIST]["detail"]
+        self.assertEqual("CHECKLIST_BLOCKED_BY_MISSING_CONFIRMATIONS", detail["checklist_status"])
+        self.assertFalse(detail["checklist_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 

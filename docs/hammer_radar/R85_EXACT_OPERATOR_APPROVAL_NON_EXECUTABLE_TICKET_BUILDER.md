@@ -204,4 +204,4 @@ curl -s -X POST http://127.0.0.1:8015/live-arming/ticket/build \
 
 ## Next Phase Recommendation
 
-R86 should add Live Env Arming Checklist + Manual Funding Confirmation. R86 should still be no-execution unless a later phase explicitly authorizes live execution after exact operator approval, funding confirmation, protective order checks, and env arming.
+R86 adds Live Env Arming Checklist + Manual Funding Confirmation. It records local manual funding and live-env review acknowledgements only; it does not check balances, modify env files, or make tickets executable. The next phase should define R87 Live Env Toggle Design + Execution Boundary Review.
