@@ -675,6 +675,22 @@ def main() -> int:
                 build_betrayal_inverse_validation(log_dir=args.log_dir)
             )
         )
+    elif args.command == "markov-regime-gate":
+        from src.app.hammer_radar.operator.markov_regime_gate import (
+            build_markov_regime_gate,
+            format_markov_regime_gate_text,
+        )
+
+        print(
+            format_markov_regime_gate_text(
+                build_markov_regime_gate(
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    limit=args.limit,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1005,6 +1021,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("betrayal-strategy-audit", parents=[parent])
     subparsers.add_parser("betrayal-inverse-validation", parents=[parent])
+
+    markov_regime_gate_parser = subparsers.add_parser("markov-regime-gate", parents=[parent])
+    markov_regime_gate_parser.add_argument("--symbol", default="BTCUSDT")
+    markov_regime_gate_parser.add_argument("--timeframe", default=None)
+    markov_regime_gate_parser.add_argument("--limit", type=int, default=120)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
