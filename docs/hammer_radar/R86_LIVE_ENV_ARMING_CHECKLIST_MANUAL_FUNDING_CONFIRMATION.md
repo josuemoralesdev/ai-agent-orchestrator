@@ -172,4 +172,4 @@ curl -s -X POST http://127.0.0.1:8015/live-arming/checklist/confirm \
 
 ## Next Phase Recommendation
 
-R87 adds Live Env Toggle Design + Execution Boundary Review. It maps the exact boundary between local confirmations and any future env arming without modifying env files, calling Binance, or enabling live execution.
+R87 adds Live Env Toggle Design + Execution Boundary Review. R88 then bundles the R83 through R87 evidence chain into a final non-executable human review packet.

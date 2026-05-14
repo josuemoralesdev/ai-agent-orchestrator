@@ -790,6 +790,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "final-review-packet":
+        from src.app.hammer_radar.operator.final_human_review_packet import (
+            build_final_human_review_packet,
+            format_final_human_review_packet_text,
+        )
+
+        print(
+            format_final_human_review_packet_text(
+                build_final_human_review_packet(
+                    candidate_id=args.candidate_id,
+                    final_approval_phrase=args.final_approval_phrase,
+                    operator_note=args.operator_note,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1170,6 +1188,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     live_env_boundary_review_parser.add_argument("--write", action="store_true")
+
+    final_review_packet_parser = subparsers.add_parser("final-review-packet", parents=[parent])
+    final_review_packet_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    final_review_packet_parser.add_argument("--write", action="store_true")
+    final_review_packet_parser.add_argument("--final-approval-phrase", default=None)
+    final_review_packet_parser.add_argument("--operator-note", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
