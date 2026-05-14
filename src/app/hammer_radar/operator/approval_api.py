@@ -240,6 +240,10 @@ from src.app.hammer_radar.operator.market_intelligence import (
 )
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
+from src.app.hammer_radar.operator.final_human_review_packet import (
+    build_final_human_review_packet,
+    build_final_human_review_packets_payload,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -392,6 +396,14 @@ class LiveEnvBoundaryReviewReportRequest(BaseModel):
     dry_run: bool = True
     write: bool = False
     candidate_id: str | None = None
+
+
+class FinalHumanReviewPacketBuildRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+    final_approval_phrase: str | None = None
+    operator_note: str | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -1708,6 +1720,27 @@ def live_arming_env_boundary_review_report(request: LiveEnvBoundaryReviewReportR
         write=request.write,
         log_dir=get_log_dir(use_env=True),
     )
+
+
+@app.post("/live-arming/review-packet/build")
+def live_arming_review_packet_build(request: FinalHumanReviewPacketBuildRequest | None = None) -> dict:
+    request = request or FinalHumanReviewPacketBuildRequest()
+    return build_final_human_review_packet(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        final_approval_phrase=request.final_approval_phrase,
+        operator_note=request.operator_note,
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/review-packets")
+def live_arming_review_packets(
+    limit: int = Query(default=20, ge=0),
+    candidate_id: str | None = None,
+) -> dict:
+    return build_final_human_review_packets_payload(limit=limit, candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/strategy-promotion/status")

@@ -98,6 +98,17 @@ from src.app.hammer_radar.operator.live_env_boundary_review import (
     build_live_env_boundary_review,
     live_env_boundary_report_path,
 )
+from src.app.hammer_radar.operator.final_human_review_packet import (
+    FINAL_HUMAN_APPROVAL_INVALID,
+    FINAL_HUMAN_APPROVAL_RECORDED_FOR_REVIEW,
+    FINAL_HUMAN_APPROVAL_REQUIRED,
+    REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY,
+    REVIEW_PACKET_CREATED_FOR_HUMAN_REVIEW,
+    build_final_human_review_packet,
+    final_human_review_packets_path,
+    load_final_human_review_packets,
+    packet_hash,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -1893,6 +1904,135 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R87 Live Env Boundary Review: OK", result.stdout)
         self.assertIn("execution_boundary_status: EXECUTION_BOUNDARY_INTACT", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r88_review_packet_default_dry_run_does_not_write(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R88", payload["phase"])
+        self.assertEqual(REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY, payload["packet_status"])
+        self.assertEqual(FINAL_HUMAN_APPROVAL_REQUIRED, payload["final_human_approval_status"])
+        self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["candidate_id"])
+        self.assertEqual("764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8", payload["risk_contract_hash"])
+        self.assertFalse(payload["packet_written"])
+        self.assertFalse(final_human_review_packets_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r88_packet_hash_and_final_phrase_are_deterministic(self) -> None:
+        self._seed_supported_13m_long()
+
+        first = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+        second = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(first["packet_hash"], second["packet_hash"])
+        source_snapshot = {
+            "candidate_id": first["candidate_id"],
+            "r83_summary": first["r83_summary"],
+            "r84_preflight_summary": first["r84_preflight_summary"],
+            "r84_1_risk_contract_summary": first["r84_1_risk_contract_summary"],
+            "r85_ticket_summary": first["r85_ticket_summary"],
+            "r86_checklist_summary": first["r86_checklist_summary"],
+            "r87_boundary_summary": first["r87_boundary_summary"],
+        }
+        self.assertEqual(packet_hash(source_snapshot), first["packet_hash"])
+        self.assertIn(first["packet_hash"], first["final_approval_phrase_required"])
+
+    def test_r88_wrong_final_phrase_is_invalid(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_final_human_review_packet(
+            final_approval_phrase="FINAL_REVIEW_ACK wrong",
+            dry_run=True,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(FINAL_HUMAN_APPROVAL_INVALID, payload["final_human_approval_status"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r88_exact_final_phrase_records_review_only_packet_when_written(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+
+        payload = build_final_human_review_packet(
+            final_approval_phrase=template["final_approval_phrase_required"],
+            operator_note="fixture final review only",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(FINAL_HUMAN_APPROVAL_RECORDED_FOR_REVIEW, payload["final_human_approval_status"])
+        self.assertEqual(REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY, payload["packet_status"])
+        self.assertTrue(payload["packet_written"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        records = load_final_human_review_packets(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(payload["packet_id"], records[0]["packet_id"])
+
+    def test_r88_source_chain_and_forbidden_actions_are_included(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R83", payload["r83_summary"]["phase"])
+        self.assertEqual("R84", payload["r84_preflight_summary"]["phase"])
+        self.assertEqual("R84.1", payload["r84_1_risk_contract_summary"]["phase"])
+        self.assertEqual("R85", payload["r85_ticket_summary"]["phase"])
+        self.assertEqual("R86", payload["r86_checklist_summary"]["phase"])
+        self.assertEqual("R87", payload["r87_boundary_summary"]["phase"])
+        self.assertIn("no Binance calls", payload["forbidden_actions"])
+        self.assertIn("no order payload creation", payload["forbidden_actions"])
+
+    def test_r88_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.post("/live-arming/review-packet/build", json={"dry_run": True, "write": False})
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R88", payload["phase"])
+        self.assertFalse(payload["packet_written"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+        packets_response = self.client.get("/live-arming/review-packets")
+        self.assertEqual(200, packets_response.status_code)
+        packets_payload = packets_response.json()
+        self.assertEqual("R88", packets_payload["phase"])
+        self.assertEqual([], packets_payload["packets"])
+
+    def test_r88_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "final-review-packet",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R88 Final Human Review Packet: OK", result.stdout)
+        self.assertIn("executable: False", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod

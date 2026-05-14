@@ -13,6 +13,7 @@ from src.app.hammer_radar.operator.approval_api import app
 from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     AVAILABLE_TASKS,
     DEFAULT_TASKS,
+    TASK_FINAL_HUMAN_REVIEW_PACKET,
     TASK_LIVE_ARMING_PREFLIGHT,
     TASK_LIVE_ENV_ARMING_CHECKLIST,
     TASK_LIVE_ENV_BOUNDARY_REVIEW,
@@ -73,6 +74,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_LIVE_ENV_ARMING_CHECKLIST, DEFAULT_TASKS)
         self.assertIn(TASK_LIVE_ENV_BOUNDARY_REVIEW, AVAILABLE_TASKS)
         self.assertNotIn(TASK_LIVE_ENV_BOUNDARY_REVIEW, DEFAULT_TASKS)
+        self.assertIn(TASK_FINAL_HUMAN_REVIEW_PACKET, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_FINAL_HUMAN_REVIEW_PACKET, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -337,6 +340,33 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_LIVE_ENV_BOUNDARY_REVIEW]["detail"]
         self.assertEqual("LIVE_ENV_ARMING_NOT_ALLOWED_YET", detail["boundary_status"])
         self.assertFalse(detail["report_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_final_human_review_packet_task_is_read_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_final_human_review_packet",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "packet_status": "REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY",
+                "final_human_approval_status": "FINAL_HUMAN_APPROVAL_REQUIRED",
+                "packet_written": False,
+                "execution_mode": "FINAL_HUMAN_APPROVAL_RECORD_REVIEW_PACKET_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_FINAL_HUMAN_REVIEW_PACKET],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_FINAL_HUMAN_REVIEW_PACKET], record["completed_tasks"])
+        detail = record["task_results"][TASK_FINAL_HUMAN_REVIEW_PACKET]["detail"]
+        self.assertEqual("REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY", detail["packet_status"])
+        self.assertFalse(detail["packet_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 
