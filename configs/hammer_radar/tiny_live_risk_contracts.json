@@ -1,0 +1,35 @@
+{
+  "funding_config": {
+    "account_balance_checked": false,
+    "account_balance_source": "not_checked_no_network",
+    "funding_check_mode": "LOCAL_CONFIG_ONLY_NO_NETWORK",
+    "funding_config_present": true,
+    "funding_note": "Operator must manually ensure account has available USDT before any later live approval.",
+    "max_loss_usdt": 4.44,
+    "max_margin_usdt": 44.0
+  },
+  "risk_contracts": [
+    {
+      "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+      "direction": "long",
+      "enabled_for_preflight": true,
+      "entry_mode": "ladder_close_50_618",
+      "entry_price_source": "operator_supplied_or_future_ticket_builder",
+      "leverage": 1,
+      "margin_mode": "ISOLATED_REQUIRED",
+      "max_loss_usdt": 4.44,
+      "max_margin_usdt": 44.0,
+      "max_position_notional_usdt": 44.0,
+      "notes": "R84.1 non-secret local config only. Does not create orders, payloads, or live execution permission.",
+      "order_type": "not_created",
+      "protective_stop_required": true,
+      "reduce_only_allowed": true,
+      "risk_reward_ratio": 2.0,
+      "stop_distance_pct": 0.35,
+      "symbol": "BTCUSDT",
+      "take_profit_distance_pct": 0.7,
+      "take_profit_required": true,
+      "timeframe": "13m"
+    }
+  ]
+}

@@ -29,6 +29,7 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.multi_symbol_scanner import scan_watchlist
 from src.app.hammer_radar.operator.notification_watcher import check_notifications, notification_status
+from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
 
 LIVE_EXECUTION_ENABLED = False
 ORDER_PLACED = False
@@ -50,6 +51,7 @@ TASK_BETRAYAL_CANDLE_CAPTURE = "betrayal_candle_capture"
 TASK_MARKOV_REGIME_GATE = "markov_regime_gate"
 TASK_MIRO_FISH_QUALITY_GATE = "miro_fish_quality_gate"
 TASK_LIVE_ARMING_PREFLIGHT = "live_arming_preflight"
+TASK_TINY_LIVE_RISK_CONTRACT = "tiny_live_risk_contract"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -68,6 +70,7 @@ AVAILABLE_TASKS = (
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_LIVE_ARMING_PREFLIGHT,
+    TASK_TINY_LIVE_RISK_CONTRACT,
 )
 
 
@@ -351,6 +354,17 @@ def run_refresh_task(
             detail={
                 "final_preflight_status": result.get("final_preflight_status"),
                 "selected_candidate_id": (result.get("top_candidate_preflight") or {}).get("candidate_id"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_TINY_LIVE_RISK_CONTRACT:
+        result = build_tiny_live_risk_contract_payload()
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "validation_status": (result.get("validation") or {}).get("validation_status"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

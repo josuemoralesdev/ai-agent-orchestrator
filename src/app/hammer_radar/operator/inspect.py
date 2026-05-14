@@ -724,6 +724,17 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-risk-contract":
+        from src.app.hammer_radar.operator.tiny_live_risk_contract import (
+            build_tiny_live_risk_contract_payload,
+            format_tiny_live_risk_contract_text,
+        )
+
+        print(
+            format_tiny_live_risk_contract_text(
+                build_tiny_live_risk_contract_payload(candidate_id=args.candidate_id)
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1070,6 +1081,12 @@ def _build_parser() -> argparse.ArgumentParser:
     live_arming_preflight_parser.add_argument("--symbol", default="BTCUSDT")
     live_arming_preflight_parser.add_argument("--timeframe", default=None)
     live_arming_preflight_parser.add_argument("--candidate-id", default=None)
+
+    tiny_live_risk_contract_parser = subparsers.add_parser("tiny-live-risk-contract", parents=[parent])
+    tiny_live_risk_contract_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
