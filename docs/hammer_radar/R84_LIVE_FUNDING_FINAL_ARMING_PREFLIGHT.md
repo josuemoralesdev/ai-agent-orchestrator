@@ -261,4 +261,4 @@ curl -s http://127.0.0.1:8015/live-arming/preflight | jq '
 
 ## Next Phase Recommendation
 
-R85 adds Exact Operator Approval + Non-Executable Tiny Live Ticket Builder after R84.1 risk contract fields are complete. The next phase should be R86 Live Env Arming Checklist + Manual Funding Confirmation, still with no execution unless a later phase explicitly authorizes that path.
+R85 adds Exact Operator Approval + Non-Executable Tiny Live Ticket Builder after R84.1 risk contract fields are complete. R86 adds Live Env Arming Checklist + Manual Funding Confirmation, still with no execution, no env modification, and no account-balance network checks unless a later phase explicitly authorizes a separate path.

@@ -753,6 +753,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-env-checklist":
+        from src.app.hammer_radar.operator.live_env_arming_checklist import (
+            build_live_env_arming_checklist,
+            format_live_env_arming_checklist_text,
+        )
+
+        print(
+            format_live_env_arming_checklist_text(
+                build_live_env_arming_checklist(
+                    candidate_id=args.candidate_id,
+                    manual_funding_phrase=args.manual_funding_phrase,
+                    live_env_review_phrase=args.live_env_review_phrase,
+                    max_loss_ack_phrase=args.max_loss_ack_phrase,
+                    exact_candidate_ack_phrase=args.exact_candidate_ack_phrase,
+                    operator_note=args.operator_note,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1114,6 +1135,18 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_ticket_parser.add_argument("--write", action="store_true")
     tiny_live_ticket_parser.add_argument("--approval-phrase", default=None)
     tiny_live_ticket_parser.add_argument("--operator-note", default=None)
+
+    live_env_checklist_parser = subparsers.add_parser("live-env-checklist", parents=[parent])
+    live_env_checklist_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    live_env_checklist_parser.add_argument("--write", action="store_true")
+    live_env_checklist_parser.add_argument("--manual-funding-phrase", default=None)
+    live_env_checklist_parser.add_argument("--live-env-review-phrase", default=None)
+    live_env_checklist_parser.add_argument("--max-loss-ack-phrase", default=None)
+    live_env_checklist_parser.add_argument("--exact-candidate-ack-phrase", default=None)
+    live_env_checklist_parser.add_argument("--operator-note", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

@@ -75,6 +75,19 @@ from src.app.hammer_radar.operator.live_arming_preflight import (
     BLOCKED_BY_STRATEGY_QUALITY,
     build_live_arming_preflight,
 )
+from src.app.hammer_radar.operator.live_env_arming_checklist import (
+    CHECKLIST_BLOCKED_BY_MISSING_CONFIRMATIONS,
+    CHECKLIST_REQUIRED,
+    CHECKLIST_RECORDED_FOR_REVIEW,
+    LIVE_ENV_ARMING_CONFIRMED_FOR_REVIEW,
+    LIVE_ENV_ARMING_CONFIRMATION_REQUIRED,
+    MANUAL_FUNDING_CONFIRMED_BY_OPERATOR,
+    MANUAL_FUNDING_CONFIRMATION_REQUIRED,
+    build_live_env_arming_checklist,
+    build_live_env_arming_checklist_status,
+    live_env_arming_checklists_path,
+    load_live_env_arming_checklists,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -1647,6 +1660,131 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R85 Tiny Live Ticket Builder: OK", result.stdout)
+        self.assertIn("executable: False", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r86_checklist_default_dry_run_does_not_write(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_env_arming_checklist(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R86", payload["phase"])
+        self.assertEqual(CHECKLIST_BLOCKED_BY_MISSING_CONFIRMATIONS, payload["checklist_status"])
+        self.assertEqual(MANUAL_FUNDING_CONFIRMATION_REQUIRED, payload["manual_funding_status"])
+        self.assertEqual(LIVE_ENV_ARMING_CONFIRMATION_REQUIRED, payload["live_env_arming_status"])
+        self.assertFalse(payload["checklist_written"])
+        self.assertFalse(live_env_arming_checklists_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r86_write_false_does_not_write_even_with_exact_phrases(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_live_env_arming_checklist(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+
+        payload = build_live_env_arming_checklist(
+            manual_funding_phrase=phrases["manual_funding_phrase"],
+            live_env_review_phrase=phrases["live_env_review_phrase"],
+            max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            dry_run=False,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual("CHECKLIST_DRY_RUN_ONLY", payload["checklist_status"])
+        self.assertFalse(payload["checklist_written"])
+        self.assertFalse(live_env_arming_checklists_path(self.log_dir).exists())
+
+    def test_r86_wrong_phrase_blocks_confirmation(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_env_arming_checklist(
+            manual_funding_phrase="wrong",
+            dry_run=True,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual("CHECKLIST_INVALID_CONFIRMATION", payload["checklist_status"])
+        self.assertIn("manual_funding_phrase_invalid", payload["blockers"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r86_exact_phrases_record_review_only_checklist(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_live_env_arming_checklist(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+
+        payload = build_live_env_arming_checklist(
+            risk_contract_hash=template["risk_contract_hash"],
+            manual_funding_phrase=phrases["manual_funding_phrase"],
+            live_env_review_phrase=phrases["live_env_review_phrase"],
+            max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            operator_note="fixture review only",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(CHECKLIST_RECORDED_FOR_REVIEW, payload["checklist_status"])
+        self.assertEqual(MANUAL_FUNDING_CONFIRMED_BY_OPERATOR, payload["manual_funding_status"])
+        self.assertEqual(LIVE_ENV_ARMING_CONFIRMED_FOR_REVIEW, payload["live_env_arming_status"])
+        self.assertTrue(payload["checklist_written"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        records = load_live_env_arming_checklists(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(payload["checklist_id"], records[0]["checklist_id"])
+
+    def test_r86_status_and_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.post("/live-arming/checklist/confirm", json={"dry_run": True, "write": False})
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R86", payload["phase"])
+        self.assertEqual(CHECKLIST_BLOCKED_BY_MISSING_CONFIRMATIONS, payload["checklist_status"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        status = build_live_env_arming_checklist_status(log_dir=self.log_dir)
+        self.assertEqual("OK", status["status"])
+        self.assertEqual(CHECKLIST_REQUIRED, status["summary"]["latest_checklist_status"])
+
+        status_response = self.client.get("/live-arming/checklist/status")
+        self.assertEqual(200, status_response.status_code)
+        status_payload = status_response.json()
+        self.assertEqual("R86", status_payload["phase"])
+        self.assertIn("manual_funding_phrase", status_payload["required_phrases"])
+
+    def test_r86_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-env-checklist",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R86 Live Env Arming Checklist: OK", result.stdout)
         self.assertIn("executable: False", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
