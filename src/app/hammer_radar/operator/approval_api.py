@@ -245,6 +245,7 @@ from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
     build_live_env_arming_checklist_status,
 )
+from src.app.hammer_radar.operator.live_env_boundary_review import build_live_env_boundary_review
 from src.app.hammer_radar.operator.tiny_live_risk_contract import build_tiny_live_risk_contract_payload
 from src.app.hammer_radar.operator.tiny_live_ticket_builder import (
     build_tiny_live_ticket,
@@ -385,6 +386,12 @@ class LiveEnvChecklistConfirmRequest(BaseModel):
     max_loss_ack_phrase: str | None = None
     exact_candidate_ack_phrase: str | None = None
     operator_note: str | None = None
+
+
+class LiveEnvBoundaryReviewReportRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -1683,6 +1690,24 @@ def live_arming_checklist_status(
     limit: int = Query(default=20, ge=0),
 ) -> dict:
     return build_live_env_arming_checklist_status(candidate_id=candidate_id, limit=limit, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live-arming/env-boundary-review")
+def live_arming_env_boundary_review(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_live_env_boundary_review(candidate_id=candidate_id, dry_run=True, write=False, log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live-arming/env-boundary-review/report")
+def live_arming_env_boundary_review_report(request: LiveEnvBoundaryReviewReportRequest | None = None) -> dict:
+    request = request or LiveEnvBoundaryReviewReportRequest()
+    return build_live_env_boundary_review(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
 
 
 @app.get("/strategy-promotion/status")

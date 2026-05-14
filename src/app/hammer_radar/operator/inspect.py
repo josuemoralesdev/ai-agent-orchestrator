@@ -774,6 +774,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-env-boundary-review":
+        from src.app.hammer_radar.operator.live_env_boundary_review import (
+            build_live_env_boundary_review,
+            format_live_env_boundary_review_text,
+        )
+
+        print(
+            format_live_env_boundary_review_text(
+                build_live_env_boundary_review(
+                    candidate_id=args.candidate_id,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1147,6 +1163,13 @@ def _build_parser() -> argparse.ArgumentParser:
     live_env_checklist_parser.add_argument("--max-loss-ack-phrase", default=None)
     live_env_checklist_parser.add_argument("--exact-candidate-ack-phrase", default=None)
     live_env_checklist_parser.add_argument("--operator-note", default=None)
+
+    live_env_boundary_review_parser = subparsers.add_parser("live-env-boundary-review", parents=[parent])
+    live_env_boundary_review_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    live_env_boundary_review_parser.add_argument("--write", action="store_true")
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
