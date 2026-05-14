@@ -70,6 +70,13 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import (
     MIRO_FISH_SUPPORTS_CANDIDATE,
     build_miro_fish_quality_gate,
 )
+from src.app.hammer_radar.operator.live_arming_preflight import (
+    BLOCKED_BY_FUNDING_CONFIG,
+    BLOCKED_BY_MISSING_RISK_CONTRACT,
+    BLOCKED_BY_STRATEGY_QUALITY,
+    READY_FOR_OPERATOR_LIVE_ARMING_REVIEW,
+    build_live_arming_preflight,
+)
 from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -1273,6 +1280,137 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("TOP SUPPORTED CANDIDATES", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r84_payload_safety_fields_and_top_candidate_selected(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir)
+
+        self.assertEqual("OK", payload["status"])
+        self.assertEqual("R84", payload["phase"])
+        self.assertEqual("LIVE_ARMING_PREFLIGHT_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["top_candidate_preflight"]["candidate_id"])
+        self.assertEqual("MIRO_FISH_SUPPORTS_CANDIDATE", payload["top_candidate_preflight"]["miro_fish_status"])
+        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["allow_live_orders"])
+        self.assertTrue(payload["global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r84_candidate_without_miro_support_is_not_selected(self) -> None:
+        self._seed_group("normal-13m-short", "13m", "short", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_live_arming_preflight(
+            log_dir=self.log_dir,
+            candidate_id="normal|BTCUSDT|13m|short|ladder_close_50_618",
+        )
+
+        self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
+        self.assertIsNone(payload["top_candidate_preflight"]["candidate_id"])
+
+    def test_r84_missing_risk_fields_returns_missing_risk_contract(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir)
+
+        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_MISSING", payload["risk_contract"]["risk_contract_status"])
+        self.assertIn("missing_stop_price_or_stop_distance_pct", payload["risk_contract"]["blockers"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r84_valid_local_risk_contract_can_move_to_operator_review_ready(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir, env=self._r84_ready_env())
+
+        self.assertEqual(READY_FOR_OPERATOR_LIVE_ARMING_REVIEW, payload["final_preflight_status"])
+        self.assertEqual("RISK_CONTRACT_COMPLETE", payload["risk_contract"]["risk_contract_status"])
+        self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
+        self.assertEqual("LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT", payload["live_env_preflight"]["live_env_status"])
+        self.assertEqual("MISSING_OPERATOR_APPROVAL", payload["operator_approval_preflight"]["approval_status"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+
+    def test_r84_missing_funding_config_returns_funding_blocker(self) -> None:
+        self._seed_supported_13m_long()
+        env = self._r84_ready_env()
+        env["HAMMER_R84_FUNDING_CONFIG_PRESENT"] = "false"
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir, env=env)
+
+        self.assertEqual(BLOCKED_BY_FUNDING_CONFIG, payload["final_preflight_status"])
+        self.assertEqual("FUNDING_CONFIG_MISSING", payload["funding_preflight"]["funding_status"])
+        self.assertIn("funding_config_missing", payload["funding_preflight"]["blockers"])
+
+    def test_r84_live_env_disabled_and_kill_switch_reported_safe_for_review(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_live_arming_preflight(log_dir=self.log_dir, env=self._r84_ready_env())
+
+        live_env = payload["live_env_preflight"]
+        self.assertFalse(live_env["configured_live_execution_enabled"])
+        self.assertFalse(live_env["configured_allow_live_orders"])
+        self.assertTrue(live_env["configured_global_kill_switch"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+
+    def test_r84_betrayal_candidate_id_remains_out_of_arming_path(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
+        self._capture_close_series("222m", [100, 101, 102, 103, 104, 105])
+
+        payload = build_live_arming_preflight(
+            log_dir=self.log_dir,
+            candidate_id="betrayal|aggregate|BTCUSDT|222m",
+            env=self._r84_ready_env(),
+        )
+
+        self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
+        self.assertIn("no_miro_fish_supported_candidate", payload["risk_contract"]["blockers"])
+
+    def test_r84_api_endpoint_is_read_only_and_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.get("/live-arming/preflight")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R84", payload["phase"])
+        self.assertEqual(BLOCKED_BY_MISSING_RISK_CONTRACT, payload["final_preflight_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r84_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "live-arming-preflight",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R84 Live Arming Preflight: OK", result.stdout)
+        self.assertIn("risk_contract_status:", result.stdout)
+        self.assertIn("final_preflight_status:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -1483,6 +1621,27 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
                 }
             )
         capture_candles(candles, log_dir=self.log_dir)
+
+    def _seed_supported_13m_long(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+    @staticmethod
+    def _r84_ready_env() -> dict[str, str]:
+        return {
+            "HAMMER_R84_STOP_DISTANCE_PCT": "1.0",
+            "HAMMER_R84_TAKE_PROFIT_DISTANCE_PCT": "2.0",
+            "HAMMER_R84_MAX_POSITION_NOTIONAL_USDT": "44",
+            "HAMMER_R84_MAX_MARGIN_USDT": "44",
+            "HAMMER_R84_MAX_LOSS_USDT": "4.44",
+            "HAMMER_R84_LEVERAGE": "1",
+            "HAMMER_R84_MARGIN_MODE": "ISOLATED",
+            "HAMMER_R84_FUNDING_CONFIG_PRESENT": "true",
+            "HAMMER_BINANCE_LIVE_ENABLED": "false",
+            "HAMMER_LIVE_EXECUTION_ENABLED": "false",
+            "HAMMER_ALLOW_LIVE_ORDERS": "false",
+            "HAMMER_GLOBAL_KILL_SWITCH": "true",
+        }
 
     @staticmethod
     def _fish_vote(gate: dict, fish: str) -> dict:
