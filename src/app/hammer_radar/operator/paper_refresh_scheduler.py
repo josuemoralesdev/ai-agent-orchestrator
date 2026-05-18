@@ -24,6 +24,7 @@ from src.app.hammer_radar.operator.betrayal_shadow_resolver import resolve_betra
 from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_candidate
 from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome
 from src.app.hammer_radar.operator.final_human_review_packet import build_final_human_review_packet
+from src.app.hammer_radar.operator.human_confirmation_records import build_human_confirmation_records
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -60,6 +61,7 @@ TASK_TINY_LIVE_TICKET_BUILDER = "tiny_live_ticket_builder"
 TASK_LIVE_ENV_ARMING_CHECKLIST = "live_env_arming_checklist"
 TASK_LIVE_ENV_BOUNDARY_REVIEW = "live_env_boundary_review"
 TASK_FINAL_HUMAN_REVIEW_PACKET = "final_human_review_packet"
+TASK_HUMAN_CONFIRMATION_RECORDS = "human_confirmation_records"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -83,6 +85,7 @@ AVAILABLE_TASKS = (
     TASK_LIVE_ENV_ARMING_CHECKLIST,
     TASK_LIVE_ENV_BOUNDARY_REVIEW,
     TASK_FINAL_HUMAN_REVIEW_PACKET,
+    TASK_HUMAN_CONFIRMATION_RECORDS,
 )
 
 
@@ -430,6 +433,19 @@ def run_refresh_task(
                 "packet_status": result.get("packet_status"),
                 "final_human_approval_status": result.get("final_human_approval_status"),
                 "packet_written": result.get("packet_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_HUMAN_CONFIRMATION_RECORDS:
+        result = build_human_confirmation_records(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "unified_readiness_status": result.get("unified_readiness_status"),
+                "records_written": result.get("records_written"),
+                "r87_boundary_status": result.get("r87_boundary_status"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

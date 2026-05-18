@@ -244,6 +244,10 @@ from src.app.hammer_radar.operator.final_human_review_packet import (
     build_final_human_review_packet,
     build_final_human_review_packets_payload,
 )
+from src.app.hammer_radar.operator.human_confirmation_records import (
+    build_human_confirmation_records,
+    build_human_confirmation_records_status,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -403,6 +407,19 @@ class FinalHumanReviewPacketBuildRequest(BaseModel):
     write: bool = False
     candidate_id: str | None = None
     final_approval_phrase: str | None = None
+    operator_note: str | None = None
+
+
+class HumanConfirmationRecordRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+    r85_approval_phrase: str | None = None
+    r86_manual_funding_phrase: str | None = None
+    r86_live_env_review_phrase: str | None = None
+    r86_max_loss_ack_phrase: str | None = None
+    r86_exact_candidate_ack_phrase: str | None = None
+    r88_final_approval_phrase: str | None = None
     operator_note: str | None = None
 
 
@@ -1741,6 +1758,40 @@ def live_arming_review_packets(
     candidate_id: str | None = None,
 ) -> dict:
     return build_final_human_review_packets_payload(limit=limit, candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/live-arming/human-confirmations/record")
+def live_arming_human_confirmations_record(request: HumanConfirmationRecordRequest | None = None) -> dict:
+    request = request or HumanConfirmationRecordRequest()
+    return build_human_confirmation_records(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        r85_approval_phrase=request.r85_approval_phrase,
+        r86_manual_funding_phrase=request.r86_manual_funding_phrase,
+        r86_live_env_review_phrase=request.r86_live_env_review_phrase,
+        r86_max_loss_ack_phrase=request.r86_max_loss_ack_phrase,
+        r86_exact_candidate_ack_phrase=request.r86_exact_candidate_ack_phrase,
+        r88_final_approval_phrase=request.r88_final_approval_phrase,
+        operator_note=request.operator_note,
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/human-confirmations/status")
+def live_arming_human_confirmations_status(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+    limit: int = Query(default=20, ge=0),
+) -> dict:
+    return build_human_confirmation_records_status(candidate_id=candidate_id, limit=limit, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/live-arming/human-confirmations")
+def live_arming_human_confirmations(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+    limit: int = Query(default=20, ge=0),
+) -> dict:
+    return build_human_confirmation_records_status(candidate_id=candidate_id, limit=limit, log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/strategy-promotion/status")

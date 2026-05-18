@@ -109,6 +109,23 @@ from src.app.hammer_radar.operator.final_human_review_packet import (
     load_final_human_review_packets,
     packet_hash,
 )
+from src.app.hammer_radar.operator.human_confirmation_records import (
+    HUMAN_CONFIRMATION_DRY_RUN_ONLY,
+    HUMAN_CONFIRMATION_INVALID_PHRASE,
+    HUMAN_CONFIRMATION_RECORDED_FOR_REVIEW,
+    HUMAN_CONFIRMATION_REQUIRED,
+    R85_TINY_LIVE_TICKET_REVIEW_APPROVAL,
+    R86_MANUAL_FUNDING_AND_ENV_CHECKLIST,
+    R88_FINAL_HUMAN_REVIEW_APPROVAL,
+    REVIEW_RECORDS_MISSING,
+    REVIEW_RECORDS_PARTIAL,
+    REVIEW_RECORDS_RECORDED_FOR_REVIEW,
+    build_human_confirmation_records,
+    build_human_confirmation_records_status,
+    human_confirmation_records_path,
+    load_human_confirmation_records,
+    phrase_hash,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -2034,6 +2051,226 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("R88 Final Human Review Packet: OK", result.stdout)
         self.assertIn("executable: False", result.stdout)
         self.assertIn("No order placed", result.stdout)
+
+    def test_r89_default_dry_run_does_not_write_and_reports_missing(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R89", payload["phase"])
+        self.assertEqual(REVIEW_RECORDS_MISSING, payload["unified_readiness_status"])
+        self.assertEqual(HUMAN_CONFIRMATION_REQUIRED, payload["record_statuses"][R85_TINY_LIVE_TICKET_REVIEW_APPROVAL])
+        self.assertEqual(HUMAN_CONFIRMATION_REQUIRED, payload["record_statuses"][R86_MANUAL_FUNDING_AND_ENV_CHECKLIST])
+        self.assertEqual(HUMAN_CONFIRMATION_REQUIRED, payload["record_statuses"][R88_FINAL_HUMAN_REVIEW_APPROVAL])
+        self.assertEqual(0, payload["records_written"])
+        self.assertFalse(human_confirmation_records_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r89_write_false_does_not_write_even_with_exact_phrases(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+
+        payload = build_human_confirmation_records(
+            r85_approval_phrase=phrases["r85_approval_phrase"],
+            r86_manual_funding_phrase=phrases["manual_funding_phrase"],
+            r86_live_env_review_phrase=phrases["live_env_review_phrase"],
+            r86_max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            r86_exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            r88_final_approval_phrase=phrases["r88_final_approval_phrase"],
+            dry_run=False,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(HUMAN_CONFIRMATION_DRY_RUN_ONLY, payload["record_statuses"][R85_TINY_LIVE_TICKET_REVIEW_APPROVAL])
+        self.assertEqual(0, payload["records_written"])
+        self.assertFalse(human_confirmation_records_path(self.log_dir).exists())
+
+    def test_r89_wrong_phrases_are_invalid_and_not_written(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_human_confirmation_records(
+            r85_approval_phrase="wrong r85",
+            r86_manual_funding_phrase="wrong r86",
+            r88_final_approval_phrase="wrong r88",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(HUMAN_CONFIRMATION_INVALID_PHRASE, payload["record_statuses"][R85_TINY_LIVE_TICKET_REVIEW_APPROVAL])
+        self.assertEqual(HUMAN_CONFIRMATION_INVALID_PHRASE, payload["record_statuses"][R86_MANUAL_FUNDING_AND_ENV_CHECKLIST])
+        self.assertEqual(HUMAN_CONFIRMATION_INVALID_PHRASE, payload["record_statuses"][R88_FINAL_HUMAN_REVIEW_APPROVAL])
+        self.assertEqual(REVIEW_RECORDS_MISSING, payload["unified_readiness_status"])
+        self.assertEqual(0, payload["records_written"])
+        self.assertFalse(human_confirmation_records_path(self.log_dir).exists())
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r89_exact_r85_phrase_persists_ticket_review_record_only(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        payload = build_human_confirmation_records(
+            r85_approval_phrase=template["required_phrases"]["r85_approval_phrase"],
+            operator_note="fixture r85 confirmation",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(HUMAN_CONFIRMATION_RECORDED_FOR_REVIEW, payload["record_statuses"][R85_TINY_LIVE_TICKET_REVIEW_APPROVAL])
+        self.assertEqual(REVIEW_RECORDS_PARTIAL, payload["unified_readiness_status"])
+        self.assertEqual(1, payload["records_written"])
+        records = load_human_confirmation_records(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(R85_TINY_LIVE_TICKET_REVIEW_APPROVAL, records[0]["record_type"])
+        self.assertNotIn("APPROVE_TINY_LIVE_REVIEW", json.dumps(records[0]))
+        self.assertFalse(records[0]["executable"])
+        self.assertFalse(records[0]["order_payload_created"])
+
+    def test_r89_exact_r86_phrases_persist_checklist_review_record_only(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+
+        payload = build_human_confirmation_records(
+            r86_manual_funding_phrase=phrases["manual_funding_phrase"],
+            r86_live_env_review_phrase=phrases["live_env_review_phrase"],
+            r86_max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            r86_exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(HUMAN_CONFIRMATION_RECORDED_FOR_REVIEW, payload["record_statuses"][R86_MANUAL_FUNDING_AND_ENV_CHECKLIST])
+        self.assertEqual(REVIEW_RECORDS_PARTIAL, payload["unified_readiness_status"])
+        records = load_human_confirmation_records(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(R86_MANUAL_FUNDING_AND_ENV_CHECKLIST, records[0]["record_type"])
+        self.assertFalse(records[0]["network_allowed"])
+        self.assertFalse(records[0]["secrets_shown"])
+
+    def test_r89_exact_r88_phrase_persists_final_review_record_only(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        payload = build_human_confirmation_records(
+            r88_final_approval_phrase=template["required_phrases"]["r88_final_approval_phrase"],
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(HUMAN_CONFIRMATION_RECORDED_FOR_REVIEW, payload["record_statuses"][R88_FINAL_HUMAN_REVIEW_APPROVAL])
+        records = load_human_confirmation_records(limit=0, log_dir=self.log_dir)
+        self.assertEqual(1, len(records))
+        self.assertEqual(R88_FINAL_HUMAN_REVIEW_APPROVAL, records[0]["record_type"])
+        self.assertEqual(template["packet_hash"], records[0]["packet_hash"])
+        self.assertFalse(records[0]["execution_attempted"])
+
+    def test_r89_all_exact_phrases_record_review_only_ledger(self) -> None:
+        self._seed_supported_13m_long()
+        before_env = dict(os.environ)
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+
+        payload = build_human_confirmation_records(
+            r85_approval_phrase=phrases["r85_approval_phrase"],
+            r86_manual_funding_phrase=phrases["manual_funding_phrase"],
+            r86_live_env_review_phrase=phrases["live_env_review_phrase"],
+            r86_max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            r86_exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            r88_final_approval_phrase=phrases["r88_final_approval_phrase"],
+            operator_note="fixture all confirmations",
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(REVIEW_RECORDS_RECORDED_FOR_REVIEW, payload["unified_readiness_status"])
+        self.assertEqual(LIVE_ENV_ARMING_NOT_ALLOWED_YET, payload["r87_boundary_status"])
+        self.assertEqual(3, payload["records_written"])
+        self.assertEqual(before_env, dict(os.environ))
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["env_modified"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r89_phrase_hashes_are_deterministic(self) -> None:
+        self.assertEqual(phrase_hash("abc"), phrase_hash("abc"))
+        self.assertEqual(phrase_hash("abc"), phrase_hash(" abc "))
+        self.assertNotEqual(phrase_hash("abc"), phrase_hash("abcd"))
+
+    def test_r89_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.post("/live-arming/human-confirmations/record", json={"dry_run": True, "write": False})
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R89", payload["phase"])
+        self.assertEqual(REVIEW_RECORDS_MISSING, payload["unified_readiness_status"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        status_response = self.client.get("/live-arming/human-confirmations/status")
+        self.assertEqual(200, status_response.status_code)
+        status_payload = status_response.json()
+        self.assertEqual("R89", status_payload["phase"])
+        self.assertEqual(REVIEW_RECORDS_MISSING, status_payload["unified_readiness_status"])
+
+        list_response = self.client.get("/live-arming/human-confirmations")
+        self.assertEqual(200, list_response.status_code)
+        self.assertEqual([], list_response.json()["records"])
+
+    def test_r89_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "human-confirmations",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R89 Human Confirmation Records status: OK", result.stdout)
+        self.assertIn("unified_readiness_status: REVIEW_RECORDS_MISSING", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r89_status_reflects_written_records(self) -> None:
+        self._seed_supported_13m_long()
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        build_human_confirmation_records(
+            r85_approval_phrase=template["required_phrases"]["r85_approval_phrase"],
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+        status = build_human_confirmation_records_status(log_dir=self.log_dir)
+
+        self.assertEqual(REVIEW_RECORDS_PARTIAL, status["unified_readiness_status"])
+        self.assertEqual(1, status["summary"]["written_confirmation_records"])
+        self.assertEqual([R85_TINY_LIVE_TICKET_REVIEW_APPROVAL], status["summary"]["recorded_record_types"])
+        self.assertFalse(status["order_payload_created"])
 
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
