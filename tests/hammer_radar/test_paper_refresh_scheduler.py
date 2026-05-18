@@ -21,6 +21,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_REVIEW_RECORD_AGGREGATOR,
+    TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
     TASK_TINY_LIVE_TICKET_BUILDER,
     build_refresh_runs_payload,
@@ -82,6 +83,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_HUMAN_CONFIRMATION_RECORDS, DEFAULT_TASKS)
         self.assertIn(TASK_REVIEW_RECORD_AGGREGATOR, AVAILABLE_TASKS)
         self.assertNotIn(TASK_REVIEW_RECORD_AGGREGATOR, DEFAULT_TASKS)
+        self.assertIn(TASK_SOURCE_WARNING_REVIEW, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_SOURCE_WARNING_REVIEW, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -429,6 +432,34 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertEqual("READY_FOR_HUMAN_RECORD_COMPLETION", detail["readiness_class"])
         self.assertFalse(detail["snapshot_written"])
         self.assertTrue(detail["hash_chain_consistent"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_source_warning_review_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_source_warning_review",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "source_warning_classification": "CANDIDATE_SUPPORT_MISSING",
+                "rehydrated_review_context": {"rehydration_status": "REHYDRATION_AVAILABLE_FOR_REVIEW"},
+                "report_written": False,
+                "execution_mode": "SOURCE_WARNING_REVIEW_CANDIDATE_SUPPORT_REHYDRATION_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_SOURCE_WARNING_REVIEW],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_SOURCE_WARNING_REVIEW], record["completed_tasks"])
+        detail = record["task_results"][TASK_SOURCE_WARNING_REVIEW]["detail"]
+        self.assertEqual("CANDIDATE_SUPPORT_MISSING", detail["source_warning_classification"])
+        self.assertEqual("REHYDRATION_AVAILABLE_FOR_REVIEW", detail["rehydration_status"])
+        self.assertFalse(detail["report_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 

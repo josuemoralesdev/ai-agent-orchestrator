@@ -144,6 +144,18 @@ from src.app.hammer_radar.operator.review_record_aggregator import (
     build_review_record_arming_snapshot,
     review_record_arming_snapshot_path,
 )
+from src.app.hammer_radar.operator.source_warning_review import (
+    ARCHIVE_INTEGRITY_WARNING,
+    CANDIDATE_SUPPORT_MISSING,
+    REHYDRATION_AVAILABLE_FOR_REVIEW,
+    REHYDRATION_BLOCKED_BY_MISSING_HISTORICAL_CONTEXT,
+    REHYDRATION_NOT_NEEDED,
+    SOURCE_CHAIN_CANDIDATE_SUPPORT_REHYDRATED_FOR_REVIEW,
+    SOURCE_CHAIN_CLEAN_CURRENT_SUPPORT_PRESENT,
+    SOURCE_CHAIN_NON_EXECUTABLE_ONLY,
+    build_source_warning_review,
+    source_warning_review_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -2541,6 +2553,135 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R90 Readiness Snapshot status: OK", result.stdout)
+        self.assertIn("hash_chain_consistent: True", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r91_payload_is_safe_and_does_not_write_by_default(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R91", payload["phase"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(source_warning_review_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r91_candidate_missing_classification_and_rehydration(self) -> None:
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(CANDIDATE_SUPPORT_MISSING, payload["source_warning_classification"])
+        self.assertFalse(payload["current_candidate_support"]["candidate_present_currently"])
+        self.assertEqual(REHYDRATION_AVAILABLE_FOR_REVIEW, payload["rehydrated_review_context"]["rehydration_status"])
+        self.assertIn(SOURCE_CHAIN_CANDIDATE_SUPPORT_REHYDRATED_FOR_REVIEW, payload["source_warning_statuses"])
+        self.assertFalse(payload["rehydrated_review_context"]["live_permission"])
+        self.assertFalse(payload["executable"])
+
+    def test_r91_clean_source_path_when_candidate_current_support_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertTrue(payload["current_candidate_support"]["candidate_present_currently"])
+        self.assertEqual("NONE", payload["source_warning_classification"])
+        self.assertEqual(REHYDRATION_NOT_NEEDED, payload["rehydrated_review_context"]["rehydration_status"])
+        self.assertIn(SOURCE_CHAIN_CLEAN_CURRENT_SUPPORT_PRESENT, payload["source_warning_statuses"])
+        self.assertIn(SOURCE_CHAIN_NON_EXECUTABLE_ONLY, payload["source_warning_statuses"])
+
+    def test_r91_archive_warning_classification(self) -> None:
+        self._seed_supported_13m_long()
+        archive_path = self.log_dir / "candle_archive" / "BTCUSDT_13m.ndjson"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with archive_path.open("a", encoding="utf-8") as handle:
+            handle.write('{"symbol": "BTCUSDT", "timeframe": "13m", broken\n')
+
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(ARCHIVE_INTEGRITY_WARNING, payload["source_warning_classification"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+
+    def test_r91_rehydration_unavailable_for_unknown_candidate(self) -> None:
+        payload = build_source_warning_review(
+            candidate_id="normal|BTCUSDT|99m|long|ladder_close_50_618",
+            dry_run=True,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(
+            REHYDRATION_BLOCKED_BY_MISSING_HISTORICAL_CONTEXT,
+            payload["rehydrated_review_context"]["rehydration_status"],
+        )
+        self.assertFalse(payload["rehydrated_review_context"]["live_permission"])
+
+    def test_r91_risk_and_hash_continuity_are_reported(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertTrue(payload["risk_contract_continuity"]["risk_contract_valid_for_preflight"])
+        self.assertTrue(payload["hash_chain_continuity"]["hash_chain_consistent"])
+        self.assertIn("current_risk_contract_hash", payload["hash_chain_continuity"])
+        self.assertIn("final_preflight_status", payload["current_preflight_diagnostic"])
+
+    def test_r91_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_supported_13m_long()
+        before_env = dict(os.environ)
+
+        payload = build_source_warning_review(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = source_warning_review_path(self.log_dir)
+        self.assertTrue(path.exists())
+        with path.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+        self.assertEqual("R91", report["phase"])
+        self.assertFalse(report["executable"])
+        self.assertFalse(report["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r91_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.get("/live-arming/source-warning-review")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R91", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/source-warning-review/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r91_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "source-warning-review",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R91 Source Warning Review status: OK", result.stdout)
         self.assertIn("hash_chain_consistent: True", result.stdout)
         self.assertIn("No order placed", result.stdout)
 

@@ -151,3 +151,5 @@ Choose R91 from the actual R90 result:
 - If source chain is clean and records are missing, do `R91 Human Confirmation Record Write Trial`.
 
 Do not treat live execution as the next step.
+
+R91 adds Source Warning Review + Candidate Support Rehydration to explain source-chain support gaps before any human confirmation write trial.
