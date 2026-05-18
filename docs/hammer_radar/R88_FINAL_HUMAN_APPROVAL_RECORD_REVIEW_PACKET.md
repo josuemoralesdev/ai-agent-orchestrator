@@ -2,7 +2,7 @@
 
 ## Purpose
 
-R88 bundles the R83 through R87 evidence chain into one final human-readable, non-executable review packet for the exact BTCUSDT 13m long tiny-live candidate.
+R88 bundles the R83 through R87 evidence chain into one final human-readable, non-executable review packet for the exact BTCUSDT 13m long tiny-live candidate. R89 follows this by persisting exact human confirmation review records in a separate local ledger while remaining non-executable.
 
 Current candidate:
 

@@ -808,6 +808,29 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "human-confirmations":
+        from src.app.hammer_radar.operator.human_confirmation_records import (
+            build_human_confirmation_records,
+            format_human_confirmation_records_text,
+        )
+
+        print(
+            format_human_confirmation_records_text(
+                build_human_confirmation_records(
+                    candidate_id=args.candidate_id,
+                    r85_approval_phrase=args.r85_approval_phrase,
+                    r86_manual_funding_phrase=args.r86_manual_funding_phrase,
+                    r86_live_env_review_phrase=args.r86_live_env_review_phrase,
+                    r86_max_loss_ack_phrase=args.r86_max_loss_ack_phrase,
+                    r86_exact_candidate_ack_phrase=args.r86_exact_candidate_ack_phrase,
+                    r88_final_approval_phrase=args.r88_final_approval_phrase,
+                    operator_note=args.operator_note,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1197,6 +1220,20 @@ def _build_parser() -> argparse.ArgumentParser:
     final_review_packet_parser.add_argument("--write", action="store_true")
     final_review_packet_parser.add_argument("--final-approval-phrase", default=None)
     final_review_packet_parser.add_argument("--operator-note", default=None)
+
+    human_confirmations_parser = subparsers.add_parser("human-confirmations", parents=[parent])
+    human_confirmations_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    human_confirmations_parser.add_argument("--write", action="store_true")
+    human_confirmations_parser.add_argument("--r85-approval-phrase", default=None)
+    human_confirmations_parser.add_argument("--r86-manual-funding-phrase", default=None)
+    human_confirmations_parser.add_argument("--r86-live-env-review-phrase", default=None)
+    human_confirmations_parser.add_argument("--r86-max-loss-ack-phrase", default=None)
+    human_confirmations_parser.add_argument("--r86-exact-candidate-ack-phrase", default=None)
+    human_confirmations_parser.add_argument("--r88-final-approval-phrase", default=None)
+    human_confirmations_parser.add_argument("--operator-note", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-R87 adds a read-only live-env boundary review surface. It reports which live toggles exist, what their current safe states are, which future phase could request changes, what must be true before live arming is considered, and which actions remain forbidden.
+R87 adds a read-only live-env boundary review surface. It reports which live toggles exist, what their current safe states are, which future phase could request changes, what must be true before live arming is considered, and which actions remain forbidden. R89 can persist human confirmation review records, but those records do not bypass this boundary or create execution permission.
 
 R87 does not place orders, sign payloads, call Binance, check account balances, modify env files, restart services, or enable live execution.
 
