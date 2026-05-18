@@ -6,6 +6,7 @@ fetches balances, calls Binance, creates order payloads, or enables execution.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -68,6 +69,17 @@ def build_tiny_live_risk_contract_payload(
             **_safety_fields(),
         }
     )
+
+
+def stable_json(payload: Any) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def risk_contract_hash(snapshot: Mapping[str, Any]) -> str:
+    return hashlib.sha256(stable_json(snapshot).encode("utf-8")).hexdigest()
+
+
+canonical_risk_contract_hash = risk_contract_hash
 
 
 def load_tiny_live_risk_config(*, config_path: str | Path | None = None) -> dict[str, Any]:

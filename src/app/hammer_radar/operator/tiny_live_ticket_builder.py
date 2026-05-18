@@ -18,7 +18,11 @@ from src.app.hammer_radar.operator.live_arming_preflight import (
     BLOCKED_BY_MISSING_OPERATOR_APPROVAL,
     build_live_arming_preflight,
 )
-from src.app.hammer_radar.operator.tiny_live_risk_contract import DEFAULT_CANDIDATE_ID
+from src.app.hammer_radar.operator.tiny_live_risk_contract import (
+    DEFAULT_CANDIDATE_ID,
+    risk_contract_hash as canonical_risk_contract_hash,
+    stable_json,
+)
 
 PHASE = "R85"
 SYSTEM = "money_printing_machine_hammer_radar"
@@ -152,11 +156,7 @@ def build_tiny_live_tickets_payload(
 
 
 def risk_contract_hash(snapshot: Mapping[str, Any]) -> str:
-    return hashlib.sha256(stable_json(snapshot).encode("utf-8")).hexdigest()
-
-
-def stable_json(payload: Any) -> str:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return canonical_risk_contract_hash(snapshot)
 
 
 def approval_phrase_for(*, candidate_id: str, risk_contract_hash: str) -> str:

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.betrayal_candle_archive import archive_integrity_warnings
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import build_live_env_arming_checklist_status
 from src.app.hammer_radar.operator.live_env_boundary_review import build_live_env_boundary_review
@@ -32,6 +33,7 @@ REVIEW_PACKET_CREATED_FOR_HUMAN_REVIEW = "REVIEW_PACKET_CREATED_FOR_HUMAN_REVIEW
 REVIEW_PACKET_BLOCKED_BY_MISSING_OPERATOR_APPROVAL = "REVIEW_PACKET_BLOCKED_BY_MISSING_OPERATOR_APPROVAL"
 REVIEW_PACKET_BLOCKED_BY_MISSING_CHECKLIST = "REVIEW_PACKET_BLOCKED_BY_MISSING_CHECKLIST"
 REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY = "REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY"
+REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS = "REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS"
 REVIEW_PACKET_NON_EXECUTABLE_REVIEW_ONLY = "REVIEW_PACKET_NON_EXECUTABLE_REVIEW_ONLY"
 REVIEW_PACKET_INVALID_SOURCE_CHAIN = "REVIEW_PACKET_INVALID_SOURCE_CHAIN"
 
@@ -146,9 +148,13 @@ def build_source_chain(*, candidate_id: str, log_dir: str | Path | None = None) 
     ticket = build_tiny_live_ticket(candidate_id=candidate_id, dry_run=True, write=False, log_dir=log_dir)
     checklist = build_live_env_arming_checklist_status(candidate_id=candidate_id, log_dir=log_dir)
     boundary = build_live_env_boundary_review(candidate_id=candidate_id, dry_run=True, write=False, log_dir=log_dir)
+    integrity_warnings = archive_integrity_warnings(log_dir)
     return _sanitize(
         {
             "candidate_id": candidate_id,
+            "source_warnings": {
+                "archive_integrity_warnings": integrity_warnings,
+            },
             "r83_summary": {
                 "phase": quality.get("phase"),
                 "candidate_id": r83.get("candidate_id"),
@@ -275,8 +281,10 @@ def _approval_status(*, supplied: str | None, expected: str) -> str:
 
 
 def _packet_status(*, source: Mapping[str, Any], approval_status: str, dry_run: bool, write: bool) -> str:
+    if _source_warning_blockers(source):
+        return REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS
     if not source["r83_summary"].get("candidate_id"):
-        return REVIEW_PACKET_INVALID_SOURCE_CHAIN
+        return REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS
     if source["r87_boundary_summary"].get("boundary_status") != "LIVE_ENV_LOCKED_SAFE":
         if approval_status == FINAL_HUMAN_APPROVAL_INVALID:
             return REVIEW_PACKET_BLOCKED_BY_MISSING_OPERATOR_APPROVAL
@@ -322,6 +330,7 @@ def _packet_payload(
             "candidate_id": candidate_id,
             "risk_contract_hash": risk_hash,
             "source_phase": PHASE,
+            "source_warnings": source.get("source_warnings") or {},
             "r83_summary": source["r83_summary"],
             "r84_preflight_summary": source["r84_preflight_summary"],
             "r84_1_risk_contract_summary": source["r84_1_risk_contract_summary"],
@@ -359,6 +368,7 @@ def _packet_payload(
 
 def _remaining_blockers(*, source: Mapping[str, Any], approval_status: str) -> list[str]:
     blockers: list[str] = []
+    blockers.extend(_source_warning_blockers(source))
     if source["r84_preflight_summary"].get("final_preflight_status") == "BLOCKED_BY_MISSING_OPERATOR_APPROVAL":
         blockers.append("r84_missing_operator_approval")
     if source["r85_ticket_summary"].get("approval_status") != "OPERATOR_APPROVAL_RECORDED_FOR_REVIEW":
@@ -371,6 +381,18 @@ def _remaining_blockers(*, source: Mapping[str, Any], approval_status: str) -> l
     if approval_status != FINAL_HUMAN_APPROVAL_RECORDED_FOR_REVIEW:
         blockers.append("final_human_approval_not_recorded")
     return list(dict.fromkeys(blockers))
+
+
+def _source_warning_blockers(source: Mapping[str, Any]) -> list[str]:
+    warnings = ((source.get("source_warnings") or {}).get("archive_integrity_warnings") or {})
+    blockers: list[str] = []
+    if int(warnings.get("malformed_json_lines") or 0) > 0:
+        blockers.append("source_archive_malformed_json_lines_skipped")
+    if int(warnings.get("non_object_json_lines") or 0) > 0:
+        blockers.append("source_archive_non_object_json_lines_skipped")
+    if not source.get("r83_summary", {}).get("candidate_id"):
+        blockers.append("r83_candidate_not_supported_in_current_source_chain")
+    return blockers
 
 
 def _packet_id(*, candidate_id: str, packet_hash_value: str) -> str:

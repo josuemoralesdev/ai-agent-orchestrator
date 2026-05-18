@@ -19,8 +19,10 @@ normal|BTCUSDT|13m|long|ladder_close_50_618
 Current risk hash:
 
 ```text
-764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+<current_risk_contract_hash>
 ```
+
+R89.1 clarifies that this hash is generated from the canonical R85 risk snapshot. Older copied hash values may be stale; use current API/CLI surfaces for exact phrase construction.
 
 R87 treats R83/R84/R85/R86 evidence as review context only. It does not convert any record into live execution permission.
 

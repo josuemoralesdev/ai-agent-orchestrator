@@ -88,6 +88,7 @@ def build_betrayal_candle_archive(
             "persisted": persisted,
             "discovered_sources": discovered["discovered_sources"],
             "files_scanned": discovered["files_scanned"],
+            "archive_integrity_warnings": archive_integrity_warnings(resolved_log_dir),
             "candles_found": len(discovered["candles"]),
             "candles_written": written_count,
             "duplicate_candles_skipped": duplicate_count,
@@ -121,6 +122,7 @@ def build_betrayal_candle_archive_status(
             "log_dir": str(resolved_log_dir),
             "archive_dir": str(_archive_dir(resolved_log_dir)),
             "available": _available_summary(candles),
+            "archive_integrity_warnings": archive_integrity_warnings(resolved_log_dir),
             "target_coverage": _target_coverage(candles, log_dir=resolved_log_dir),
             "notes": [NO_ORDER_NOTE],
             **_safety_fields(),
@@ -290,6 +292,25 @@ def load_archive_candles(
     return _dedupe_candles(candles)
 
 
+def archive_integrity_warnings(log_dir: str | Path | None = None) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    warnings = []
+    malformed_lines = 0
+    non_object_lines = 0
+    for path in _candidate_source_files(resolved_log_dir):
+        scan = _scan_jsonl_integrity(path)
+        if scan["malformed_json_lines"] or scan["non_object_json_lines"]:
+            warnings.append(scan)
+            malformed_lines += int(scan["malformed_json_lines"])
+            non_object_lines += int(scan["non_object_json_lines"])
+    return {
+        "files_with_warnings": len(warnings),
+        "malformed_json_lines": malformed_lines,
+        "non_object_json_lines": non_object_lines,
+        "warnings": warnings,
+    }
+
+
 def append_archive_candles(candles: list[dict[str, Any]], *, log_dir: Path) -> int:
     archive_dir = _archive_dir(log_dir)
     archive_dir.mkdir(parents=True, exist_ok=True)
@@ -392,9 +413,48 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
-            if line:
-                records.append(json.loads(line))
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            records.append(payload)
     return records
+
+
+def _scan_jsonl_integrity(path: Path) -> dict[str, Any]:
+    malformed = 0
+    non_object = 0
+    total = 0
+    if not path.exists():
+        return {
+            "path": str(path),
+            "lines_scanned": 0,
+            "malformed_json_lines": 0,
+            "non_object_json_lines": 0,
+        }
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            total += 1
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                malformed += 1
+                continue
+            if not isinstance(payload, dict):
+                non_object += 1
+    return {
+        "path": str(path),
+        "lines_scanned": total,
+        "malformed_json_lines": malformed,
+        "non_object_json_lines": non_object,
+    }
 
 
 def _archive_dir(log_dir: Path) -> Path:

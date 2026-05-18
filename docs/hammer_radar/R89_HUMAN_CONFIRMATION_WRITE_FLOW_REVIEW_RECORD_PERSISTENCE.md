@@ -16,24 +16,26 @@ Candidate:
 normal|BTCUSDT|13m|long|ladder_close_50_618
 ```
 
-Risk contract hash:
+Risk contract hash is generated at runtime from the canonical R84.1/R85 risk contract snapshot:
 
 ```text
-764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+<current_risk_contract_hash>
 ```
 
-R88 packet hash:
+R88 packet hash is generated at runtime from the canonical R88 source-chain snapshot:
 
 ```text
-b82fac02035b4a1b784548823c42f15c3082b01329cbcd6f72a5ac2000669625
+<current_packet_hash>
 ```
+
+Do not copy stale hashes from older docs or smoke output. R85, R88, and R89 must surface the same current risk hash, and R88/R89 must surface the same current packet hash for the same dry-run source chain.
 
 ## Required Phrases
 
 R85 ticket review approval:
 
 ```text
-APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>
 ```
 
 R86 checklist confirmations:
@@ -42,13 +44,13 @@ R86 checklist confirmations:
 CONFIRM_MANUAL_FUNDING BTCUSDT MAX_MARGIN_44 MAX_LOSS_4.44 NO_BALANCE_CHECK
 CONFIRM_LIVE_ENV_REVIEW_ONLY KILL_SWITCH_ON LIVE_EXEC_DISABLED NO_ORDER
 ACK_MAX_LOSS_4.44_USDT
-ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>
 ```
 
 R88 final human review approval:
 
 ```text
-FINAL_REVIEW_ACK normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8 b82fac02035b4a1b784548823c42f15c3082b01329cbcd6f72a5ac2000669625
+FINAL_REVIEW_ACK normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash> <current_packet_hash>
 ```
 
 ## Ledger Storage
@@ -129,12 +131,12 @@ Write exact review records only when explicitly supplied:
 
 ```bash
 .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward human-confirmations --write \
-  --r85-approval-phrase "APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8" \
+  --r85-approval-phrase "APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>" \
   --r86-manual-funding-phrase "CONFIRM_MANUAL_FUNDING BTCUSDT MAX_MARGIN_44 MAX_LOSS_4.44 NO_BALANCE_CHECK" \
   --r86-live-env-review-phrase "CONFIRM_LIVE_ENV_REVIEW_ONLY KILL_SWITCH_ON LIVE_EXEC_DISABLED NO_ORDER" \
   --r86-max-loss-ack-phrase "ACK_MAX_LOSS_4.44_USDT" \
-  --r86-exact-candidate-ack-phrase "ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8" \
-  --r88-final-approval-phrase "FINAL_REVIEW_ACK normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8 b82fac02035b4a1b784548823c42f15c3082b01329cbcd6f72a5ac2000669625"
+  --r86-exact-candidate-ack-phrase "ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>" \
+  --r88-final-approval-phrase "FINAL_REVIEW_ACK normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash> <current_packet_hash>"
 ```
 
 ## Smoke Commands

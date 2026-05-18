@@ -13,8 +13,10 @@ normal|BTCUSDT|13m|long|ladder_close_50_618
 Current risk contract hash:
 
 ```text
-764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+<current_risk_contract_hash>
 ```
+
+The current risk hash is generated from the same canonical risk contract snapshot used by R85. The packet hash is generated from the R88 source-chain snapshot. Older docs or smoke output may contain stale hashes; use the current API/CLI surfaces when constructing final review phrases.
 
 R88 is a review packet only. It does not place orders, sign payloads, create executable exchange payloads, call Binance, check balances, modify env files, restart services, or enable live execution.
 
@@ -63,6 +65,8 @@ packet_hash=sha256(stable_json(source_chain_snapshot))
 ```
 
 The source chain snapshot excludes runtime write metadata so repeated dry-runs over the same evidence produce the same packet hash.
+
+R89.1 adds local candle archive integrity warnings to the source chain. If malformed local archive lines are present, R88 still returns JSON and may report `REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS`; it does not crash or create executable order material.
 
 ## Final Approval Phrase
 

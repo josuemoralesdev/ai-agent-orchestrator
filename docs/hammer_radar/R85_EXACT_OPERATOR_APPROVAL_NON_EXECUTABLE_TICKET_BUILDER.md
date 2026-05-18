@@ -35,7 +35,7 @@ risk_contract_hash=sha256(stable_json(risk_contract_snapshot))
 
 Stable JSON uses sorted keys and compact separators so the same contract produces the same hash.
 
-The hash binds the approval phrase to the exact risk contract snapshot reviewed by the operator.
+The hash binds the approval phrase to the exact risk contract snapshot reviewed by the operator. R89.1 centralizes this canonical hash helper so R85 tickets, R88 review packets, and R89 human confirmations surface the same current risk hash for the same dry-run source chain. Do not use stale hashes copied from older docs or smoke output.
 
 ## Exact Approval Phrase
 

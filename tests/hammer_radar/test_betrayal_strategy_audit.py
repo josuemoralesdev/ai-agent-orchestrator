@@ -21,8 +21,10 @@ from src.app.hammer_radar.operator.betrayal_inverse_validation import (
     build_betrayal_inverse_validation,
 )
 from src.app.hammer_radar.operator.betrayal_candle_archive import (
+    archive_integrity_warnings,
     build_betrayal_candle_archive,
     build_betrayal_candle_archive_status,
+    load_archive_candles,
 )
 from src.app.hammer_radar.operator.betrayal_candle_capture import (
     backfill_betrayal_candle_capture,
@@ -103,6 +105,7 @@ from src.app.hammer_radar.operator.final_human_review_packet import (
     FINAL_HUMAN_APPROVAL_RECORDED_FOR_REVIEW,
     FINAL_HUMAN_APPROVAL_REQUIRED,
     REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY,
+    REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS,
     REVIEW_PACKET_CREATED_FOR_HUMAN_REVIEW,
     build_final_human_review_packet,
     final_human_review_packets_path,
@@ -660,6 +663,54 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual("OK", payload["status"])
         self.assertEqual(1, payload["available"][0]["candle_count"])
         self.assertEqual("222m", payload["available"][0]["timeframe"])
+
+    def test_r81_2_archive_reader_skips_malformed_json_lines(self) -> None:
+        archive_dir = self.log_dir / "candle_archive"
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "BTCUSDT_13m.ndjson"
+        with archive_path.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(self._candle_at("13m", timestamp="2026-05-01T00:01:00+00:00", high=101, low=99)) + "\n")
+            handle.write('{"symbol": "BTCUSDT", "timeframe": "13m", broken\n')
+            handle.write(json.dumps(self._candle_at("13m", timestamp="2026-05-01T00:02:00+00:00", high=102, low=100)) + "\n")
+
+        candles = load_archive_candles(log_dir=self.log_dir, symbol="BTCUSDT", timeframe="13m")
+        status = build_betrayal_candle_archive_status(log_dir=self.log_dir)
+        warnings = archive_integrity_warnings(self.log_dir)
+
+        self.assertEqual(2, len(candles))
+        self.assertEqual("OK", status["status"])
+        self.assertEqual(1, status["archive_integrity_warnings"]["malformed_json_lines"])
+        self.assertEqual(1, warnings["malformed_json_lines"])
+        self.assertFalse(status["order_payload_created"])
+        self.assertFalse(status["network_allowed"])
+
+    def test_r81_2_malformed_archive_does_not_crash_source_chain(self) -> None:
+        self._seed_supported_13m_long()
+        archive_path = self.log_dir / "candle_archive" / "BTCUSDT_13m.ndjson"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        if not archive_path.exists():
+            with archive_path.open("w", encoding="utf-8") as handle:
+                handle.write(json.dumps(self._candle_at("13m", timestamp="2026-05-01T00:01:00+00:00", high=101, low=99)) + "\n")
+        with archive_path.open("a", encoding="utf-8") as handle:
+            handle.write('{"symbol": "BTCUSDT", "timeframe": "13m", broken\n')
+
+        markov = build_markov_regime_gate(log_dir=self.log_dir)
+        miro = build_miro_fish_quality_gate(family="NORMAL", log_dir=self.log_dir)
+        preflight = build_live_arming_preflight(log_dir=self.log_dir)
+        ticket = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+        packet = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+        confirmations = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("OK", markov["status"])
+        self.assertEqual("OK", miro["status"])
+        self.assertEqual("R84", preflight["phase"])
+        self.assertEqual("R85", ticket["phase"])
+        self.assertEqual("R88", packet["phase"])
+        self.assertEqual(REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS, packet["packet_status"])
+        self.assertIn("source_archive_malformed_json_lines_skipped", packet["remaining_blockers"])
+        self.assertEqual("R89", confirmations["phase"])
+        self.assertFalse(packet["order_payload_created"])
+        self.assertFalse(confirmations["network_allowed"])
 
     def test_r81_2_missing_archive_keeps_resolver_no_data_behavior(self) -> None:
         self._write_shadow_records([self._unresolved_shadow_record("222m", index=0)])
@@ -1932,7 +1983,7 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(REVIEW_PACKET_BLOCKED_BY_LIVE_ENV_BOUNDARY, payload["packet_status"])
         self.assertEqual(FINAL_HUMAN_APPROVAL_REQUIRED, payload["final_human_approval_status"])
         self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["candidate_id"])
-        self.assertEqual("764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8", payload["risk_contract_hash"])
+        self.assertEqual(payload["r85_ticket_summary"]["risk_contract_hash"], payload["risk_contract_hash"])
         self.assertFalse(payload["packet_written"])
         self.assertFalse(final_human_review_packets_path(self.log_dir).exists())
         self.assertFalse(payload["executable"])
@@ -1951,6 +2002,7 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(first["packet_hash"], second["packet_hash"])
         source_snapshot = {
             "candidate_id": first["candidate_id"],
+            "source_warnings": first["source_warnings"],
             "r83_summary": first["r83_summary"],
             "r84_preflight_summary": first["r84_preflight_summary"],
             "r84_1_risk_contract_summary": first["r84_1_risk_contract_summary"],
@@ -2232,6 +2284,32 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(200, list_response.status_code)
         self.assertEqual([], list_response.json()["records"])
 
+    def test_r89_1_api_dry_runs_return_json_with_malformed_archive_line(self) -> None:
+        self._seed_supported_13m_long()
+        archive_path = self.log_dir / "candle_archive" / "BTCUSDT_13m.ndjson"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with archive_path.open("a", encoding="utf-8") as handle:
+            handle.write('{"symbol": "BTCUSDT", "timeframe": "13m", broken\n')
+
+        packet_response = self.client.post("/live-arming/review-packet/build", json={"dry_run": True, "write": False})
+        confirmation_response = self.client.post("/live-arming/human-confirmations/record", json={"dry_run": True, "write": False})
+
+        self.assertEqual(200, packet_response.status_code)
+        self.assertEqual("application/json", packet_response.headers["content-type"].split(";")[0])
+        packet = packet_response.json()
+        self.assertEqual("R88", packet["phase"])
+        self.assertEqual(REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS, packet["packet_status"])
+        self.assertFalse(packet["executable"])
+        self.assertFalse(packet["order_payload_created"])
+
+        self.assertEqual(200, confirmation_response.status_code)
+        self.assertEqual("application/json", confirmation_response.headers["content-type"].split(";")[0])
+        confirmations = confirmation_response.json()
+        self.assertEqual("R89", confirmations["phase"])
+        self.assertEqual(0, confirmations["records_written"])
+        self.assertFalse(confirmations["executable"])
+        self.assertFalse(confirmations["network_allowed"])
+
     def test_r89_cli_command_exists(self) -> None:
         self._seed_supported_13m_long()
 
@@ -2271,6 +2349,22 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(1, status["summary"]["written_confirmation_records"])
         self.assertEqual([R85_TINY_LIVE_TICKET_REVIEW_APPROVAL], status["summary"]["recorded_record_types"])
         self.assertFalse(status["order_payload_created"])
+
+    def test_r89_1_hash_chain_consistency_across_r85_r88_r89(self) -> None:
+        self._seed_supported_13m_long()
+
+        r85 = build_tiny_live_ticket(dry_run=True, write=False, log_dir=self.log_dir)
+        r88 = build_final_human_review_packet(dry_run=True, write=False, log_dir=self.log_dir)
+        r89 = build_human_confirmation_records_status(log_dir=self.log_dir)
+
+        self.assertEqual(r85["risk_contract_hash"], r88["risk_contract_hash"])
+        self.assertEqual(r88["risk_contract_hash"], r89["risk_contract_hash"])
+        self.assertEqual(r88["packet_hash"], r89["packet_hash"])
+        self.assertEqual(risk_contract_hash(r85["risk_contract_snapshot"]), r89["risk_contract_hash"])
+        self.assertIn(r85["risk_contract_hash"], r85["approval_phrase_required"])
+        self.assertIn(r88["risk_contract_hash"], r88["final_approval_phrase_required"])
+        self.assertIn(r89["risk_contract_hash"], r89["required_phrases"]["r85_approval_phrase"])
+        self.assertIn(r89["packet_hash"], r89["required_phrases"]["r88_final_approval_phrase"])
 
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
