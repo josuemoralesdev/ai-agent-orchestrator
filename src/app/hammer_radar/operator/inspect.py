@@ -831,6 +831,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "readiness-snapshot":
+        from src.app.hammer_radar.operator.review_record_aggregator import (
+            build_review_record_arming_snapshot,
+            format_review_record_arming_snapshot_text,
+        )
+
+        print(
+            format_review_record_arming_snapshot_text(
+                build_review_record_arming_snapshot(
+                    candidate_id=args.candidate_id,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1234,6 +1250,13 @@ def _build_parser() -> argparse.ArgumentParser:
     human_confirmations_parser.add_argument("--r86-exact-candidate-ack-phrase", default=None)
     human_confirmations_parser.add_argument("--r88-final-approval-phrase", default=None)
     human_confirmations_parser.add_argument("--operator-note", default=None)
+
+    readiness_snapshot_parser = subparsers.add_parser("readiness-snapshot", parents=[parent])
+    readiness_snapshot_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    readiness_snapshot_parser.add_argument("--write", action="store_true")
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

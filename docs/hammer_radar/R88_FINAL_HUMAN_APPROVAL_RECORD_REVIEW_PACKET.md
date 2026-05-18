@@ -68,6 +68,8 @@ The source chain snapshot excludes runtime write metadata so repeated dry-runs o
 
 R89.1 adds local candle archive integrity warnings to the source chain. If malformed local archive lines are present, R88 still returns JSON and may report `REVIEW_PACKET_BLOCKED_BY_SOURCE_WARNINGS`; it does not crash or create executable order material.
 
+R90 aggregates the R88 packet with R85, R86, R87, and R89 review-record state into a single read-only readiness snapshot.
+
 ## Final Approval Phrase
 
 R88 generates:

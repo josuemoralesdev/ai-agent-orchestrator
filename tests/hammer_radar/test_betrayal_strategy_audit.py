@@ -129,6 +129,21 @@ from src.app.hammer_radar.operator.human_confirmation_records import (
     load_human_confirmation_records,
     phrase_hash,
 )
+from src.app.hammer_radar.operator.review_record_aggregator import (
+    ARMING_SNAPSHOT_BLOCKED_BY_HASH_MISMATCH,
+    ARMING_SNAPSHOT_BLOCKED_BY_LIVE_ENV_BOUNDARY,
+    ARMING_SNAPSHOT_BLOCKED_BY_MISSING_REVIEW_RECORDS,
+    ARMING_SNAPSHOT_BLOCKED_BY_SOURCE_WARNINGS,
+    ARMING_SNAPSHOT_RECORDS_COMPLETE_FOR_REVIEW,
+    ARMING_SNAPSHOT_RECORDS_PARTIAL,
+    HASH_CHAIN_INVALID,
+    READY_FOR_HUMAN_RECORD_COMPLETION,
+    REVIEW_RECORDS_COMPLETE_BUT_ENV_LOCKED,
+    SOURCE_CHAIN_NEEDS_REVIEW,
+    _hash_chain_summary,
+    build_review_record_arming_snapshot,
+    review_record_arming_snapshot_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -2365,6 +2380,169 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn(r88["risk_contract_hash"], r88["final_approval_phrase_required"])
         self.assertIn(r89["risk_contract_hash"], r89["required_phrases"]["r85_approval_phrase"])
         self.assertIn(r89["packet_hash"], r89["required_phrases"]["r88_final_approval_phrase"])
+
+    def test_r90_default_snapshot_is_safe_and_does_not_write(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R90", payload["phase"])
+        self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_MISSING_REVIEW_RECORDS, payload["snapshot_status"])
+        self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_LIVE_ENV_BOUNDARY, payload["snapshot_status"])
+        self.assertEqual(READY_FOR_HUMAN_RECORD_COMPLETION, payload["readiness_class"])
+        self.assertFalse(payload["snapshot_written"])
+        self.assertFalse(review_record_arming_snapshot_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r90_write_false_does_not_write_report(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_review_record_arming_snapshot(dry_run=False, write=False, log_dir=self.log_dir)
+
+        self.assertFalse(payload["snapshot_written"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(review_record_arming_snapshot_path(self.log_dir).exists())
+
+    def test_r90_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_supported_13m_long()
+        before_env = dict(os.environ)
+
+        payload = build_review_record_arming_snapshot(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["snapshot_written"])
+        self.assertTrue(payload["report_written"])
+        path = review_record_arming_snapshot_path(self.log_dir)
+        self.assertTrue(path.exists())
+        with path.open("r", encoding="utf-8") as handle:
+            record = json.load(handle)
+        self.assertEqual("R90", record["phase"])
+        self.assertFalse(record["executable"])
+        self.assertFalse(record["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r90_hash_chain_consistent_when_r85_r88_r89_agree(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertTrue(payload["hash_chain_summary"]["hash_chain_consistent"])
+        self.assertEqual(payload["hash_chain_summary"]["hash_chain_items"]["r85_risk_contract_hash"], payload["hash_chain_summary"]["hash_chain_items"]["r88_risk_contract_hash"])
+        self.assertEqual(payload["hash_chain_summary"]["hash_chain_items"]["r88_packet_hash"], payload["hash_chain_summary"]["hash_chain_items"]["r89_packet_hash"])
+
+    def test_r90_hash_chain_mismatch_fixture_reports_invalid(self) -> None:
+        summary = _hash_chain_summary(
+            r85_risk_hash="risk-a",
+            r88_risk_hash="risk-b",
+            r89_risk_hash="risk-b",
+            r88_packet_hash="packet-a",
+            r89_packet_hash="packet-b",
+        )
+
+        self.assertFalse(summary["hash_chain_consistent"])
+        self.assertIn("risk_contract_hash_mismatch", summary["hash_chain_blockers"])
+        self.assertIn("packet_hash_mismatch", summary["hash_chain_blockers"])
+
+    def test_r90_missing_partial_and_complete_review_record_states(self) -> None:
+        self._seed_supported_13m_long()
+        missing = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+        template = build_human_confirmation_records(dry_run=True, write=False, log_dir=self.log_dir)
+
+        build_human_confirmation_records(
+            r85_approval_phrase=template["required_phrases"]["r85_approval_phrase"],
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+        partial = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+        phrases = template["required_phrases"]
+        build_human_confirmation_records(
+            r86_manual_funding_phrase=phrases["manual_funding_phrase"],
+            r86_live_env_review_phrase=phrases["live_env_review_phrase"],
+            r86_max_loss_ack_phrase=phrases["max_loss_ack_phrase"],
+            r86_exact_candidate_ack_phrase=phrases["exact_candidate_ack_phrase"],
+            r88_final_approval_phrase=phrases["r88_final_approval_phrase"],
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+        complete = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertFalse(missing["review_record_summary"]["review_records_complete"])
+        self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_MISSING_REVIEW_RECORDS, missing["snapshot_status"])
+        self.assertIn(ARMING_SNAPSHOT_RECORDS_PARTIAL, partial["snapshot_status"])
+        self.assertTrue(complete["review_record_summary"]["review_records_complete"])
+        self.assertIn(ARMING_SNAPSHOT_RECORDS_COMPLETE_FOR_REVIEW, complete["snapshot_status"])
+        self.assertEqual(REVIEW_RECORDS_COMPLETE_BUT_ENV_LOCKED, complete["readiness_class"])
+        self.assertFalse(complete["executable"])
+
+    def test_r90_r87_boundary_blocks_live_arming(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("LIVE_ENV_ARMING_NOT_ALLOWED_YET", payload["boundary_summary"]["r87_boundary_status"])
+        self.assertFalse(payload["boundary_summary"]["live_env_arming_allowed"])
+        self.assertTrue(payload["boundary_summary"]["execution_boundary_intact"])
+        self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_LIVE_ENV_BOUNDARY, payload["snapshot_status"])
+
+    def test_r90_source_warnings_are_surfaced_as_blockers(self) -> None:
+        self._seed_supported_13m_long()
+        archive_path = self.log_dir / "candle_archive" / "BTCUSDT_13m.ndjson"
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with archive_path.open("a", encoding="utf-8") as handle:
+            handle.write('{"symbol": "BTCUSDT", "timeframe": "13m", broken\n')
+
+        payload = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("SOURCE_CHAIN_WARNINGS_PRESENT", payload["source_chain_summary"]["source_chain_status"])
+        self.assertTrue(payload["source_chain_summary"]["source_warning_review_required"])
+        self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_SOURCE_WARNINGS, payload["snapshot_status"])
+        self.assertEqual(SOURCE_CHAIN_NEEDS_REVIEW, payload["readiness_class"])
+
+    def test_r90_api_endpoints_are_safe(self) -> None:
+        self._seed_supported_13m_long()
+
+        response = self.client.get("/live-arming/readiness-snapshot")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R90", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/readiness-snapshot/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r90_cli_command_exists(self) -> None:
+        self._seed_supported_13m_long()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "readiness-snapshot",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R90 Readiness Snapshot status: OK", result.stdout)
+        self.assertIn("hash_chain_consistent: True", result.stdout)
+        self.assertIn("No order placed", result.stdout)
 
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:

@@ -20,6 +20,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_LIVE_ENV_BOUNDARY_REVIEW,
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
+    TASK_REVIEW_RECORD_AGGREGATOR,
     TASK_TINY_LIVE_RISK_CONTRACT,
     TASK_TINY_LIVE_TICKET_BUILDER,
     build_refresh_runs_payload,
@@ -79,6 +80,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_FINAL_HUMAN_REVIEW_PACKET, DEFAULT_TASKS)
         self.assertIn(TASK_HUMAN_CONFIRMATION_RECORDS, AVAILABLE_TASKS)
         self.assertNotIn(TASK_HUMAN_CONFIRMATION_RECORDS, DEFAULT_TASKS)
+        self.assertIn(TASK_REVIEW_RECORD_AGGREGATOR, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_REVIEW_RECORD_AGGREGATOR, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -397,6 +400,35 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_HUMAN_CONFIRMATION_RECORDS]["detail"]
         self.assertEqual("REVIEW_RECORDS_MISSING", detail["unified_readiness_status"])
         self.assertEqual(0, detail["records_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_review_record_aggregator_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_review_record_arming_snapshot",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "snapshot_status": ["ARMING_SNAPSHOT_BLOCKED_BY_MISSING_REVIEW_RECORDS"],
+                "readiness_class": "READY_FOR_HUMAN_RECORD_COMPLETION",
+                "snapshot_written": False,
+                "hash_chain_summary": {"hash_chain_consistent": True},
+                "execution_mode": "REVIEW_RECORD_AGGREGATOR_ARMING_READINESS_SNAPSHOT_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_REVIEW_RECORD_AGGREGATOR],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_REVIEW_RECORD_AGGREGATOR], record["completed_tasks"])
+        detail = record["task_results"][TASK_REVIEW_RECORD_AGGREGATOR]["detail"]
+        self.assertEqual("READY_FOR_HUMAN_RECORD_COMPLETION", detail["readiness_class"])
+        self.assertFalse(detail["snapshot_written"])
+        self.assertTrue(detail["hash_chain_consistent"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 

@@ -89,3 +89,5 @@ After an approved service restart, API smoke should confirm R85/R88/R89 risk has
 ## Next Phase Recommendation
 
 R90 should add Review Record Aggregator + Arming Readiness Snapshot. It should remain non-executable unless a later phase explicitly authorizes a separate live execution path with human approval, live-env changes, and safety validation.
+
+R90 now consumes the R89.1 JSON-safe and hash-consistent surfaces to produce one non-executable readiness snapshot.
