@@ -847,6 +847,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "source-warning-review":
+        from src.app.hammer_radar.operator.source_warning_review import (
+            build_source_warning_review,
+            format_source_warning_review_text,
+        )
+
+        print(
+            format_source_warning_review_text(
+                build_source_warning_review(
+                    candidate_id=args.candidate_id,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1257,6 +1273,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     readiness_snapshot_parser.add_argument("--write", action="store_true")
+
+    source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
+    source_warning_review_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    source_warning_review_parser.add_argument("--write", action="store_true")
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

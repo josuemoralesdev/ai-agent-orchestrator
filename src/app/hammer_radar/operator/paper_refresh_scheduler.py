@@ -26,6 +26,7 @@ from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_out
 from src.app.hammer_radar.operator.final_human_review_packet import build_final_human_review_packet
 from src.app.hammer_radar.operator.human_confirmation_records import build_human_confirmation_records
 from src.app.hammer_radar.operator.review_record_aggregator import build_review_record_arming_snapshot
+from src.app.hammer_radar.operator.source_warning_review import build_source_warning_review
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -64,6 +65,7 @@ TASK_LIVE_ENV_BOUNDARY_REVIEW = "live_env_boundary_review"
 TASK_FINAL_HUMAN_REVIEW_PACKET = "final_human_review_packet"
 TASK_HUMAN_CONFIRMATION_RECORDS = "human_confirmation_records"
 TASK_REVIEW_RECORD_AGGREGATOR = "review_record_aggregator"
+TASK_SOURCE_WARNING_REVIEW = "source_warning_review"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -89,6 +91,7 @@ AVAILABLE_TASKS = (
     TASK_FINAL_HUMAN_REVIEW_PACKET,
     TASK_HUMAN_CONFIRMATION_RECORDS,
     TASK_REVIEW_RECORD_AGGREGATOR,
+    TASK_SOURCE_WARNING_REVIEW,
 )
 
 
@@ -463,6 +466,19 @@ def run_refresh_task(
                 "readiness_class": result.get("readiness_class"),
                 "hash_chain_consistent": (result.get("hash_chain_summary") or {}).get("hash_chain_consistent"),
                 "snapshot_written": result.get("snapshot_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_SOURCE_WARNING_REVIEW:
+        result = build_source_warning_review(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "source_warning_classification": result.get("source_warning_classification"),
+                "rehydration_status": (result.get("rehydrated_review_context") or {}).get("rehydration_status"),
+                "report_written": result.get("report_written"),
                 "execution_mode": result.get("execution_mode"),
             },
         )
