@@ -250,6 +250,7 @@ from src.app.hammer_radar.operator.human_confirmation_records import (
 )
 from src.app.hammer_radar.operator.review_record_aggregator import build_review_record_arming_snapshot
 from src.app.hammer_radar.operator.source_warning_review import build_source_warning_review
+from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -432,6 +433,12 @@ class ReadinessSnapshotReportRequest(BaseModel):
 
 
 class SourceWarningReviewReportRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+
+
+class SourceChainRepairReportRequest(BaseModel):
     dry_run: bool = True
     write: bool = False
     candidate_id: str | None = None
@@ -1847,6 +1854,29 @@ def live_arming_source_warning_review(
 def live_arming_source_warning_review_report(request: SourceWarningReviewReportRequest | None = None) -> dict:
     request = request or SourceWarningReviewReportRequest()
     return build_source_warning_review(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/source-chain-repair")
+def live_arming_source_chain_repair(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_source_chain_repair(
+        candidate_id=candidate_id,
+        dry_run=True,
+        write=False,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/source-chain-repair/report")
+def live_arming_source_chain_repair_report(request: SourceChainRepairReportRequest | None = None) -> dict:
+    request = request or SourceChainRepairReportRequest()
+    return build_source_chain_repair(
         candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
         dry_run=request.dry_run,
         write=request.write,
