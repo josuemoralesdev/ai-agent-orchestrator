@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.eth_paper_candidates import build_eth_paper_c
 from src.app.hammer_radar.operator.eth_paper_outcomes import build_eth_paper_outcome
 from src.app.hammer_radar.operator.final_human_review_packet import build_final_human_review_packet
 from src.app.hammer_radar.operator.human_confirmation_records import build_human_confirmation_records
+from src.app.hammer_radar.operator.review_record_aggregator import build_review_record_arming_snapshot
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -62,6 +63,7 @@ TASK_LIVE_ENV_ARMING_CHECKLIST = "live_env_arming_checklist"
 TASK_LIVE_ENV_BOUNDARY_REVIEW = "live_env_boundary_review"
 TASK_FINAL_HUMAN_REVIEW_PACKET = "final_human_review_packet"
 TASK_HUMAN_CONFIRMATION_RECORDS = "human_confirmation_records"
+TASK_REVIEW_RECORD_AGGREGATOR = "review_record_aggregator"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -86,6 +88,7 @@ AVAILABLE_TASKS = (
     TASK_LIVE_ENV_BOUNDARY_REVIEW,
     TASK_FINAL_HUMAN_REVIEW_PACKET,
     TASK_HUMAN_CONFIRMATION_RECORDS,
+    TASK_REVIEW_RECORD_AGGREGATOR,
 )
 
 
@@ -446,6 +449,20 @@ def run_refresh_task(
                 "unified_readiness_status": result.get("unified_readiness_status"),
                 "records_written": result.get("records_written"),
                 "r87_boundary_status": result.get("r87_boundary_status"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_REVIEW_RECORD_AGGREGATOR:
+        result = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "snapshot_status": result.get("snapshot_status"),
+                "readiness_class": result.get("readiness_class"),
+                "hash_chain_consistent": (result.get("hash_chain_summary") or {}).get("hash_chain_consistent"),
+                "snapshot_written": result.get("snapshot_written"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

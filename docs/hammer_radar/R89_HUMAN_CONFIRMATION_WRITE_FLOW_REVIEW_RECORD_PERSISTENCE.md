@@ -150,3 +150,5 @@ Write exact review records only when explicitly supplied:
 ## Next Phase Recommendation
 
 R90 should add Review Record Aggregator + Arming Readiness Snapshot. It should remain non-executable unless a later phase explicitly authorizes a separate live execution path with human approval, live-env changes, and safety validation.
+
+R90 now aggregates R83-R89.1 into a single read-only readiness snapshot. It does not convert persisted R89 records into live permission.
