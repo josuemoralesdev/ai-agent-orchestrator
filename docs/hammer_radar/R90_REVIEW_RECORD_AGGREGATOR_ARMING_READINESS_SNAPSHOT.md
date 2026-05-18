@@ -153,3 +153,5 @@ Choose R91 from the actual R90 result:
 Do not treat live execution as the next step.
 
 R91 adds Source Warning Review + Candidate Support Rehydration to explain source-chain support gaps before any human confirmation write trial.
+
+R92 follows when R91 classifies the gap as strategy performance drift. It diagnoses Markov/Miro Fish/preflight interpretation and keeps any Operator/Architect Seat recommendation advisory only.

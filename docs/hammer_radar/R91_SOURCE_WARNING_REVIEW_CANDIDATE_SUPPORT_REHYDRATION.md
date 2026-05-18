@@ -133,3 +133,5 @@ Choose R92 based on the R91 result:
 - `R92 Human Confirmation Write Trial` only if current support is clean.
 
 Do not treat live execution as the next step.
+
+R92 adds Source Chain Repair for Strategy Performance Inputs and an advisory Operator/Architect Seat. The seat may recommend revalidation or source mapping repair, but it cannot override Markov, Miro Fish, R87, missing R89 records, or execution blockers.

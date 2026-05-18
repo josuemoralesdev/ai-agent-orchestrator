@@ -69,6 +69,7 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import (
     FISH_PASS,
     MIRO_FISH_BLOCKED,
     MIRO_FISH_NEEDS_MORE_EVIDENCE,
+    MIRO_FISH_OPERATOR_REVIEW_ONLY,
     MIRO_FISH_REJECTS_CANDIDATE,
     MIRO_FISH_SUPPORTS_CANDIDATE,
     build_miro_fish_quality_gate,
@@ -155,6 +156,16 @@ from src.app.hammer_radar.operator.source_warning_review import (
     SOURCE_CHAIN_NON_EXECUTABLE_ONLY,
     build_source_warning_review,
     source_warning_review_path,
+)
+from src.app.hammer_radar.operator.source_chain_repair import (
+    ARCHITECT_SEAT_RECOMMENDS_NO_LIVE_ACTION,
+    ARCHITECT_SEAT_RECOMMENDS_SOURCE_MAPPING_REPAIR,
+    LEGITIMATE_MARKET_REGIME_DRIFT,
+    OPERATOR_SEAT_NO_OVERRIDE_POWER,
+    RISK_CONTRACT_CONTINUITY_VALID,
+    SOURCE_CHAIN_NON_EXECUTABLE_ONLY,
+    build_source_chain_repair,
+    source_chain_repair_path,
 )
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
@@ -2685,6 +2696,127 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("hash_chain_consistent: True", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r92_payload_is_safe_and_does_not_write_by_default(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R92", payload["phase"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(source_chain_repair_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r92_miro_fish_and_markov_drift_are_diagnosed(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(LEGITIMATE_MARKET_REGIME_DRIFT, payload["repair_classification"])
+        self.assertEqual(MIRO_FISH_OPERATOR_REVIEW_ONLY, payload["current_miro_fish_review"]["final_quality_status"])
+        self.assertEqual(92, payload["current_miro_fish_review"]["final_quality_score"])
+        self.assertEqual(LOW_VOLATILITY, payload["current_markov_review"]["markov_regime"])
+        self.assertEqual(REGIME_NEUTRAL_OR_INSUFFICIENT_DATA, payload["current_markov_review"]["markov_gate_status"])
+        self.assertTrue(payload["current_markov_review"]["regime_drift_detected"])
+        self.assertIn(SOURCE_CHAIN_NON_EXECUTABLE_ONLY, payload["r92_statuses"])
+
+    def test_r92_preflight_null_candidate_and_cascading_blockers_are_identified(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+        preflight = payload["preflight_selection_review"]
+
+        self.assertTrue(preflight["top_candidate_preflight_is_null"])
+        self.assertEqual("NO_SUPPORTED_MIRO_FISH_CANDIDATE_SELECTED", preflight["selection_status"])
+        self.assertEqual("no_supported_miro_fish_candidate", preflight["primary_root_blocker"])
+        self.assertTrue(preflight["risk_funding_missing_blockers_are_secondary"])
+        self.assertTrue(preflight["risk_contract_continuity_should_be_reported_separately"])
+
+    def test_r92_risk_contract_and_hash_chain_continuity_are_valid(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(RISK_CONTRACT_CONTINUITY_VALID, payload["risk_contract_continuity"]["continuity_status"])
+        self.assertTrue(payload["risk_contract_continuity"]["risk_contract_valid"])
+        self.assertTrue(payload["risk_contract_continuity"]["funding_config_present"])
+        self.assertTrue(payload["hash_chain_continuity"]["hash_chain_consistent"])
+
+    def test_r92_operator_architect_seat_is_advisory_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+        seat = payload["operator_architect_seat_review"]
+
+        self.assertFalse(seat["override_power"])
+        self.assertFalse(seat["execution_permission"])
+        self.assertFalse(seat["can_override_markov"])
+        self.assertFalse(seat["can_override_miro_fish"])
+        self.assertFalse(seat["can_bypass_r87"])
+        self.assertIn(OPERATOR_SEAT_NO_OVERRIDE_POWER, seat["seat_statuses"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_NO_LIVE_ACTION, seat["architect_position"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_SOURCE_MAPPING_REPAIR, seat["architect_position"])
+
+    def test_r92_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        before_env = dict(os.environ)
+
+        payload = build_source_chain_repair(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = source_chain_repair_path(self.log_dir)
+        self.assertTrue(path.exists())
+        with path.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+        self.assertEqual("R92", report["phase"])
+        self.assertFalse(report["executable"])
+        self.assertFalse(report["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r92_api_endpoints_are_safe(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        response = self.client.get("/live-arming/source-chain-repair")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R92", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/source-chain-repair/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r92_cli_command_exists(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "source-chain-repair",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R92 Source Chain Repair status: OK", result.stdout)
+        self.assertIn("hash_chain_consistent: True", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -2899,6 +3031,10 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
     def _seed_supported_13m_long(self) -> None:
         self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
         self._capture_close_series("13m", [100, 101, 102, 103, 104, 105])
+
+    def _seed_operator_review_13m_long_low_volatility(self) -> None:
+        self._seed_group("normal-13m", "13m", "long", "ladder_close_50_618", wins=30, losses=0, total_pnl=3.0)
+        self._capture_close_series("13m", [100, 100.05, 100.1, 100.12, 100.08, 100.11], range_width=0.2)
 
     @staticmethod
     def _r84_ready_env() -> dict[str, str]:

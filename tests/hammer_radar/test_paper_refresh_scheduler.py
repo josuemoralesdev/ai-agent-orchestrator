@@ -21,6 +21,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_MARKOV_REGIME_GATE,
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_REVIEW_RECORD_AGGREGATOR,
+    TASK_SOURCE_CHAIN_REPAIR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
     TASK_TINY_LIVE_TICKET_BUILDER,
@@ -85,6 +86,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_REVIEW_RECORD_AGGREGATOR, DEFAULT_TASKS)
         self.assertIn(TASK_SOURCE_WARNING_REVIEW, AVAILABLE_TASKS)
         self.assertNotIn(TASK_SOURCE_WARNING_REVIEW, DEFAULT_TASKS)
+        self.assertIn(TASK_SOURCE_CHAIN_REPAIR, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_SOURCE_CHAIN_REPAIR, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -459,6 +462,33 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_SOURCE_WARNING_REVIEW]["detail"]
         self.assertEqual("CANDIDATE_SUPPORT_MISSING", detail["source_warning_classification"])
         self.assertEqual("REHYDRATION_AVAILABLE_FOR_REVIEW", detail["rehydration_status"])
+        self.assertFalse(detail["report_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_source_chain_repair_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_source_chain_repair",
+            return_value={
+                "candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "repair_classification": "LEGITIMATE_MARKET_REGIME_DRIFT",
+                "recommended_next_phase": "R93 Current Candidate Revalidation + Markov/Miro Fish Threshold Review",
+                "report_written": False,
+                "execution_mode": "SOURCE_CHAIN_REPAIR_STRATEGY_PERFORMANCE_INPUTS_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_SOURCE_CHAIN_REPAIR],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_SOURCE_CHAIN_REPAIR], record["completed_tasks"])
+        detail = record["task_results"][TASK_SOURCE_CHAIN_REPAIR]["detail"]
+        self.assertEqual("LEGITIMATE_MARKET_REGIME_DRIFT", detail["repair_classification"])
         self.assertFalse(detail["report_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
