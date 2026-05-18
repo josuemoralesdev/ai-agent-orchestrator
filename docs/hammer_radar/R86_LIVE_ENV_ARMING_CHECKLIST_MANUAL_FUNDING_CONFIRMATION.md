@@ -14,17 +14,19 @@ R85 created a review-only ticket for:
 normal|BTCUSDT|13m|long|ladder_close_50_618
 ```
 
-with risk contract hash:
+with risk contract hash generated from the current canonical R85 risk snapshot:
 
 ```text
-764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+<current_risk_contract_hash>
 ```
 
 and approval phrase:
 
 ```text
-APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+APPROVE_TINY_LIVE_REVIEW normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>
 ```
+
+R89.1 clarifies that older copied hash values may be stale. Use the current R85/R88/R89 API or CLI surfaces when constructing exact phrases.
 
 R86 adds the next local review layer: manual funding and live-env checklist confirmations.
 
@@ -53,7 +55,7 @@ ACK_MAX_LOSS_4.44_USDT
 Exact candidate and risk hash:
 
 ```text
-ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 764df0c3cea3357416872be8d47e0f6189324cc8fbd0711dc5d1c8385ba114d8
+ACK_TINY_LIVE_CANDIDATE normal|BTCUSDT|13m|long|ladder_close_50_618 <current_risk_contract_hash>
 ```
 
 ## Manual Funding Limitation
