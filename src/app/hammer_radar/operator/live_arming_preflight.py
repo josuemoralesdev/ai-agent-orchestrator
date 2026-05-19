@@ -46,16 +46,26 @@ RISK_CONTRACT_PRESENT = "RISK_CONTRACT_PRESENT"
 RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS = "RISK_CONTRACT_VALID_FOR_PREFLIGHT"
 RISK_CONTRACT_MISSING = "RISK_CONTRACT_MISSING"
 RISK_CONTRACT_INVALID = "RISK_CONTRACT_INVALID"
+RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE = "RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE"
 
 FUNDING_CONFIG_PRESENT = "FUNDING_CONFIG_PRESENT"
 FUNDING_CONFIG_MISSING = "FUNDING_CONFIG_MISSING"
 FUNDING_CHECK_DEFERRED_NO_NETWORK = "FUNDING_CHECK_DEFERRED_NO_NETWORK"
 FUNDING_BLOCKED_BY_LIVE_ENV_LOCKS = "FUNDING_BLOCKED_BY_LIVE_ENV_LOCKS"
+FUNDING_NOT_EVALUATED_NO_CANDIDATE = "FUNDING_NOT_EVALUATED_NO_CANDIDATE"
 
 LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT = "LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT"
 LIVE_ENV_UNSAFE_FOR_PREFLIGHT = "LIVE_ENV_UNSAFE_FOR_PREFLIGHT"
 
 MISSING_OPERATOR_APPROVAL = "MISSING_OPERATOR_APPROVAL"
+OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE = "OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE"
+
+PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED = "PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED"
+PRIMARY_BLOCKER_STRATEGY_QUALITY = "PRIMARY_BLOCKER_STRATEGY_QUALITY"
+SECONDARY_BLOCKERS_NOT_EVALUATED = "SECONDARY_BLOCKERS_NOT_EVALUATED"
+RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED = "RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED"
+FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED = "FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED"
+PREFLIGHT_NON_EXECUTABLE_ONLY = "PREFLIGHT_NON_EXECUTABLE_ONLY"
 
 DEFAULT_SYMBOL = "BTCUSDT"
 DEFAULT_MAX_MARGIN_USDT = 44.0
@@ -102,7 +112,7 @@ def build_live_arming_preflight(
     ]
     candidate = supported[0] if supported else None
     live_env = build_live_env_preflight(env=source)
-    risk_contract = build_risk_contract(candidate=candidate, env=source)
+    risk_contract = build_risk_contract(candidate=candidate, env=source, requested_candidate_id=candidate_id)
     funding = build_funding_preflight(env=source, live_env=live_env, risk_contract=risk_contract)
     approval = build_operator_approval_preflight(candidate=candidate)
     top_candidate = _top_candidate_preflight(
@@ -111,6 +121,15 @@ def build_live_arming_preflight(
         funding=funding,
         live_env=live_env,
         approval=approval,
+    )
+    preflight_blocker_hierarchy = _preflight_blocker_hierarchy(
+        candidate=candidate,
+        requested_candidate_id=candidate_id,
+        risk_contract=risk_contract,
+        funding=funding,
+        live_env=live_env,
+        approval=approval,
+        top_candidate=top_candidate,
     )
     blockers = list(
         dict.fromkeys(
@@ -161,6 +180,7 @@ def build_live_arming_preflight(
             "operator_approval_preflight": approval,
             "final_preflight_status": final_status,
             "blockers": blockers,
+            "preflight_blocker_hierarchy": preflight_blocker_hierarchy,
             "notes": [
                 NO_ORDER_NOTE,
                 "READY_FOR_OPERATOR_LIVE_ARMING_REVIEW is review readiness only, not approval to execute.",
@@ -171,13 +191,52 @@ def build_live_arming_preflight(
     )
 
 
-def build_risk_contract(*, candidate: Mapping[str, Any] | None, env: Mapping[str, str]) -> dict[str, Any]:
+def build_risk_contract(
+    *,
+    candidate: Mapping[str, Any] | None,
+    env: Mapping[str, str],
+    requested_candidate_id: str | None = None,
+) -> dict[str, Any]:
     candidate_id = str(candidate.get("candidate_id") or "") if candidate else ""
     config_payload = build_tiny_live_risk_contract_payload(candidate_id=candidate_id or "missing_candidate")
     config_contract = config_payload.get("risk_contract") if isinstance(config_payload.get("risk_contract"), dict) else {}
     config_validation = config_payload.get("validation") if isinstance(config_payload.get("validation"), dict) else {}
     if candidate is not None and config_validation.get("validation_status") == RISK_CONTRACT_VALID_FOR_PREFLIGHT:
         return _risk_contract_from_config(candidate=candidate, config_payload=config_payload)
+    if candidate is None:
+        continuity = _independent_continuity(requested_candidate_id=requested_candidate_id)
+        return _sanitize(
+            {
+                "risk_contract_status": RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE,
+                "risk_contract_source": "not_evaluated_no_supported_candidate_selected",
+                "risk_contract_loaded": False,
+                "risk_contract_validation": config_validation,
+                "independent_continuity": continuity,
+                "symbol": None,
+                "timeframe": None,
+                "direction": None,
+                "entry_mode": None,
+                "entry_price_source": None,
+                "stop_price": None,
+                "take_profit_price": None,
+                "stop_distance_pct": None,
+                "take_profit_distance_pct": None,
+                "risk_reward_ratio": None,
+                "max_position_notional_usdt": None,
+                "max_margin_usdt": None,
+                "max_loss_usdt": None,
+                "leverage": None,
+                "margin_mode": None,
+                "reduce_only_allowed": True,
+                "protective_stop_required": True,
+                "take_profit_required": True,
+                "order_type": "not_created",
+                "not_evaluated": True,
+                "not_evaluated_reason": "no_supported_miro_fish_candidate_selected",
+                "blockers": [],
+                **_safety_fields(),
+            }
+        )
     stop_price = _float_or_none(env.get("HAMMER_R84_STOP_PRICE"))
     take_profit_price = _float_or_none(env.get("HAMMER_R84_TAKE_PROFIT_PRICE"))
     stop_distance = _float_or_none(env.get("HAMMER_R84_STOP_DISTANCE_PCT"))
@@ -251,6 +310,30 @@ def build_funding_preflight(
     live_env: Mapping[str, Any],
     risk_contract: Mapping[str, Any],
 ) -> dict[str, Any]:
+    if risk_contract.get("risk_contract_status") == RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE:
+        continuity = (
+            risk_contract.get("independent_continuity")
+            if isinstance(risk_contract.get("independent_continuity"), dict)
+            else {}
+        )
+        return _sanitize(
+            {
+                "funding_status": FUNDING_NOT_EVALUATED_NO_CANDIDATE,
+                "funding_check_mode": FUNDING_CHECK_DEFERRED_NO_NETWORK,
+                "funding_config_present": None,
+                "funding_config_loaded": False,
+                "account_balance_checked": False,
+                "account_balance_source": "not_checked_no_network",
+                "effective_max_margin_usdt": None,
+                "effective_max_loss_usdt": None,
+                "network_allowed": False,
+                "independent_continuity": continuity,
+                "not_evaluated": True,
+                "not_evaluated_reason": "no_supported_miro_fish_candidate_selected",
+                "blockers": [],
+                **_safety_fields(),
+            }
+        )
     if risk_contract.get("funding_config_loaded") is True:
         present = risk_contract.get("funding_status") == FUNDING_CONFIG_PRESENT
         return _sanitize(
@@ -327,6 +410,7 @@ def build_live_env_preflight(*, env: Mapping[str, str]) -> dict[str, Any]:
 
 
 def build_operator_approval_preflight(*, candidate: Mapping[str, Any] | None) -> dict[str, Any]:
+    approval_status = MISSING_OPERATOR_APPROVAL if candidate is not None else OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE
     return _sanitize(
         {
             "operator_approval_required": True,
@@ -336,9 +420,11 @@ def build_operator_approval_preflight(*, candidate: Mapping[str, Any] | None) ->
             "approval_record_required": True,
             "ticket_required": True,
             "ticket_builder_status": "R85_NON_EXECUTABLE_TICKET_REQUIRED",
-            "approval_status": MISSING_OPERATOR_APPROVAL,
+            "approval_status": approval_status,
             "candidate_id": candidate.get("candidate_id") if candidate else None,
-            "blockers": ["missing_operator_approval"],
+            "not_evaluated": candidate is None,
+            "not_evaluated_reason": "no_supported_miro_fish_candidate_selected" if candidate is None else None,
+            "blockers": ["missing_operator_approval"] if candidate is not None else [],
             **_safety_fields(),
         }
     )
@@ -351,6 +437,11 @@ def format_live_arming_preflight_text(payload: Mapping[str, Any]) -> str:
     live_env = payload.get("live_env_preflight") if isinstance(payload.get("live_env_preflight"), dict) else {}
     approval = payload.get("operator_approval_preflight") if isinstance(payload.get("operator_approval_preflight"), dict) else {}
     blockers = payload.get("blockers") if isinstance(payload.get("blockers"), list) else []
+    hierarchy = (
+        payload.get("preflight_blocker_hierarchy")
+        if isinstance(payload.get("preflight_blocker_hierarchy"), dict)
+        else {}
+    )
     return "\n".join(
         [
             f"R84 Live Arming Preflight: {payload.get('status')}",
@@ -363,6 +454,8 @@ def format_live_arming_preflight_text(payload: Mapping[str, Any]) -> str:
             f"live_env_status: {live_env.get('live_env_status')} kill_switch={live_env.get('configured_global_kill_switch')}",
             f"operator_approval_status: {approval.get('approval_status')}",
             f"final_preflight_status: {payload.get('final_preflight_status')}",
+            f"primary_blockers: {', '.join(str(item) for item in hierarchy.get('primary_blockers') or []) or 'none'}",
+            f"secondary_blockers: {', '.join(str(item) for item in hierarchy.get('secondary_blockers') or []) or 'none'}",
             f"blockers: {', '.join(str(item) for item in blockers) if blockers else 'none'}",
             NO_ORDER_NOTE,
         ]
@@ -380,13 +473,19 @@ def _top_candidate_preflight(
     blockers = []
     if candidate is None:
         blockers.append("no_supported_miro_fish_candidate")
-    if risk_contract.get("risk_contract_status") not in {RISK_CONTRACT_COMPLETE, RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS}:
+    if risk_contract.get("risk_contract_status") == RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE:
+        blockers.append("risk_contract_not_evaluated_because_no_candidate_selected")
+    elif risk_contract.get("risk_contract_status") not in {RISK_CONTRACT_COMPLETE, RISK_CONTRACT_VALID_FOR_PREFLIGHT_STATUS}:
         blockers.append("risk_contract_incomplete")
-    if funding.get("funding_status") != FUNDING_CONFIG_PRESENT:
+    if funding.get("funding_status") == FUNDING_NOT_EVALUATED_NO_CANDIDATE:
+        blockers.append("funding_not_evaluated_because_no_candidate_selected")
+    elif funding.get("funding_status") != FUNDING_CONFIG_PRESENT:
         blockers.append("funding_config_not_ready")
     if live_env.get("live_env_status") != LIVE_ENV_LOCKED_SAFE_FOR_PREFLIGHT:
         blockers.append("live_env_locks_unsafe")
-    if approval.get("approval_status") == MISSING_OPERATOR_APPROVAL:
+    if approval.get("approval_status") == OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE:
+        blockers.append("operator_approval_not_evaluated_because_no_candidate_selected")
+    elif approval.get("approval_status") == MISSING_OPERATOR_APPROVAL:
         blockers.append("missing_operator_approval")
     return _sanitize(
         {
@@ -432,6 +531,85 @@ def _final_status(
             return BLOCKED_BY_KILL_SWITCH
         return BLOCKED_BY_LIVE_ENV_LOCKS
     return BLOCKED_BY_MISSING_OPERATOR_APPROVAL
+
+
+def _preflight_blocker_hierarchy(
+    *,
+    candidate: Mapping[str, Any] | None,
+    requested_candidate_id: str | None,
+    risk_contract: Mapping[str, Any],
+    funding: Mapping[str, Any],
+    live_env: Mapping[str, Any],
+    approval: Mapping[str, Any],
+    top_candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    if candidate is not None:
+        return _sanitize(
+            {
+                "hierarchy_status": PREFLIGHT_NON_EXECUTABLE_ONLY,
+                "primary_blockers": list(top_candidate.get("blockers") or []),
+                "secondary_blockers": [],
+                "cascading_blockers": [],
+                "not_evaluated": {
+                    "risk_contract": False,
+                    "funding_config": False,
+                    "operator_approval": False,
+                },
+                "independent_continuity": {},
+                "explanation": "R84 selected a supported candidate, so existing risk/funding/operator checks were evaluated normally.",
+            }
+        )
+
+    continuity = _independent_continuity(requested_candidate_id=requested_candidate_id)
+    secondary = [
+        "risk_contract_not_evaluated_because_no_candidate_selected",
+        "funding_not_evaluated_because_no_candidate_selected",
+    ]
+    if approval.get("approval_status") == OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE:
+        secondary.append("operator_approval_not_evaluated_because_no_candidate_selected")
+    cascading = ["risk_contract_incomplete", "funding_config_not_ready"]
+    if continuity.get("funding_continuity_status") != FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED:
+        cascading.append("funding_config_missing")
+    return _sanitize(
+        {
+            "hierarchy_status": PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED,
+            "primary_status": PRIMARY_BLOCKER_STRATEGY_QUALITY,
+            "secondary_status": SECONDARY_BLOCKERS_NOT_EVALUATED,
+            "primary_blockers": ["no_supported_miro_fish_candidate"],
+            "secondary_blockers": secondary,
+            "cascading_blockers": cascading,
+            "not_evaluated": {
+                "risk_contract": risk_contract.get("risk_contract_status") == RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE,
+                "funding_config": funding.get("funding_status") == FUNDING_NOT_EVALUATED_NO_CANDIDATE,
+                "operator_approval": approval.get("approval_status") == OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE,
+            },
+            "independent_continuity": continuity,
+            "explanation": (
+                "R84 did not select a supported candidate, so risk/funding checks are reported as not evaluated "
+                "rather than direct blockers."
+            ),
+            "execution_mode": PREFLIGHT_NON_EXECUTABLE_ONLY,
+            **_safety_fields(),
+        }
+    )
+
+
+def _independent_continuity(*, requested_candidate_id: str | None) -> dict[str, Any]:
+    if not requested_candidate_id:
+        return {}
+    payload = build_tiny_live_risk_contract_payload(candidate_id=requested_candidate_id)
+    validation = payload.get("validation") if isinstance(payload.get("validation"), dict) else {}
+    funding = payload.get("funding_config") if isinstance(payload.get("funding_config"), dict) else {}
+    risk_valid = validation.get("validation_status") == RISK_CONTRACT_VALID_FOR_PREFLIGHT
+    funding_present = funding.get("funding_status") == RISK_FUNDING_CONFIG_PRESENT
+    return {
+        "candidate_id": requested_candidate_id,
+        "risk_contract_continuity_status": RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED if risk_valid else validation.get("validation_status"),
+        "funding_continuity_status": FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED if funding_present else funding.get("funding_status"),
+        "risk_contract_valid_for_preflight": risk_valid,
+        "funding_config_present": funding_present,
+        "risk_contract_hash": payload.get("risk_contract_hash"),
+    }
 
 
 def _risk_contract_from_config(

@@ -47,6 +47,7 @@ FIELD_MAPPING_REPAIR_RECOMMENDED = "FIELD_MAPPING_REPAIR_RECOMMENDED"
 CURRENT_REVALIDATION_REQUIRED = "CURRENT_REVALIDATION_REQUIRED"
 OPERATOR_SEAT_REVIEW_REQUIRED = "OPERATOR_SEAT_REVIEW_REQUIRED"
 SOURCE_CHAIN_NON_EXECUTABLE_ONLY = "SOURCE_CHAIN_NON_EXECUTABLE_ONLY"
+PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED = "PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED"
 
 LEGITIMATE_MARKET_REGIME_DRIFT = "LEGITIMATE_MARKET_REGIME_DRIFT"
 MIRO_FISH_THRESHOLD_DOWNGRADE = "MIRO_FISH_THRESHOLD_DOWNGRADE"
@@ -340,6 +341,14 @@ def _preflight_selection_review(
     risk_continuity: Mapping[str, Any],
 ) -> dict[str, Any]:
     blockers = list(preflight.get("blockers") or [])
+    hierarchy = (
+        preflight.get("preflight_blocker_hierarchy")
+        if isinstance(preflight.get("preflight_blocker_hierarchy"), dict)
+        else {}
+    )
+    primary = list(hierarchy.get("primary_blockers") or [])
+    secondary = list(hierarchy.get("secondary_blockers") or [])
+    cascading_from_hierarchy = list(hierarchy.get("cascading_blockers") or [])
     top_candidate = preflight.get("top_candidate_preflight")
     top_candidate_missing = top_candidate in (None, {}, []) or (
         isinstance(top_candidate, dict) and top_candidate.get("candidate_id") in (None, "")
@@ -349,24 +358,41 @@ def _preflight_selection_review(
         and miro_review.get("candidate_present_currently")
         and miro_review.get("final_quality_status") != MIRO_FISH_SUPPORTS_CANDIDATE
     )
-    cascading = [
+    cascading = cascading_from_hierarchy or [
         blocker
         for blocker in blockers
         if any(token in str(blocker) for token in ("risk_contract", "funding", "max_loss", "margin"))
     ]
+    not_evaluated = hierarchy.get("not_evaluated") if isinstance(hierarchy.get("not_evaluated"), dict) else {}
     return {
         "final_preflight_status": preflight.get("final_preflight_status"),
         "top_candidate_preflight": top_candidate,
         "top_candidate_preflight_is_null": top_candidate_missing,
         "selection_status": "NO_SUPPORTED_MIRO_FISH_CANDIDATE_SELECTED" if no_supported else "PREFLIGHT_SELECTED_CANDIDATE",
-        "primary_root_blocker": "no_supported_miro_fish_candidate" if no_supported else None,
+        "primary_root_blocker": primary[0] if primary else "no_supported_miro_fish_candidate" if no_supported else None,
+        "primary_blockers": primary,
+        "secondary_blockers": secondary,
+        "preflight_blocker_hierarchy": hierarchy,
         "preflight_blockers": blockers,
         "blocked_by_strategy_quality": preflight.get("final_preflight_status") == "BLOCKED_BY_STRATEGY_QUALITY",
-        "risk_funding_missing_blockers_are_secondary": bool(no_supported and cascading and risk_continuity.get("risk_contract_valid")),
+        "risk_funding_missing_blockers_are_secondary": bool(
+            no_supported
+            and (
+                secondary
+                or cascading
+                or not_evaluated.get("risk_contract")
+                or not_evaluated.get("funding_config")
+            )
+            and risk_continuity.get("risk_contract_valid")
+        ),
         "cascading_risk_funding_blockers": cascading,
+        "not_evaluated": not_evaluated,
+        "independent_continuity": hierarchy.get("independent_continuity") or {},
         "risk_contract_continuity_should_be_reported_separately": bool(no_supported and risk_continuity.get("risk_contract_valid")),
         "future_repair_recommendation": (
-            "R93 improve R84 preflight blocker hierarchy: distinguish primary strategy-quality block from secondary risk/funding not evaluated"
+            "R84 preflight blocker hierarchy repaired; keep monitoring current candidate and Markov support"
+            if hierarchy.get("hierarchy_status") == PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED
+            else "R93 improve R84 preflight blocker hierarchy: distinguish primary strategy-quality block from secondary risk/funding not evaluated"
             if no_supported and cascading
             else None
         ),
@@ -451,7 +477,7 @@ def _r92_statuses(
         statuses.append(PREFLIGHT_SELECTION_BLOCKED_BY_STRATEGY_QUALITY)
     if risk_continuity.get("continuity_status") == RISK_CONTRACT_CONTINUITY_VALID:
         statuses.append(RISK_CONTRACT_CONTINUITY_VALID)
-    if preflight_review.get("risk_contract_continuity_should_be_reported_separately"):
+    if preflight_review.get("risk_contract_continuity_should_be_reported_separately") and not preflight_review.get("preflight_blocker_hierarchy"):
         statuses.append(FIELD_MAPPING_REPAIR_RECOMMENDED)
     statuses.extend([CURRENT_REVALIDATION_REQUIRED, OPERATOR_SEAT_REVIEW_REQUIRED, SOURCE_CHAIN_NON_EXECUTABLE_ONLY])
     return list(dict.fromkeys(statuses))
@@ -469,7 +495,7 @@ def _operator_architect_seat_review(
         architect_positions.append(ARCHITECT_SEAT_RECOMMENDS_WAIT_FOR_MARKOV_SUPPORT)
     if miro_review.get("final_quality_status") == MIRO_FISH_OPERATOR_REVIEW_ONLY:
         architect_positions.append(ARCHITECT_SEAT_RECOMMENDS_REVALIDATION)
-    if preflight_review.get("risk_contract_continuity_should_be_reported_separately"):
+    if preflight_review.get("risk_contract_continuity_should_be_reported_separately") and not preflight_review.get("preflight_blocker_hierarchy"):
         architect_positions.append(ARCHITECT_SEAT_RECOMMENDS_SOURCE_MAPPING_REPAIR)
     architect_positions.append(ARCHITECT_SEAT_RECOMMENDS_HUMAN_RECORDS_ONLY_AFTER_SOURCE_REPAIR)
     return {
@@ -504,6 +530,11 @@ def _recommendation(
     markov_review: Mapping[str, Any],
 ) -> tuple[str, str]:
     if preflight_review.get("risk_contract_continuity_should_be_reported_separately"):
+        if preflight_review.get("preflight_blocker_hierarchy"):
+            return (
+                "R94 Current Candidate Revalidation + Markov Support Watch",
+                "monitor current candidate under repaired R84 blocker hierarchy without forcing Miro Fish or Markov support",
+            )
         return (
             "R93 R84 Preflight Blocker Hierarchy Repair",
             "separate primary strategy-quality blocker from cascading risk/funding not evaluated because no candidate selected",
