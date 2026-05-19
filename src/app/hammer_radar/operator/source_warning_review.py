@@ -198,6 +198,8 @@ def format_source_warning_review_text(payload: Mapping[str, Any]) -> str:
             f"candidate_present_currently: {support.get('candidate_present_currently')}",
             f"current_final_quality_status: {support.get('final_quality_status')}",
             f"current_preflight_status: {preflight.get('final_preflight_status')}",
+            f"primary_root_blocker: {preflight.get('primary_root_blocker')}",
+            f"cascading_risk_funding_blockers: {preflight.get('cascading_risk_funding_blockers')}",
             f"rehydration_status: {rehydration.get('rehydration_status')}",
             f"hash_chain_consistent: {hash_chain.get('hash_chain_consistent')}",
             f"next_action_recommendation: {payload.get('next_action_recommendation')}",
@@ -247,12 +249,31 @@ def _missing_candidate_reason(quality: Mapping[str, Any]) -> str:
 
 def _current_preflight_diagnostic(preflight: Mapping[str, Any]) -> dict[str, Any]:
     blockers = list(preflight.get("blockers") or [])
+    hierarchy = (
+        preflight.get("preflight_blocker_hierarchy")
+        if isinstance(preflight.get("preflight_blocker_hierarchy"), dict)
+        else {}
+    )
+    primary = list(hierarchy.get("primary_blockers") or [])
+    secondary = list(hierarchy.get("secondary_blockers") or [])
+    cascading = list(hierarchy.get("cascading_blockers") or [])
     strategy_quality_only = preflight.get("final_preflight_status") == "BLOCKED_BY_STRATEGY_QUALITY"
     return {
         "phase": preflight.get("phase"),
         "final_preflight_status": preflight.get("final_preflight_status"),
         "blocked_by_strategy_quality": strategy_quality_only,
         "blockers": blockers,
+        "preflight_blocker_hierarchy": hierarchy,
+        "primary_root_blocker": primary[0] if primary else None,
+        "primary_blockers": primary,
+        "secondary_blockers": secondary,
+        "cascading_risk_funding_blockers": [
+            blocker
+            for blocker in cascading
+            if any(token in str(blocker) for token in ("risk_contract", "funding", "max_loss", "margin"))
+        ],
+        "not_evaluated": hierarchy.get("not_evaluated") or {},
+        "independent_continuity": hierarchy.get("independent_continuity") or {},
         "top_candidate_preflight": preflight.get("top_candidate_preflight"),
     }
 
@@ -380,7 +401,8 @@ def _blockers(
         blockers.append(str(classification).lower())
     if not current_support.get("candidate_present_currently"):
         blockers.append("r83_candidate_not_supported_in_current_source_chain")
-    blockers.extend(preflight_diagnostic.get("blockers") or [])
+    blockers.extend(preflight_diagnostic.get("primary_blockers") or preflight_diagnostic.get("blockers") or [])
+    blockers.extend(preflight_diagnostic.get("secondary_blockers") or [])
     blockers.extend((snapshot.get("blocker_summary") or {}).get("blockers") or [])
     if rehydration.get("rehydration_status") != REHYDRATION_NOT_NEEDED:
         blockers.append(str(rehydration.get("rehydration_status")).lower())

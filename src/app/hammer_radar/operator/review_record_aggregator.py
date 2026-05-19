@@ -167,6 +167,7 @@ def format_review_record_arming_snapshot_text(payload: Mapping[str, Any]) -> str
     review_summary = payload.get("review_record_summary") if isinstance(payload.get("review_record_summary"), dict) else {}
     boundary = payload.get("boundary_summary") if isinstance(payload.get("boundary_summary"), dict) else {}
     source = payload.get("source_chain_summary") if isinstance(payload.get("source_chain_summary"), dict) else {}
+    blockers = payload.get("blocker_summary") if isinstance(payload.get("blocker_summary"), dict) else {}
     actions = payload.get("next_required_actions") if isinstance(payload.get("next_required_actions"), list) else []
     return "\n".join(
         [
@@ -181,6 +182,8 @@ def format_review_record_arming_snapshot_text(payload: Mapping[str, Any]) -> str
             f"review_records_complete: {review_summary.get('review_records_complete')}",
             f"r87_boundary_status: {boundary.get('r87_boundary_status')}",
             f"source_chain_status: {source.get('source_chain_status')}",
+            f"primary_preflight_blockers: {blockers.get('primary_preflight_blockers') or []}",
+            f"cascading_preflight_blockers: {blockers.get('cascading_preflight_blockers') or []}",
             f"snapshot_written: {payload.get('snapshot_written')} report_path: {payload.get('report_path')}",
             "next_required_actions:",
             *[f"  {index}. {action}" for index, action in enumerate(actions, start=1)],
@@ -219,6 +222,12 @@ def _aggregation_inputs(*, candidate_id: str, log_dir: Path) -> dict[str, Any]:
 
 def _source_chain_summary(source: Mapping[str, Any]) -> dict[str, Any]:
     packet = source["r88_packet"]
+    preflight = source["r84_preflight"]
+    hierarchy = (
+        preflight.get("preflight_blocker_hierarchy")
+        if isinstance(preflight.get("preflight_blocker_hierarchy"), dict)
+        else {}
+    )
     warnings = packet.get("source_warnings") if isinstance(packet.get("source_warnings"), dict) else {}
     packet_status = str(packet.get("packet_status") or "")
     warning_blockers = list(packet.get("remaining_blockers") or [])
@@ -229,7 +238,13 @@ def _source_chain_summary(source: Mapping[str, Any]) -> dict[str, Any]:
         "source_chain_status": "SOURCE_CHAIN_WARNINGS_PRESENT" if source_warnings_present else "SOURCE_CHAIN_NO_WARNINGS",
         "source_warning_review_required": bool(source_warnings_present),
         "r83_final_quality_status": _first_supported_candidate(source["r83_quality"]).get("final_quality_status"),
-        "r84_final_preflight_status": source["r84_preflight"].get("final_preflight_status"),
+        "r84_final_preflight_status": preflight.get("final_preflight_status"),
+        "r84_preflight_blocker_hierarchy": hierarchy,
+        "r84_primary_preflight_blockers": hierarchy.get("primary_blockers") or [],
+        "r84_secondary_preflight_blockers": hierarchy.get("secondary_blockers") or [],
+        "r84_cascading_preflight_blockers": hierarchy.get("cascading_blockers") or [],
+        "r84_not_evaluated": hierarchy.get("not_evaluated") or {},
+        "r84_independent_continuity": hierarchy.get("independent_continuity") or {},
         "r88_packet_status": packet_status,
         "source_chain_warnings": warnings,
         "source_chain_blockers": warning_blockers,
@@ -363,9 +378,16 @@ def _blocker_summary(
     blockers.extend(f"missing_review_record:{item}" for item in review_summary.get("missing_record_types") or [])
     blockers.extend(boundary_summary.get("boundary_blockers") or [])
     blockers.extend(snapshot_status)
+    primary_preflight = list(source_summary.get("r84_primary_preflight_blockers") or [])
+    secondary_preflight = list(source_summary.get("r84_secondary_preflight_blockers") or [])
+    cascading_preflight = list(source_summary.get("r84_cascading_preflight_blockers") or [])
     return {
         "blockers": list(dict.fromkeys(str(item) for item in blockers if item)),
         "blocker_count": len(list(dict.fromkeys(str(item) for item in blockers if item))),
+        "primary_preflight_blockers": list(dict.fromkeys(str(item) for item in primary_preflight if item)),
+        "secondary_preflight_blockers": list(dict.fromkeys(str(item) for item in secondary_preflight if item)),
+        "cascading_preflight_blockers": list(dict.fromkeys(str(item) for item in cascading_preflight if item)),
+        "preflight_not_evaluated": source_summary.get("r84_not_evaluated") or {},
     }
 
 

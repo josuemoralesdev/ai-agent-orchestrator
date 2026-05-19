@@ -77,6 +77,12 @@ from src.app.hammer_radar.operator.miro_fish_quality_gate import (
 from src.app.hammer_radar.operator.live_arming_preflight import (
     BLOCKED_BY_MISSING_OPERATOR_APPROVAL,
     BLOCKED_BY_STRATEGY_QUALITY,
+    FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED,
+    FUNDING_NOT_EVALUATED_NO_CANDIDATE,
+    OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE,
+    PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED,
+    RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED,
+    RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE,
     build_live_arming_preflight,
 )
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
@@ -1448,6 +1454,8 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(BLOCKED_BY_MISSING_OPERATOR_APPROVAL, payload["final_preflight_status"])
         self.assertEqual("RISK_CONTRACT_VALID_FOR_PREFLIGHT", payload["risk_contract"]["risk_contract_status"])
         self.assertEqual("FUNDING_CONFIG_PRESENT", payload["funding_preflight"]["funding_status"])
+        self.assertFalse(payload["preflight_blocker_hierarchy"]["not_evaluated"]["risk_contract"])
+        self.assertFalse(payload["preflight_blocker_hierarchy"]["not_evaluated"]["funding_config"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["allow_live_orders"])
         self.assertTrue(payload["global_kill_switch"])
@@ -1469,6 +1477,54 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
 
         self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
         self.assertIsNone(payload["top_candidate_preflight"]["candidate_id"])
+        self.assertEqual(RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE, payload["risk_contract"]["risk_contract_status"])
+        self.assertEqual(FUNDING_NOT_EVALUATED_NO_CANDIDATE, payload["funding_preflight"]["funding_status"])
+        self.assertEqual(
+            OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE,
+            payload["operator_approval_preflight"]["approval_status"],
+        )
+
+    def test_r93_r84_no_supported_candidate_reports_blocker_hierarchy(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_live_arming_preflight(
+            log_dir=self.log_dir,
+            candidate_id="normal|BTCUSDT|13m|long|ladder_close_50_618",
+        )
+        hierarchy = payload["preflight_blocker_hierarchy"]
+
+        self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
+        self.assertIsNone(payload["top_candidate_preflight"]["candidate_id"])
+        self.assertEqual(PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED, hierarchy["hierarchy_status"])
+        self.assertEqual(["no_supported_miro_fish_candidate"], hierarchy["primary_blockers"])
+        self.assertIn("risk_contract_not_evaluated_because_no_candidate_selected", hierarchy["secondary_blockers"])
+        self.assertIn("funding_not_evaluated_because_no_candidate_selected", hierarchy["secondary_blockers"])
+        self.assertIn("operator_approval_not_evaluated_because_no_candidate_selected", hierarchy["secondary_blockers"])
+        self.assertIn("risk_contract_incomplete", hierarchy["cascading_blockers"])
+        self.assertIn("funding_config_not_ready", hierarchy["cascading_blockers"])
+        self.assertTrue(hierarchy["not_evaluated"]["risk_contract"])
+        self.assertTrue(hierarchy["not_evaluated"]["funding_config"])
+        self.assertTrue(hierarchy["not_evaluated"]["operator_approval"])
+        self.assertEqual(RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE, payload["risk_contract"]["risk_contract_status"])
+        self.assertEqual(FUNDING_NOT_EVALUATED_NO_CANDIDATE, payload["funding_preflight"]["funding_status"])
+        self.assertEqual(
+            OPERATOR_APPROVAL_NOT_EVALUATED_NO_CANDIDATE,
+            payload["operator_approval_preflight"]["approval_status"],
+        )
+        self.assertEqual(
+            RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED,
+            hierarchy["independent_continuity"]["risk_contract_continuity_status"],
+        )
+        self.assertEqual(
+            FUNDING_CONTINUITY_VALID_BUT_NOT_SELECTED,
+            hierarchy["independent_continuity"]["funding_continuity_status"],
+        )
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
 
     def test_r84_1_default_config_removes_missing_risk_contract_blocker(self) -> None:
         self._seed_supported_13m_long()
@@ -1530,7 +1586,8 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         )
 
         self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["final_preflight_status"])
-        self.assertIn("no_miro_fish_supported_candidate", payload["risk_contract"]["blockers"])
+        self.assertEqual(RISK_CONTRACT_NOT_EVALUATED_NO_CANDIDATE, payload["risk_contract"]["risk_contract_status"])
+        self.assertIn("no_supported_miro_fish_candidate", payload["preflight_blocker_hierarchy"]["primary_blockers"])
 
     def test_r84_api_endpoint_is_read_only_and_safe(self) -> None:
         self._seed_supported_13m_long()
@@ -2527,6 +2584,22 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn(ARMING_SNAPSHOT_BLOCKED_BY_SOURCE_WARNINGS, payload["snapshot_status"])
         self.assertEqual(SOURCE_CHAIN_NEEDS_REVIEW, payload["readiness_class"])
 
+    def test_r93_r90_surfaces_preflight_blocker_hierarchy(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_review_record_arming_snapshot(dry_run=True, write=False, log_dir=self.log_dir)
+
+        hierarchy = payload["source_chain_summary"]["r84_preflight_blocker_hierarchy"]
+        self.assertEqual(PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED, hierarchy["hierarchy_status"])
+        self.assertEqual(["no_supported_miro_fish_candidate"], payload["blocker_summary"]["primary_preflight_blockers"])
+        self.assertIn(
+            "risk_contract_not_evaluated_because_no_candidate_selected",
+            payload["blocker_summary"]["secondary_preflight_blockers"],
+        )
+        self.assertIn("risk_contract_incomplete", payload["blocker_summary"]["cascading_preflight_blockers"])
+        self.assertTrue(payload["blocker_summary"]["preflight_not_evaluated"]["risk_contract"])
+        self.assertFalse(payload["order_payload_created"])
+
     def test_r90_api_endpoints_are_safe(self) -> None:
         self._seed_supported_13m_long()
 
@@ -2640,6 +2713,21 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("current_risk_contract_hash", payload["hash_chain_continuity"])
         self.assertIn("final_preflight_status", payload["current_preflight_diagnostic"])
 
+    def test_r93_r91_consumes_preflight_blocker_hierarchy(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_warning_review(dry_run=True, write=False, log_dir=self.log_dir)
+        preflight = payload["current_preflight_diagnostic"]
+
+        self.assertEqual("no_supported_miro_fish_candidate", preflight["primary_root_blocker"])
+        self.assertIn("risk_contract_incomplete", preflight["cascading_risk_funding_blockers"])
+        self.assertTrue(preflight["not_evaluated"]["risk_contract"])
+        self.assertEqual(
+            RISK_CONTRACT_CONTINUITY_VALID_BUT_NOT_SELECTED,
+            preflight["independent_continuity"]["risk_contract_continuity_status"],
+        )
+        self.assertFalse(payload["order_payload_created"])
+
     def test_r91_write_true_writes_local_json_report_only(self) -> None:
         self._seed_supported_13m_long()
         before_env = dict(os.environ)
@@ -2733,6 +2821,8 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertTrue(preflight["top_candidate_preflight_is_null"])
         self.assertEqual("NO_SUPPORTED_MIRO_FISH_CANDIDATE_SELECTED", preflight["selection_status"])
         self.assertEqual("no_supported_miro_fish_candidate", preflight["primary_root_blocker"])
+        self.assertIn("risk_contract_not_evaluated_because_no_candidate_selected", preflight["secondary_blockers"])
+        self.assertTrue(preflight["not_evaluated"]["risk_contract"])
         self.assertTrue(preflight["risk_funding_missing_blockers_are_secondary"])
         self.assertTrue(preflight["risk_contract_continuity_should_be_reported_separately"])
 
@@ -2759,7 +2849,20 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertFalse(seat["can_bypass_r87"])
         self.assertIn(OPERATOR_SEAT_NO_OVERRIDE_POWER, seat["seat_statuses"])
         self.assertIn(ARCHITECT_SEAT_RECOMMENDS_NO_LIVE_ACTION, seat["architect_position"])
-        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_SOURCE_MAPPING_REPAIR, seat["architect_position"])
+        self.assertNotIn(ARCHITECT_SEAT_RECOMMENDS_SOURCE_MAPPING_REPAIR, seat["architect_position"])
+
+    def test_r93_r92_uses_repaired_hierarchy_for_next_phase(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_source_chain_repair(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R94 Current Candidate Revalidation + Markov Support Watch", payload["recommended_next_phase"])
+        self.assertEqual(
+            PREFLIGHT_BLOCKER_HIERARCHY_REPAIRED,
+            payload["preflight_selection_review"]["preflight_blocker_hierarchy"]["hierarchy_status"],
+        )
+        self.assertIn("r84_risk_funding_blockers_are_cascading_from_no_supported_candidate", payload["blockers"])
+        self.assertFalse(payload["order_payload_created"])
 
     def test_r92_write_true_writes_local_json_report_only(self) -> None:
         self._seed_operator_review_13m_long_low_volatility()
