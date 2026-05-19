@@ -173,6 +173,19 @@ from src.app.hammer_radar.operator.source_chain_repair import (
     build_source_chain_repair,
     source_chain_repair_path,
 )
+from src.app.hammer_radar.operator.candidate_revalidation_watch import (
+    ARCHITECT_SEAT_RECOMMENDS_CURRENT_REVALIDATION_WATCH,
+    ARCHITECT_SEAT_RECOMMENDS_WAIT_FOR_MARKOV_SUPPORT,
+    CANDIDATE_MIRO_FISH_OPERATOR_REVIEW_ONLY,
+    CANDIDATE_MIRO_FISH_SUPPORT_RESTORED,
+    CURRENT_SUPPORT_RESTORED_FOR_REVIEW,
+    MARKOV_SUPPORT_PENDING,
+    MARKOV_SUPPORT_RESTORED,
+    STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING,
+    STRATEGY_INPUTS_ACCEPTABLE_FOR_REVIEW,
+    build_candidate_revalidation_watch,
+    candidate_revalidation_watch_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -2918,6 +2931,160 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R92 Source Chain Repair status: OK", result.stdout)
         self.assertIn("hash_chain_consistent: True", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r94_payload_is_safe_and_current_watch_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R94", payload["phase"])
+        self.assertEqual("CURRENT_CANDIDATE_REVALIDATION_MARKOV_SUPPORT_WATCH_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(candidate_revalidation_watch_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["support_restored"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r94_current_operator_review_only_markov_pending_path(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertTrue(payload["candidate_identity"]["candidate_present_currently"])
+        self.assertEqual("normal|BTCUSDT|13m|long|ladder_close_50_618", payload["candidate_identity"]["candidate_id"])
+        self.assertEqual(MIRO_FISH_OPERATOR_REVIEW_ONLY, payload["miro_fish_watch"]["current_miro_fish_status"])
+        self.assertEqual(92, payload["miro_fish_watch"]["current_miro_fish_score"])
+        self.assertFalse(payload["miro_fish_watch"]["support_restored"])
+        self.assertIn("regime_not_supportive", payload["miro_fish_watch"]["downgrade_reasons"])
+        self.assertIn("risk_fields_unavailable", payload["miro_fish_watch"]["downgrade_reasons"])
+        self.assertEqual(LOW_VOLATILITY, payload["markov_support_watch"]["current_markov_regime"])
+        self.assertEqual(REGIME_NEUTRAL_OR_INSUFFICIENT_DATA, payload["markov_support_watch"]["current_markov_gate_status"])
+        self.assertFalse(payload["markov_support_watch"]["markov_support_restored"])
+        self.assertEqual(STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING, payload["revalidation_class"])
+        self.assertIn(CANDIDATE_MIRO_FISH_OPERATOR_REVIEW_ONLY, payload["r94_statuses"])
+        self.assertIn(MARKOV_SUPPORT_PENDING, payload["r94_statuses"])
+        self.assertIn(STRATEGY_INPUTS_ACCEPTABLE_FOR_REVIEW, payload["r94_statuses"])
+
+    def test_r94_support_restored_fixture_remains_review_only(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertTrue(payload["support_restored"])
+        self.assertEqual(CURRENT_SUPPORT_RESTORED_FOR_REVIEW, payload["revalidation_class"])
+        self.assertEqual(MIRO_FISH_SUPPORTS_CANDIDATE, payload["miro_fish_watch"]["current_miro_fish_status"])
+        self.assertTrue(payload["miro_fish_watch"]["support_restored"])
+        self.assertEqual(REGIME_SUPPORTS_CANDIDATE, payload["markov_support_watch"]["current_markov_gate_status"])
+        self.assertTrue(payload["markov_support_watch"]["markov_support_restored"])
+        self.assertIn(CANDIDATE_MIRO_FISH_SUPPORT_RESTORED, payload["r94_statuses"])
+        self.assertIn(MARKOV_SUPPORT_RESTORED, payload["r94_statuses"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["operator_architect_seat_review"]["execution_permission"])
+
+    def test_r94_strategy_missing_path_blocks_revalidation(self) -> None:
+        payload = build_candidate_revalidation_watch(
+            candidate_id="normal|BTCUSDT|99m|long|ladder_close_50_618",
+            dry_run=True,
+            write=False,
+            log_dir=self.log_dir,
+        )
+
+        self.assertFalse(payload["candidate_identity"]["candidate_present_currently"])
+        self.assertFalse(payload["strategy_input_watch"]["strategy_inputs_present"])
+        self.assertFalse(payload["strategy_input_watch"]["strategy_inputs_acceptable_for_review"])
+        self.assertIn("candidate_not_present_currently", payload["blockers"])
+        self.assertIn("strategy_performance_candidate_missing", payload["blockers"])
+        self.assertFalse(payload["support_restored"])
+
+    def test_r94_consumes_r84_hierarchy_and_continuity(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(BLOCKED_BY_STRATEGY_QUALITY, payload["preflight_hierarchy_watch"]["final_preflight_status"])
+        self.assertEqual(["no_supported_miro_fish_candidate"], payload["preflight_hierarchy_watch"]["primary_blockers"])
+        self.assertTrue(payload["preflight_hierarchy_watch"]["not_evaluated"]["risk_contract"])
+        self.assertTrue(payload["preflight_hierarchy_watch"]["hierarchy_repaired"])
+        self.assertTrue(payload["risk_hash_continuity"]["risk_contract_continuity_valid"])
+        self.assertTrue(payload["risk_hash_continuity"]["hash_chain_consistent"])
+
+    def test_r94_review_records_and_boundary_keep_live_blocked(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=self.log_dir)
+        review = payload["review_record_and_boundary_status"]
+        seat = payload["operator_architect_seat_review"]
+
+        self.assertFalse(review["r89_review_records_complete"])
+        self.assertEqual("LIVE_ENV_ARMING_NOT_ALLOWED_YET", review["r87_boundary_status"])
+        self.assertFalse(review["live_env_arming_allowed"])
+        self.assertFalse(seat["override_power"])
+        self.assertFalse(seat["execution_permission"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_WAIT_FOR_MARKOV_SUPPORT, seat["operator_architect_position"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_CURRENT_REVALIDATION_WATCH, seat["operator_architect_position"])
+
+    def test_r94_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        before_env = dict(os.environ)
+
+        payload = build_candidate_revalidation_watch(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = candidate_revalidation_watch_path(self.log_dir)
+        self.assertTrue(path.exists())
+        with path.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+        self.assertEqual("R94", report["phase"])
+        self.assertFalse(report["executable"])
+        self.assertFalse(report["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r94_api_endpoints_are_safe(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        response = self.client.get("/live-arming/candidate-revalidation-watch")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R94", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/candidate-revalidation-watch/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r94_cli_command_exists(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "candidate-revalidation-watch",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R94 Candidate Revalidation Watch status: OK", result.stdout)
+        self.assertIn("revalidation_class:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod

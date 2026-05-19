@@ -28,6 +28,7 @@ from src.app.hammer_radar.operator.human_confirmation_records import build_human
 from src.app.hammer_radar.operator.review_record_aggregator import build_review_record_arming_snapshot
 from src.app.hammer_radar.operator.source_warning_review import build_source_warning_review
 from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
+from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -68,6 +69,7 @@ TASK_HUMAN_CONFIRMATION_RECORDS = "human_confirmation_records"
 TASK_REVIEW_RECORD_AGGREGATOR = "review_record_aggregator"
 TASK_SOURCE_WARNING_REVIEW = "source_warning_review"
 TASK_SOURCE_CHAIN_REPAIR = "source_chain_repair"
+TASK_CANDIDATE_REVALIDATION_WATCH = "candidate_revalidation_watch"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -95,6 +97,7 @@ AVAILABLE_TASKS = (
     TASK_REVIEW_RECORD_AGGREGATOR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_SOURCE_CHAIN_REPAIR,
+    TASK_CANDIDATE_REVALIDATION_WATCH,
 )
 
 
@@ -494,6 +497,20 @@ def run_refresh_task(
                 "candidate_id": result.get("candidate_id"),
                 "repair_classification": result.get("repair_classification"),
                 "recommended_next_phase": result.get("recommended_next_phase"),
+                "report_written": result.get("report_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_CANDIDATE_REVALIDATION_WATCH:
+        result = build_candidate_revalidation_watch(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "candidate_id": result.get("candidate_id"),
+                "revalidation_class": result.get("revalidation_class"),
+                "support_restored": result.get("support_restored"),
+                "next_action_recommendation": result.get("next_action_recommendation"),
                 "report_written": result.get("report_written"),
                 "execution_mode": result.get("execution_mode"),
             },
