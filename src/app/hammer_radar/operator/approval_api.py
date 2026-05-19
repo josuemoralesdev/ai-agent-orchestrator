@@ -252,6 +252,7 @@ from src.app.hammer_radar.operator.review_record_aggregator import build_review_
 from src.app.hammer_radar.operator.source_warning_review import build_source_warning_review
 from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
 from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
+from src.app.hammer_radar.operator.dual_lane_candidate_watch import build_dual_lane_candidate_watch
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -446,6 +447,12 @@ class SourceChainRepairReportRequest(BaseModel):
 
 
 class CandidateRevalidationWatchReportRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    candidate_id: str | None = None
+
+
+class DualLaneCandidateWatchReportRequest(BaseModel):
     dry_run: bool = True
     write: bool = False
     candidate_id: str | None = None
@@ -1909,6 +1916,31 @@ def live_arming_candidate_revalidation_watch_report(
 ) -> dict:
     request = request or CandidateRevalidationWatchReportRequest()
     return build_candidate_revalidation_watch(
+        candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/dual-lane-candidate-watch")
+def live_arming_dual_lane_candidate_watch(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_dual_lane_candidate_watch(
+        candidate_id=candidate_id,
+        dry_run=True,
+        write=False,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/dual-lane-candidate-watch/report")
+def live_arming_dual_lane_candidate_watch_report(
+    request: DualLaneCandidateWatchReportRequest | None = None,
+) -> dict:
+    request = request or DualLaneCandidateWatchReportRequest()
+    return build_dual_lane_candidate_watch(
         candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
         dry_run=request.dry_run,
         write=request.write,

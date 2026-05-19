@@ -29,6 +29,7 @@ from src.app.hammer_radar.operator.review_record_aggregator import build_review_
 from src.app.hammer_radar.operator.source_warning_review import build_source_warning_review
 from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
 from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
+from src.app.hammer_radar.operator.dual_lane_candidate_watch import build_dual_lane_candidate_watch
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -70,6 +71,7 @@ TASK_REVIEW_RECORD_AGGREGATOR = "review_record_aggregator"
 TASK_SOURCE_WARNING_REVIEW = "source_warning_review"
 TASK_SOURCE_CHAIN_REPAIR = "source_chain_repair"
 TASK_CANDIDATE_REVALIDATION_WATCH = "candidate_revalidation_watch"
+TASK_DUAL_LANE_CANDIDATE_WATCH = "dual_lane_candidate_watch"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -98,6 +100,7 @@ AVAILABLE_TASKS = (
     TASK_SOURCE_WARNING_REVIEW,
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_CANDIDATE_REVALIDATION_WATCH,
+    TASK_DUAL_LANE_CANDIDATE_WATCH,
 )
 
 
@@ -510,6 +513,19 @@ def run_refresh_task(
                 "candidate_id": result.get("candidate_id"),
                 "revalidation_class": result.get("revalidation_class"),
                 "support_restored": result.get("support_restored"),
+                "next_action_recommendation": result.get("next_action_recommendation"),
+                "report_written": result.get("report_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_DUAL_LANE_CANDIDATE_WATCH:
+        result = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "normal_candidate_id": result.get("normal_candidate_id"),
+                "overall_lane_class": result.get("overall_lane_class"),
                 "next_action_recommendation": result.get("next_action_recommendation"),
                 "report_written": result.get("report_written"),
                 "execution_mode": result.get("execution_mode"),

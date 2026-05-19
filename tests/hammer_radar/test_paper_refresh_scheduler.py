@@ -22,6 +22,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_MIRO_FISH_QUALITY_GATE,
     TASK_REVIEW_RECORD_AGGREGATOR,
     TASK_CANDIDATE_REVALIDATION_WATCH,
+    TASK_DUAL_LANE_CANDIDATE_WATCH,
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
@@ -91,6 +92,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_SOURCE_CHAIN_REPAIR, DEFAULT_TASKS)
         self.assertIn(TASK_CANDIDATE_REVALIDATION_WATCH, AVAILABLE_TASKS)
         self.assertNotIn(TASK_CANDIDATE_REVALIDATION_WATCH, DEFAULT_TASKS)
+        self.assertIn(TASK_DUAL_LANE_CANDIDATE_WATCH, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_DUAL_LANE_CANDIDATE_WATCH, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -521,6 +524,33 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_CANDIDATE_REVALIDATION_WATCH]["detail"]
         self.assertEqual("STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING", detail["revalidation_class"])
         self.assertFalse(detail["support_restored"])
+        self.assertFalse(detail["report_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_dual_lane_candidate_watch_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_dual_lane_candidate_watch",
+            return_value={
+                "normal_candidate_id": "normal|BTCUSDT|13m|long|ladder_close_50_618",
+                "overall_lane_class": "BETRAYAL_LANE_NEEDS_TRUE_PAPER",
+                "next_action_recommendation": "R96 Betrayal True Paper Tracking Scaffold",
+                "report_written": False,
+                "execution_mode": "DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_DUAL_LANE_CANDIDATE_WATCH],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_DUAL_LANE_CANDIDATE_WATCH], record["completed_tasks"])
+        detail = record["task_results"][TASK_DUAL_LANE_CANDIDATE_WATCH]["detail"]
+        self.assertEqual("BETRAYAL_LANE_NEEDS_TRUE_PAPER", detail["overall_lane_class"])
         self.assertFalse(detail["report_written"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
