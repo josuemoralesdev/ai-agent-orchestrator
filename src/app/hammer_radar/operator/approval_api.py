@@ -253,6 +253,7 @@ from src.app.hammer_radar.operator.source_warning_review import build_source_war
 from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
 from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
 from src.app.hammer_radar.operator.dual_lane_candidate_watch import build_dual_lane_candidate_watch
+from src.app.hammer_radar.operator.betrayal_true_paper_tracking import build_betrayal_true_paper_scaffold
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -456,6 +457,13 @@ class DualLaneCandidateWatchReportRequest(BaseModel):
     dry_run: bool = True
     write: bool = False
     candidate_id: str | None = None
+
+
+class BetrayalTruePaperScaffoldReportRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    symbol: str | None = None
+    max_candidates: int | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -1942,6 +1950,34 @@ def live_arming_dual_lane_candidate_watch_report(
     request = request or DualLaneCandidateWatchReportRequest()
     return build_dual_lane_candidate_watch(
         candidate_id=request.candidate_id or "normal|BTCUSDT|13m|long|ladder_close_50_618",
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-true-paper-scaffold")
+def live_arming_betrayal_true_paper_scaffold(
+    symbol: str = "BTCUSDT",
+    max_candidates: int = Query(default=20, ge=0),
+) -> dict:
+    return build_betrayal_true_paper_scaffold(
+        symbol=symbol,
+        max_candidates=max_candidates,
+        dry_run=True,
+        write=False,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/betrayal-true-paper-scaffold/report")
+def live_arming_betrayal_true_paper_scaffold_report(
+    request: BetrayalTruePaperScaffoldReportRequest | None = None,
+) -> dict:
+    request = request or BetrayalTruePaperScaffoldReportRequest()
+    return build_betrayal_true_paper_scaffold(
+        symbol=request.symbol or "BTCUSDT",
+        max_candidates=request.max_candidates if request.max_candidates is not None else 20,
         dry_run=request.dry_run,
         write=request.write,
         log_dir=get_log_dir(use_env=True),

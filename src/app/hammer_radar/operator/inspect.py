@@ -911,6 +911,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-true-paper-scaffold":
+        from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
+            build_betrayal_true_paper_scaffold,
+            format_betrayal_true_paper_scaffold_text,
+        )
+
+        print(
+            format_betrayal_true_paper_scaffold_text(
+                build_betrayal_true_paper_scaffold(
+                    symbol=args.symbol,
+                    max_candidates=args.max_candidates,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1349,6 +1366,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     dual_lane_candidate_watch_parser.add_argument("--write", action="store_true")
+
+    betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
+    betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
+    betrayal_true_paper_scaffold_parser.add_argument("--max-candidates", type=int, default=20)
+    betrayal_true_paper_scaffold_parser.add_argument("--write", action="store_true")
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

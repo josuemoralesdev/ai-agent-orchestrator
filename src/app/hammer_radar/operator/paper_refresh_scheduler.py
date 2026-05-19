@@ -30,6 +30,7 @@ from src.app.hammer_radar.operator.source_warning_review import build_source_war
 from src.app.hammer_radar.operator.source_chain_repair import build_source_chain_repair
 from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
 from src.app.hammer_radar.operator.dual_lane_candidate_watch import build_dual_lane_candidate_watch
+from src.app.hammer_radar.operator.betrayal_true_paper_tracking import build_betrayal_true_paper_scaffold
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -72,6 +73,7 @@ TASK_SOURCE_WARNING_REVIEW = "source_warning_review"
 TASK_SOURCE_CHAIN_REPAIR = "source_chain_repair"
 TASK_CANDIDATE_REVALIDATION_WATCH = "candidate_revalidation_watch"
 TASK_DUAL_LANE_CANDIDATE_WATCH = "dual_lane_candidate_watch"
+TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD = "betrayal_true_paper_scaffold"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -101,6 +103,7 @@ AVAILABLE_TASKS = (
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_CANDIDATE_REVALIDATION_WATCH,
     TASK_DUAL_LANE_CANDIDATE_WATCH,
+    TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD,
 )
 
 
@@ -528,6 +531,19 @@ def run_refresh_task(
                 "overall_lane_class": result.get("overall_lane_class"),
                 "next_action_recommendation": result.get("next_action_recommendation"),
                 "report_written": result.get("report_written"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD:
+        result = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=log_dir)
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "scaffold_candidate_count": (result.get("scaffold_summary") or {}).get("scaffold_candidate_count"),
+                "next_action_recommendation": result.get("next_action_recommendation"),
+                "report_written": result.get("report_written"),
+                "outcome_ledger_path": result.get("outcome_ledger_path"),
                 "execution_mode": result.get("execution_mode"),
             },
         )

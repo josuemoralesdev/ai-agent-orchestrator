@@ -197,6 +197,14 @@ from src.app.hammer_radar.operator.dual_lane_candidate_watch import (
     build_dual_lane_candidate_watch,
     dual_lane_candidate_watch_path,
 )
+from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
+    NAIVE_INVERSE_AUDIT_EVIDENCE_ONLY as R96_NAIVE_INVERSE_AUDIT_EVIDENCE_ONLY,
+    PAPER_IDENTITY_CREATED,
+    PAPER_TRACKING_READY,
+    build_betrayal_true_paper_scaffold,
+    betrayal_true_paper_outcomes_path,
+    betrayal_true_paper_scaffold_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3252,6 +3260,130 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R95 Dual Lane Candidate Watch status: OK", result.stdout)
         self.assertIn("overall_lane_class:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r96_payload_is_safe_and_scaffold_only(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R96", payload["phase"])
+        self.assertEqual("BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(betrayal_true_paper_scaffold_path(self.log_dir).exists())
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r96_direction_entry_mode_identity_and_hash_are_stable(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        first = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+        second = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+        candidate = first["top_scaffold_candidates"][0]
+
+        self.assertEqual("betrayal|BTCUSDT|4m|long_to_short|fib_650|direction_entry_mode", candidate["betrayal_paper_signal_id"])
+        self.assertEqual(candidate["betrayal_paper_signal_hash"], second["top_scaffold_candidates"][0]["betrayal_paper_signal_hash"])
+        self.assertEqual(PAPER_TRACKING_READY, candidate["maturity_status"])
+        self.assertEqual(R96_NAIVE_INVERSE_AUDIT_EVIDENCE_ONLY, candidate["evidence_label"])
+        self.assertTrue(candidate["true_paper_required"])
+        self.assertFalse(candidate["live_ready"])
+
+    def test_r96_timeframe_aggregate_identity_requires_decomposition(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+        aggregate = payload["aggregate_candidates_needing_decomposition"][0]
+
+        self.assertEqual("betrayal|BTCUSDT|222m|aggregate|timeframe_aggregate", aggregate["betrayal_paper_signal_id"])
+        self.assertEqual(PAPER_IDENTITY_CREATED, aggregate["maturity_status"])
+        self.assertTrue(aggregate["aggregate_requires_directional_decomposition"])
+        self.assertIn("decompose aggregate candidate", aggregate["required_next_steps"][0])
+
+    def test_r96_outcome_schema_declared_without_fake_outcomes(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_618", wins=46, losses=168, total_pnl=-1.701)
+
+        payload = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(0, payload["scaffold_summary"]["true_paper_outcomes_count"])
+        self.assertFalse(payload["outcome_ledger"]["outcome_ledger_exists"])
+        self.assertFalse(payload["outcome_ledger"]["fake_outcomes_created"])
+        schema = payload["outcome_ledger"]["outcome_schema"]
+        self.assertIn("paper_entry_price", schema)
+        self.assertIn("paper_result_win_loss", schema)
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+
+    def test_r96_minimum_requirements_and_next_phase_are_declared(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        payload = build_betrayal_true_paper_scaffold(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(30, payload["minimum_sample_requirements"]["primary_min_true_paper_samples"])
+        self.assertEqual(30, payload["minimum_sample_requirements"]["watchlist_min_true_paper_samples"])
+        self.assertTrue(payload["minimum_sample_requirements"]["stop_take_profit_required_before_promotion"])
+        self.assertEqual("R97 Betrayal Paper Outcome Ledger + First Tracking Loop", payload["next_action_recommendation"])
+
+    def test_r96_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        before_env = dict(os.environ)
+
+        payload = build_betrayal_true_paper_scaffold(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = betrayal_true_paper_scaffold_path(self.log_dir)
+        self.assertTrue(path.exists())
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+        with path.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+        self.assertEqual("R96", report["phase"])
+        self.assertFalse(report["executable"])
+        self.assertFalse(report["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r96_api_endpoints_are_safe(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        response = self.client.get("/live-arming/betrayal-true-paper-scaffold")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R96", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/betrayal-true-paper-scaffold/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r96_cli_command_exists(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-true-paper-scaffold",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R96 Betrayal True Paper Scaffold status: OK", result.stdout)
+        self.assertIn("top_betrayal_paper_identities:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod
