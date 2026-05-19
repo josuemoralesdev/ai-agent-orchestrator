@@ -186,6 +186,17 @@ from src.app.hammer_radar.operator.candidate_revalidation_watch import (
     build_candidate_revalidation_watch,
     candidate_revalidation_watch_path,
 )
+from src.app.hammer_radar.operator.dual_lane_candidate_watch import (
+    ARCHITECT_SEAT_RECOMMENDS_BETRAYAL_MATURATION_LANE,
+    BETRAYAL_LANE_NEEDS_TRUE_PAPER,
+    BETRAYAL_PAPER_TRACKING_REQUIRED,
+    DUAL_LANE_WAITING,
+    NAIVE_INVERSE_AUDIT_EVIDENCE_ONLY,
+    NORMAL_LANE_LEADS,
+    NORMAL_STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING,
+    build_dual_lane_candidate_watch,
+    dual_lane_candidate_watch_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3085,6 +3096,162 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=result.stderr)
         self.assertIn("R94 Candidate Revalidation Watch status: OK", result.stdout)
         self.assertIn("revalidation_class:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
+    def test_r95_payload_is_safe_and_dual_lane_watch_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual("R95", payload["phase"])
+        self.assertEqual("DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertFalse(payload["report_written"])
+        self.assertFalse(dual_lane_candidate_watch_path(self.log_dir).exists())
+        self.assertFalse(payload["executable"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r95_normal_lane_consumes_r94_pending_state(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+        normal = payload["normal_lane"]
+
+        self.assertEqual("NORMAL_SUPPORT_PENDING", normal["normal_lane_status"])
+        self.assertEqual(NORMAL_STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING, normal["normal_lane_class"])
+        self.assertEqual(STRATEGY_INPUTS_ACCEPTABLE_BUT_REGIME_PENDING, normal["revalidation_class"])
+        self.assertEqual(MIRO_FISH_OPERATOR_REVIEW_ONLY, normal["current_miro_fish_status"])
+        self.assertFalse(normal["support_restored"])
+        self.assertFalse(normal["live_ready"])
+
+    def test_r95_normal_lane_support_restored_fixture_is_review_only(self) -> None:
+        self._seed_supported_13m_long()
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(NORMAL_LANE_LEADS, payload["overall_lane_class"])
+        self.assertTrue(payload["normal_lane"]["support_restored"])
+        self.assertEqual("NORMAL_SUPPORT_RESTORED_FOR_REVIEW_ONLY", payload["normal_lane"]["normal_lane_class"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_payload_created"])
+
+    def test_r95_betrayal_lane_ranks_primary_and_watchlist_audit_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._seed_group("watch-88m", "88m", "long", "ladder_close_50_618", wins=33, losses=57, total_pnl=-1.5995)
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+        betrayal = payload["betrayal_lane"]
+        top = betrayal["top_betrayal_candidates"]
+
+        self.assertEqual(BETRAYAL_PAPER_TRACKING_REQUIRED, betrayal["betrayal_lane_class"])
+        self.assertTrue(betrayal["true_paper_required"])
+        self.assertFalse(betrayal["live_ready"])
+        self.assertGreaterEqual(len(top), 2)
+        self.assertEqual(BETRAYAL_PRIMARY_CANDIDATE, top[0]["candidate_classification"])
+        self.assertEqual("222m", top[0]["timeframe"])
+        self.assertEqual(NAIVE_INVERSE_AUDIT_EVIDENCE_ONLY, top[0]["evidence_label"])
+        self.assertEqual("NEEDS_TRUE_PAPER_TRACKING", top[0]["maturity_status"])
+        self.assertIn("track actual inverse entries/exits", top[0]["required_next_steps"])
+
+    def test_r95_betrayal_no_candidates_fixture_remains_waiting(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+
+        self.assertEqual(DUAL_LANE_WAITING, payload["overall_lane_class"])
+        self.assertEqual([], payload["betrayal_lane"]["top_betrayal_candidates"])
+        self.assertFalse(payload["betrayal_lane"]["live_ready"])
+        self.assertEqual("R96 Markov Support Watch Scheduler / Candidate Revalidation Loop", payload["next_action_recommendation"])
+
+    def test_r95_dual_lane_comparison_keeps_betrayal_audit_not_live_ready(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+        comparison = payload["dual_lane_comparison"]
+
+        self.assertEqual(BETRAYAL_LANE_NEEDS_TRUE_PAPER, payload["overall_lane_class"])
+        self.assertEqual("betrayal_audit_opportunity", comparison["leading_lane"])
+        self.assertIn("audit evidence", comparison["why"])
+        self.assertIn("No lane is live-ready", comparison["no_live_reason"])
+        self.assertIn("betrayal_true_paper_tracking_required", payload["blockers"])
+
+    def test_r95_operator_architect_seat_is_advisory_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_dual_lane_candidate_watch(dry_run=True, write=False, log_dir=self.log_dir)
+        seat = payload["operator_architect_seat_review"]
+
+        self.assertFalse(seat["override_power"])
+        self.assertFalse(seat["execution_permission"])
+        self.assertFalse(seat["can_override_miro_fish"])
+        self.assertFalse(seat["can_override_markov"])
+        self.assertFalse(seat["can_bypass_r87"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_WAIT_FOR_MARKOV_SUPPORT, seat["operator_architect_position"])
+        self.assertIn(ARCHITECT_SEAT_RECOMMENDS_BETRAYAL_MATURATION_LANE, seat["operator_architect_position"])
+
+    def test_r95_write_true_writes_local_json_report_only(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+        before_env = dict(os.environ)
+
+        payload = build_dual_lane_candidate_watch(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = dual_lane_candidate_watch_path(self.log_dir)
+        self.assertTrue(path.exists())
+        with path.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+        self.assertEqual("R95", report["phase"])
+        self.assertFalse(report["executable"])
+        self.assertFalse(report["order_payload_created"])
+        self.assertEqual(before_env, dict(os.environ))
+
+    def test_r95_api_endpoints_are_safe(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        response = self.client.get("/live-arming/dual-lane-candidate-watch")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R95", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/dual-lane-candidate-watch/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r95_cli_command_exists(self) -> None:
+        self._seed_operator_review_13m_long_low_volatility()
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "dual-lane-candidate-watch",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R95 Dual Lane Candidate Watch status: OK", result.stdout)
+        self.assertIn("overall_lane_class:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
     @staticmethod
