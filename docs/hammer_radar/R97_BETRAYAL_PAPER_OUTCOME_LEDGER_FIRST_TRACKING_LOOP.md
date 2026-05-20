@@ -150,3 +150,5 @@ R98 Betrayal Maturity Evaluator
 ```
 
 R98 now scans local `signals.ndjson` and `outcomes.ndjson`, prepares open betrayal paper tracking records, and captures closed records through R97 validation only when explicitly run with `dry_run=false` and `write=true`.
+
+R99 adds source wiring diagnostics and aggregate decomposition review. It does not write ledger rows.

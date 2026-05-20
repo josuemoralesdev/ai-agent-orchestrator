@@ -144,3 +144,5 @@ If no detector source can capture current signals:
 ```text
 R99 Betrayal Directional Decomposition for 222m or detector source wiring
 ```
+
+R99 now inventories local detector sources and reviews whether aggregate candidates such as `222m` can be decomposed from real direction/entry audit evidence. It does not create fake signals or outcomes.

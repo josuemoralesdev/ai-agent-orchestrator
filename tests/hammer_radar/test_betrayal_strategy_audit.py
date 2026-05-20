@@ -226,6 +226,13 @@ from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
     build_betrayal_paper_signal_detector_status,
     run_betrayal_paper_signal_detector,
 )
+from src.app.hammer_radar.operator.betrayal_detector_source_wiring import (
+    AGGREGATE_DECOMPOSITION_AVAILABLE,
+    AGGREGATE_DECOMPOSITION_NOT_AVAILABLE,
+    DETECTOR_SOURCE_FIELDS_INCOMPLETE,
+    build_betrayal_detector_source_wiring,
+    betrayal_detector_source_wiring_report_path,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3700,6 +3707,129 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("detected_signal_count:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r99_payload_is_safe_and_handles_missing_files(self) -> None:
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+
+        self.assertEqual("R99", payload["phase"])
+        self.assertEqual("BETRAYAL_DETECTOR_SOURCE_WIRING_222M_DECOMPOSITION_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertEqual(0, len(payload["usable_detector_sources"]))
+
+    def test_r99_source_inventory_handles_malformed_jsonl(self) -> None:
+        path = self.log_dir / "signals.ndjson"
+        path.write_text("{bad json\n", encoding="utf-8")
+
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+        signals = self._find(payload["source_inventory"], source_name="signals")
+
+        self.assertTrue(signals["exists"])
+        self.assertEqual(1, signals["malformed_record_count"])
+        self.assertFalse(signals["usable_for_detector"])
+
+    def test_r99_usable_source_detection_when_required_fields_exist(self) -> None:
+        self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+        signals = self._find(payload["source_inventory"], source_name="signals")
+
+        self.assertTrue(signals["usable_for_detector"])
+        self.assertIn("entry_mode", signals["required_fields_present"])
+        self.assertEqual([], signals["missing_required_fields"])
+        self.assertIn("signals", payload["detector_wiring_diagnostic"]["usable_source_names"])
+
+    def test_r99_unusable_source_detection_when_entry_mode_missing(self) -> None:
+        self._append_signal_without_entry_mode(timeframe="4m", direction="long")
+
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+        signals = self._find(payload["source_inventory"], source_name="signals")
+
+        self.assertFalse(signals["usable_for_detector"])
+        self.assertIn("entry_mode", signals["missing_required_fields"])
+        self.assertIn(DETECTOR_SOURCE_FIELDS_INCOMPLETE, payload["r99_statuses"])
+        self.assertIn("missing detector-required fields", payload["detector_wiring_diagnostic"]["r98_no_signal_reason"])
+
+    def test_r99_222m_aggregate_no_directional_candidate_path(self) -> None:
+        self._seed_group("primary-222m-long", "222m", "long", "ladder_close_50_618", wins=3, losses=21, total_pnl=-7.0)
+        self._seed_group("primary-222m-short", "222m", "short", "ladder_close_50_618", wins=3, losses=21, total_pnl=-7.0)
+
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+        review = payload["aggregate_decomposition_review"]
+
+        self.assertEqual(AGGREGATE_DECOMPOSITION_NOT_AVAILABLE, review["decomposition_status"])
+        self.assertEqual([], payload["proposed_decomposition_identities"])
+        self.assertIn("222m_directional_decomposition_not_available", payload["blockers"])
+
+    def test_r99_222m_directional_decomposition_fixture_path(self) -> None:
+        self._seed_group("primary-222m-direction", "222m", "long", "fib_650", wins=6, losses=42, total_pnl=-14.1309)
+
+        payload = build_betrayal_detector_source_wiring(log_dir=self.log_dir)
+        review = payload["aggregate_decomposition_review"]
+        proposed = payload["proposed_decomposition_identities"][0]
+
+        self.assertEqual(AGGREGATE_DECOMPOSITION_AVAILABLE, review["decomposition_status"])
+        self.assertEqual("betrayal|BTCUSDT|222m|long_to_short|fib_650|direction_entry_mode", proposed["betrayal_paper_signal_id"])
+        self.assertEqual("long", proposed["original_direction"])
+        self.assertEqual("short", proposed["betrayal_direction"])
+        self.assertEqual("fib_650", proposed["entry_mode"])
+        self.assertFalse(proposed["live_ready"])
+        self.assertTrue(proposed["requires_true_paper_tracking"])
+
+    def test_r99_report_write_is_local_only(self) -> None:
+        before_env = dict(os.environ)
+
+        payload = build_betrayal_detector_source_wiring(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertTrue(payload["report_written"])
+        path = betrayal_detector_source_wiring_report_path(self.log_dir)
+        self.assertTrue(path.exists())
+        self.assertEqual(before_env, dict(os.environ))
+        report = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual("R99", report["phase"])
+        self.assertFalse(report["order_payload_created"])
+
+    def test_r99_api_endpoints_are_safe(self) -> None:
+        response = self.client.get("/live-arming/betrayal-detector-source-wiring")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("R99", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        report = self.client.post("/live-arming/betrayal-detector-source-wiring/report", json={"dry_run": True, "write": False})
+        self.assertEqual(200, report.status_code)
+        report_payload = report.json()
+        self.assertFalse(report_payload["report_written"])
+        self.assertFalse(report_payload["order_payload_created"])
+
+    def test_r99_cli_command_exists(self) -> None:
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-detector-source-wiring",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R99 Detector Source Wiring status: OK", result.stdout)
+        self.assertIn("222m_decomposition_status:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -3770,6 +3900,36 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
     def _append_r98_signal(self, *, timeframe: str, direction: str, entry_mode: str) -> str:
         timestamp = datetime.now(UTC).isoformat()
         signal_id = f"BTCUSDT|{timeframe}|{direction}|{entry_mode}|{timestamp}"
+        archive.append_signal(
+            SignalRecord(
+                signal_id=signal_id,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+                direction=direction,
+                timestamp=timestamp,
+                hammer_strength=90.0,
+                hammer_high=102.0,
+                hammer_low=98.0,
+                fib_50=100.0,
+                fib_618=99.5,
+                fib_650=99.0,
+                fib_786=98.5,
+                invalidation=97.5,
+                bias_timeframe="4H",
+                bias_direction="bullish" if direction == "long" else "bearish",
+                bias_aligned=True,
+                same_direction_streak=0,
+                opposite_direction_streak=0,
+                tradable=True,
+                signal_close=100.5,
+            ),
+            log_dir=self.log_dir,
+        )
+        return signal_id
+
+    def _append_signal_without_entry_mode(self, *, timeframe: str, direction: str) -> str:
+        timestamp = datetime.now(UTC).isoformat()
+        signal_id = f"BTCUSDT|{timeframe}|{direction}|{timestamp}"
         archive.append_signal(
             SignalRecord(
                 signal_id=signal_id,
