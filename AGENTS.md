@@ -66,6 +66,51 @@ Any change touching these invariants must include tests or smoke checks proving 
 - Preserve dirty worktree changes made by the user.
 - If unexpected changes appear in files being edited, stop and report them.
 
+## Phase Classification And Capability Reuse
+
+Before implementing any new phase or task, Codex must classify the work as exactly one or more of:
+
+- `NEW CAPABILITY`: a genuinely new behavior or surface that does not already exist in the repo.
+- `EXTENSION OF EXISTING CAPABILITY`: expands something already present, such as an existing module, endpoint, CLI command, scheduler task, ledger, detector, risk contract, notification, or preflight.
+- `WIRING / INTEGRATION`: connects existing pieces, adapts formats, adds source/consumer plumbing, or makes one subsystem consume another subsystem's output.
+- `DIAGNOSTIC / AUDIT`: adds inspection, reporting, validation, summaries, review-only checks, or source-chain explanation.
+- `DUPLICATE RISK`: resembles an existing module, endpoint, CLI command, ledger, scheduler task, report, or safety gate and must be checked carefully before implementation.
+
+Codex must perform a lightweight capability scan before implementation. Inspect, at minimum when relevant:
+
+- `docs/`
+- `docs/hammer_radar/`
+- `src/app/hammer_radar/operator/`
+- `src/app/hammer_radar/execution/`
+- `tests/hammer_radar/`
+- `configs/`
+- existing FastAPI routes
+- existing CLI inspect commands
+- existing scheduler tasks
+- existing log/ledger file names referenced in code or docs
+- existing risk contract, preflight, readiness, ticket, packet, and notification modules
+
+Use available tools such as `rg`, `grep`, `find`, `git grep`, existing tests/docs, endpoint names, and CLI command names. If `rg` is unavailable, use `grep` or `find`; do not fail the scan just because one search tool is missing.
+
+If an existing capability already solves 70% or more of the requested behavior:
+
+- Prefer extending it instead of creating a new module.
+- Prefer adding a small adapter or wiring layer instead of duplicating logic.
+- Prefer updating docs/tests to reflect reuse.
+- Only create a new module when it creates a clearly distinct boundary.
+
+The phase classification process does not override safety requirements. For Hammer Radar / live trading work:
+
+- No orders unless explicitly authorized by the correct live gate.
+- No Binance live/trading calls unless explicitly authorized.
+- No account/balance calls unless explicitly authorized.
+- No executable payloads unless explicitly authorized.
+- No env edits unless explicitly authorized.
+- No secrets.
+- No `AGENTS.md` edits unless the user explicitly asks for `AGENTS.md` changes.
+
+When a repo has many phases or a long history, Codex should recommend or create a capability index doc when useful. For this repo, keep `docs/hammer_radar/PHASE_CAPABILITY_INDEX_R1_R100.md` current as future phases discover or extend capabilities.
+
 ## Engineering Standards
 
 - Search for existing patterns before adding new helpers.
@@ -151,6 +196,33 @@ Changes to strategy scoring, promotion, or live eligibility must preserve audita
 Every substantial Codex run must end with:
 
 - branch name
+- Phase Classification:
+  - Primary classification:
+  - Secondary classification(s):
+  - Duplicate risk level: `LOW` / `MEDIUM` / `HIGH`
+  - Reason:
+- Capability Scan:
+  - Existing docs checked:
+  - Existing modules checked:
+  - Existing tests checked:
+  - Existing endpoints checked:
+  - Existing CLI commands checked:
+  - Existing scheduler tasks checked:
+  - Existing logs/ledgers/configs checked:
+- Reuse / Extend / Create Decision:
+  - Existing capability reused:
+  - Existing capability extended:
+  - New capability created:
+  - Why new code was necessary:
+  - Why this is not duplicating prior work:
+- Duplicate Risk Report:
+  - Similar existing modules:
+  - Similar existing endpoints:
+  - Similar existing CLI commands:
+  - Similar existing scheduler tasks:
+  - Similar existing docs:
+  - Risk:
+  - Mitigation:
 - files changed
 - what changed and why
 - tests or checks run
