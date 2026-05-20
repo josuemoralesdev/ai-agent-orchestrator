@@ -157,6 +157,13 @@ from src.app.hammer_radar.operator.final_protected_live_gate_review import (
     build_final_protected_live_gate_status,
     format_final_protected_live_gate_operator_message,
 )
+from src.app.hammer_radar.operator.final_approval_intent import (
+    evaluate_final_approval_intent,
+    format_final_approval_intent_telegram_message,
+    format_final_preflight_telegram_message,
+    telegram_final_preflight_payload,
+)
+from src.app.hammer_radar.operator.final_live_preflight import build_final_live_preflight
 from src.app.hammer_radar.operator.live_preflight import build_promoted_strategy_preflight
 from src.app.hammer_radar.operator.notification_watcher import load_alert_records
 from src.app.hammer_radar.operator.operator_actions import (
@@ -262,6 +269,8 @@ HELP_COMMANDS = [
     "LIVE FINAL STATUS",
     "LIVE FINAL CHECK",
     "LIVE FINAL RUNBOOK",
+    "/final_preflight",
+    "/approve_final <candidate_id> <risk_contract_hash> <packet_hash>",
     "FIRST LIVE GATE",
     "FIRST LIVE GATE <signal_id>",
     "FIRST LIVE GATE INTENT <execution_intent_id>",
@@ -303,7 +312,7 @@ def handle_telegram_operator_command(
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     raw_text = (text or "").strip()
     normalized = " ".join(raw_text.upper().split())
-    result = _dispatch_command(raw_text=raw_text, normalized=normalized, source=source, log_dir=resolved_log_dir)
+    result = _dispatch_command(raw_text=raw_text, normalized=normalized, source=source, chat_id=chat_id, log_dir=resolved_log_dir)
     record = _command_record(
         raw_text=raw_text,
         source=source,
@@ -353,7 +362,7 @@ def telegram_operator_commands_path(log_dir: str | Path) -> Path:
     return Path(log_dir) / COMMANDS_FILENAME
 
 
-def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: Path) -> dict[str, Any]:
+def _dispatch_command(*, raw_text: str, normalized: str, source: str, chat_id: str | None = None, log_dir: Path) -> dict[str, Any]:
     if normalized == "HELP":
         return _result("help", "ACCEPTED", "Available commands: " + ", ".join(HELP_COMMANDS))
     if normalized == "FIRST LIVE PROFILE":
@@ -808,6 +817,46 @@ def _dispatch_command(*, raw_text: str, normalized: str, source: str, log_dir: P
             format_final_protected_live_gate_operator_message(payload),
             payload={"final_protected_live_gate": payload},
             performance=payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+        )
+    if normalized in {"FINAL PREFLIGHT", "/FINAL_PREFLIGHT"}:
+        preflight = build_final_live_preflight(log_dir=log_dir)
+        telegram_payload = telegram_final_preflight_payload(preflight)
+        return _result(
+            "final_live_preflight",
+            str(telegram_payload.get("status") or "BLOCKED"),
+            format_final_preflight_telegram_message(telegram_payload),
+            payload={"final_live_preflight": telegram_payload},
+            reason="R102 final live preflight adapter is authoritative",
+        )
+    if normalized == "APPROVE FINAL" or normalized.startswith("APPROVE FINAL ") or normalized == "/APPROVE_FINAL" or normalized.startswith("/APPROVE_FINAL "):
+        parsed = _parse_approve_final_command(raw_text=raw_text)
+        if parsed.get("status") != "ACCEPTED":
+            reason = str(parsed.get("reason") or "/approve_final requires candidate_id risk_contract_hash packet_hash")
+            return _result(
+                "final_approval_intent",
+                "REJECTED",
+                f"{reason}. Approval intent not recorded. No live order was placed.",
+                payload={"final_approval_intent": parsed},
+                reason=reason,
+            )
+        intent = evaluate_final_approval_intent(
+            candidate_id=str(parsed["candidate_id"]),
+            supplied_risk_contract_hash=str(parsed["risk_contract_hash"]),
+            supplied_packet_hash=str(parsed["packet_hash"]),
+            telegram_user_id=chat_id,
+            chat_id=chat_id,
+            log_dir=log_dir,
+        )
+        result_status = "ACCEPTED" if intent.get("status") == "ACCEPTED_INTENT_ONLY" else (
+            "BLOCKED" if intent.get("status") == "BLOCKED_BY_FINAL_PREFLIGHT" else "REJECTED"
+        )
+        record = intent.get("record") if isinstance(intent.get("record"), dict) else {}
+        return _result(
+            "final_approval_intent",
+            result_status,
+            format_final_approval_intent_telegram_message(intent),
+            payload={"final_approval_intent": intent},
+            reason=str(record.get("result_status") or intent.get("status") or result_status),
         )
     if normalized == "LIVE FINAL CHECK":
         payload = build_final_protected_live_gate_check(log_dir=log_dir)
@@ -1301,6 +1350,30 @@ def _handle_paper_intent(*, normalized: str, raw_text: str, source: str, log_dir
         payload={"operator_action": record, "candidate": candidate},
         signal_id=candidate.get("signal_id"),
     )
+
+
+def _parse_approve_final_command(*, raw_text: str) -> dict[str, Any]:
+    parts = raw_text.strip().split()
+    if not parts:
+        return {"status": "REJECTED", "reason": "/approve_final requires candidate_id risk_contract_hash packet_hash"}
+    command = parts[0].lower()
+    if command == "/approve_final":
+        args = parts[1:]
+    elif len(parts) >= 2 and parts[0].lower() == "approve" and parts[1].lower() == "final":
+        args = parts[2:]
+    else:
+        return {"status": "REJECTED", "reason": "/approve_final command is required"}
+    if len(args) != 3:
+        return {"status": "REJECTED", "reason": "/approve_final requires candidate_id risk_contract_hash packet_hash"}
+    candidate_id, risk_contract_hash, packet_hash = [item.strip() for item in args]
+    if not candidate_id or not risk_contract_hash or not packet_hash:
+        return {"status": "REJECTED", "reason": "/approve_final arguments must be non-empty"}
+    return {
+        "status": "ACCEPTED",
+        "candidate_id": candidate_id,
+        "risk_contract_hash": risk_contract_hash,
+        "packet_hash": packet_hash,
+    }
 
 
 def _handle_live_approve(*, raw_text: str, source: str, log_dir: Path) -> dict[str, Any]:
