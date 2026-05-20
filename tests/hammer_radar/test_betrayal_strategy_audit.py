@@ -233,6 +233,16 @@ from src.app.hammer_radar.operator.betrayal_detector_source_wiring import (
     build_betrayal_detector_source_wiring,
     betrayal_detector_source_wiring_report_path,
 )
+from src.app.hammer_radar.operator.betrayal_source_signal_emitter import (
+    BETRAYAL_AGGREGATE_SKIPPED_DECOMPOSITION_REQUIRED,
+    BETRAYAL_SIGNAL_EMIT_DRY_RUN_ONLY,
+    BETRAYAL_SIGNAL_EMITTED_LOCAL_ONLY,
+    HISTORICAL_REPLAY_SOURCE,
+    HISTORICAL_REPLAY_STATUS,
+    build_betrayal_source_signal_emitter_status,
+    betrayal_paper_signals_path,
+    run_betrayal_source_signal_emitter,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3830,6 +3840,144 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("222m_decomposition_status:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r100_payload_is_safe_and_output_absent_by_default(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        payload = build_betrayal_source_signal_emitter_status(log_dir=self.log_dir)
+
+        self.assertEqual("R100", payload["phase"])
+        self.assertEqual("BETRAYAL_SOURCE_SIGNAL_EMITTER_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertIn(BETRAYAL_SIGNAL_EMIT_DRY_RUN_ONLY, payload["r100_statuses"])
+        self.assertTrue(payload["review_only"])
+        self.assertFalse(payload["executable"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertFalse(betrayal_paper_signals_path(self.log_dir).exists())
+
+    def test_r100_historical_replay_matches_4m_long_fib650_to_betrayal_identity(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        source_id = self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+        self._append_r98_outcome(signal_id=source_id, timeframe="4m", direction="long", entry_mode="fib_650", pnl_pct=-1.2)
+
+        payload = run_betrayal_source_signal_emitter(log_dir=self.log_dir, max_signals=1)
+        emission = payload["top_prepared_emissions"][0]
+
+        self.assertEqual("betrayal|BTCUSDT|4m|long_to_short|fib_650|direction_entry_mode", emission["betrayal_paper_signal_id"])
+        self.assertEqual(source_id, emission["source_signal_id"])
+        self.assertEqual("long", emission["original_direction"])
+        self.assertEqual("short", emission["betrayal_direction"])
+        self.assertEqual("short", emission["direction"])
+        self.assertEqual("fib_650", emission["entry_mode"])
+        self.assertEqual(HISTORICAL_REPLAY_STATUS, emission["signal_freshness"])
+        self.assertEqual(HISTORICAL_REPLAY_SOURCE, emission["data_source"])
+        self.assertFalse(emission["is_fresh_current_signal"])
+        self.assertFalse(emission["eligible_for_live"])
+        self.assertEqual(1, payload["emitter_summary"]["emittable_signal_count"])
+        self.assertEqual(0, payload["emitter_summary"]["emitted_signal_count"])
+
+    def test_r100_stable_id_dry_run_writes_nothing_and_write_skips_duplicate(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        source_id = self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+        self._append_r98_outcome(signal_id=source_id, timeframe="4m", direction="long", entry_mode="fib_650", pnl_pct=-0.8)
+
+        dry_first = run_betrayal_source_signal_emitter(log_dir=self.log_dir, max_signals=1)
+        dry_second = run_betrayal_source_signal_emitter(log_dir=self.log_dir, max_signals=1)
+        first_id = dry_first["top_prepared_emissions"][0]["emitted_signal_id"]
+
+        self.assertEqual(first_id, dry_second["top_prepared_emissions"][0]["emitted_signal_id"])
+        self.assertFalse(betrayal_paper_signals_path(self.log_dir).exists())
+
+        written = run_betrayal_source_signal_emitter(dry_run=False, write=True, log_dir=self.log_dir, max_signals=1)
+        duplicate = run_betrayal_source_signal_emitter(dry_run=False, write=True, log_dir=self.log_dir, max_signals=1)
+
+        self.assertEqual(BETRAYAL_SIGNAL_EMITTED_LOCAL_ONLY, written["top_prepared_emissions"][0]["emission_status"])
+        self.assertEqual(1, written["emitter_summary"]["emitted_signal_count"])
+        self.assertEqual(1, len(self._read_jsonl(betrayal_paper_signals_path(self.log_dir))))
+        self.assertEqual(1, duplicate["emitter_summary"]["duplicate_skipped_count"])
+        self.assertEqual(1, len(self._read_jsonl(betrayal_paper_signals_path(self.log_dir))))
+
+    def test_r100_skips_aggregate_missing_entry_mode_and_missing_stop_tp(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        missing_stop_signal_id = "missing-stop-source"
+        self._append_raw_outcome(
+            signal_id=missing_stop_signal_id,
+            timeframe="4m",
+            direction="long",
+            entry_mode="fib_650",
+        )
+        self._append_raw_outcome(
+            signal_id="missing-entry-mode-source",
+            timeframe="4m",
+            direction="long",
+            entry_mode=None,
+        )
+        self._append_raw_outcome(
+            signal_id="aggregate-source",
+            timeframe="222m",
+            direction="long",
+            entry_mode="fib_650",
+        )
+
+        payload = run_betrayal_source_signal_emitter(log_dir=self.log_dir, max_signals=5)
+
+        self.assertIn(BETRAYAL_AGGREGATE_SKIPPED_DECOMPOSITION_REQUIRED, payload["r100_statuses"])
+        self.assertGreaterEqual(payload["emitter_summary"]["aggregate_skipped_count"], 1)
+        self.assertGreaterEqual(payload["emitter_summary"]["missing_entry_mode_count"], 1)
+        self.assertGreaterEqual(payload["emitter_summary"]["missing_price_fields_count"], 1)
+
+    def test_r100_api_endpoints_are_safe(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        status = self.client.get("/live-arming/betrayal-source-signal-emitter/status")
+        self.assertEqual(200, status.status_code)
+        payload = status.json()
+        self.assertEqual("R100", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        run_response = self.client.post(
+            "/live-arming/betrayal-source-signal-emitter/run",
+            json={"dry_run": True, "write": False, "max_signals": 20, "allow_historical_replay": True},
+        )
+        self.assertEqual(200, run_response.status_code)
+        run_payload = run_response.json()
+        self.assertEqual("R100", run_payload["phase"])
+        self.assertEqual(0, run_payload["emitted_signal_count"])
+        self.assertFalse(run_payload["order_payload_created"])
+
+        signals = self.client.get("/live-arming/betrayal-source-signal-emitter/signals")
+        self.assertEqual(200, signals.status_code)
+        self.assertEqual("R100", signals.json()["phase"])
+
+    def test_r100_cli_command_exists(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-source-signal-emitter",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R100 Source Signal Emitter status: OK", result.stdout)
+        self.assertIn("emittable_signal_count:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -3986,6 +4134,36 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             ),
             log_dir=self.log_dir,
         )
+
+    def _append_raw_outcome(
+        self,
+        *,
+        signal_id: str,
+        timeframe: str,
+        direction: str,
+        entry_mode: str | None,
+    ) -> None:
+        record = {
+            "signal_id": signal_id,
+            "symbol": "BTCUSDT",
+            "timeframe": timeframe,
+            "direction": direction,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "entry_price": 99.0,
+            "exit_price": 98.0,
+            "fill_status": "filled",
+            "outcome": "loss",
+            "mae_pct": 0.5,
+            "mfe_pct": 1.0,
+            "pnl_pct": -1.0,
+            "stop_hit": True,
+            "evaluated_at": datetime.now(UTC).isoformat(),
+        }
+        if entry_mode is not None:
+            record["entry_mode"] = entry_mode
+        path = self.log_dir / "outcomes.ndjson"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     def _seed_group(
         self,

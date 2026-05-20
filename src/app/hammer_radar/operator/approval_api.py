@@ -265,6 +265,11 @@ from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
 from src.app.hammer_radar.operator.betrayal_detector_source_wiring import (
     build_betrayal_detector_source_wiring,
 )
+from src.app.hammer_radar.operator.betrayal_source_signal_emitter import (
+    build_betrayal_source_signal_emitter_status,
+    load_emitted_betrayal_paper_signals,
+    run_betrayal_source_signal_emitter,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -497,6 +502,15 @@ class BetrayalDetectorSourceWiringReportRequest(BaseModel):
     write: bool = False
     symbol: str | None = None
     timeframe: str | None = None
+
+
+class BetrayalSourceSignalEmitterRunRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    max_signals: int | None = None
+    identity_filter: str | None = None
+    allow_historical_replay: bool = True
+    allow_fresh_current: bool = False
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -2118,6 +2132,57 @@ def live_arming_betrayal_detector_source_wiring_report(
         timeframe=request.timeframe if request.timeframe is not None else "222m",
         dry_run=request.dry_run,
         write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-source-signal-emitter/status")
+def live_arming_betrayal_source_signal_emitter_status(
+    max_signals: int = Query(default=20, ge=0),
+    identity_filter: str | None = None,
+) -> dict:
+    return build_betrayal_source_signal_emitter_status(
+        max_signals=max_signals,
+        identity_filter=identity_filter,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-source-signal-emitter/signals")
+def live_arming_betrayal_source_signal_emitter_signals(
+    recent: int = Query(default=20, ge=0),
+) -> dict:
+    return {
+        "status": "OK",
+        "phase": "R100",
+        "execution_mode": "BETRAYAL_SOURCE_SIGNAL_EMITTER_ONLY_NO_ORDER",
+        "records": load_emitted_betrayal_paper_signals(limit=recent, log_dir=get_log_dir(use_env=True)),
+        "review_only": True,
+        "executable": False,
+        "live_execution_enabled": False,
+        "allow_live_orders": False,
+        "global_kill_switch": True,
+        "order_placed": False,
+        "real_order_placed": False,
+        "order_payload_created": False,
+        "execution_attempted": False,
+        "network_allowed": False,
+        "secrets_shown": False,
+    }
+
+
+@app.post("/live-arming/betrayal-source-signal-emitter/run")
+def live_arming_betrayal_source_signal_emitter_run(
+    request: BetrayalSourceSignalEmitterRunRequest | None = None,
+) -> dict:
+    request = request or BetrayalSourceSignalEmitterRunRequest()
+    return run_betrayal_source_signal_emitter(
+        dry_run=request.dry_run,
+        write=request.write,
+        max_signals=request.max_signals if request.max_signals is not None else 20,
+        identity_filter=request.identity_filter,
+        allow_historical_replay=request.allow_historical_replay,
+        allow_fresh_current=request.allow_fresh_current,
         log_dir=get_log_dir(use_env=True),
     )
 

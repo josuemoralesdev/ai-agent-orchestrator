@@ -34,6 +34,7 @@ from src.app.hammer_radar.operator.betrayal_true_paper_tracking import build_bet
 from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import build_betrayal_paper_outcome_status
 from src.app.hammer_radar.operator.betrayal_paper_signal_detector import run_betrayal_paper_signal_detector
 from src.app.hammer_radar.operator.betrayal_detector_source_wiring import build_betrayal_detector_source_wiring
+from src.app.hammer_radar.operator.betrayal_source_signal_emitter import run_betrayal_source_signal_emitter
 from src.app.hammer_radar.operator.markov_regime_gate import build_markov_regime_gate
 from src.app.hammer_radar.operator.market_intelligence import build_market_intelligence_summary
 from src.app.hammer_radar.operator.miro_fish_quality_gate import build_miro_fish_quality_gate
@@ -80,6 +81,7 @@ TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD = "betrayal_true_paper_scaffold"
 TASK_BETRAYAL_PAPER_OUTCOME_LEDGER = "betrayal_paper_outcome_ledger"
 TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR = "betrayal_paper_signal_detector"
 TASK_BETRAYAL_DETECTOR_SOURCE_WIRING = "betrayal_detector_source_wiring"
+TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER = "betrayal_source_signal_emitter"
 TASK_NOTIFICATION_CHECK = "notification_check"
 
 DEFAULT_TASKS = [
@@ -113,6 +115,7 @@ AVAILABLE_TASKS = (
     TASK_BETRAYAL_PAPER_OUTCOME_LEDGER,
     TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR,
     TASK_BETRAYAL_DETECTOR_SOURCE_WIRING,
+    TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER,
 )
 
 
@@ -591,6 +594,21 @@ def run_refresh_task(
                 "missing_detector_sources": len(result.get("missing_detector_sources") or []),
                 "decomposition_status": (result.get("aggregate_decomposition_review") or {}).get("decomposition_status"),
                 "recommended_next_phase": result.get("recommended_next_phase"),
+                "execution_mode": result.get("execution_mode"),
+            },
+        )
+    if task == TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER:
+        result = run_betrayal_source_signal_emitter(dry_run=True, write=False, max_signals=20, log_dir=log_dir)
+        summary = result.get("emitter_summary") or {}
+        return _task_result(
+            task,
+            status="completed",
+            detail={
+                "source_status": result.get("source_status"),
+                "emittable_signal_count": summary.get("emittable_signal_count"),
+                "emitted_signal_count": summary.get("emitted_signal_count"),
+                "duplicate_skipped_count": summary.get("duplicate_skipped_count"),
+                "output_path": result.get("output_path"),
                 "execution_mode": result.get("execution_mode"),
             },
         )
