@@ -214,6 +214,18 @@ from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import (
     build_betrayal_paper_outcome_status,
     record_betrayal_paper_outcome,
 )
+from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
+    BETRAYAL_AGGREGATE_DECOMPOSITION_REQUIRED,
+    BETRAYAL_NO_FRESH_SIGNALS_FOUND,
+    BETRAYAL_OUTCOME_CAPTURED_LOCAL_ONLY,
+    SIGNAL_CLOSED_OUTCOME_READY,
+    SIGNAL_OPEN_TRACKING_ONLY,
+    SIGNAL_REJECTED_AGGREGATE_ONLY,
+    SIGNAL_REJECTED_DUPLICATE,
+    SIGNAL_REJECTED_NO_MATCHING_IDENTITY,
+    build_betrayal_paper_signal_detector_status,
+    run_betrayal_paper_signal_detector,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3562,6 +3574,132 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("ledger_record_count:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r98_detector_status_with_no_source_is_safe(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        payload = build_betrayal_paper_signal_detector_status(log_dir=self.log_dir)
+
+        self.assertEqual("R98", payload["phase"])
+        self.assertEqual("BETRAYAL_PAPER_SIGNAL_DETECTOR_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertIn(BETRAYAL_NO_FRESH_SIGNALS_FOUND, payload["r98_statuses"])
+        self.assertEqual(0, payload["detection_summary"]["detected_signal_count"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+    def test_r98_matches_4m_long_fib650_source_to_long_to_short_identity_open(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        source_id = self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+
+        payload = run_betrayal_paper_signal_detector(log_dir=self.log_dir)
+        detection = payload["prepared_detections"][0]
+
+        self.assertEqual(source_id, detection["source_signal_id"])
+        self.assertEqual(SIGNAL_OPEN_TRACKING_ONLY, detection["signal_status"])
+        self.assertEqual("betrayal|BTCUSDT|4m|long_to_short|fib_650|direction_entry_mode", detection["betrayal_paper_signal_id"])
+        self.assertEqual("short", detection["prepared_outcome"]["direction"])
+        self.assertEqual("fib_650", detection["prepared_outcome"]["entry_mode"])
+        self.assertIsNone(detection["prepared_outcome"]["paper_exit_price"])
+        self.assertIsNone(detection["prepared_outcome"]["paper_pnl_pct"])
+        self.assertEqual(1, payload["detection_summary"]["prepared_open_tracking_count"])
+        self.assertEqual(0, payload["detection_summary"]["ledger_record_count_after"])
+
+    def test_r98_rejects_unknown_identity_and_aggregate_direct_signal(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+        self._append_r98_signal(timeframe="222m", direction="long", entry_mode="fib_650")
+
+        payload = run_betrayal_paper_signal_detector(log_dir=self.log_dir, max_signals=5)
+        statuses = [row["signal_status"] for row in payload["prepared_detections"]]
+
+        self.assertIn(SIGNAL_REJECTED_NO_MATCHING_IDENTITY, statuses)
+        self.assertIn(SIGNAL_REJECTED_AGGREGATE_ONLY, statuses)
+        self.assertIn(BETRAYAL_AGGREGATE_DECOMPOSITION_REQUIRED, payload["r98_statuses"])
+        self.assertEqual(1, payload["detection_summary"]["aggregate_rejected_count"])
+
+    def test_r98_closed_outcome_dry_run_uses_r97_validation_without_write(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        source_id = self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+        self._append_r98_outcome(signal_id=source_id, timeframe="4m", direction="long", entry_mode="fib_650", pnl_pct=-1.2)
+
+        payload = run_betrayal_paper_signal_detector(dry_run=True, write=True, log_dir=self.log_dir)
+        detection = payload["prepared_detections"][0]
+
+        self.assertEqual(SIGNAL_CLOSED_OUTCOME_READY, detection["signal_status"])
+        self.assertEqual("closed", detection["paper_status"])
+        self.assertEqual("win", detection["prepared_outcome"]["paper_result_win_loss"])
+        self.assertEqual(1.2, detection["prepared_outcome"]["paper_pnl_pct"])
+        self.assertEqual(1, payload["detection_summary"]["prepared_closed_outcome_count"])
+        self.assertEqual(0, payload["detection_summary"]["captured_outcome_count"])
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+
+    def test_r98_write_true_appends_only_valid_closed_record_and_skips_duplicate(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        source_id = self._append_r98_signal(timeframe="4m", direction="long", entry_mode="fib_650")
+        self._append_r98_outcome(signal_id=source_id, timeframe="4m", direction="long", entry_mode="fib_650", pnl_pct=-0.8)
+
+        first = run_betrayal_paper_signal_detector(dry_run=False, write=True, log_dir=self.log_dir)
+        second = run_betrayal_paper_signal_detector(dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertEqual(BETRAYAL_OUTCOME_CAPTURED_LOCAL_ONLY, first["prepared_detections"][0]["capture_status"])
+        self.assertEqual(0, first["detection_summary"]["ledger_record_count_before"])
+        self.assertEqual(1, first["detection_summary"]["ledger_record_count_after"])
+        self.assertEqual(1, first["detection_summary"]["captured_outcome_count"])
+        self.assertEqual(SIGNAL_REJECTED_DUPLICATE, second["prepared_detections"][0]["signal_status"])
+        self.assertEqual(1, second["detection_summary"]["duplicate_skipped_count"])
+        self.assertEqual(1, second["detection_summary"]["ledger_record_count_after"])
+        records = self._read_jsonl(betrayal_true_paper_outcomes_path(self.log_dir))
+        self.assertEqual(1, len(records))
+        self.assertFalse(records[0]["real_order_placed"])
+        self.assertFalse(records[0]["order_payload_created"])
+
+    def test_r98_api_endpoints_are_safe(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        status = self.client.get("/live-arming/betrayal-paper-signal-detector/status")
+        self.assertEqual(200, status.status_code)
+        payload = status.json()
+        self.assertEqual("R98", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        run_response = self.client.post(
+            "/live-arming/betrayal-paper-signal-detector/run",
+            json={"dry_run": True, "write": False, "max_signals": 20},
+        )
+        self.assertEqual(200, run_response.status_code)
+        run_payload = run_response.json()
+        self.assertEqual("R98", run_payload["phase"])
+        self.assertEqual(0, run_payload["outcomes_written"])
+        self.assertFalse(run_payload["order_payload_created"])
+
+    def test_r98_cli_command_exists(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-paper-signal-detector",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R98 Betrayal Paper Signal Detector status: OK", result.stdout)
+        self.assertIn("detected_signal_count:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -3628,6 +3766,66 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             "network_allowed": False,
             "secrets_shown": False,
         }
+
+    def _append_r98_signal(self, *, timeframe: str, direction: str, entry_mode: str) -> str:
+        timestamp = datetime.now(UTC).isoformat()
+        signal_id = f"BTCUSDT|{timeframe}|{direction}|{entry_mode}|{timestamp}"
+        archive.append_signal(
+            SignalRecord(
+                signal_id=signal_id,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+                direction=direction,
+                timestamp=timestamp,
+                hammer_strength=90.0,
+                hammer_high=102.0,
+                hammer_low=98.0,
+                fib_50=100.0,
+                fib_618=99.5,
+                fib_650=99.0,
+                fib_786=98.5,
+                invalidation=97.5,
+                bias_timeframe="4H",
+                bias_direction="bullish" if direction == "long" else "bearish",
+                bias_aligned=True,
+                same_direction_streak=0,
+                opposite_direction_streak=0,
+                tradable=True,
+                signal_close=100.5,
+            ),
+            log_dir=self.log_dir,
+        )
+        return signal_id
+
+    def _append_r98_outcome(
+        self,
+        *,
+        signal_id: str,
+        timeframe: str,
+        direction: str,
+        entry_mode: str,
+        pnl_pct: float,
+    ) -> None:
+        archive.append_outcome(
+            OutcomeRecord(
+                signal_id=signal_id,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+                direction=direction,
+                timestamp=datetime.now(UTC).isoformat(),
+                entry_price=99.0,
+                exit_price=99.0 + pnl_pct,
+                fill_status="filled",
+                outcome="win" if pnl_pct > 0 else "loss",
+                mae_pct=abs(pnl_pct) / 2.0,
+                mfe_pct=abs(pnl_pct),
+                pnl_pct=pnl_pct,
+                stop_hit=pnl_pct <= 0,
+                evaluated_at=datetime.now(UTC).isoformat(),
+                entry_mode=entry_mode,
+            ),
+            log_dir=self.log_dir,
+        )
 
     def _seed_group(
         self,

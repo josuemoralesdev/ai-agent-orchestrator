@@ -258,6 +258,10 @@ from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import (
     build_betrayal_paper_outcome_status,
     record_betrayal_paper_outcome,
 )
+from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
+    build_betrayal_paper_signal_detector_status,
+    run_betrayal_paper_signal_detector,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -474,6 +478,15 @@ class BetrayalPaperOutcomeRecordRequest(BaseModel):
     dry_run: bool = True
     write: bool = False
     outcome: dict[str, Any] | None = None
+
+
+class BetrayalPaperSignalDetectorRunRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    max_signals: int | None = None
+    identity_filter: str | None = None
+    allow_open_tracking: bool = True
+    allow_closed_outcomes: bool = True
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -2027,6 +2040,46 @@ def live_arming_betrayal_paper_outcomes_record(
         outcome=request.outcome,
         dry_run=request.dry_run,
         write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-paper-signal-detector/status")
+def live_arming_betrayal_paper_signal_detector_status(
+    max_signals: int = Query(default=20, ge=0),
+    identity_filter: str | None = None,
+) -> dict:
+    return build_betrayal_paper_signal_detector_status(
+        max_signals=max_signals,
+        identity_filter=identity_filter,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-paper-signal-detector/detections")
+def live_arming_betrayal_paper_signal_detector_detections(
+    max_signals: int = Query(default=20, ge=0),
+    identity_filter: str | None = None,
+) -> dict:
+    return build_betrayal_paper_signal_detector_status(
+        max_signals=max_signals,
+        identity_filter=identity_filter,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/betrayal-paper-signal-detector/run")
+def live_arming_betrayal_paper_signal_detector_run(
+    request: BetrayalPaperSignalDetectorRunRequest | None = None,
+) -> dict:
+    request = request or BetrayalPaperSignalDetectorRunRequest()
+    return run_betrayal_paper_signal_detector(
+        dry_run=request.dry_run,
+        write=request.write,
+        max_signals=request.max_signals if request.max_signals is not None else 20,
+        identity_filter=request.identity_filter,
+        allow_open_tracking=request.allow_open_tracking,
+        allow_closed_outcomes=request.allow_closed_outcomes,
         log_dir=get_log_dir(use_env=True),
     )
 

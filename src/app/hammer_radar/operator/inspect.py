@@ -961,6 +961,25 @@ def main() -> int:
                     )
                 )
             )
+    elif args.command == "betrayal-paper-signal-detector":
+        from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
+            format_betrayal_paper_signal_detector_text,
+            run_betrayal_paper_signal_detector,
+        )
+
+        print(
+            format_betrayal_paper_signal_detector_text(
+                run_betrayal_paper_signal_detector(
+                    dry_run=not args.write,
+                    write=args.write,
+                    max_signals=args.max_signals,
+                    identity_filter=args.identity_filter,
+                    allow_open_tracking=args.allow_open_tracking,
+                    allow_closed_outcomes=args.allow_closed_outcomes,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1410,6 +1429,13 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_paper_outcomes_parser.add_argument("--recent", type=int, default=20)
     betrayal_paper_outcomes_parser.add_argument("--write", action="store_true")
     betrayal_paper_outcomes_parser.add_argument("--outcome-json", default=None)
+
+    betrayal_paper_signal_detector_parser = subparsers.add_parser("betrayal-paper-signal-detector", parents=[parent])
+    betrayal_paper_signal_detector_parser.add_argument("--max-signals", type=int, default=20)
+    betrayal_paper_signal_detector_parser.add_argument("--identity-filter", default=None)
+    betrayal_paper_signal_detector_parser.add_argument("--write", action="store_true")
+    betrayal_paper_signal_detector_parser.add_argument("--allow-open-tracking", action=argparse.BooleanOptionalAction, default=True)
+    betrayal_paper_signal_detector_parser.add_argument("--allow-closed-outcomes", action=argparse.BooleanOptionalAction, default=True)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
