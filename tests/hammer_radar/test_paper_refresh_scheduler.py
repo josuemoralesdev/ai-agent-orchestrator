@@ -27,6 +27,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_BETRAYAL_PAPER_OUTCOME_LEDGER,
     TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR,
     TASK_BETRAYAL_DETECTOR_SOURCE_WIRING,
+    TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER,
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
@@ -106,6 +107,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR, DEFAULT_TASKS)
         self.assertIn(TASK_BETRAYAL_DETECTOR_SOURCE_WIRING, AVAILABLE_TASKS)
         self.assertNotIn(TASK_BETRAYAL_DETECTOR_SOURCE_WIRING, DEFAULT_TASKS)
+        self.assertIn(TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -673,6 +676,36 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertEqual(0, detail["usable_detector_sources"])
         self.assertEqual("AGGREGATE_DECOMPOSITION_NOT_AVAILABLE", detail["decomposition_status"])
         self.assertFalse(record["live_execution_enabled"])
+
+    def test_optional_betrayal_source_signal_emitter_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.run_betrayal_source_signal_emitter",
+            return_value={
+                "source_status": "BETRAYAL_USABLE_SOURCE_FOUND",
+                "emitter_summary": {
+                    "emittable_signal_count": 1,
+                    "emitted_signal_count": 0,
+                    "duplicate_skipped_count": 0,
+                },
+                "output_path": "logs/hammer_radar_forward/betrayal_paper_signals.ndjson",
+                "execution_mode": "BETRAYAL_SOURCE_SIGNAL_EMITTER_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER], record["completed_tasks"])
+        detail = record["task_results"][TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER]["detail"]
+        self.assertEqual(1, detail["emittable_signal_count"])
+        self.assertEqual(0, detail["emitted_signal_count"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
         self.assertFalse(record["order_placed"])
 
     def test_api_paper_refresh_status_works(self) -> None:

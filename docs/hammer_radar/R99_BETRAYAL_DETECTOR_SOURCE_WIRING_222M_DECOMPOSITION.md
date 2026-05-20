@@ -166,3 +166,5 @@ or:
 ```text
 R100 222m Directional Audit Expansion
 ```
+
+R100 now implements the source signal emitter path by creating local review-only `betrayal_paper_signals.ndjson` rows from explicit-entry outcome replay evidence. It does not write the R97 outcome ledger or convert aggregate identities into forced directional signals.

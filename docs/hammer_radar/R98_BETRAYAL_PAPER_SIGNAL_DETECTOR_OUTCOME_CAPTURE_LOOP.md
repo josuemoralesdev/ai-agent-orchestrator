@@ -146,3 +146,5 @@ R99 Betrayal Directional Decomposition for 222m or detector source wiring
 ```
 
 R99 now inventories local detector sources and reviews whether aggregate candidates such as `222m` can be decomposed from real direction/entry audit evidence. It does not create fake signals or outcomes.
+
+R100 now emits local review-only explicit-entry betrayal paper signal rows from historical outcome replay into `betrayal_paper_signals.ndjson`. R101 should wire R98 to consume that emitted source while keeping dry-run/no-write behavior as the default.

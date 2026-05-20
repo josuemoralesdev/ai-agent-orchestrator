@@ -997,6 +997,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-source-signal-emitter":
+        from src.app.hammer_radar.operator.betrayal_source_signal_emitter import (
+            format_betrayal_source_signal_emitter_text,
+            run_betrayal_source_signal_emitter,
+        )
+
+        print(
+            format_betrayal_source_signal_emitter_text(
+                run_betrayal_source_signal_emitter(
+                    dry_run=not args.write,
+                    write=args.write,
+                    max_signals=args.max_signals,
+                    identity_filter=args.identity_filter,
+                    allow_historical_replay=args.allow_historical_replay,
+                    allow_fresh_current=args.allow_fresh_current,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1458,6 +1477,13 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_detector_source_wiring_parser.add_argument("--symbol", default="BTCUSDT")
     betrayal_detector_source_wiring_parser.add_argument("--timeframe", default="222m")
     betrayal_detector_source_wiring_parser.add_argument("--write", action="store_true")
+
+    betrayal_source_signal_emitter_parser = subparsers.add_parser("betrayal-source-signal-emitter", parents=[parent])
+    betrayal_source_signal_emitter_parser.add_argument("--max-signals", type=int, default=20)
+    betrayal_source_signal_emitter_parser.add_argument("--identity-filter", default=None)
+    betrayal_source_signal_emitter_parser.add_argument("--write", action="store_true")
+    betrayal_source_signal_emitter_parser.add_argument("--allow-historical-replay", action=argparse.BooleanOptionalAction, default=True)
+    betrayal_source_signal_emitter_parser.add_argument("--allow-fresh-current", action=argparse.BooleanOptionalAction, default=False)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
