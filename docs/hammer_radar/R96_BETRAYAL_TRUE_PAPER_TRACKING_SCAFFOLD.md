@@ -152,3 +152,5 @@ R97 Betrayal Paper Outcome Ledger + First Tracking Loop
 R97 should record real paper outcomes only. It should still remain non-executable and preserve all no-order, no-network, no-env-mutation guarantees unless a later explicit phase changes scope.
 
 R97 has now added the local append-only ledger reader/writer and first tracking loop for explicitly supplied outcomes. The aggregate-only `222m` identity remains decomposition-required before true-paper maturity.
+
+R98 adds local paper signal detection and capture on top of this scaffold. It does not change R96 identity semantics and does not make any scaffolded identity executable or live-ready.

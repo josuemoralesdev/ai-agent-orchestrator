@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_DUAL_LANE_CANDIDATE_WATCH,
     TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD,
     TASK_BETRAYAL_PAPER_OUTCOME_LEDGER,
+    TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR,
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
@@ -100,6 +101,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD, DEFAULT_TASKS)
         self.assertIn(TASK_BETRAYAL_PAPER_OUTCOME_LEDGER, AVAILABLE_TASKS)
         self.assertNotIn(TASK_BETRAYAL_PAPER_OUTCOME_LEDGER, DEFAULT_TASKS)
+        self.assertIn(TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -610,6 +613,35 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_BETRAYAL_PAPER_OUTCOME_LEDGER]["detail"]
         self.assertEqual(0, detail["ledger_record_count"])
         self.assertEqual("BETRAYAL_PAPER_TRACKING_LOOP_READY", detail["tracking_loop_status"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_betrayal_paper_signal_detector_task_is_dry_run_no_write(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.run_betrayal_paper_signal_detector",
+            return_value={
+                "detection_source_status": "BETRAYAL_NO_FRESH_SIGNALS_FOUND",
+                "detection_summary": {
+                    "detected_signal_count": 0,
+                    "matched_signal_count": 0,
+                    "captured_outcome_count": 0,
+                },
+                "execution_mode": "BETRAYAL_PAPER_SIGNAL_DETECTOR_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR], record["completed_tasks"])
+        detail = record["task_results"][TASK_BETRAYAL_PAPER_SIGNAL_DETECTOR]["detail"]
+        self.assertEqual(0, detail["detected_signal_count"])
+        self.assertEqual(0, detail["captured_outcome_count"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 
