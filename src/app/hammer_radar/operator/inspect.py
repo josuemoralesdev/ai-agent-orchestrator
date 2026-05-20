@@ -877,6 +877,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "one-tiny-live-order-protocol":
+        from src.app.hammer_radar.operator.one_tiny_live_order_protocol import (
+            build_one_tiny_live_order_protocol_check,
+            format_one_tiny_live_order_protocol_check_text,
+        )
+
+        print(
+            format_one_tiny_live_order_protocol_check_text(
+                build_one_tiny_live_order_protocol_check(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1468,6 +1483,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     tiny_live_armed_dry_run_parser.add_argument("--no-record", action="store_true")
+
+    one_tiny_live_order_protocol_parser = subparsers.add_parser("one-tiny-live-order-protocol", parents=[parent])
+    one_tiny_live_order_protocol_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    one_tiny_live_order_protocol_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
