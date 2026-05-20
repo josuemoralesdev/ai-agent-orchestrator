@@ -862,6 +862,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-armed-dry-run":
+        from src.app.hammer_radar.operator.tiny_live_armed_dry_run import (
+            build_tiny_live_armed_dry_run,
+            format_tiny_live_armed_dry_run_text,
+        )
+
+        print(
+            format_tiny_live_armed_dry_run_text(
+                build_tiny_live_armed_dry_run(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1446,6 +1461,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--candidate-id",
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
+
+    tiny_live_armed_dry_run_parser = subparsers.add_parser("tiny-live-armed-dry-run", parents=[parent])
+    tiny_live_armed_dry_run_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    tiny_live_armed_dry_run_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
