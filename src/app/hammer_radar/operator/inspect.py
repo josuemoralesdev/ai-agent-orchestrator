@@ -848,6 +848,20 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "final-live-preflight":
+        from src.app.hammer_radar.operator.final_live_preflight import (
+            build_final_live_preflight,
+            format_final_live_preflight_text,
+        )
+
+        print(
+            format_final_live_preflight_text(
+                build_final_live_preflight(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1426,6 +1440,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     readiness_snapshot_parser.add_argument("--write", action="store_true")
+
+    final_live_preflight_parser = subparsers.add_parser("final-live-preflight", parents=[parent])
+    final_live_preflight_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
