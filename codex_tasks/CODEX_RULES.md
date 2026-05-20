@@ -9,6 +9,8 @@ These rules are non-negotiable.
 
 ## Scope Control
 - Make the smallest safe change needed for the requested phase.
+- Before implementation, follow the `AGENTS.md` phase classification, capability scan, reuse/extend/create decision, and duplicate-risk process.
+- If an existing capability solves 70% or more of the requested behavior, extend or wire it before creating a new module unless a clearly distinct boundary is justified.
 - Do not introduce live trading, Binance API keys, order execution, or secret handling unless the task explicitly asks for it.
 - Preserve existing Hammer Radar behavior unless the task explicitly asks to change it.
 - Do not delete existing logs, state files, or runtime scripts.
