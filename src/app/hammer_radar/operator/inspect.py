@@ -980,6 +980,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-detector-source-wiring":
+        from src.app.hammer_radar.operator.betrayal_detector_source_wiring import (
+            build_betrayal_detector_source_wiring,
+            format_betrayal_detector_source_wiring_text,
+        )
+
+        print(
+            format_betrayal_detector_source_wiring_text(
+                build_betrayal_detector_source_wiring(
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    dry_run=not args.write,
+                    write=args.write,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1436,6 +1453,11 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_paper_signal_detector_parser.add_argument("--write", action="store_true")
     betrayal_paper_signal_detector_parser.add_argument("--allow-open-tracking", action=argparse.BooleanOptionalAction, default=True)
     betrayal_paper_signal_detector_parser.add_argument("--allow-closed-outcomes", action=argparse.BooleanOptionalAction, default=True)
+
+    betrayal_detector_source_wiring_parser = subparsers.add_parser("betrayal-detector-source-wiring", parents=[parent])
+    betrayal_detector_source_wiring_parser.add_argument("--symbol", default="BTCUSDT")
+    betrayal_detector_source_wiring_parser.add_argument("--timeframe", default="222m")
+    betrayal_detector_source_wiring_parser.add_argument("--write", action="store_true")
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)

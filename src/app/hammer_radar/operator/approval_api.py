@@ -262,6 +262,9 @@ from src.app.hammer_radar.operator.betrayal_paper_signal_detector import (
     build_betrayal_paper_signal_detector_status,
     run_betrayal_paper_signal_detector,
 )
+from src.app.hammer_radar.operator.betrayal_detector_source_wiring import (
+    build_betrayal_detector_source_wiring,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -487,6 +490,13 @@ class BetrayalPaperSignalDetectorRunRequest(BaseModel):
     identity_filter: str | None = None
     allow_open_tracking: bool = True
     allow_closed_outcomes: bool = True
+
+
+class BetrayalDetectorSourceWiringReportRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    symbol: str | None = None
+    timeframe: str | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -2080,6 +2090,34 @@ def live_arming_betrayal_paper_signal_detector_run(
         identity_filter=request.identity_filter,
         allow_open_tracking=request.allow_open_tracking,
         allow_closed_outcomes=request.allow_closed_outcomes,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-detector-source-wiring")
+def live_arming_betrayal_detector_source_wiring(
+    symbol: str = "BTCUSDT",
+    timeframe: str | None = "222m",
+) -> dict:
+    return build_betrayal_detector_source_wiring(
+        symbol=symbol,
+        timeframe=timeframe,
+        dry_run=True,
+        write=False,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/betrayal-detector-source-wiring/report")
+def live_arming_betrayal_detector_source_wiring_report(
+    request: BetrayalDetectorSourceWiringReportRequest | None = None,
+) -> dict:
+    request = request or BetrayalDetectorSourceWiringReportRequest()
+    return build_betrayal_detector_source_wiring(
+        symbol=request.symbol or "BTCUSDT",
+        timeframe=request.timeframe if request.timeframe is not None else "222m",
+        dry_run=request.dry_run,
+        write=request.write,
         log_dir=get_log_dir(use_env=True),
     )
 
