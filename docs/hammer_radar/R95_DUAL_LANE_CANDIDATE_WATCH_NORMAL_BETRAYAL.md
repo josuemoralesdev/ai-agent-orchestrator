@@ -147,3 +147,5 @@ R96 Markov Support Watch Scheduler / Candidate Revalidation Loop
 ```
 
 Both remain non-executable unless a later explicit phase defines a separate, human-approved, safety-gated path.
+
+R96 created deterministic betrayal paper identities. R97 follows by adding a local paper outcome ledger and read-only tracking loop; this does not change R95's no-live, no-order, no-payload boundary.

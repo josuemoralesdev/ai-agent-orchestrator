@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
@@ -254,6 +254,10 @@ from src.app.hammer_radar.operator.source_chain_repair import build_source_chain
 from src.app.hammer_radar.operator.candidate_revalidation_watch import build_candidate_revalidation_watch
 from src.app.hammer_radar.operator.dual_lane_candidate_watch import build_dual_lane_candidate_watch
 from src.app.hammer_radar.operator.betrayal_true_paper_tracking import build_betrayal_true_paper_scaffold
+from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import (
+    build_betrayal_paper_outcome_status,
+    record_betrayal_paper_outcome,
+)
 from src.app.hammer_radar.operator.live_arming_preflight import build_live_arming_preflight
 from src.app.hammer_radar.operator.live_env_arming_checklist import (
     build_live_env_arming_checklist,
@@ -464,6 +468,12 @@ class BetrayalTruePaperScaffoldReportRequest(BaseModel):
     write: bool = False
     symbol: str | None = None
     max_candidates: int | None = None
+
+
+class BetrayalPaperOutcomeRecordRequest(BaseModel):
+    dry_run: bool = True
+    write: bool = False
+    outcome: dict[str, Any] | None = None
 
 
 class LiveExecutionIntentRequest(BaseModel):
@@ -1978,6 +1988,43 @@ def live_arming_betrayal_true_paper_scaffold_report(
     return build_betrayal_true_paper_scaffold(
         symbol=request.symbol or "BTCUSDT",
         max_candidates=request.max_candidates if request.max_candidates is not None else 20,
+        dry_run=request.dry_run,
+        write=request.write,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-paper-outcomes/status")
+def live_arming_betrayal_paper_outcomes_status(
+    signal_id: str | None = None,
+    recent: int = Query(default=20, ge=0),
+) -> dict:
+    return build_betrayal_paper_outcome_status(
+        signal_id=signal_id,
+        recent=recent,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.get("/live-arming/betrayal-paper-outcomes")
+def live_arming_betrayal_paper_outcomes(
+    signal_id: str | None = None,
+    recent: int = Query(default=20, ge=0),
+) -> dict:
+    return build_betrayal_paper_outcome_status(
+        signal_id=signal_id,
+        recent=recent,
+        log_dir=get_log_dir(use_env=True),
+    )
+
+
+@app.post("/live-arming/betrayal-paper-outcomes/record")
+def live_arming_betrayal_paper_outcomes_record(
+    request: BetrayalPaperOutcomeRecordRequest | None = None,
+) -> dict:
+    request = request or BetrayalPaperOutcomeRecordRequest()
+    return record_betrayal_paper_outcome(
+        outcome=request.outcome,
         dry_run=request.dry_run,
         write=request.write,
         log_dir=get_log_dir(use_env=True),

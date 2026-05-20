@@ -205,6 +205,15 @@ from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
     betrayal_true_paper_outcomes_path,
     betrayal_true_paper_scaffold_path,
 )
+from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import (
+    BETRAYAL_OUTCOME_REJECTED_NO_MATCHING_IDENTITY,
+    BETRAYAL_OUTCOME_WRITE_DRY_RUN_ONLY,
+    BETRAYAL_OUTCOME_WRITTEN_LOCAL_ONLY,
+    PAPER_EVIDENCE_EMPTY,
+    PAPER_EVIDENCE_INSUFFICIENT,
+    build_betrayal_paper_outcome_status,
+    record_betrayal_paper_outcome,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract import (
     RISK_CONTRACT_INVALID,
     RISK_CONTRACT_VALID_FOR_PREFLIGHT,
@@ -3386,6 +3395,173 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
         self.assertIn("top_betrayal_paper_identities:", result.stdout)
         self.assertIn("No order placed", result.stdout)
 
+    def test_r97_empty_ledger_status_is_safe_and_joins_scaffold(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        payload = build_betrayal_paper_outcome_status(log_dir=self.log_dir)
+
+        self.assertEqual("R97", payload["phase"])
+        self.assertEqual("BETRAYAL_PAPER_OUTCOME_LEDGER_ONLY_NO_ORDER", payload["execution_mode"])
+        self.assertEqual(str(betrayal_true_paper_outcomes_path(self.log_dir)), payload["ledger_path"])
+        self.assertFalse(payload["ledger_summary"]["ledger_exists"])
+        self.assertEqual(0, payload["ledger_summary"]["ledger_record_count"])
+        self.assertGreaterEqual(payload["ledger_summary"]["identities_tracked"], 1)
+        self.assertEqual(PAPER_EVIDENCE_EMPTY, payload["identity_summaries"][0]["paper_evidence_status"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["real_order_placed"])
+        self.assertFalse(payload["execution_attempted"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+
+    def test_r97_valid_direction_entry_outcome_dry_run_validates_without_write(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        candidate = build_betrayal_true_paper_scaffold(log_dir=self.log_dir)["top_scaffold_candidates"][0]
+
+        payload = record_betrayal_paper_outcome(
+            outcome=self._r97_outcome(candidate),
+            dry_run=True,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(BETRAYAL_OUTCOME_WRITE_DRY_RUN_ONLY, payload["record_status"])
+        self.assertFalse(payload["outcome_written"])
+        self.assertEqual([], payload["validation_errors"])
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+
+    def test_r97_valid_direction_entry_outcome_write_appends_local_ndjson(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        candidate = build_betrayal_true_paper_scaffold(log_dir=self.log_dir)["top_scaffold_candidates"][0]
+
+        payload = record_betrayal_paper_outcome(
+            outcome=self._r97_outcome(candidate),
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(BETRAYAL_OUTCOME_WRITTEN_LOCAL_ONLY, payload["record_status"])
+        self.assertTrue(payload["outcome_written"])
+        records = self._read_jsonl(betrayal_true_paper_outcomes_path(self.log_dir))
+        self.assertEqual(1, len(records))
+        self.assertEqual(candidate["betrayal_paper_signal_id"], records[0]["betrayal_paper_signal_id"])
+        self.assertFalse(records[0]["real_order_placed"])
+        self.assertFalse(records[0]["order_payload_created"])
+
+    def test_r97_rejects_unknown_identity_and_aggregate_identity(self) -> None:
+        self._seed_group("primary-222m", "222m", "long", "ladder_close_50_618", wins=6, losses=42, total_pnl=-14.1309)
+        scaffold = build_betrayal_true_paper_scaffold(log_dir=self.log_dir)
+        aggregate = scaffold["aggregate_candidates_needing_decomposition"][0]
+        unknown = self._r97_outcome(scaffold["top_scaffold_candidates"][0])
+        unknown["betrayal_paper_signal_id"] = "betrayal|BTCUSDT|4m|missing|fib_650|direction_entry_mode"
+
+        missing = record_betrayal_paper_outcome(outcome=unknown, dry_run=False, write=True, log_dir=self.log_dir)
+        aggregate_payload = record_betrayal_paper_outcome(
+            outcome=self._r97_outcome(aggregate, direction="short", entry_mode="ladder_close_50_618"),
+            dry_run=False,
+            write=True,
+            log_dir=self.log_dir,
+        )
+
+        self.assertEqual(BETRAYAL_OUTCOME_REJECTED_NO_MATCHING_IDENTITY, missing["record_status"])
+        self.assertIn("aggregate-only betrayal identity requires directional decomposition before outcomes", aggregate_payload["validation_errors"])
+        self.assertFalse(betrayal_true_paper_outcomes_path(self.log_dir).exists())
+
+    def test_r97_rejects_mismatched_direction_entry_mode_and_live_fields(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_618", wins=46, losses=168, total_pnl=-1.701)
+        candidate = build_betrayal_true_paper_scaffold(log_dir=self.log_dir)["top_scaffold_candidates"][0]
+        outcome = self._r97_outcome(candidate, direction="long", entry_mode="fib_650")
+        outcome["betrayal_paper_signal_hash"] = "bad-hash"
+        outcome["real_order_placed"] = True
+        outcome["order_payload_created"] = True
+        outcome["execution_attempted"] = True
+        outcome["network_allowed"] = True
+        outcome["secrets_shown"] = True
+        outcome["live_order_id"] = "live-123"
+
+        payload = record_betrayal_paper_outcome(outcome=outcome, dry_run=False, write=True, log_dir=self.log_dir)
+
+        self.assertFalse(payload["outcome_written"])
+        self.assertIn("direction must match scaffold identity", payload["validation_errors"])
+        self.assertIn("entry_mode must match scaffold identity", payload["validation_errors"])
+        self.assertIn("betrayal_paper_signal_hash does not match scaffold identity", payload["validation_errors"])
+        self.assertIn("real_order_placed must remain false", payload["validation_errors"])
+        self.assertIn("order_payload_created must remain false", payload["validation_errors"])
+        self.assertIn("execution_attempted must remain false", payload["validation_errors"])
+        self.assertIn("network_allowed must remain false", payload["validation_errors"])
+        self.assertIn("secrets_shown must remain false", payload["validation_errors"])
+        self.assertIn("live_order_id must remain null", payload["validation_errors"])
+
+    def test_r97_summary_counts_win_loss_pnl_and_sample_progress(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+        candidate = build_betrayal_true_paper_scaffold(log_dir=self.log_dir)["top_scaffold_candidates"][0]
+        win = self._r97_outcome(candidate, outcome_id="r97-win", result="win", pnl=1.25)
+        loss = self._r97_outcome(candidate, outcome_id="r97-loss", result="loss", pnl=-0.5)
+        record_betrayal_paper_outcome(outcome=win, dry_run=False, write=True, log_dir=self.log_dir)
+        record_betrayal_paper_outcome(outcome=loss, dry_run=False, write=True, log_dir=self.log_dir)
+
+        payload = build_betrayal_paper_outcome_status(log_dir=self.log_dir)
+        summary = self._find(payload["identity_summaries"], betrayal_paper_signal_id=candidate["betrayal_paper_signal_id"])
+
+        self.assertEqual(2, summary["true_paper_outcomes_count"])
+        self.assertEqual(PAPER_EVIDENCE_INSUFFICIENT, summary["paper_evidence_status"])
+        self.assertEqual(6.67, summary["true_paper_sample_progress_pct"])
+        self.assertEqual(50.0, summary["paper_win_rate_pct"])
+        self.assertEqual(0.375, summary["paper_avg_pnl_pct"])
+        self.assertEqual(0.75, summary["paper_total_pnl_pct"])
+        self.assertEqual(1.25, summary["paper_best_pnl_pct"])
+        self.assertEqual(-0.5, summary["paper_worst_pnl_pct"])
+        self.assertFalse(summary["live_ready"])
+        self.assertFalse(summary["executable"])
+
+    def test_r97_api_endpoints_are_safe(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        status = self.client.get("/live-arming/betrayal-paper-outcomes/status")
+        self.assertEqual(200, status.status_code)
+        payload = status.json()
+        self.assertEqual("R97", payload["phase"])
+        self.assertFalse(payload["order_payload_created"])
+        self.assertFalse(payload["network_allowed"])
+        self.assertFalse(payload["secrets_shown"])
+
+        record = self.client.post("/live-arming/betrayal-paper-outcomes/record", json={"dry_run": True, "write": False})
+        self.assertEqual(200, record.status_code)
+        record_payload = record.json()
+        self.assertEqual("R97", record_payload["phase"])
+        self.assertFalse(record_payload["outcome_written"])
+        self.assertFalse(record_payload["order_payload_created"])
+        self.assertFalse(record_payload["network_allowed"])
+
+        recent = self.client.get("/live-arming/betrayal-paper-outcomes")
+        self.assertEqual(200, recent.status_code)
+        self.assertEqual("R97", recent.json()["phase"])
+
+    def test_r97_cli_command_exists(self) -> None:
+        self._seed_group("primary-4m", "4m", "long", "fib_650", wins=41, losses=163, total_pnl=-1.4766)
+
+        result = run(
+            [
+                ".venv/bin/python",
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "betrayal-paper-outcomes",
+            ],
+            cwd=Path(__file__).resolve().parents[2],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("R97 Betrayal Paper Outcome Ledger status: OK", result.stdout)
+        self.assertIn("ledger_record_count:", result.stdout)
+        self.assertIn("No order placed", result.stdout)
+
     @staticmethod
     def _row(*, timeframe: str, sample_count: int, wins: int, total_pnl: float, direction: str = "long") -> dict:
         losses = sample_count - wins
@@ -3411,6 +3587,47 @@ class BetrayalStrategyAuditTestCase(unittest.TestCase):
             if all(row.get(key) == value for key, value in filters.items()):
                 return row
         raise AssertionError(f"row not found: {filters}")
+
+    @staticmethod
+    def _r97_outcome(
+        candidate: dict,
+        *,
+        outcome_id: str = "r97-outcome-1",
+        direction: str | None = None,
+        entry_mode: str | None = None,
+        result: str = "win",
+        pnl: float = 1.25,
+    ) -> dict:
+        return {
+            "outcome_id": outcome_id,
+            "betrayal_paper_signal_id": candidate["betrayal_paper_signal_id"],
+            "betrayal_paper_signal_hash": candidate["betrayal_paper_signal_hash"],
+            "symbol": candidate["symbol"],
+            "timeframe": candidate["timeframe"],
+            "direction": direction if direction is not None else candidate.get("betrayal_direction"),
+            "entry_mode": entry_mode if entry_mode is not None else candidate.get("entry_mode"),
+            "source_signal_id": f"source-{outcome_id}",
+            "source_timestamp": "2026-05-20T00:00:00+00:00",
+            "paper_entry_price": 100.0,
+            "paper_stop_price": 98.0,
+            "paper_take_profit_price": 102.0,
+            "paper_exit_price": 101.25,
+            "paper_exit_reason": "take_profit" if result == "win" else "stop",
+            "paper_pnl_pct": pnl,
+            "paper_result_win_loss": result,
+            "max_adverse_excursion_pct": -0.25,
+            "max_favorable_excursion_pct": 1.5,
+            "created_at": "2026-05-20T00:01:00+00:00",
+            "closed_at": "2026-05-20T00:05:00+00:00",
+            "data_source": "unit_test",
+            "review_only": True,
+            "live_order_id": None,
+            "real_order_placed": False,
+            "order_payload_created": False,
+            "execution_attempted": False,
+            "network_allowed": False,
+            "secrets_shown": False,
+        }
 
     def _seed_group(
         self,

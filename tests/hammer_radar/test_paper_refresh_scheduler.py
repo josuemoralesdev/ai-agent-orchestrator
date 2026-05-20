@@ -24,6 +24,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     TASK_CANDIDATE_REVALIDATION_WATCH,
     TASK_DUAL_LANE_CANDIDATE_WATCH,
     TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD,
+    TASK_BETRAYAL_PAPER_OUTCOME_LEDGER,
     TASK_SOURCE_CHAIN_REPAIR,
     TASK_SOURCE_WARNING_REVIEW,
     TASK_TINY_LIVE_RISK_CONTRACT,
@@ -97,6 +98,8 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         self.assertNotIn(TASK_DUAL_LANE_CANDIDATE_WATCH, DEFAULT_TASKS)
         self.assertIn(TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD, AVAILABLE_TASKS)
         self.assertNotIn(TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD, DEFAULT_TASKS)
+        self.assertIn(TASK_BETRAYAL_PAPER_OUTCOME_LEDGER, AVAILABLE_TASKS)
+        self.assertNotIn(TASK_BETRAYAL_PAPER_OUTCOME_LEDGER, DEFAULT_TASKS)
 
     def test_paper_refresh_run_executes_default_tasks_with_mocked_helpers(self) -> None:
         with self._mock_helpers():
@@ -582,6 +585,31 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
         detail = record["task_results"][TASK_BETRAYAL_TRUE_PAPER_SCAFFOLD]["detail"]
         self.assertEqual(3, detail["scaffold_candidate_count"])
         self.assertFalse(detail["report_written"])
+        self.assertFalse(record["live_execution_enabled"])
+        self.assertFalse(record["order_placed"])
+
+    def test_optional_betrayal_paper_outcome_ledger_task_is_read_status_only(self) -> None:
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_betrayal_paper_outcome_status",
+            return_value={
+                "ledger_summary": {"ledger_record_count": 0, "valid_record_count": 0},
+                "tracking_loop_status": "BETRAYAL_PAPER_TRACKING_LOOP_READY",
+                "execution_mode": "BETRAYAL_PAPER_OUTCOME_LEDGER_ONLY_NO_ORDER",
+            },
+        ) as mocked:
+            record = run_refresh_sequence(
+                tasks=[TASK_BETRAYAL_PAPER_OUTCOME_LEDGER],
+                use_network=False,
+                write_outputs=False,
+                send_notifications=False,
+                log_dir=self.log_dir,
+            )
+
+        mocked.assert_called_once()
+        self.assertEqual([TASK_BETRAYAL_PAPER_OUTCOME_LEDGER], record["completed_tasks"])
+        detail = record["task_results"][TASK_BETRAYAL_PAPER_OUTCOME_LEDGER]["detail"]
+        self.assertEqual(0, detail["ledger_record_count"])
+        self.assertEqual("BETRAYAL_PAPER_TRACKING_LOOP_READY", detail["tracking_loop_status"])
         self.assertFalse(record["live_execution_enabled"])
         self.assertFalse(record["order_placed"])
 

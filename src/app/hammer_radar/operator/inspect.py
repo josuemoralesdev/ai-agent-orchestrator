@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -928,6 +929,38 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-paper-outcomes":
+        from src.app.hammer_radar.operator.betrayal_paper_outcome_ledger import (
+            build_betrayal_paper_outcome_status,
+            format_betrayal_paper_outcome_status_text,
+            record_betrayal_paper_outcome,
+        )
+
+        if args.write:
+            outcome = None
+            if args.outcome_json:
+                with Path(args.outcome_json).open("r", encoding="utf-8") as handle:
+                    outcome = json.load(handle)
+            result = record_betrayal_paper_outcome(
+                outcome=outcome,
+                dry_run=False,
+                write=True,
+                log_dir=args.log_dir,
+            )
+            print(format_betrayal_paper_outcome_status_text(build_betrayal_paper_outcome_status(log_dir=args.log_dir)))
+            print(f"record_status: {result.get('record_status')} outcome_written: {result.get('outcome_written')}")
+            if result.get("validation_errors"):
+                print(f"validation_errors: {result.get('validation_errors')}")
+        else:
+            print(
+                format_betrayal_paper_outcome_status_text(
+                    build_betrayal_paper_outcome_status(
+                        signal_id=args.signal_id,
+                        recent=args.recent,
+                        log_dir=args.log_dir,
+                    )
+                )
+            )
     elif args.command == "decisions":
         from src.app.hammer_radar.operator.approval_api import build_decisions_text
 
@@ -1371,6 +1404,12 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
     betrayal_true_paper_scaffold_parser.add_argument("--max-candidates", type=int, default=20)
     betrayal_true_paper_scaffold_parser.add_argument("--write", action="store_true")
+
+    betrayal_paper_outcomes_parser = subparsers.add_parser("betrayal-paper-outcomes", parents=[parent])
+    betrayal_paper_outcomes_parser.add_argument("--signal-id", default=None)
+    betrayal_paper_outcomes_parser.add_argument("--recent", type=int, default=20)
+    betrayal_paper_outcomes_parser.add_argument("--write", action="store_true")
+    betrayal_paper_outcomes_parser.add_argument("--outcome-json", default=None)
 
     decisions_parser = subparsers.add_parser("decisions", parents=[parent])
     decisions_parser.add_argument("--limit", type=int, default=50)
