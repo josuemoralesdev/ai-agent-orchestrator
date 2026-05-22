@@ -996,6 +996,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-live-evidence-runbook":
+        from src.app.hammer_radar.operator.first_live_evidence_runbook import (
+            build_first_live_evidence_runbook,
+            format_first_live_evidence_runbook_text,
+        )
+
+        print(
+            format_first_live_evidence_runbook_text(
+                build_first_live_evidence_runbook(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1638,6 +1653,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     first_live_guided_actions_parser.add_argument("--no-record", action="store_true")
+
+    first_live_evidence_runbook_parser = subparsers.add_parser("first-live-evidence-runbook", parents=[parent])
+    first_live_evidence_runbook_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_live_evidence_runbook_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
