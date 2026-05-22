@@ -1,0 +1,658 @@
+"""R108 first-live operator approval cockpit.
+
+This module composes existing first-live readiness gates into a UI-safe cockpit
+state and records operator approval intent only. It never enables live
+execution, places orders, creates signed payloads, or calls Binance order
+endpoints.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.final_live_preflight import READY, build_final_live_preflight
+from src.app.hammer_radar.operator.first_live_activation_gate import (
+    FIRST_LIVE_ACTIVATION_READY,
+    build_first_live_activation_gate,
+)
+from src.app.hammer_radar.operator.one_tiny_live_order_protocol import (
+    CONFIRMATION_PHRASE_TEMPLATE,
+    PROTOCOL_PREREQS_READY,
+    build_one_tiny_live_order_protocol_check,
+)
+from src.app.hammer_radar.operator.tiny_live_armed_dry_run import (
+    READY_FOR_DRY_RUN,
+    build_tiny_live_armed_dry_run,
+)
+from src.app.hammer_radar.operator.tiny_live_risk_contract import DEFAULT_CANDIDATE_ID
+
+EVENT_TYPE = "OPERATOR_APPROVAL_COCKPIT_INTENT"
+INTENTS_FILENAME = "operator_approval_cockpit_intents.ndjson"
+SOURCE_SURFACE = "operator.first_live_operator_approval_cockpit.build_operator_approval_cockpit_state"
+WINDOW_SECONDS = 15 * 60
+
+VALID_INTENTS = {"APPROVE", "REJECT", "WAIT"}
+VALID_COUNSEL_DECISIONS = {"APPROVE", "REJECT", "WAIT", "ESCALATE"}
+
+
+def build_operator_approval_cockpit_state(
+    *,
+    candidate_id: str = DEFAULT_CANDIDATE_ID,
+    log_dir: str | Path | None = None,
+    env: Mapping[str, str] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    checked_at = _utc(now)
+
+    final_preflight = build_final_live_preflight(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env)
+    dry_run = build_tiny_live_armed_dry_run(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env, record=False)
+    protocol = build_one_tiny_live_order_protocol_check(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env, record=False)
+    activation_gate = build_first_live_activation_gate(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env, record=False)
+
+    resolved_candidate_id = (
+        activation_gate.get("candidate_id")
+        or dry_run.get("candidate_id")
+        or protocol.get("candidate_id")
+        or final_preflight.get("candidate_id")
+        or candidate_id
+    )
+    risk_contract_hash = activation_gate.get("risk_contract_hash") or dry_run.get("risk_contract_hash") or final_preflight.get("risk_contract_hash")
+    packet_hash = activation_gate.get("packet_hash") or dry_run.get("packet_hash") or final_preflight.get("final_review_packet_hash")
+    window = _approval_window(activation_gate=activation_gate, risk_contract_hash=risk_contract_hash, packet_hash=packet_hash, now=checked_at)
+    latest_intent = _latest_cockpit_intent(candidate_id=str(resolved_candidate_id or ""), log_dir=resolved_log_dir)
+
+    blockers = _dedupe(
+        [
+            *[str(item) for item in activation_gate.get("blockers") or []],
+            *[f"final preflight: {item}" for item in final_preflight.get("blockers") or []],
+        ]
+    )
+    warnings = _dedupe(
+        [
+            *[str(item) for item in activation_gate.get("warnings") or []],
+            "Cockpit approval records operator intent only and cannot place a real order.",
+            "R106 first-live activation gate remains backend authority.",
+        ]
+    )
+    status = _cockpit_status(
+        activation_status=str(activation_gate.get("status") or ""),
+        window_status=window["approval_window_status"],
+        latest_intent=latest_intent,
+    )
+    can_approve = (
+        activation_gate.get("status") == FIRST_LIVE_ACTIVATION_READY
+        and window["approval_window_status"] == "OPEN"
+        and bool(resolved_candidate_id)
+        and bool(risk_contract_hash)
+        and bool(packet_hash)
+    )
+
+    state = {
+        "status": status,
+        "checked_at_utc": checked_at.isoformat(),
+        "first_live_activation_gate_status": activation_gate.get("status"),
+        "final_preflight_status": final_preflight.get("status"),
+        "tiny_live_armed_dry_run_status": dry_run.get("status"),
+        "protocol_status": protocol.get("status"),
+        "candidate_id": resolved_candidate_id,
+        "risk_contract_hash": risk_contract_hash,
+        "packet_hash": packet_hash,
+        "counsel_decision": (latest_intent or {}).get("counsel_decision") or "WAIT",
+        "counsel_tags": list((latest_intent or {}).get("counsel_tags") or ["R108", "INTENT_ONLY", "R106_GATE_AUTHORITY"]),
+        **window,
+        "sequence_steps": _sequence_steps(
+            final_preflight=final_preflight,
+            dry_run=dry_run,
+            protocol=protocol,
+            activation_gate=activation_gate,
+            window=window,
+            latest_intent=latest_intent,
+        ),
+        "simultaneous_signals": [
+            _signal_card(
+                candidate_id=str(resolved_candidate_id or ""),
+                risk_contract_hash=risk_contract_hash,
+                packet_hash=packet_hash,
+                activation_gate=activation_gate,
+                final_preflight=final_preflight,
+                window=window,
+                can_record_intent=can_approve,
+                latest_intent=latest_intent,
+            )
+        ],
+        "blockers": blockers,
+        "warnings": warnings,
+        "live_ready": False,
+        "execution_enabled_by_ui": False,
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "real_order_possible": False,
+        "secrets_shown": False,
+        "source_surfaces_used": _source_surfaces(
+            final_preflight=final_preflight,
+            dry_run=dry_run,
+            protocol=protocol,
+            activation_gate=activation_gate,
+        ),
+        "backend_authority": {
+            "r106_first_live_activation_gate": activation_gate.get("status"),
+            "ui_approval_is_execution_authority": False,
+            "telegram_approval_is_execution_authority": False,
+            "confirmation_phrase_required": True,
+            "confirmation_phrase_template": CONFIRMATION_PHRASE_TEMPLATE,
+        },
+        "latest_intent": latest_intent,
+        "intent_ledger_path": str(operator_approval_cockpit_intents_path(resolved_log_dir)),
+    }
+    return _sanitize(state)
+
+
+def record_operator_approval_cockpit_intent(
+    *,
+    candidate_id: str,
+    intent: str,
+    counsel_decision: str,
+    counsel_tags: list[str],
+    risk_contract_hash: str,
+    packet_hash: str,
+    operator_note: str | None = None,
+    log_dir: str | Path | None = None,
+    env: Mapping[str, str] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    checked_at = _utc(now)
+    state = build_operator_approval_cockpit_state(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env, now=checked_at)
+    rejection_reason = _intent_rejection_reason(
+        state=state,
+        candidate_id=candidate_id,
+        risk_contract_hash=risk_contract_hash,
+        packet_hash=packet_hash,
+        intent=intent,
+        counsel_decision=counsel_decision,
+        counsel_tags=counsel_tags,
+    )
+    accepted = rejection_reason is None
+    record = {
+        "event_type": EVENT_TYPE,
+        "intent_id": uuid4().hex,
+        "recorded_at_utc": checked_at.isoformat(),
+        "candidate_id": candidate_id,
+        "intent": intent,
+        "counsel_decision": counsel_decision,
+        "counsel_tags": _normalize_tags(counsel_tags),
+        "risk_contract_hash": risk_contract_hash,
+        "packet_hash": packet_hash,
+        "operator_note": operator_note or "",
+        "approval_window_status": state.get("approval_window_status"),
+        "approval_window_expires_at_utc": state.get("approval_window_expires_at_utc"),
+        "accepted_as_intent": accepted,
+        "rejection_reason": rejection_reason,
+        "first_live_activation_gate_status": state.get("first_live_activation_gate_status"),
+        "live_ready": False,
+        "execution_enabled_by_ui": False,
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "real_order_possible": False,
+        "secrets_shown": False,
+    }
+    append_operator_approval_cockpit_intent(record, log_dir=resolved_log_dir)
+    current_state = build_operator_approval_cockpit_state(candidate_id=candidate_id, log_dir=resolved_log_dir, env=env, now=checked_at)
+    return _sanitize(
+        {
+            "status": "INTENT_RECORDED" if accepted else "INTENT_REJECTED",
+            "accepted_as_intent": accepted,
+            "rejection_reason": rejection_reason,
+            "record": record,
+            "current_state": current_state,
+            "live_ready": False,
+            "execution_enabled_by_ui": False,
+            "order_placed": False,
+            "real_order_placed": False,
+            "execution_attempted": False,
+            "real_order_possible": False,
+            "secrets_shown": False,
+        }
+    )
+
+
+def append_operator_approval_cockpit_intent(record: dict[str, Any], *, log_dir: str | Path) -> None:
+    path = operator_approval_cockpit_intents_path(log_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(_sanitize(record), sort_keys=True) + "\n")
+
+
+def load_operator_approval_cockpit_intents(
+    *,
+    limit: int = 50,
+    intent_id: str | None = None,
+    candidate_id: str | None = None,
+    log_dir: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    path = operator_approval_cockpit_intents_path(get_log_dir(log_dir, use_env=True))
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            record = _sanitize(json.loads(line))
+            if intent_id is not None and record.get("intent_id") != intent_id:
+                continue
+            if candidate_id is not None and record.get("candidate_id") != candidate_id:
+                continue
+            records.append(record)
+    records = list(reversed(records))
+    if limit > 0:
+        return records[:limit]
+    return records
+
+
+def operator_approval_cockpit_intents_path(log_dir: str | Path) -> Path:
+    return Path(log_dir) / INTENTS_FILENAME
+
+
+def operator_approval_cockpit_html() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>R108 First-Live Operator Approval Cockpit</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, sans-serif; background: #080b10; color: #f8fafc; }
+    body { margin: 0; background: #080b10; }
+    header { padding: 20px; border-bottom: 1px solid #273244; background: #0f172a; }
+    main { max-width: 1180px; margin: 0 auto; padding: 20px; }
+    .guard { padding: 14px 20px; background: #450a0a; color: #fee2e2; font-weight: 900; letter-spacing: .02em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .panel, .step, .signal { border: 1px solid #334155; border-radius: 8px; background: #111827; padding: 14px; margin-bottom: 14px; }
+    .ready { border-color: #22c55e; }
+    .blocked { border-color: #ef4444; }
+    .expired { border-color: #f59e0b; }
+    .intent { border-color: #38bdf8; }
+    .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+    .value { font-weight: 800; overflow-wrap: anywhere; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .tag { display: inline-block; margin: 3px 4px 3px 0; padding: 4px 8px; border-radius: 999px; background: #1e293b; border: 1px solid #475569; font-size: 12px; font-weight: 800; }
+    .hourglass { font-size: 26px; font-weight: 900; }
+    .buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+    button { min-height: 70px; border-radius: 8px; border: 2px solid #64748b; background: #1e293b; color: #f8fafc; font-size: 20px; font-weight: 900; cursor: pointer; }
+    button.approve { background: #14532d; border-color: #22c55e; }
+    button.reject { background: #7f1d1d; border-color: #ef4444; }
+    button.wait { background: #78350f; border-color: #f59e0b; }
+    button:disabled { background: #1f2937; color: #64748b; border-color: #374151; cursor: not-allowed; }
+    input, textarea, select { width: 100%; box-sizing: border-box; padding: 9px; border-radius: 6px; border: 1px solid #475569; background: #020617; color: #f8fafc; }
+    pre { white-space: pre-wrap; background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>R108 First-Live Operator Approval Cockpit</h1>
+    <div>INTENT ONLY | NO ORDER WILL BE PLACED | R106 GATE AUTHORITY</div>
+  </header>
+  <div class="guard">This UI cannot place real orders, cannot enable execution, and cannot override backend gates.</div>
+  <main>
+    <section id="summary" class="panel blocked">
+      <div class="grid">
+        <div><div class="label">Cockpit status</div><div id="status" class="value">loading</div></div>
+        <div><div class="label">R106 gate</div><div id="gate" class="value">loading</div></div>
+        <div><div class="label">Window</div><div id="window" class="value">loading</div></div>
+        <div><div class="label">Hourglass</div><div id="hourglass" class="hourglass">...</div></div>
+        <div><div class="label">live_ready</div><div class="value">false</div></div>
+        <div><div class="label">execution_enabled_by_ui</div><div class="value">false</div></div>
+        <div><div class="label">order_placed</div><div class="value">false</div></div>
+        <div><div class="label">real_order_possible</div><div class="value">false</div></div>
+      </div>
+    </section>
+
+    <h2>Sequence View</h2>
+    <section id="sequence"></section>
+
+    <h2>Simultaneous Signal View</h2>
+    <section id="signals"></section>
+
+    <section class="panel">
+      <h2>Record Counsel / Operator Intent</h2>
+      <div class="grid">
+        <div><div class="label">candidate_id</div><input id="candidateId"></div>
+        <div><div class="label">risk_contract_hash</div><input id="riskHash"></div>
+        <div><div class="label">packet_hash</div><input id="packetHash"></div>
+        <div><div class="label">counsel_decision</div><select id="counsel"><option>WAIT</option><option>APPROVE</option><option>REJECT</option><option>ESCALATE</option></select></div>
+      </div>
+      <p><div class="label">counsel_tags comma separated</div><input id="tags" value="R108,INTENT_ONLY,R106_GATE_AUTHORITY"></p>
+      <p><div class="label">operator_note optional</div><textarea id="note" rows="3"></textarea></p>
+      <div class="buttons">
+        <button id="approve" class="approve" onclick="recordIntent('APPROVE')">APPROVE INTENT ONLY</button>
+        <button id="reject" class="reject" onclick="recordIntent('REJECT')">REJECT INTENT ONLY</button>
+        <button id="wait" class="wait" onclick="recordIntent('WAIT')">WAIT INTENT ONLY</button>
+      </div>
+      <p id="intentMessage"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Backend Evidence</h2>
+      <pre id="raw">loading</pre>
+    </section>
+  </main>
+  <script>
+    let state = null;
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function tags(items) {
+      return (items || []).map(item => `<span class="tag">${esc(item)}</span>`).join('');
+    }
+    function panelClass(status) {
+      if (status === 'INTENT_RECORDED') return 'intent';
+      if (status === 'EXPIRED') return 'expired';
+      if (status === 'READY_FOR_REVIEW' || status === 'READY' || status === 'FIRST_LIVE_ACTIVATION_READY') return 'ready';
+      return 'blocked';
+    }
+    async function loadState() {
+      const response = await fetch('/operator/approval-cockpit/state');
+      state = await response.json();
+      document.getElementById('status').textContent = state.status;
+      document.getElementById('gate').textContent = state.first_live_activation_gate_status;
+      document.getElementById('window').textContent = `${state.approval_window_status} ${state.approval_window_seconds_remaining ?? 'n/a'}s`;
+      document.getElementById('hourglass').textContent = state.approval_window_status === 'OPEN' ? `hourglass ${state.approval_window_seconds_remaining}s` : state.approval_window_status;
+      document.getElementById('summary').className = `panel ${panelClass(state.status)}`;
+      document.getElementById('candidateId').value = state.candidate_id || '';
+      document.getElementById('riskHash').value = state.risk_contract_hash || '';
+      document.getElementById('packetHash').value = state.packet_hash || '';
+      document.getElementById('counsel').value = state.counsel_decision || 'WAIT';
+      document.getElementById('tags').value = (state.counsel_tags || []).join(',');
+      const disabled = state.approval_window_status !== 'OPEN' || state.first_live_activation_gate_status !== 'FIRST_LIVE_ACTIVATION_READY';
+      for (const id of ['approve', 'reject', 'wait']) document.getElementById(id).disabled = disabled;
+      document.getElementById('sequence').innerHTML = state.sequence_steps.map(step => `
+        <div class="step ${panelClass(step.status)}">
+          <div class="grid">
+            <div><div class="label">step</div><div class="value">${esc(step.label)}</div></div>
+            <div><div class="label">status</div><div class="value">${esc(step.status)}</div></div>
+            <div><div class="label">required</div><div class="value">${esc(step.required)}</div></div>
+            <div><div class="label">blockers</div><div class="value">${esc(step.blocker_count)}</div></div>
+            <div><div class="label">can_approve</div><div class="value">${esc(step.can_approve)}</div></div>
+            <div><div class="label">expires_at_utc</div><div class="value mono">${esc(step.expires_at_utc || 'n/a')}</div></div>
+          </div>
+        </div>`).join('');
+      document.getElementById('signals').innerHTML = state.simultaneous_signals.map(signal => `
+        <div class="signal ${panelClass(signal.approval_window_status)}">
+          <div class="grid">
+            <div><div class="label">candidate</div><div class="value mono">${esc(signal.candidate_id)}</div></div>
+            <div><div class="label">symbol</div><div class="value">${esc(signal.symbol)}</div></div>
+            <div><div class="label">timeframe</div><div class="value">${esc(signal.timeframe)}</div></div>
+            <div><div class="label">direction</div><div class="value">${esc(signal.direction)}</div></div>
+            <div><div class="label">score</div><div class="value">${esc(signal.score ?? 'n/a')}</div></div>
+            <div><div class="label">counsel</div><div class="value">${esc(signal.counsel_decision)}</div></div>
+            <div><div class="label">window</div><div class="value">${esc(signal.approval_window_status)} ${esc(signal.seconds_remaining ?? 'n/a')}s</div></div>
+            <div><div class="label">can_record_intent</div><div class="value">${esc(signal.can_record_intent)}</div></div>
+          </div>
+          <p>${tags(signal.tags)}</p>
+          <p><strong>Blockers:</strong> ${esc((signal.blockers || []).join('; ') || 'none')}</p>
+          <p><strong>Warnings:</strong> ${esc((signal.warnings || []).join('; ') || 'none')}</p>
+        </div>`).join('');
+      document.getElementById('raw').textContent = JSON.stringify(state, null, 2);
+    }
+    async function recordIntent(intent) {
+      const payload = {
+        candidate_id: document.getElementById('candidateId').value,
+        intent,
+        counsel_decision: document.getElementById('counsel').value,
+        counsel_tags: document.getElementById('tags').value.split(',').map(x => x.trim()).filter(Boolean),
+        risk_contract_hash: document.getElementById('riskHash').value,
+        packet_hash: document.getElementById('packetHash').value,
+        operator_note: document.getElementById('note').value
+      };
+      const response = await fetch('/operator/approval-cockpit/intent', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      document.getElementById('intentMessage').textContent = response.ok ? `INTENT_RECORDED ${data.record.intent_id}` : `INTENT_REJECTED ${JSON.stringify(data.detail || data)}`;
+      await loadState();
+    }
+    loadState();
+    setInterval(loadState, 10000);
+  </script>
+</body>
+</html>"""
+
+
+def _sequence_steps(
+    *,
+    final_preflight: Mapping[str, Any],
+    dry_run: Mapping[str, Any],
+    protocol: Mapping[str, Any],
+    activation_gate: Mapping[str, Any],
+    window: Mapping[str, Any],
+    latest_intent: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    return [
+        _step("final preflight", final_preflight.get("status"), final_preflight.get("blockers"), final_preflight.get("status") == READY),
+        _step("armed dry run", dry_run.get("status"), dry_run.get("blockers"), dry_run.get("status") == READY_FOR_DRY_RUN),
+        _step(
+            "one tiny live order protocol",
+            protocol.get("status"),
+            protocol.get("blockers"),
+            protocol.get("status") == PROTOCOL_PREREQS_READY,
+        ),
+        _step(
+            "first live activation gate",
+            activation_gate.get("status"),
+            activation_gate.get("blockers"),
+            activation_gate.get("status") == FIRST_LIVE_ACTIVATION_READY,
+        ),
+        {
+            "label": "operator approval intent",
+            "status": "INTENT_RECORDED" if latest_intent and latest_intent.get("accepted_as_intent") else "READY_FOR_REVIEW",
+            "required": True,
+            "blocker_count": 0 if latest_intent and latest_intent.get("accepted_as_intent") else 1,
+            "can_approve": activation_gate.get("status") == FIRST_LIVE_ACTIVATION_READY and window.get("approval_window_status") == "OPEN",
+            "expires_at_utc": window.get("approval_window_expires_at_utc"),
+        },
+        {
+            "label": "confirmation phrase requirement",
+            "status": "BLOCKED",
+            "required": True,
+            "blocker_count": 1,
+            "can_approve": False,
+            "expires_at_utc": None,
+        },
+    ]
+
+
+def _step(label: str, status: Any, blockers: Any, can_approve: bool) -> dict[str, Any]:
+    return {
+        "label": label,
+        "status": str(status or "BLOCKED"),
+        "required": True,
+        "blocker_count": len(list(blockers or [])),
+        "can_approve": bool(can_approve),
+        "expires_at_utc": None,
+    }
+
+
+def _signal_card(
+    *,
+    candidate_id: str,
+    risk_contract_hash: Any,
+    packet_hash: Any,
+    activation_gate: Mapping[str, Any],
+    final_preflight: Mapping[str, Any],
+    window: Mapping[str, Any],
+    can_record_intent: bool,
+    latest_intent: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    parsed = _parse_candidate_id(candidate_id)
+    return {
+        "candidate_id": candidate_id,
+        "symbol": parsed.get("symbol"),
+        "timeframe": parsed.get("timeframe"),
+        "direction": parsed.get("direction"),
+        "score": None,
+        "risk_contract_hash": risk_contract_hash,
+        "packet_hash": packet_hash,
+        "counsel_decision": (latest_intent or {}).get("counsel_decision") or "WAIT",
+        "tags": list((latest_intent or {}).get("counsel_tags") or ["R108", "INTENT_ONLY", "NO_ORDER", "R106_GATE_AUTHORITY"]),
+        "approval_window_status": window.get("approval_window_status"),
+        "seconds_remaining": window.get("approval_window_seconds_remaining"),
+        "can_record_intent": bool(can_record_intent),
+        "blockers": list(activation_gate.get("blockers") or []),
+        "warnings": list(final_preflight.get("warnings") or []),
+    }
+
+
+def _approval_window(*, activation_gate: Mapping[str, Any], risk_contract_hash: Any, packet_hash: Any, now: datetime) -> dict[str, Any]:
+    if not risk_contract_hash or not packet_hash:
+        return {
+            "approval_window_opened_at_utc": None,
+            "approval_window_expires_at_utc": None,
+            "approval_window_seconds_remaining": 0,
+            "approval_window_status": "MISSING",
+        }
+    opened_at = _parse_dt(activation_gate.get("checked_at_utc") or activation_gate.get("recorded_at_utc")) or now
+    expires_at = opened_at + timedelta(seconds=WINDOW_SECONDS)
+    seconds_remaining = max(0, int((expires_at - now).total_seconds()))
+    return {
+        "approval_window_opened_at_utc": opened_at.isoformat(),
+        "approval_window_expires_at_utc": expires_at.isoformat(),
+        "approval_window_seconds_remaining": seconds_remaining,
+        "approval_window_status": "OPEN" if seconds_remaining > 0 else "EXPIRED",
+    }
+
+
+def _intent_rejection_reason(
+    *,
+    state: Mapping[str, Any],
+    candidate_id: str,
+    risk_contract_hash: str,
+    packet_hash: str,
+    intent: str,
+    counsel_decision: str,
+    counsel_tags: list[str],
+) -> str | None:
+    if intent not in VALID_INTENTS:
+        return "invalid intent"
+    if counsel_decision not in VALID_COUNSEL_DECISIONS:
+        return "invalid counsel_decision"
+    if len(_normalize_tags(counsel_tags)) != len(counsel_tags):
+        return "invalid counsel_tags"
+    if not state.get("candidate_id") or not state.get("risk_contract_hash") or not state.get("packet_hash"):
+        return "missing candidate or hash data"
+    if state.get("approval_window_status") != "OPEN":
+        return f"approval window is {state.get('approval_window_status') or 'MISSING'}"
+    if candidate_id != state.get("candidate_id"):
+        return "candidate_id mismatch"
+    if risk_contract_hash != state.get("risk_contract_hash"):
+        return "risk_contract_hash mismatch"
+    if packet_hash != state.get("packet_hash"):
+        return "packet_hash mismatch"
+    if state.get("first_live_activation_gate_status") != FIRST_LIVE_ACTIVATION_READY:
+        return "R106 first-live activation gate is not ready"
+    return None
+
+
+def _source_surfaces(
+    *,
+    final_preflight: Mapping[str, Any],
+    dry_run: Mapping[str, Any],
+    protocol: Mapping[str, Any],
+    activation_gate: Mapping[str, Any],
+) -> list[str]:
+    sources = [
+        SOURCE_SURFACE,
+        "operator.final_live_preflight.build_final_live_preflight",
+        "operator.tiny_live_armed_dry_run.build_tiny_live_armed_dry_run",
+        "operator.one_tiny_live_order_protocol.build_one_tiny_live_order_protocol_check",
+        "operator.first_live_activation_gate.build_first_live_activation_gate",
+        "R106 first-live activation gate",
+    ]
+    for payload in (final_preflight, dry_run, protocol, activation_gate):
+        sources.extend(str(item) for item in payload.get("source_surfaces_used") or [])
+    return _dedupe(sources)
+
+
+def _cockpit_status(*, activation_status: str, window_status: str, latest_intent: Mapping[str, Any] | None) -> str:
+    if latest_intent and latest_intent.get("accepted_as_intent") is True:
+        return "INTENT_RECORDED"
+    if window_status == "EXPIRED":
+        return "EXPIRED"
+    if activation_status == FIRST_LIVE_ACTIVATION_READY and window_status == "OPEN":
+        return "READY_FOR_REVIEW"
+    return "BLOCKED"
+
+
+def _latest_cockpit_intent(*, candidate_id: str, log_dir: Path) -> dict[str, Any] | None:
+    records = load_operator_approval_cockpit_intents(limit=1, candidate_id=candidate_id, log_dir=log_dir)
+    return records[0] if records else None
+
+
+def _parse_candidate_id(candidate_id: str) -> dict[str, str | None]:
+    parts = str(candidate_id or "").split("|")
+    return {
+        "symbol": parts[1] if len(parts) > 1 else None,
+        "timeframe": parts[2] if len(parts) > 2 else None,
+        "direction": parts[3] if len(parts) > 3 else None,
+    }
+
+
+def _normalize_tags(tags: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for tag in tags:
+        item = str(tag or "").strip().upper()
+        if not item or len(item) > 40 or not all(char.isalnum() or char in {"_", "-"} for char in item):
+            continue
+        normalized.append(item)
+    return normalized[:12]
+
+
+def _parse_dt(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _utc(parsed)
+
+
+def _utc(value: datetime | None = None) -> datetime:
+    current = value or datetime.now(UTC)
+    if current.tzinfo is None:
+        return current.replace(tzinfo=UTC)
+    return current.astimezone(UTC)
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    return list(dict.fromkeys(str(item) for item in items if str(item)))
+
+
+def _sanitize(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        sanitized = {str(key): _sanitize(value) for key, value in payload.items()}
+        for key in list(sanitized):
+            lower = key.lower()
+            if any(token in lower for token in ("api_key", "api_secret", "secret", "token", "signature")) and lower not in {
+                "secrets_shown",
+            }:
+                if lower.endswith("_present"):
+                    sanitized[key] = bool(sanitized[key])
+                else:
+                    sanitized[key] = "[redacted]"
+        return sanitized
+    if isinstance(payload, list):
+        return [_sanitize(item) for item in payload]
+    return payload

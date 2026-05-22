@@ -1,0 +1,362 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+Phase:
+R108
+
+Branch:
+r108-first-live-operator-approval-cockpit
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create a minimal operator approval cockpit for the first-live readiness chain.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire approval buttons to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Telegram approval intent remains intent only.
+- UI approval remains intent only.
+- Backend gates remain authority.
+- R106 first-live activation gate remains authority.
+- Any approve/reject button must record operator intent only.
+
+Context:
+R101-R106 created the first-live readiness spine.
+R106.5 added specialized agent/task workflow.
+R107 created first-live execution phase design.
+
+Now R108 must create a very simple UI/operator cockpit showing candidate readiness and approval windows in a sequence/simultaneous approval layout.
+
+The desired UI:
+- Minimalist design.
+- Maximalist approval/reject buttons.
+- Sequence view for required gate order.
+- Simultaneous signal view for active candidate/operator decisions.
+- Each signal/card/button includes tagged info.
+- Include “counsel decision” metadata/tagging.
+- Each approvable item has a visible countdown/hourglass showing remaining approval window.
+- Expired windows must disable approval.
+- Approval records intent only, never execution.
+- UI must clearly show BLOCKED / READY_FOR_REVIEW / EXPIRED / INTENT_RECORDED.
+- Must show that no real order can be placed from this UI.
+
+Capability scan:
+Inspect:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect operator/API/frontend-relevant surfaces:
+- src/app/hammer_radar/operator/approval_api.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/final_approval_intent.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/operator_actions.py
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*telegram*
+- src/app/hammer_radar/execution/
+- tests/hammer_radar/
+
+Also inspect whether this repo already has:
+- static HTML UI
+- FastAPI templates
+- frontend assets
+- approval dashboard
+- operator dashboard
+- existing UI routes
+
+Reuse / extend preference:
+Prefer extending existing approval API/UI patterns if present.
+If no UI pattern exists, create a minimal static HTML/JS page served by the existing approval API only if safe and consistent.
+Do not create a heavy frontend framework.
+Do not introduce React unless the repo already uses it for operator UI.
+Do not create an execution endpoint.
+Do not duplicate readiness logic.
+UI must consume existing gate/status surfaces.
+
+Main deliverables:
+
+1. Create R108 design doc:
+docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+
+Include:
+- What R108 adds
+- What R108 does not add
+- UI concept
+- Sequence approval model
+- Simultaneous signal approval model
+- Counsel decision tags
+- Hourglass/countdown approval window behavior
+- Expired approval behavior
+- Backend authority model
+- Why UI approval is not execution authority
+- Safety constraints
+- How this prepares future R109
+
+2. Add or extend API safely.
+
+Preferred endpoint names if approval_api.py is the correct place:
+- GET /operator/approval-cockpit
+  Returns minimal HTML cockpit.
+
+- GET /operator/approval-cockpit/state
+  Returns JSON state composed from existing gates:
+  - final_live_preflight
+  - tiny_live_armed_dry_run
+  - one_tiny_live_order_protocol
+  - first_live_activation_gate
+  - approval intents
+  - candidate/hash metadata if available
+
+- POST /operator/approval-cockpit/intent
+  Records UI approval/reject/counsel intent only.
+
+If existing route conventions differ, follow existing conventions.
+
+The state JSON must include:
+- status
+- checked_at_utc
+- first_live_activation_gate_status
+- final_preflight_status
+- tiny_live_armed_dry_run_status
+- protocol_status
+- candidate_id
+- risk_contract_hash
+- packet_hash
+- counsel_decision
+- counsel_tags
+- approval_window_opened_at_utc
+- approval_window_expires_at_utc
+- approval_window_seconds_remaining
+- approval_window_status: OPEN / EXPIRED / MISSING
+- sequence_steps
+- simultaneous_signals
+- blockers
+- warnings
+- live_ready: false
+- execution_enabled_by_ui: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+- source_surfaces_used
+
+Sequence steps should include:
+- final preflight
+- armed dry run
+- one tiny live order protocol
+- first live activation gate
+- operator approval intent
+- confirmation phrase requirement
+
+Each step should include:
+- label
+- status
+- required
+- blocker_count
+- can_approve
+- expires_at_utc if relevant
+
+Simultaneous signals should include candidate/signal cards if available:
+- candidate_id
+- symbol
+- timeframe
+- direction
+- score if available
+- counsel_decision
+- tags
+- approval_window_status
+- seconds_remaining
+- can_record_intent
+- blockers
+- warnings
+
+3. Approval/counsel intent behavior:
+POST /operator/approval-cockpit/intent must accept:
+- candidate_id
+- intent: APPROVE / REJECT / WAIT
+- counsel_decision: APPROVE / REJECT / WAIT / ESCALATE
+- counsel_tags: list of short strings
+- risk_contract_hash
+- packet_hash
+- operator_note optional
+
+It must:
+- validate shape
+- reject expired approval windows
+- reject missing candidate/hash data
+- record append-only intent only
+- never place orders
+- never enable execution
+- never alter env flags
+- return current gate status after recording
+
+Use or extend existing final approval intent ledger if suitable.
+If separate ledger is clearer, use:
+operator_approval_cockpit_intents.ndjson
+
+Ledger fields:
+- event_type: OPERATOR_APPROVAL_COCKPIT_INTENT
+- recorded_at_utc
+- candidate_id
+- intent
+- counsel_decision
+- counsel_tags
+- risk_contract_hash
+- packet_hash
+- approval_window_status
+- approval_window_expires_at_utc
+- accepted_as_intent: true/false
+- rejection_reason if any
+- first_live_activation_gate_status
+- live_ready: false
+- execution_enabled_by_ui: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+4. Minimal UI:
+If adding HTML, make it:
+- no external CDN
+- no secret display
+- no trading execution button
+- simple black/dark interface
+- large buttons
+- each card has countdown/hourglass visual
+- disabled buttons when expired/blocked
+- clear labels:
+  - INTENT ONLY
+  - NO ORDER WILL BE PLACED
+  - R106 GATE AUTHORITY
+- support sequence and simultaneous sections
+
+5. Update phase index:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R108:
+- status
+- purpose
+- commands/endpoints
+- safety state
+- artifact path
+- agent roles
+
+6. Create R109 draft task:
+codex_tasks/phases/R109_FIRST_LIVE_DRY_AUTHORIZATION_COCKPIT_REVIEW.md
+
+R109 should be a review/hardening phase for the cockpit before any future execution authorization.
+It must remain non-executing unless explicitly authorized later.
+
+Tests:
+Add or update tests under tests/hammer_radar/ covering:
+- cockpit state endpoint returns live_ready=false
+- cockpit state endpoint returns execution_enabled_by_ui=false
+- cockpit state endpoint includes sequence_steps
+- cockpit state endpoint includes simultaneous_signals
+- cockpit state includes countdown/window status
+- cockpit intent rejects expired windows
+- cockpit intent records intent only
+- cockpit intent never places order
+- cockpit intent never enables execution
+- cockpit intent never exposes secrets
+- malformed intent is rejected
+- counsel_decision and counsel_tags are recorded
+- blockers/warnings are included
+- source_surfaces_used includes R106 gate
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused cockpit tests
+- full tests/hammer_radar if Python runtime/API changed
+
+Optional safe smoke:
+If API route exists and can be tested locally without service restart, use TestClient or pytest only.
+Do not restart services.
+Do not call real Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Cockpit endpoints added:
+UI added:
+Approval/counsel intent ledger used:
+R108 design doc:
+R109 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R108 cockpit status:
+Exact blockers still present:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R108 cockpit package in one pass.
+Prefer minimal implementation over over-engineered frontend.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.

@@ -1,6 +1,6 @@
 # Live Readiness Phase Index
 
-This index maps the R101-R108 first-live readiness path. It is documentation only and does not change runtime trading behavior.
+This index maps the R101-R109 first-live readiness path. It is documentation only and does not change runtime trading behavior.
 
 | Phase | Status | Purpose | Primary Command | Safety State | Artifact / Doc Path | Agent Roles |
 |---|---|---|---|---|---|---|
@@ -12,7 +12,8 @@ This index maps the R101-R108 first-live readiness path. It is documentation onl
 | R106 first-live activation gate | Complete | Compose R102-R105 evidence into the final non-executing activation gate before any future execution phase. | `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-activation-gate` | Returns `FIRST_LIVE_BLOCKED` or `FIRST_LIVE_ACTIVATION_READY`; still non-executing. | `docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md` | builder, index, qa, security |
 | R106.5 specialized agent task workflow integration | Complete | Add specialized agent role files, phase task folders, workflow docs, and an R107 draft task. | None; workflow/documentation phase only. | No runtime changes, no live trading, no order calls, no env edits. | `docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md`, `codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md` | builder, index, qa, security |
 | R107 first-live execution phase design | Complete | Formal design package for a future first-live execution phase after R106, including preconditions, risk, approval, protective, rollback, monitoring, and postmortem requirements. | None; design/config/task artifacts only. | Design only; no live trading, no order calls, no env edits, no execution authority. | `docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md`, `configs/hammer_radar/first_live_execution_design_checklist.json`, `codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md` | builder, index, qa, security |
-| R108 planned first-live dry authorization gate | Planned draft | Future dry authorization gate to verify R107 design artifacts and R106 evidence without order placement. | Planned only; possible future `first-live-execution-dry-authorization-gate` if explicitly implemented. | Dry authorization only; no order placement unless separately authorized in a later execution phase. | `codex_tasks/phases/R108_FIRST_LIVE_EXECUTION_DRY_AUTHORIZATION_GATE.md` | builder, index, qa, security |
+| R108 first-live operator approval cockpit | Complete | Minimal operator cockpit showing R102-R106 readiness, approval sequence, simultaneous signal cards, counsel tags, and approval-window countdowns. Buttons record intent only. | `GET /operator/approval-cockpit`, `GET /operator/approval-cockpit/state`, `POST /operator/approval-cockpit/intent` | UI/API intent only; `live_ready=false`, `execution_enabled_by_ui=false`, `order_placed=false`, `execution_attempted=false`, R106 remains authority. | `docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md` | builder, index, qa, security |
+| R109 first-live dry authorization cockpit review | Draft task | Review and harden the R108 cockpit before any future dry authorization or execution-adjacent work. | None yet; future review task only. | Non-executing review/hardening only; no live trading, no order calls, no env edits. | `codex_tasks/phases/R109_FIRST_LIVE_DRY_AUTHORIZATION_COCKPIT_REVIEW.md` | builder, index, qa, security |
 
 ## Source-Of-Truth Notes
 
@@ -22,4 +23,5 @@ This index maps the R101-R108 first-live readiness path. It is documentation onl
 - R105 defines protocol prerequisites; it does not place orders.
 - R106 reports activation readiness for a future phase; it does not enable execution.
 - R107 is design only and creates no execution authority.
-- R108 is planned dry authorization only and must not place orders.
+- R108 is a cockpit and intent ledger only; it cannot place orders or override R106.
+- R109 is a draft review/hardening task and must remain non-executing.
