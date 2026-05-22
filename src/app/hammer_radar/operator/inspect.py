@@ -1011,6 +1011,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-live-evidence-assisted-run":
+        from src.app.hammer_radar.operator.first_live_evidence_assisted_run import (
+            build_first_live_evidence_assisted_run,
+            format_first_live_evidence_assisted_run_text,
+        )
+
+        print(
+            format_first_live_evidence_assisted_run_text(
+                build_first_live_evidence_assisted_run(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    group=args.group,
+                    all_groups=args.all_groups,
+                    execute_evidence=args.execute_evidence,
+                    confirm_evidence_only=args.confirm_evidence_only,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1660,6 +1678,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     first_live_evidence_runbook_parser.add_argument("--no-record", action="store_true")
+
+    first_live_evidence_assisted_run_parser = subparsers.add_parser("first-live-evidence-assisted-run", parents=[parent])
+    first_live_evidence_assisted_run_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_live_evidence_assisted_run_parser.add_argument("--group", default=None)
+    first_live_evidence_assisted_run_parser.add_argument("--all-groups", action="store_true")
+    first_live_evidence_assisted_run_parser.add_argument("--execute-evidence", action="store_true")
+    first_live_evidence_assisted_run_parser.add_argument("--confirm-evidence-only", default=None)
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
