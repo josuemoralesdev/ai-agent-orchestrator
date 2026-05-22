@@ -1,0 +1,394 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R118_FIRST_LIVE_ACTIVATION_GATE_FINAL_REVIEW.md
+
+Phase:
+R118
+
+Branch:
+r118-first-live-activation-gate-final-review
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the final non-executing first-live activation gate review that determines whether the system is ready to request explicit first-live execution authorization.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R118 is final review only.
+- R118 must not execute live trading under any circumstance.
+
+Context:
+R112 records first-live operator evidence.
+R113 rechecks prerequisites after evidence.
+R114 generates evidence-guided clearing actions.
+R115 creates the evidence recording runbook.
+R116 assists evidence recording safely.
+R117 creates the post-evidence gate recheck.
+
+R118 must combine the whole readiness chain into one final review:
+- R102 final-live-preflight
+- R104 tiny-live-armed-dry-run
+- R105 one-tiny-live-order-protocol
+- R106 first-live-activation-gate
+- R109 cockpit sacred button
+- R112 evidence status
+- R113 prerequisite recheck
+- R116 assisted run state
+- R117 post-evidence gate recheck
+
+Main objective:
+Add a CLI command that returns whether the system is ready to request explicit first-live execution authorization.
+
+Required CLI command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-activation-final-review
+
+Output JSON must include:
+
+- status:
+  - FINAL_REVIEW_BLOCKED
+  - FINAL_REVIEW_PARTIAL
+  - READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION
+
+- checked_at_utc
+
+Hard safety fields:
+- live_ready: false
+- execution_enabled_by_final_review: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+Important:
+Even if READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION is returned, this command must not return live_ready=true.
+It means only:
+“The system may request explicit human authorization for a future first-live execution phase.”
+
+It does not authorize execution by itself.
+
+Required sections:
+
+1. active_tuple:
+- candidate_id
+- risk_contract_hash
+- packet_hash
+- tuple_status: CONSISTENT / INCONSISTENT / MISSING
+- source
+
+2. source_statuses:
+- R102 final preflight
+- R104 tiny live armed dry run
+- R105 protocol
+- R106 activation gate
+- R109 cockpit
+- R112 evidence status
+- R113 prerequisite recheck
+- R116 assisted run latest status
+- R117 post-evidence recheck
+
+3. readiness_matrix:
+For each layer:
+- layer
+- required_status
+- current_status
+- satisfied: true/false
+- blockers
+- verification_command
+
+Layers:
+- final_preflight
+- armed_dry_run
+- one_tiny_live_order_protocol
+- activation_gate
+- cockpit_sacred_button
+- evidence_status
+- prerequisite_recheck
+- post_evidence_recheck
+- paper_live_separation
+- secret_safety
+- no_order_safety
+
+4. authorization_request_readiness:
+- can_request_authorization: true/false
+- reason
+- missing_requirements
+- required_confirmation_phrase_template
+- future_phase_required: true
+- future_phase_suggestion: R119_FIRST_LIVE_EXPLICIT_AUTHORIZATION_REQUEST
+
+5. remaining_blockers:
+- blocker
+- source
+- owner: OPERATOR / CONFIG / MARKET / CODE / EXCHANGE / UNKNOWN
+- severity: HIGH / MEDIUM / LOW
+- next_action
+- command
+
+6. final_operator_readiness_checklist:
+- active tuple consistent?
+- evidence ready?
+- R106 activation gate ready?
+- sacred button still intent-only?
+- paper/live separation intact?
+- no secrets shown?
+- no order placed?
+- no execution attempted?
+- protective orders ready?
+- tiny size/max loss defined?
+- kill switch understood?
+- emergency cancel path reviewed?
+- no conflicting position reviewed?
+- candidate fresh?
+
+7. authorization_boundary:
+Must clearly state:
+- R118 does not place orders
+- R118 does not enable live trading
+- R118 does not change env flags
+- R118 does not call Binance order endpoints
+- R118 only determines whether a later explicit authorization request phase may be opened
+
+8. next_operator_actions:
+Prioritized next actions depending on status:
+- If blocked: list exact blockers and commands.
+- If partial: list evidence/gate gaps.
+- If ready to request authorization: say next phase may be R119 explicit authorization request, still non-executing unless user explicitly authorizes execution in a later phase.
+
+9. final_recheck_command_pack:
+- final-live-preflight
+- tiny-live-armed-dry-run
+- one-tiny-live-order-protocol
+- first-live-activation-gate
+- first-live-evidence-status
+- first-live-prerequisite-recheck-after-evidence
+- first-live-post-evidence-gate-recheck
+- cockpit state curl
+
+Ledger:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_live_activation_final_reviews.ndjson
+
+Record:
+- event_type: FIRST_LIVE_ACTIVATION_FINAL_REVIEW
+- final_review_id
+- recorded_at_utc
+- status
+- active_tuple
+- source_statuses
+- readiness_matrix
+- authorization_request_readiness
+- remaining_blockers
+- live_ready=false
+- execution_enabled_by_final_review=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Status rules:
+
+FINAL_REVIEW_BLOCKED if any of these are true:
+- active tuple missing or inconsistent
+- R106 is FIRST_LIVE_BLOCKED
+- R102 is not READY
+- R104 is not READY_FOR_DRY_RUN
+- R105 is not PROTOCOL_PREREQS_READY
+- R112 evidence status is not EVIDENCE_READY_FOR_PREREQ_RECHECK
+- R113 is not RECHECK_READY_FOR_R106 or equivalent ready state
+- R117 is not POST_EVIDENCE_READY_FOR_ACTIVATION_GATE_RECHECK
+- sacred button can_place_order true
+- sacred button records_intent_only false
+- paper_live_separation_intact false
+- any safety field shows order/execution/secrets
+
+FINAL_REVIEW_PARTIAL if:
+- some evidence or post-evidence surfaces improved, but one or more required layers remain blocked
+
+READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION only if:
+- all required surfaces are satisfied
+- active tuple is consistent
+- R106 is no longer blocked and indicates activation readiness
+- evidence is complete and consistent
+- post-evidence recheck is ready
+- sacred button remains intent-only
+- paper/live separation is intact
+- no safety violation exists
+- still return live_ready=false
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+- docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md
+- docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+- docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+- docs/hammer_radar/live_readiness/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+- docs/hammer_radar/live_readiness/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+- docs/hammer_radar/live_readiness/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+- docs/hammer_radar/live_readiness/R117_FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK.md
+
+Inspect modules:
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_prerequisite_recheck_after_evidence.py
+- src/app/hammer_radar/operator/first_live_evidence_assisted_run.py
+- src/app/hammer_radar/operator/first_live_post_evidence_gate_recheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin final-review module and inspect.py command.
+Reuse R102/R104/R105/R106/R109/R112/R113/R116/R117 surfaces.
+Do not duplicate readiness logic.
+Do not create another execution path.
+Do not mutate config.
+Do not create authority beyond “request authorization readiness.”
+
+Docs:
+Create:
+docs/hammer_radar/live_readiness/R118_FIRST_LIVE_ACTIVATION_GATE_FINAL_REVIEW.md
+
+Include:
+- What R118 adds
+- What R118 does not add
+- Status meanings
+- Authorization request readiness
+- Readiness matrix
+- Remaining blockers
+- Final operator checklist
+- Safety boundary
+- Ledger location
+- How this prepares R119
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R118:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R119_FIRST_LIVE_EXPLICIT_AUTHORIZATION_REQUEST.md
+
+R119 should:
+- request explicit first-live authorization only if R118 says READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION
+- remain non-executing unless the user explicitly authorizes a later execution phase
+- include exact confirmation phrase and final human boundary
+- no order placement by default
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+- final review returns live_ready=false
+- final review returns execution_enabled_by_final_review=false
+- final review never places orders
+- final review never exposes secrets
+- includes source_statuses for R102/R104/R105/R106/R109/R112/R113/R116/R117
+- includes readiness_matrix
+- includes authorization_request_readiness
+- includes final_operator_readiness_checklist
+- FINAL_REVIEW_BLOCKED when R106 is blocked
+- FINAL_REVIEW_PARTIAL when evidence/post-evidence improves but not all gates ready
+- READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION only when all surfaces ready and safety clean
+- sacred button can_place_order true forces FINAL_REVIEW_BLOCKED
+- paper_live_separation_intact false forces FINAL_REVIEW_BLOCKED
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused final-review tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-activation-final-review
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Final review command added:
+Ledger used:
+R118 design doc:
+R119 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R118 final review status:
+Authorization request readiness:
+Remaining blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R118 final-review package in one pass.
+Prioritize today’s tiny-live objective without bypassing evidence, gate, and safety boundaries.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.

@@ -1044,6 +1044,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-live-activation-final-review":
+        from src.app.hammer_radar.operator.first_live_activation_gate_final_review import (
+            build_first_live_activation_final_review,
+            format_first_live_activation_final_review_text,
+        )
+
+        print(
+            format_first_live_activation_final_review_text(
+                build_first_live_activation_final_review(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1710,6 +1725,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     first_live_post_evidence_recheck_parser.add_argument("--no-record", action="store_true")
+
+    first_live_activation_final_review_parser = subparsers.add_parser("first-live-activation-final-review", parents=[parent])
+    first_live_activation_final_review_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_live_activation_final_review_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
