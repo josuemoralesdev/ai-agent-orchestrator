@@ -1,0 +1,354 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R117_FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK.md
+
+Phase:
+R117
+
+Branch:
+r117-first-live-post-evidence-gate-recheck
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the post-evidence gate recheck layer that determines whether evidence recorded through R112/R116 reduces blockers and moves the system closer to R106 FIRST_LIVE_ACTIVATION_READY.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R117 is a recheck/decision support phase only.
+- R117 must not execute live trading under any circumstance.
+
+Context:
+R112 records first-live operator evidence.
+R113 rechecks prerequisites after evidence.
+R114 generates evidence-guided clearing actions.
+R115 creates the evidence recording runbook.
+R116 creates the assisted evidence-recording command.
+
+R117 must now build a post-evidence gate recheck package:
+- read evidence status
+- read assisted-run evidence state
+- re-run R113/R111/R110/R106/R109 status surfaces
+- compare before/after where possible
+- identify remaining blockers
+- identify evidence that counts
+- identify evidence that is rejected/stale/mismatched
+- produce exact next action
+- preserve non-executing safety fields
+
+Main objective:
+Add a CLI command that creates a single post-evidence recheck report.
+
+Required CLI command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-post-evidence-gate-recheck
+
+Output JSON must include:
+- status:
+  - POST_EVIDENCE_BLOCKED
+  - POST_EVIDENCE_PARTIAL
+  - POST_EVIDENCE_READY_FOR_ACTIVATION_GATE_RECHECK
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_post_evidence_recheck: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- active_tuple:
+  - candidate_id
+  - risk_contract_hash
+  - packet_hash
+  - tuple_status
+
+- source_statuses:
+  - R112 evidence status
+  - R113 prerequisite recheck
+  - R116 assisted run status if ledger exists
+  - R111 prerequisite clearing
+  - R110 burn-down
+  - R106 activation gate
+  - R109 cockpit
+
+- evidence_summary:
+  - records_count
+  - accepted_records_count
+  - rejected_records_count
+  - evidence_types_present
+  - evidence_types_missing
+  - ready_tuple
+  - tuple_consistency_status: CONSISTENT / INCONSISTENT / MISSING
+
+- gate_delta:
+  - r106_current_status
+  - r113_current_status
+  - blockers_remaining_count
+  - evidence_missing_count
+  - groups_cleared_count
+  - groups_still_blocked_count
+  - groups_needing_evidence_count
+  - did_evidence_reduce_blockers: true/false/unknown
+  - activation_gate_ready: true/false
+
+- blocker_map:
+  For each group:
+  - group
+  - status_after_evidence
+  - evidence_types_required
+  - evidence_types_present
+  - evidence_types_missing
+  - blockers_remaining
+  - next_action
+  - verification_command
+
+Groups:
+- candidate_freshness
+- approval_records
+- binance_credentials_presence
+- account_funding_read_only_check
+- protective_orders_readiness
+- live_adapter_boundary
+- tiny_position_size_cap
+- max_loss_cap
+- environment_flag_review
+- confirmation_phrase_preparation
+- sacred_button_safety
+- duplicate_source_conflicts
+
+- activation_readiness_summary:
+  - can_consider_activation_phase: true/false
+  - reason
+  - required_before_activation_phase
+  - current_r106_status
+  - sacred_button_can_place_order
+  - sacred_button_records_intent_only
+  - paper_live_separation_intact
+
+- next_operator_actions:
+  prioritized list:
+  - action
+  - why
+  - command
+  - safety_note
+
+- final_recheck_command_pack:
+  - evidence_status
+  - prerequisite_recheck
+  - prerequisite_clearing
+  - burn_down
+  - activation_gate
+  - cockpit_state
+
+- safety_summary:
+  - R106 remains authority
+  - R109 sacred button remains intent-only
+  - no order was placed
+  - live execution remains disabled by this phase
+  - evidence does not equal execution authorization
+  - no secret values shown
+
+Status rules:
+POST_EVIDENCE_BLOCKED if:
+- R106 remains FIRST_LIVE_BLOCKED
+- evidence is missing/incomplete
+- tuple is inconsistent
+- sacred button can_place_order true
+- paper_live_separation_intact false
+- any safety field indicates order/execution/secrets
+- activation preconditions remain blocked
+
+POST_EVIDENCE_PARTIAL if:
+- evidence exists and is accepted but some required evidence or gate blockers remain
+
+POST_EVIDENCE_READY_FOR_ACTIVATION_GATE_RECHECK only if:
+- evidence status is EVIDENCE_READY_FOR_PREREQ_RECHECK
+- tuple is consistent
+- R113 shows evidence-backed groups materially cleared
+- sacred button remains intent-only and can_place_order=false
+- paper_live_separation_intact=true
+- no order/execution/secret safety violation exists
+- still do not return live_ready=true
+
+Ledger:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_live_post_evidence_gate_rechecks.ndjson
+
+Record:
+- event_type: FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK
+- post_evidence_recheck_id
+- recorded_at_utc
+- status
+- active_tuple
+- source_statuses
+- evidence_summary
+- gate_delta
+- blocker_map
+- activation_readiness_summary
+- live_ready=false
+- execution_enabled_by_post_evidence_recheck=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+- docs/hammer_radar/live_readiness/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+- docs/hammer_radar/live_readiness/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+- docs/hammer_radar/live_readiness/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_prerequisite_recheck_after_evidence.py
+- src/app/hammer_radar/operator/first_live_evidence_guided_actions.py
+- src/app/hammer_radar/operator/first_live_evidence_runbook.py
+- src/app/hammer_radar/operator/first_live_evidence_assisted_run.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/first_live_prerequisite_clearing.py
+- src/app/hammer_radar/operator/first_live_burn_down.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin post-evidence recheck module and inspect.py command.
+Reuse R112/R113/R116/R106/R109 source surfaces.
+Do not duplicate readiness logic.
+Do not create another gate.
+Do not create execution authority.
+Do not mutate live config.
+
+Docs:
+Create:
+docs/hammer_radar/live_readiness/R117_FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK.md
+
+Include:
+- What R117 adds
+- What R117 does not add
+- How R117 uses R112/R113/R116
+- Status meanings
+- Evidence-to-gate delta
+- Activation readiness summary
+- Final recheck command pack
+- Safety constraints
+- Why this is non-executing
+- How this prepares R118
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R117:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R118_FIRST_LIVE_ACTIVATION_GATE_FINAL_REVIEW.md
+
+R118 should perform final activation-gate review after evidence and post-evidence recheck.
+R118 must still be non-executing unless explicitly authorized later.
+R118 should determine whether the system is ready to request explicit first-live execution authorization.
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+- post-evidence recheck returns live_ready=false
+- post-evidence recheck returns execution_enabled_by_post_evidence_recheck=false
+- post-evidence recheck never places orders
+- post-evidence recheck never exposes secrets
+- includes source_statuses R112/R113/R116/R111/R110/R106/R109
+- includes evidence_summary
+- includes gate_delta
+- includes blocker_map for all required groups
+- includes activation_readiness_summary
+- POST_EVIDENCE_BLOCKED when R106 is blocked
+- POST_EVIDENCE_PARTIAL when evidence is partial
+- POST_EVIDENCE_READY_FOR_ACTIVATION_GATE_RECHECK only when evidence ready and safety fields clean
+- sacred button can_place_order true forces blocked
+- paper_live_separation_intact false forces blocked
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused post-evidence tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-post-evidence-gate-recheck
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Post-evidence recheck command added:
+Ledger used:
+R117 design doc:
+R118 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R117 post-evidence status:
+Evidence summary:
+Activation readiness summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R117 post-evidence gate recheck package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
