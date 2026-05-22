@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -204,6 +205,23 @@ class InspectCliTestCase(unittest.TestCase):
         self.assertIn("order_placed: false", output)
         self.assertIn("readiness_status: NOT_READY", output)
         self.assertIn("today_timezone: UTC", output)
+
+    def test_first_live_prerequisite_clearing_cli_outputs_json(self) -> None:
+        from src.app.hammer_radar.operator.first_live_prerequisite_clearing import (
+            build_first_live_prerequisite_clearing,
+            format_first_live_prerequisite_clearing_text,
+        )
+
+        output = format_first_live_prerequisite_clearing_text(
+            build_first_live_prerequisite_clearing(log_dir=Path(self.temp_dir.name) / "r111-empty", env={})
+        )
+        payload = json.loads(output)
+
+        self.assertEqual("PREREQS_BLOCKED", payload["status"])
+        self.assertFalse(payload["live_ready"])
+        self.assertFalse(payload["execution_enabled_by_prereq_clearing"])
+        self.assertIn("candidate_freshness", payload["prerequisite_groups"])
+        self.assertIn("R110 burn-down", payload["source_statuses"])
 
     def test_readme_references_manual_tiny_live_protocol(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
