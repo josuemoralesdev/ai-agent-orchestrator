@@ -75,6 +75,11 @@ from src.app.hammer_radar.operator.first_live_runbook import (
     first_live_runbook_evaluations_path,
     load_first_live_runbook_evaluations,
 )
+from src.app.hammer_radar.operator.first_live_operator_approval_cockpit import (
+    build_operator_approval_cockpit_state,
+    operator_approval_cockpit_html,
+    record_operator_approval_cockpit_intent,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -715,6 +720,16 @@ class BinanceProtectiveRequest(BaseModel):
     use_mock_adapter: bool = False
 
 
+class OperatorApprovalCockpitIntentRequest(BaseModel):
+    candidate_id: str = Field(min_length=1)
+    intent: Literal["APPROVE", "REJECT", "WAIT"]
+    counsel_decision: Literal["APPROVE", "REJECT", "WAIT", "ESCALATE"]
+    counsel_tags: list[str] = Field(default_factory=list, max_length=12)
+    risk_contract_hash: str = Field(min_length=1)
+    packet_hash: str = Field(min_length=1)
+    operator_note: str | None = None
+
+
 WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQUID_MAJOR", "HIGH_BETA"]
 
 
@@ -722,6 +737,35 @@ WatchlistCategory = Literal["CORE_LIVE", "CORE_WATCH", "RELATIVE_STRENGTH", "LIQ
 @app.get("/ui", response_class=HTMLResponse)
 def operator_ui() -> str:
     return _operator_ui_html()
+
+
+@app.get("/operator/approval-cockpit", response_class=HTMLResponse)
+def operator_approval_cockpit() -> str:
+    return operator_approval_cockpit_html()
+
+
+@app.get("/operator/approval-cockpit/state")
+def operator_approval_cockpit_state(
+    candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_operator_approval_cockpit_state(candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/operator/approval-cockpit/intent")
+def operator_approval_cockpit_intent(request: OperatorApprovalCockpitIntentRequest) -> dict:
+    result = record_operator_approval_cockpit_intent(
+        candidate_id=request.candidate_id,
+        intent=request.intent,
+        counsel_decision=request.counsel_decision,
+        counsel_tags=request.counsel_tags,
+        risk_contract_hash=request.risk_contract_hash,
+        packet_hash=request.packet_hash,
+        operator_note=request.operator_note,
+        log_dir=get_log_dir(use_env=True),
+    )
+    if not result.get("accepted_as_intent"):
+        raise HTTPException(status_code=400, detail=result)
+    return result
 
 
 @app.get("/health")
