@@ -937,6 +937,35 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "record-first-live-evidence":
+        from src.app.hammer_radar.operator.first_live_operator_evidence import (
+            format_first_live_operator_evidence_text,
+            record_first_live_operator_evidence,
+        )
+
+        print(
+            format_first_live_operator_evidence_text(
+                record_first_live_operator_evidence(
+                    evidence_type=args.evidence_type,
+                    candidate_id=args.candidate_id,
+                    risk_contract_hash=args.risk_contract_hash,
+                    packet_hash=args.packet_hash,
+                    note=args.note,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
+    elif args.command == "first-live-evidence-status":
+        from src.app.hammer_radar.operator.first_live_operator_evidence import (
+            build_first_live_evidence_status,
+            format_first_live_operator_evidence_text,
+        )
+
+        print(
+            format_first_live_operator_evidence_text(
+                build_first_live_evidence_status(log_dir=args.log_dir)
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1556,6 +1585,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     first_live_prerequisite_clearing_parser.add_argument("--no-record", action="store_true")
+
+    first_live_evidence_parser = subparsers.add_parser("record-first-live-evidence", parents=[parent])
+    first_live_evidence_parser.add_argument("--evidence-type", default=None)
+    first_live_evidence_parser.add_argument("--candidate-id", default=None)
+    first_live_evidence_parser.add_argument("--risk-contract-hash", default=None)
+    first_live_evidence_parser.add_argument("--packet-hash", default=None)
+    first_live_evidence_parser.add_argument("--note", default=None)
+
+    subparsers.add_parser("first-live-evidence-status", parents=[parent])
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
