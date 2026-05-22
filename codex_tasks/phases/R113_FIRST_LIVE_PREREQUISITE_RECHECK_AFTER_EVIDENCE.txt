@@ -1,0 +1,310 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+
+Phase:
+R113
+
+Branch:
+r113-first-live-prerequisite-recheck-after-evidence
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the first-live prerequisite recheck after operator evidence recording.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R113 rechecks evidence only.
+
+Context:
+R110 created the burn-down pack.
+R111 created prerequisite-clearing groups.
+R112 created operator evidence recording and evidence status.
+
+R113 must compose:
+- R111 prerequisite clearing
+- R112 evidence status
+- R110 burn-down
+- R106 activation gate
+- R109 sacred cockpit state
+
+and return whether prerequisite blockers have reduced after evidence exists.
+
+Main objective:
+Add a CLI command that rechecks first-live prerequisites after evidence recording and shows:
+- which evidence clears which blocker groups
+- which blockers remain
+- whether R106 is closer to FIRST_LIVE_ACTIVATION_READY
+- whether the sacred button remains safe
+- what the next exact operator action is
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+- docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- src/app/hammer_radar/operator/first_live_burn_down.py
+- src/app/hammer_radar/operator/first_live_prerequisite_clearing.py
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin recheck module and inspect.py command.
+Do not duplicate readiness logic.
+Do not create another gate.
+Do not create execution authority.
+Do not mutate live config.
+
+Required behavior:
+Add CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-prerequisite-recheck-after-evidence
+
+Output JSON must include:
+
+- status: RECHECK_BLOCKED / RECHECK_PARTIAL / RECHECK_READY_FOR_R106
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_recheck: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- source_statuses:
+  - R106 activation gate
+  - R109 cockpit
+  - R110 burn-down
+  - R111 prerequisite clearing
+  - R112 evidence status
+
+- evidence_status:
+  - status
+  - records_count
+  - accepted_records_count
+  - rejected_records_count
+  - evidence_types_present
+  - evidence_types_missing
+  - ready_tuple
+
+- blocker_recheck:
+  for each prerequisite group:
+  - group
+  - previous_status from R111 if available
+  - evidence_present
+  - evidence_types_used
+  - rechecked_status: CLEAR / STILL_BLOCKED / NEEDS_MORE_EVIDENCE / UNKNOWN
+  - blockers_remaining
+  - next_action
+  - verification_command
+
+Groups:
+- candidate_freshness
+- approval_records
+- binance_credentials_presence
+- account_funding_read_only_check
+- protective_orders_readiness
+- live_adapter_boundary
+- tiny_position_size_cap
+- max_loss_cap
+- environment_flag_review
+- confirmation_phrase_preparation
+- sacred_button_safety
+- duplicate_source_conflicts
+
+- cleared_groups
+- still_blocked_groups
+- evidence_needed_groups
+- unknown_groups
+
+- activation_distance:
+  - r106_current_status
+  - blockers_remaining_count
+  - evidence_missing_count
+  - high_priority_next_blocker
+  - next_phase_needed
+
+- operator_next_actions:
+  prioritized next actions based on evidence gaps and remaining blockers
+
+- r106_recheck_command
+- r111_recheck_command
+- r112_status_command
+- cockpit_state_command
+
+Safety:
+- sacred_button_can_place_order must be false
+- cockpit records intent only
+- R106 remains authority
+- no live order path created
+
+Ledger:
+Write append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_prerequisite_rechecks.ndjson
+
+Record:
+- event_type: FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE
+- recheck_id
+- recorded_at_utc
+- status
+- source_statuses
+- evidence_status
+- blocker_recheck
+- activation_distance
+- live_ready=false
+- execution_enabled_by_recheck=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+
+Include:
+- What R113 adds
+- What R113 does not add
+- How R113 uses R112 evidence
+- Recheck statuses
+- Evidence-to-blocker mapping
+- Activation-distance concept
+- Commands
+- Ledger location
+- Safety constraints
+- Why this is still non-executing
+- How this prepares R114
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R113:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+
+R114 should focus on guided clearing actions from R113:
+- generate exact record-first-live-evidence commands for the active tuple
+- generate exact recheck sequence
+- still no order placement
+- still no live flag modification unless explicitly authorized later
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- recheck returns live_ready=false
+- recheck returns execution_enabled_by_recheck=false
+- recheck never places orders
+- recheck never exposes secrets
+- recheck includes source_statuses R106/R109/R110/R111/R112
+- recheck includes evidence_status
+- recheck includes blocker_recheck for all required groups
+- complete evidence makes evidence-backed groups CLEAR but does not create live readiness
+- missing evidence produces NEEDS_MORE_EVIDENCE
+- sacred_button_safety confirms can_place_order=false
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused recheck tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-prerequisite-recheck-after-evidence
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Recheck command added:
+Ledger used:
+R113 design doc:
+R114 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R113 recheck status:
+Cleared groups:
+Still blocked groups:
+Evidence needed groups:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R113 recheck package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
