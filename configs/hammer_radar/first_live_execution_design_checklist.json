@@ -1,0 +1,163 @@
+{
+  "artifact": "first_live_execution_design_checklist",
+  "phase": "R107",
+  "status": "DESIGN_ONLY",
+  "runtime_authority": {
+    "enables_live_trading": false,
+    "creates_execution_authority": false,
+    "creates_live_order_endpoint": false,
+    "places_orders": false,
+    "calls_binance_order_endpoints": false,
+    "calls_binance_account_endpoints": false,
+    "modifies_env_flags": false,
+    "wires_telegram_to_execution": false
+  },
+  "required_status_chain": [
+    {
+      "command": "final-live-preflight",
+      "required_status": "READY"
+    },
+    {
+      "command": "tiny-live-armed-dry-run",
+      "required_status": "READY_FOR_DRY_RUN"
+    },
+    {
+      "command": "one-tiny-live-order-protocol",
+      "required_status": "PROTOCOL_PREREQS_READY"
+    },
+    {
+      "command": "first-live-activation-gate",
+      "required_status": "FIRST_LIVE_ACTIVATION_READY"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "candidate_exact_match",
+      "category": "candidate",
+      "required": true,
+      "description": "Candidate id, symbol, timeframe, direction, and entry mode must match R102-R106 evidence."
+    },
+    {
+      "id": "candidate_fresh",
+      "category": "candidate",
+      "required": true,
+      "description": "Candidate must be fresh at future authorization time."
+    },
+    {
+      "id": "risk_contract_match",
+      "category": "risk_contract",
+      "required": true,
+      "description": "Risk contract hash and fields must match current candidate and approved packet."
+    },
+    {
+      "id": "packet_hash_match",
+      "category": "packet_hash",
+      "required": true,
+      "description": "Final review packet hash must match the same candidate and risk contract hash."
+    },
+    {
+      "id": "telegram_intent_match",
+      "category": "telegram_approval_intent",
+      "required": true,
+      "description": "Accepted Telegram approval intent must match candidate id, risk contract hash, and packet hash."
+    },
+    {
+      "id": "human_records_complete",
+      "category": "human_approval_record",
+      "required": true,
+      "description": "Required human approval records must be present and hash-consistent."
+    },
+    {
+      "id": "credential_presence_only",
+      "category": "binance_credentials",
+      "required": true,
+      "description": "Future checks may report credential presence booleans only and must never expose secret values."
+    },
+    {
+      "id": "account_funding_known",
+      "category": "account_funding",
+      "required": true,
+      "description": "Future explicitly authorized account/funding check must prove funding is known and sufficient."
+    },
+    {
+      "id": "protective_stop_ready",
+      "category": "protective_orders",
+      "required": true,
+      "description": "Protective stop must be configured before or atomically with entry and verified after entry."
+    },
+    {
+      "id": "take_profit_ready",
+      "category": "protective_orders",
+      "required": true,
+      "description": "Take-profit must be configured before or atomically with entry and verified after entry."
+    },
+    {
+      "id": "position_size_cap",
+      "category": "position_size",
+      "required": true,
+      "description": "Position size must stay within approved tiny max margin and max notional caps."
+    },
+    {
+      "id": "max_loss_cap",
+      "category": "max_loss",
+      "required": true,
+      "description": "Max loss must match the approved risk contract and confirmation phrase."
+    },
+    {
+      "id": "kill_switch_reviewed",
+      "category": "kill_switch_rollback",
+      "required": true,
+      "description": "Kill switch, cancel, rollback, and manual exchange UI verification plan must be reviewed before execution."
+    },
+    {
+      "id": "no_conflicting_position",
+      "category": "position_state",
+      "required": true,
+      "description": "No conflicting BTCUSDT position or open order may exist."
+    },
+    {
+      "id": "exact_operator_phrase",
+      "category": "operator_confirmation",
+      "required": true,
+      "description": "Operator must type the exact confirmation phrase with live candidate id, hashes, and max loss."
+    },
+    {
+      "id": "post_order_monitoring",
+      "category": "monitoring",
+      "required": true,
+      "description": "Post-order monitoring plan must verify entry, protective state, ledger, alert, fees, and slippage."
+    },
+    {
+      "id": "postmortem_before_second_order",
+      "category": "postmortem",
+      "required": true,
+      "description": "No second order may be considered until postmortem is complete and separately authorized."
+    }
+  ],
+  "blocked_conditions": [
+    "any_required_status_missing_or_not_ready",
+    "candidate_stale",
+    "candidate_hash_tuple_mismatch",
+    "risk_contract_missing_or_mismatched",
+    "packet_hash_missing_or_mismatched",
+    "telegram_intent_missing_rejected_or_mismatched",
+    "human_approval_records_missing_or_mismatched",
+    "binance_credentials_missing_or_unsafe",
+    "account_funding_unknown",
+    "protective_orders_not_verified",
+    "position_size_unknown_or_above_cap",
+    "max_loss_missing_mismatched_or_above_cap",
+    "kill_switch_or_rollback_plan_ambiguous",
+    "conflicting_position_or_order_unknown",
+    "operator_confirmation_phrase_missing_or_mismatched",
+    "postmortem_incomplete_for_second_order"
+  ],
+  "confirmation_phrase_template": "I CONFIRM ONE TINY LIVE ORDER FOR <candidate_id> WITH RISK <risk_contract_hash> AND PACKET <packet_hash>; MAX LOSS <amount>; I UNDERSTAND THIS CAN LOSE REAL MONEY.",
+  "safety_booleans": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "secrets_shown": false
+  }
+}
+
