@@ -1,0 +1,328 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+
+Phase:
+R114
+
+Branch:
+r114-first-live-evidence-guided-clearing-actions
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create evidence-guided clearing actions for the active first-live candidate/hash tuple.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R114 generates guided clearing actions only.
+
+Context:
+R112 added first-live operator evidence recording.
+R113 added prerequisite recheck after evidence.
+R114 must generate safe, exact, copy-pasteable evidence-recording commands for the active candidate/hash tuple, based on R113 missing evidence and R111/R110 blocker groups.
+
+Main objective:
+Add a CLI command that produces an evidence-guided clearing action pack:
+- current active candidate/hash tuple
+- missing evidence types
+- exact record-first-live-evidence commands
+- exact recheck sequence
+- safety notes
+- human-readable order of operations
+- no execution authority
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+- docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+- src/app/hammer_radar/operator/first_live_burn_down.py
+- src/app/hammer_radar/operator/first_live_prerequisite_clearing.py
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_prerequisite_recheck_after_evidence.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin command generator module and inspect.py command.
+Do not duplicate readiness logic.
+Do not create another gate.
+Do not create execution authority.
+Do not mutate live config.
+Use R113 and R112 as source surfaces.
+
+Required behavior:
+Add CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-guided-actions
+
+Output JSON must include:
+
+- status: ACTIONS_READY / ACTIONS_BLOCKED_NO_ACTIVE_TUPLE
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_guided_actions: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- active_tuple:
+  - candidate_id
+  - risk_contract_hash
+  - packet_hash
+  - source
+  - tuple_status: PRESENT / MISSING / INCONSISTENT
+
+- source_statuses:
+  - R112 evidence status
+  - R113 recheck status
+  - R111 prerequisite clearing status
+  - R106 activation gate status
+  - R109 cockpit status
+
+- missing_evidence_types:
+  list of missing required evidence types from R112/R113
+
+- evidence_recording_commands:
+  array of objects:
+  - evidence_type
+  - purpose
+  - command
+  - safety_note
+  - expected_result
+
+Generate commands for all supported evidence types still missing:
+- APPROVAL_INTENT_REVIEWED
+- HUMAN_REVIEW_R85
+- HUMAN_REVIEW_R86
+- HUMAN_REVIEW_R88
+- ACCOUNT_FUNDING_READ_ONLY_CHECK
+- PROTECTIVE_ORDERS_REVIEWED
+- LIVE_ADAPTER_BOUNDARY_REVIEWED
+- TINY_SIZE_MAX_LOSS_DEFINED
+- ENVIRONMENT_FLAGS_REVIEWED
+- SACRED_BUTTON_INTENT_ONLY_VERIFIED
+- EMERGENCY_CANCEL_PATH_REVIEWED
+- NO_CONFLICTING_POSITION_REVIEWED
+
+Each command must use:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward record-first-live-evidence ...
+
+The command must include:
+- --evidence-type
+- --candidate-id
+- --risk-contract-hash
+- --packet-hash
+- --note
+
+Notes must be safe placeholders, not secrets.
+Do not include actual API keys or secret values.
+Notes should be specific enough for the operator to edit, for example:
+"Reviewed Binance credential presence booleans only; no secret values recorded."
+
+- recheck_commands:
+  ordered command list:
+  1. first-live-evidence-status
+  2. first-live-prerequisite-recheck-after-evidence
+  3. first-live-prerequisite-clearing
+  4. first-live-burn-down
+  5. first-live-activation-gate
+  6. cockpit state curl
+
+- recommended_sequence:
+  human readable ordered list:
+  1. Verify active tuple
+  2. Record only evidence you personally verified
+  3. Do not paste secrets in notes
+  4. Run evidence status
+  5. Run R113 recheck
+  6. Run R111 prerequisite clearing
+  7. Run R106 activation gate
+  8. Keep sacred button intent-only
+  9. Stop if any blocker remains
+
+- grouped_actions:
+  group commands by:
+  - approval_records
+  - account_funding
+  - protective_orders
+  - adapter_boundary
+  - risk_limits
+  - environment
+  - sacred_button
+  - emergency
+  - position_conflict
+
+- safety_summary:
+  - evidence recording does not place orders
+  - evidence recording does not enable live execution
+  - R106 remains authority
+  - R109 sacred button remains intent-only
+  - no secret values should be pasted into notes
+
+Ledger:
+Write append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_evidence_guided_actions.ndjson
+
+Record:
+- event_type: FIRST_LIVE_EVIDENCE_GUIDED_ACTIONS
+- action_pack_id
+- recorded_at_utc
+- status
+- active_tuple
+- missing_evidence_types
+- evidence_recording_commands_count
+- grouped_actions
+- live_ready=false
+- execution_enabled_by_guided_actions=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+
+Include:
+- What R114 adds
+- What R114 does not add
+- How it uses R112/R113
+- Command generator behavior
+- Evidence command examples
+- Active tuple safety
+- Secret-handling warning
+- Recheck sequence
+- Ledger location
+- Why this is still non-executing
+- How this prepares R115
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R114:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+
+R115 should create an operator runbook for actually recording the evidence using R114’s generated commands and then rerunning R113/R111/R106.
+It must remain non-executing unless explicitly authorized later.
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- guided actions returns live_ready=false
+- guided actions returns execution_enabled_by_guided_actions=false
+- guided actions never places orders
+- guided actions never exposes secrets
+- guided actions includes active_tuple
+- guided actions includes missing_evidence_types
+- guided actions generates record-first-live-evidence commands for missing types
+- generated commands include candidate_id/risk hash/packet hash
+- generated notes do not include secret-like content
+- grouped_actions contains required categories
+- recheck_commands include R112/R113/R111/R110/R106/cockpit state
+- missing active tuple returns ACTIONS_BLOCKED_NO_ACTIVE_TUPLE
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused guided-actions tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-guided-actions
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Guided actions command added:
+Ledger used:
+R114 design doc:
+R115 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R114 guided actions status:
+Generated evidence commands:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R114 guided-actions package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
