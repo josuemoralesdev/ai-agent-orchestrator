@@ -1,6 +1,6 @@
 # Live Readiness Phase Index
 
-This index maps the R101-R109 first-live readiness path. It is documentation only and does not change runtime trading behavior.
+This index maps the R101-R110 first-live readiness path. It is documentation only and does not change runtime trading behavior.
 
 | Phase | Status | Purpose | Primary Command | Safety State | Artifact / Doc Path | Agent Roles |
 |---|---|---|---|---|---|---|
@@ -13,7 +13,8 @@ This index maps the R101-R109 first-live readiness path. It is documentation onl
 | R106.5 specialized agent task workflow integration | Complete | Add specialized agent role files, phase task folders, workflow docs, and an R107 draft task. | None; workflow/documentation phase only. | No runtime changes, no live trading, no order calls, no env edits. | `docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md`, `codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md` | builder, index, qa, security |
 | R107 first-live execution phase design | Complete | Formal design package for a future first-live execution phase after R106, including preconditions, risk, approval, protective, rollback, monitoring, and postmortem requirements. | None; design/config/task artifacts only. | Design only; no live trading, no order calls, no env edits, no execution authority. | `docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md`, `configs/hammer_radar/first_live_execution_design_checklist.json`, `codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md` | builder, index, qa, security |
 | R108 first-live operator approval cockpit | Complete | Minimal operator cockpit showing R102-R106 readiness, approval sequence, simultaneous signal cards, counsel tags, and approval-window countdowns. Buttons record intent only. | `GET /operator/approval-cockpit`, `GET /operator/approval-cockpit/state`, `POST /operator/approval-cockpit/intent` | UI/API intent only; `live_ready=false`, `execution_enabled_by_ui=false`, `order_placed=false`, `execution_attempted=false`, R106 remains authority. | `docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md` | builder, index, qa, security |
-| R109 first-live dry authorization cockpit review | Draft task | Review and harden the R108 cockpit before any future dry authorization or execution-adjacent work. | None yet; future review task only. | Non-executing review/hardening only; no live trading, no order calls, no env edits. | `codex_tasks/phases/R109_FIRST_LIVE_DRY_AUTHORIZATION_COCKPIT_REVIEW.md` | builder, index, qa, security |
+| R109 first-live cockpit sacred button hardening | Complete | Harden the R108 cockpit with sacred-button visual state, countdown emphasis, blocker hierarchy, operator path, and intent-only response summaries. | `GET /operator/approval-cockpit`, `GET /operator/approval-cockpit/state`, `POST /operator/approval-cockpit/intent` | UI/API intent only; `can_place_order=false`, `records_intent_only=true`, no live trading, no order calls, no env edits, R106 remains authority. | `docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md` | builder, index, qa, security |
+| R110 first-live operator path review | Draft task | Final non-executing operator path review and readiness rehearsal over the R109 cockpit. | None yet; future review task only. | Non-executing rehearsal only; no live trading, no order calls, no env edits, no approval-to-execution wiring. | `codex_tasks/phases/R110_FIRST_LIVE_OPERATOR_PATH_REVIEW.md` | builder, index, qa, security |
 
 ## Source-Of-Truth Notes
 
@@ -24,4 +25,5 @@ This index maps the R101-R109 first-live readiness path. It is documentation onl
 - R106 reports activation readiness for a future phase; it does not enable execution.
 - R107 is design only and creates no execution authority.
 - R108 is a cockpit and intent ledger only; it cannot place orders or override R106.
-- R109 is a draft review/hardening task and must remain non-executing.
+- R109 hardens R108's cockpit and sacred button semantics; it remains intent-only and non-executing.
+- R110 is a draft operator path review and readiness rehearsal task; it must remain non-executing unless a later phase explicitly authorizes otherwise.
