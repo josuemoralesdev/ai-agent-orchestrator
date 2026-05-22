@@ -1029,6 +1029,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-live-post-evidence-gate-recheck":
+        from src.app.hammer_radar.operator.first_live_post_evidence_gate_recheck import (
+            build_first_live_post_evidence_gate_recheck,
+            format_first_live_post_evidence_gate_recheck_text,
+        )
+
+        print(
+            format_first_live_post_evidence_gate_recheck_text(
+                build_first_live_post_evidence_gate_recheck(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1688,6 +1703,13 @@ def _build_parser() -> argparse.ArgumentParser:
     first_live_evidence_assisted_run_parser.add_argument("--all-groups", action="store_true")
     first_live_evidence_assisted_run_parser.add_argument("--execute-evidence", action="store_true")
     first_live_evidence_assisted_run_parser.add_argument("--confirm-evidence-only", default=None)
+
+    first_live_post_evidence_recheck_parser = subparsers.add_parser("first-live-post-evidence-gate-recheck", parents=[parent])
+    first_live_post_evidence_recheck_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_live_post_evidence_recheck_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(
