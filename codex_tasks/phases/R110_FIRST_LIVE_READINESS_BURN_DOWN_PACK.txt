@@ -1,0 +1,338 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+Phase:
+R110
+
+Branch:
+r110-first-live-readiness-burn-down-pack
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create a first-live readiness burn-down pack that converts the current R102-R109 blocker wall into a prioritized operator checklist for tomorrow’s live-readiness push.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire approval buttons to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- This phase prepares tomorrow’s live-readiness work; it does not execute it.
+
+Context:
+R108/R109 created and hardened the operator cockpit.
+The cockpit currently shows:
+- R106 gate authority
+- sacred button locked
+- can_place_order=false
+- records_intent_only=true
+- blocker summary
+- operator path to press
+
+R110 must now produce a practical burn-down pack:
+- group blockers by category
+- identify which blockers are code/config/operator/candidate/environment blockers
+- identify what can be cleared tomorrow
+- produce exact commands to run
+- produce exact human records/checklists needed
+- prepare the next phase cleanly
+
+Main objective:
+Create a CLI/readiness pack that outputs a prioritized “tomorrow live-readiness burn-down” report using existing R102-R109 surfaces.
+
+This is not another passive watchdog.
+This is a launch-readiness planner.
+
+Capability scan:
+Inspect:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+- docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md
+
+Inspect modules:
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/final_approval_intent.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/approval_api.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer adding a thin diagnostic module and inspect.py command.
+Do not duplicate readiness logic.
+Do not create a new gate.
+Do not create execution authority.
+Compose existing R102-R109 outputs.
+
+Required behavior:
+Add a CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-burn-down
+
+The command must return JSON with:
+
+- status: BURN_DOWN_READY
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_burn_down: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- current_gate_chain:
+  - final_preflight_status
+  - tiny_live_armed_dry_run_status
+  - protocol_status
+  - first_live_activation_gate_status
+  - cockpit_status
+  - sacred_button_state
+
+- blocker_groups:
+  - candidate_blockers
+  - approval_record_blockers
+  - environment_flag_blockers
+  - binance_credential_blockers
+  - account_funding_blockers
+  - protective_order_blockers
+  - adapter_blockers
+  - strategy_quality_blockers
+  - telegram_blockers
+  - confirmation_phrase_blockers
+  - unknown_or_manual_check_blockers
+
+Each blocker group must include:
+- blockers
+- count
+- owner: OPERATOR / CODE / CONFIG / MARKET / EXCHANGE / UNKNOWN
+- can_clear_tomorrow: true/false
+- next_action
+- verification_command if available
+- related_phase
+
+- priority_burn_down:
+  Ordered list of the top actions to clear before attempting FIRST_LIVE_ACTIVATION_READY.
+
+Must include at minimum:
+1. Wait for or identify fresh promoted candidate.
+2. Verify R102 final-live-preflight status.
+3. Record/verify final approval intent.
+4. Complete human approval/review records.
+5. Configure Binance credentials safely, without exposing values.
+6. Verify account/funding without placing orders.
+7. Configure protective order readiness.
+8. Verify live adapter boundary.
+9. Define tiny position size and max loss cap.
+10. Re-run R102/R104/R105/R106/R109 state.
+11. Confirm sacred button remains intent-only.
+12. Only then prepare future explicit authorization phase.
+
+- morning_command_pack:
+  Copy-pasteable commands for tomorrow:
+  - final-live-preflight
+  - tiny-live-armed-dry-run
+  - one-tiny-live-order-protocol
+  - first-live-activation-gate
+  - approval cockpit state curl
+  - first-live-burn-down
+
+- human_checklist:
+  Human-readable checklist:
+  - candidate fresh?
+  - hashes match?
+  - R106 ready?
+  - protective orders ready?
+  - max loss known?
+  - exchange funding checked?
+  - kill switch understood?
+  - emergency cancel path known?
+  - no conflicting position?
+  - no second order before postmortem?
+
+- readiness_path:
+  Show required chain:
+  BLOCKED -> READY -> READY_FOR_DRY_RUN -> PROTOCOL_PREREQS_READY -> FIRST_LIVE_ACTIVATION_READY -> future explicit execution authorization
+
+- next_phase_recommendation:
+  Recommend R111 as “first-live activation prerequisite clearing,” not order placement.
+
+Ledger:
+Write append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_burn_down_reports.ndjson
+
+Record:
+- event_type: FIRST_LIVE_BURN_DOWN_REPORT
+- report_id
+- recorded_at_utc
+- status
+- current_gate_chain
+- blocker_groups
+- priority_burn_down
+- live_ready=false
+- execution_enabled_by_burn_down=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+
+Include:
+- What R110 adds
+- What R110 does not add
+- Why this replaced the passive overnight watchdog
+- How to run the burn-down command
+- How to use the morning command pack
+- How blockers are grouped
+- What can be cleared tomorrow
+- What still requires future explicit authorization
+- Safety constraints
+- How this prepares R111
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R110:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+
+R111 must be a prerequisite-clearing phase, not order placement.
+It should focus on clearing:
+- approval records
+- environment review
+- protective readiness
+- candidate freshness
+- account/funding verification
+- final preflight consistency
+- sacred button state review
+No live order placement unless explicitly authorized in a later phase.
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- burn-down returns live_ready=false
+- burn-down returns execution_enabled_by_burn_down=false
+- burn-down never places order
+- burn-down never exposes secrets
+- burn-down includes current_gate_chain
+- burn-down includes blocker_groups
+- burn-down includes priority_burn_down
+- burn-down includes morning_command_pack
+- burn-down includes human_checklist
+- burn-down groups known blockers correctly
+- burn-down writes append-only ledger
+- source_surfaces_used includes R102/R104/R105/R106/R109 surfaces
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused burn-down tests
+- full tests/hammer_radar because inspect.py/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-burn-down
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Burn-down command added:
+Ledger used:
+R110 design doc:
+R111 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R110 burn-down status:
+Top priority actions:
+Exact blockers still present:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R110 burn-down package in one pass.
+Prioritize tomorrow morning usability.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
