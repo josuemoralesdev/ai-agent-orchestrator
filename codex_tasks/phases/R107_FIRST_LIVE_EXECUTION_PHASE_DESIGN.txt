@@ -1,0 +1,188 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+
+Phase:
+R107
+
+Branch:
+r107-first-live-execution-phase-design
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the formal R107 first-live execution phase design package.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire Telegram approval to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not modify runtime Python trading modules unless creating a strictly non-executing design checker is clearly justified.
+
+Capability scan:
+Inspect the workflow files:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+Inspect live-readiness docs:
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+
+Inspect relevant modules:
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/final_approval_intent.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/approval_api.py
+- src/app/hammer_radar/operator/operator_actions.py
+- src/app/hammer_radar/operator/live_arming*
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- tests/hammer_radar/
+
+Implement:
+
+1. Create:
+docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+
+Include:
+- Executive summary
+- R107 scope
+- What R107 does not do
+- Preconditions from R106
+- Required status chain:
+  - final-live-preflight must be READY
+  - tiny-live-armed-dry-run must be READY_FOR_DRY_RUN
+  - one-tiny-live-order-protocol must be PROTOCOL_PREREQS_READY
+  - first-live-activation-gate must be FIRST_LIVE_ACTIVATION_READY
+- Candidate requirements
+- Risk contract requirements
+- Packet hash requirements
+- Telegram approval intent requirements
+- Human approval record requirements
+- Binance credentials requirements
+- Account/funding requirements
+- Protective order requirements
+- Position size cap requirements
+- Max loss cap requirements
+- Kill switch and rollback requirements
+- No conflicting position requirement
+- Operator confirmation phrase requirement
+- Execution phase boundaries
+- Emergency stop plan
+- Post-order monitoring plan
+- Postmortem requirements
+- Go/no-go criteria for any second order
+
+2. Create:
+configs/hammer_radar/first_live_execution_design_checklist.json
+
+This must be machine-readable checklist only.
+No secrets.
+No execution enablement.
+No live authority.
+
+3. Create future draft task:
+codex_tasks/phases/R108_FIRST_LIVE_EXECUTION_DRY_AUTHORIZATION_GATE.md
+
+R108 is a future dry authorization gate only.
+No order placement unless explicitly authorized later by the user.
+
+4. Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add/update:
+- R107 first-live execution phase design
+- R108 planned first-live dry authorization gate
+
+5. Optional:
+Only if clearly safe, add a non-executing design checker command:
+first-live-execution-design-check
+
+It must only verify design artifacts and R106 status.
+It must never enable execution or place orders.
+
+Validation:
+If only docs/config/task files changed:
+- git diff --check
+- python json.load validation for configs/hammer_radar/first_live_execution_design_checklist.json
+- scripts/hammer_radar/list_live_readiness_phases.sh if relevant
+
+If Python is changed:
+- py_compile modified Python files
+- focused pytest
+- full tests/hammer_radar if relevant
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+R107 design document:
+Checklist/config created:
+R108 draft task created:
+Phase index updated:
+Design checker added, if any:
+Command added, if any:
+Validation commands run:
+Validation results:
+Runtime behavior changed:
+R107 design status:
+Exact blockers still present:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R107 design package in one pass.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
