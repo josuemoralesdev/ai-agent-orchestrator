@@ -1,0 +1,312 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+Phase:
+R109
+
+Branch:
+r109-first-live-cockpit-sacred-button-hardening
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Harden and refine the R108 first-live operator approval cockpit with a sacred final-button visual system, clearer blocker hierarchy, countdown emphasis, and safer operator intent UX.
+
+Classification:
+WIRING / INTEGRATION with EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire approval buttons to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- UI approval remains intent only.
+- Telegram approval remains intent only.
+- R106 first-live activation gate remains backend authority.
+- The “sacred button” must be visually powerful but functionally incapable of placing orders.
+
+Context:
+R108 created the operator approval cockpit:
+- GET /operator/approval-cockpit
+- GET /operator/approval-cockpit/state
+- POST /operator/approval-cockpit/intent
+
+The cockpit currently works but needs a clearer human-facing hierarchy:
+- less blocker wall
+- clearer “how to finally press the button” path
+- stronger visual distinction between blocked, review, expired, and intent states
+- a sacred final button visual: devil red Masonic eye / watchful eye style
+- hourglass/countdown emphasis
+- big buttons, minimalist layout
+- still no execution authority
+
+Capability scan:
+Inspect:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/approval_api.py
+- tests/hammer_radar/test_operator_approval_cockpit.py
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+
+Also inspect:
+- R102 final preflight
+- R103 final approval intent
+- R104 tiny-live armed dry run
+- R105 one tiny live order protocol
+- R106 activation gate
+
+Reuse / extend preference:
+Prefer extending the existing R108 cockpit module and tests.
+Do not create a new cockpit.
+Do not create a new approval system.
+Do not duplicate readiness logic.
+Do not add a frontend framework.
+Keep it simple: HTML/CSS/JS returned by the existing cockpit route is acceptable if that is the current pattern.
+
+Required changes:
+
+1. UI refinement:
+Improve the cockpit HTML/CSS/JS to show:
+
+- Top sacred status banner:
+  - FIRST LIVE COCKPIT
+  - INTENT ONLY
+  - NO ORDER CAN BE PLACED
+  - R106 GATE AUTHORITY
+
+- Sacred button section:
+  - A large devil-red “Masonic eye” / watchful-eye visual button.
+  - Button text must clearly say one of:
+    - SACRED BUTTON LOCKED
+    - RECORD INTENT ONLY
+    - EXPIRED
+    - BLOCKED BY R106
+  - The sacred button must never trigger execution.
+  - It may only record operator intent through the existing intent endpoint.
+  - If blocked or expired, it must be disabled.
+  - It must show the confirmation phrase requirement nearby.
+  - It must show “This does not place an order.”
+
+- Approval countdown:
+  - Hourglass visual.
+  - Large seconds/minutes remaining display.
+  - Visual depletion bar or ring if easy.
+  - Expired state must visibly lock the sacred button.
+
+- Sequence panel:
+  - Show required gate order:
+    1. Final preflight
+    2. Tiny-live armed dry run
+    3. One tiny live order protocol
+    4. First-live activation gate
+    5. Approval intent
+    6. Confirmation phrase
+  - Each step should show status, blocker count, and whether it is blocking the sacred button.
+
+- Simultaneous signals panel:
+  - Show candidate/signal card(s)
+  - Include tags:
+    - symbol
+    - timeframe
+    - direction
+    - counsel decision
+    - approval window status
+    - R106 authority
+    - intent only
+  - Show key hashes in shortened form with full value available via title or copy text if current UI pattern allows.
+
+- Human path panel:
+  Add a clear “How the sacred button eventually becomes pressable” path:
+  - R102 must be READY
+  - R104 must be READY_FOR_DRY_RUN
+  - R105 must be PROTOCOL_PREREQS_READY
+  - R106 must be FIRST_LIVE_ACTIVATION_READY
+  - approval window must be OPEN
+  - candidate/hash tuple must match
+  - confirmation phrase must be supplied in a future execution phase
+  - even then, this cockpit only records intent
+
+2. State JSON improvement:
+Extend /operator/approval-cockpit/state with a compact human-readable summary:
+
+- sacred_button_state:
+  - label
+  - enabled: false unless all intent-only requirements are satisfied
+  - reason
+  - visual_state: LOCKED / REVIEWABLE / EXPIRED / INTENT_RECORDED
+  - can_place_order: false
+  - records_intent_only: true
+
+- blocker_summary:
+  - primary_blockers: top 5 highest-level blockers
+  - detailed_blocker_count
+  - final_preflight_blocker_count
+  - dry_run_blocker_count
+  - protocol_blocker_count
+  - activation_gate_blocker_count
+
+- operator_path_to_press:
+  array of steps with:
+  - label
+  - current_status
+  - required_status
+  - satisfied
+  - next_action_hint
+
+Do not remove existing fields used by tests unless updating tests accordingly.
+
+3. Intent behavior:
+Ensure POST /operator/approval-cockpit/intent returns:
+- sacred_button_state
+- current R106 gate status
+- accepted_as_intent true/false
+- explicit message:
+  - “Intent recorded only. No order was placed.”
+  - or rejection reason
+
+Intent endpoint must still reject expired windows and malformed payloads.
+
+4. Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md
+
+Include:
+- What R109 adds
+- What R109 does not add
+- Sacred button semantics
+- Devil-red Masonic eye visual meaning
+- Why sacred button is intent only
+- How to eventually make the button pressable
+- Countdown/window behavior
+- Blocker hierarchy
+- Safety constraints
+- How this prepares R110
+
+5. Update phase index:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R109:
+- status
+- purpose
+- endpoints
+- safety state
+- artifact path
+- agent roles
+
+6. Create R110 draft task:
+codex_tasks/phases/R110_FIRST_LIVE_OPERATOR_PATH_REVIEW.md
+
+R110 should be a final operator path review and readiness rehearsal.
+It must remain non-executing unless explicitly authorized later.
+It should focus on:
+- walking through the cockpit
+- validating every gate
+- verifying button state
+- verifying blocker priority
+- verifying operator comprehension
+- verifying no execution path exists
+
+Tests:
+Update or add tests under tests/hammer_radar/ covering:
+
+- cockpit state includes sacred_button_state
+- sacred_button_state.can_place_order is always false
+- sacred_button_state.records_intent_only is true
+- blocked state disables sacred button
+- expired state disables sacred button
+- state includes blocker_summary
+- state includes operator_path_to_press
+- operator_path_to_press includes R102/R104/R105/R106 requirements
+- UI HTML contains “NO ORDER CAN BE PLACED”
+- UI HTML contains “R106 GATE AUTHORITY”
+- UI HTML contains sacred button text
+- UI HTML contains countdown/hourglass wording or symbol
+- intent response includes sacred_button_state
+- intent response says no order was placed
+- intent never enables execution
+- intent never places order
+- secrets are not exposed
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused cockpit tests
+- full tests/hammer_radar because approval_api.py/cockpit runtime changed
+
+Optional safe smoke:
+If dev server is not required, use tests only.
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Sacred button state added:
+UI updated:
+State JSON updated:
+Intent response updated:
+R109 design doc:
+R110 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R109 cockpit hardening status:
+Exact blockers still present:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R109 cockpit hardening package in one pass.
+Prefer minimal implementation over over-engineered frontend.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
