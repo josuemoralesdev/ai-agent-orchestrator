@@ -1,0 +1,296 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+
+Phase:
+R112
+
+Branch:
+r112-first-live-operator-evidence-recording
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create safe operator evidence recording for first-live prerequisites identified by R111.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence recording to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R112 records evidence only.
+
+Context:
+R111 created first-live prerequisite-clearing status and identified evidence needs:
+- approval intent evidence
+- human review evidence
+- read-only funding/account evidence
+- protective readiness evidence
+- tiny size/max loss evidence
+- environment review evidence
+- adapter boundary evidence
+- sacred button safety evidence
+
+R112 must create safe append-only evidence recording and inspection.
+
+Main objective:
+Add CLI support to record and inspect operator evidence records for first-live prerequisites without enabling execution.
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+- docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md
+- docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+- docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+- src/app/hammer_radar/operator/first_live_prerequisite_clearing.py
+- src/app/hammer_radar/operator/first_live_burn_down.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/final_approval_intent.py
+- src/app/hammer_radar/operator/human_confirmation_records.py
+- src/app/hammer_radar/operator/review_record_aggregator.py
+- src/app/hammer_radar/operator/operator_actions.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin evidence recorder module and inspect.py commands.
+Reuse existing review/human confirmation/approval ledger patterns if suitable.
+Do not mutate existing approval semantics unless clearly safe.
+Do not duplicate readiness logic.
+Do not create a new gate.
+Do not create execution authority.
+
+Required behavior:
+Add CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward record-first-live-evidence --evidence-type <type> --candidate-id <id> --risk-contract-hash <hash> --packet-hash <hash> --note <note>
+
+If inspect.py argument style makes this difficult, follow existing parser conventions safely.
+
+Supported evidence types:
+- APPROVAL_INTENT_REVIEWED
+- HUMAN_REVIEW_R85
+- HUMAN_REVIEW_R86
+- HUMAN_REVIEW_R88
+- ACCOUNT_FUNDING_READ_ONLY_CHECK
+- PROTECTIVE_ORDERS_REVIEWED
+- LIVE_ADAPTER_BOUNDARY_REVIEWED
+- TINY_SIZE_MAX_LOSS_DEFINED
+- ENVIRONMENT_FLAGS_REVIEWED
+- SACRED_BUTTON_INTENT_ONLY_VERIFIED
+- EMERGENCY_CANCEL_PATH_REVIEWED
+- NO_CONFLICTING_POSITION_REVIEWED
+
+Evidence record fields:
+- event_type: FIRST_LIVE_OPERATOR_EVIDENCE
+- evidence_id
+- recorded_at_utc
+- evidence_type
+- candidate_id
+- risk_contract_hash
+- packet_hash
+- note
+- accepted: true/false
+- rejection_reason if rejected
+- live_ready: false
+- execution_enabled_by_evidence: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+- source: CLI
+- safety_notes
+
+Validation rules:
+- Reject missing evidence_type.
+- Reject unsupported evidence_type.
+- Reject missing candidate_id.
+- Reject missing risk_contract_hash.
+- Reject missing packet_hash.
+- Reject notes that appear to contain secrets:
+  - api key
+  - api_secret
+  - secret
+  - private key
+  - token
+  - password
+- Never print secret-looking note content back if rejected for secret risk.
+- Always return no-order safety fields.
+
+Ledger:
+Use append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_operator_evidence.ndjson
+
+Add inspection command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-status
+
+It must return:
+- status: EVIDENCE_MISSING / EVIDENCE_PARTIAL / EVIDENCE_READY_FOR_PREREQ_RECHECK
+- records_count
+- latest_recorded_at_utc
+- evidence_types_present
+- evidence_types_missing
+- candidate_ids_seen
+- risk_contract_hashes_seen
+- packet_hashes_seen
+- accepted_records_count
+- rejected_records_count
+- required_evidence_types
+- live_ready: false
+- execution_enabled_by_evidence: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+- ledger_path
+
+Evidence readiness rule:
+Return EVIDENCE_READY_FOR_PREREQ_RECHECK only if all required evidence types are present and accepted for a consistent candidate_id + risk_contract_hash + packet_hash tuple.
+
+Otherwise return EVIDENCE_PARTIAL or EVIDENCE_MISSING.
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+
+Include:
+- What R112 adds
+- What R112 does not add
+- Evidence types
+- Record command examples
+- Evidence status command
+- Secret handling
+- Ledger location
+- Why evidence is not execution authority
+- How to use this with R111
+- How this prepares R113
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R112:
+- status
+- purpose
+- commands
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+
+R113 should re-run prerequisite clearing using recorded evidence and determine whether R106 blockers reduce.
+It must remain non-executing unless explicitly authorized later.
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- recording valid evidence appends ledger
+- unsupported evidence_type rejected
+- missing candidate/hash fields rejected
+- secret-looking note rejected and not echoed
+- evidence status returns EVIDENCE_MISSING with no ledger
+- evidence status returns EVIDENCE_PARTIAL with incomplete records
+- evidence status returns EVIDENCE_READY_FOR_PREREQ_RECHECK when all required accepted evidence present for consistent tuple
+- mixed candidate/hash tuples do not return ready
+- evidence commands always return live_ready=false
+- evidence commands never place orders
+- evidence commands never expose secrets
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused evidence tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run one safe rejected smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward record-first-live-evidence --evidence-type BAD_TYPE --candidate-id test --risk-contract-hash test --packet-hash test --note "safe rejected smoke"
+
+Run status:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-status
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Evidence recording command added:
+Evidence status command added:
+Ledger used:
+R112 design doc:
+R113 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R112 evidence status:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R112 evidence recording package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
