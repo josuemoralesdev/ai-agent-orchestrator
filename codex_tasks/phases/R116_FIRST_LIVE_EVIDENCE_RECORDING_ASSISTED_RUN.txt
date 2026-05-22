@@ -1,0 +1,336 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+
+Phase:
+R116
+
+Branch:
+r116-first-live-evidence-recording-assisted-run
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create a safe assisted evidence-recording run command that uses the R115 runbook and R114 generated evidence commands to help the operator record first-live evidence in controlled groups.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R116 may assist evidence recording only.
+- Evidence recording is not execution authority.
+- This phase must not execute live trading under any circumstance.
+
+Context:
+R112 added evidence recording.
+R113 added recheck after evidence.
+R114 generated exact evidence commands.
+R115 created the evidence recording runbook.
+
+R116 must create an assisted evidence runner that lets the operator choose evidence groups and record evidence safely, with explicit evidence-only confirmation.
+
+Main objective:
+Add a non-executing assisted evidence-recording CLI command.
+
+The command should support:
+1. preview mode by default
+2. group selection
+3. optional evidence-recording mode only with explicit evidence-only confirmation
+4. safety checks before and after recording
+5. automatic recheck commands after each recorded group
+6. append-only assisted-run ledger
+
+This command must never place orders.
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+- docs/hammer_radar/live_readiness/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+- docs/hammer_radar/live_readiness/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_prerequisite_recheck_after_evidence.py
+- src/app/hammer_radar/operator/first_live_evidence_guided_actions.py
+- src/app/hammer_radar/operator/first_live_evidence_runbook.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin assisted-run module and inspect.py command.
+Reuse R115 runbook as source.
+Reuse R112 evidence recorder functions directly if available.
+Do not shell out to commands if direct function calls are safer and consistent with repo style.
+Do not duplicate R114/R115 logic.
+Do not create another gate.
+Do not create execution authority.
+Do not mutate live config.
+
+Required CLI command:
+Add:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-assisted-run
+
+Default behavior:
+- preview only
+- does not record evidence
+- returns planned groups and commands
+- returns safety state
+
+Supported optional args, following existing inspect.py parser style:
+- --group <group_name>
+- --all-groups
+- --execute-evidence
+- --confirm-evidence-only "<exact phrase>"
+
+Allowed groups:
+- approval_records
+- account_and_funding
+- protective_orders
+- adapter_boundary
+- risk_limits
+- environment_review
+- sacred_button_review
+- emergency_and_position_review
+
+Exact confirmation phrase:
+I CONFIRM EVIDENCE RECORDING ONLY; NO LIVE ORDER; NO ENV CHANGE.
+
+Behavior:
+1. Without --execute-evidence:
+   - status: ASSISTED_RUN_PREVIEW
+   - no evidence is recorded
+   - show selected groups
+   - show commands that would be used
+   - show recheck commands
+   - safety fields false
+
+2. With --execute-evidence but without exact confirmation:
+   - status: ASSISTED_RUN_REJECTED
+   - no evidence is recorded
+   - rejection_reason: missing or invalid evidence-only confirmation
+
+3. With --execute-evidence and exact confirmation:
+   - record evidence for selected group(s) only
+   - append evidence records using R112 logic
+   - run or build non-executing recheck summaries after group if safe
+   - status: ASSISTED_RUN_RECORDED or ASSISTED_RUN_PARTIAL
+   - never place orders
+   - never enable live execution
+   - never call Binance order endpoints
+   - never expose secrets
+
+Output JSON must include:
+- status
+- checked_at_utc
+- selected_groups
+- execute_evidence_requested
+- confirmation_valid
+- live_ready: false
+- execution_enabled_by_assisted_run: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+- active_tuple
+- planned_evidence_types
+- recorded_evidence_ids
+- rejected_evidence
+- before_status:
+  - evidence_status
+  - recheck_status
+  - activation_gate_status
+  - cockpit_status
+- after_status:
+  - evidence_status
+  - recheck_status
+  - activation_gate_status
+  - cockpit_status
+- recheck_commands
+- stop_conditions
+- safety_summary
+- source_surfaces_used
+- ledger_path
+
+Stop conditions:
+Must stop and refuse recording if:
+- no active tuple
+- active tuple is inconsistent
+- R109 sacred button can_place_order true
+- any source reports paper_live_separation_intact false
+- any command or note contains secret-looking values
+- requested group is unsupported
+- evidence-only confirmation is missing/invalid when execute mode is requested
+- runbook reports unsafe state
+- R106 status is unexpected or missing
+- any safety field indicates execution/order/secrets
+
+Ledger:
+Use append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_evidence_assisted_runs.ndjson
+
+Record:
+- event_type: FIRST_LIVE_EVIDENCE_ASSISTED_RUN
+- assisted_run_id
+- recorded_at_utc
+- status
+- selected_groups
+- execute_evidence_requested
+- confirmation_valid
+- active_tuple
+- planned_evidence_types
+- recorded_evidence_ids
+- rejected_evidence
+- live_ready=false
+- execution_enabled_by_assisted_run=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+
+Include:
+- What R116 adds
+- What R116 does not add
+- Preview mode
+- Execute-evidence mode
+- Exact confirmation phrase
+- Supported groups
+- Stop conditions
+- Ledger location
+- Why evidence recording is not execution
+- How to use R116 safely today
+- How this prepares R117
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R116:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R117_FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK.md
+
+R117 should:
+- run evidence status after assisted recording
+- run R113/R111/R110/R106/R109 rechecks
+- determine if R106 blockers reduced
+- remain non-executing unless explicitly authorized later
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- preview mode records no evidence
+- preview mode returns live_ready=false
+- preview mode returns execution_enabled_by_assisted_run=false
+- execute mode without confirmation is rejected
+- execute mode with wrong confirmation is rejected
+- execute mode with exact confirmation records only selected group evidence
+- unsupported group rejected
+- all-groups mode plans all groups
+- evidence notes do not expose secrets
+- safety stop triggers if sacred button can_place_order true
+- safety stop triggers if paper_live_separation_intact false
+- assisted run never places orders
+- assisted run never enables execution
+- assisted run never calls Binance order endpoints
+- ledger write contains safety fields
+- source_surfaces_used includes R112/R113/R115/R106/R109
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused assisted-run tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-assisted-run --group sacred_button_review
+
+Run rejected execute:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-assisted-run --group sacred_button_review --execute-evidence --confirm-evidence-only "wrong"
+
+Do not run execute mode with valid confirmation during this Codex phase unless tests use temp ledgers/mocks only.
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Assisted run command added:
+Supported groups:
+Ledger used:
+R116 design doc:
+R117 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R116 assisted-run status:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R116 assisted evidence-run package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
