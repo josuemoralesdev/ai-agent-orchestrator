@@ -1,6 +1,6 @@
 # Live Readiness Phase Index
 
-This index maps the R101-R110 first-live readiness path. It is documentation only and does not change runtime trading behavior.
+This index maps the R101-R111 first-live readiness path. It is documentation only and does not change runtime trading behavior.
 
 | Phase | Status | Purpose | Primary Command | Safety State | Artifact / Doc Path | Agent Roles |
 |---|---|---|---|---|---|---|
@@ -15,7 +15,7 @@ This index maps the R101-R110 first-live readiness path. It is documentation onl
 | R108 first-live operator approval cockpit | Complete | Minimal operator cockpit showing R102-R106 readiness, approval sequence, simultaneous signal cards, counsel tags, and approval-window countdowns. Buttons record intent only. | `GET /operator/approval-cockpit`, `GET /operator/approval-cockpit/state`, `POST /operator/approval-cockpit/intent` | UI/API intent only; `live_ready=false`, `execution_enabled_by_ui=false`, `order_placed=false`, `execution_attempted=false`, R106 remains authority. | `docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md` | builder, index, qa, security |
 | R109 first-live cockpit sacred button hardening | Complete | Harden the R108 cockpit with sacred-button visual state, countdown emphasis, blocker hierarchy, operator path, and intent-only response summaries. | `GET /operator/approval-cockpit`, `GET /operator/approval-cockpit/state`, `POST /operator/approval-cockpit/intent` | UI/API intent only; `can_place_order=false`, `records_intent_only=true`, no live trading, no order calls, no env edits, R106 remains authority. | `docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md` | builder, index, qa, security |
 | R110 first-live readiness burn-down pack | Complete | Convert the R102-R109 blocker wall into a prioritized tomorrow morning live-readiness burn-down checklist and command pack. | `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-burn-down` | Planner only; `live_ready=false`, `execution_enabled_by_burn_down=false`, no live trading, no order calls, no env edits, R106 remains authority, R109 remains intent-only. | `docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md`, `logs/hammer_radar_forward/first_live_burn_down_reports.ndjson` | builder, index, qa, security |
-| R111 first-live activation prerequisite clearing | Draft task | Future phase to clear approval, environment review, protective readiness, candidate freshness, account/funding, final preflight, and sacred-button prerequisites without order placement. | None yet; future prerequisite-clearing task only. | Prerequisite clearing only; no live order placement unless explicitly authorized by a later phase. | `codex_tasks/phases/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md` | builder, index, qa, security |
+| R111 first-live activation prerequisite clearing | Complete | Turn R110 burn-down groups into explicit auditable prerequisite checks and next evidence actions. | `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-prerequisite-clearing` | Prerequisite clearing only; `live_ready=false`, `execution_enabled_by_prereq_clearing=false`, no live trading, no order calls, no env edits, R106 remains authority, R109 remains intent-only. | `docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md`, `logs/hammer_radar_forward/first_live_prerequisite_clearing.ndjson` | builder, index, qa, security |
 
 ## Source-Of-Truth Notes
 
@@ -28,4 +28,4 @@ This index maps the R101-R110 first-live readiness path. It is documentation onl
 - R108 is a cockpit and intent ledger only; it cannot place orders or override R106.
 - R109 hardens R108's cockpit and sacred button semantics; it remains intent-only and non-executing.
 - R110 is a burn-down planner over R102-R109; it writes a report ledger and remains non-executing.
-- R111 is a draft prerequisite-clearing phase; it is not order placement and must not create execution authority.
+- R111 maps R110 burn-down groups into prerequisite checks and writes a prerequisite-clearing ledger; it is not order placement and does not create execution authority.

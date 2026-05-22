@@ -1,0 +1,309 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+
+Phase:
+R111
+
+Branch:
+r111-first-live-activation-prerequisite-clearing
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the first-live activation prerequisite-clearing layer that turns the R110 burn-down groups into explicit, auditable prerequisite checks.
+
+Classification:
+WIRING / INTEGRATION with DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire approval buttons to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R111 clears/checks prerequisites only.
+
+Context:
+R110 created the first-live burn-down pack. It identified the main blocker groups:
+- candidate blockers
+- approval record blockers
+- environment flag blockers
+- Binance credential blockers
+- account/funding blockers
+- protective order blockers
+- adapter blockers
+- strategy quality blockers
+- confirmation phrase blockers
+- unknown/manual blockers
+
+R111 must create explicit prerequisite-clearing checks and operator evidence helpers for these groups, while remaining non-executing.
+
+Main objective:
+Add a CLI command that reports prerequisite-clearing status per blocker group and tells the operator exactly what is clear, what is still blocked, and what evidence is required next.
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md
+- docs/hammer_radar/live_readiness/R102_ONE_COMMAND_FINAL_PREFLIGHT.md
+- docs/hammer_radar/live_readiness/R103_TELEGRAM_FINAL_APPROVAL_FLOW.md
+- docs/hammer_radar/live_readiness/R104_TINY_LIVE_ARMED_DRY_RUN.md
+- docs/hammer_radar/live_readiness/R105_ONE_TINY_LIVE_ORDER_PROTOCOL.md
+- docs/hammer_radar/live_readiness/R106_FIRST_LIVE_ACTIVATION_GATE.md
+- docs/hammer_radar/live_readiness/R107_FIRST_LIVE_EXECUTION_PHASE_DESIGN.md
+- docs/hammer_radar/live_readiness/R108_FIRST_LIVE_OPERATOR_APPROVAL_COCKPIT.md
+- docs/hammer_radar/live_readiness/R109_FIRST_LIVE_COCKPIT_SACRED_BUTTON_HARDENING.md
+- docs/hammer_radar/live_readiness/R110_FIRST_LIVE_READINESS_BURN_DOWN_PACK.md
+- src/app/hammer_radar/operator/first_live_burn_down.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/final_approval_intent.py
+- src/app/hammer_radar/operator/tiny_live_armed_dry_run.py
+- src/app/hammer_radar/operator/one_tiny_live_order_protocol.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*review*
+- src/app/hammer_radar/operator/*approval*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin diagnostic/check module composing R110/R106/R102-R105.
+Do not duplicate readiness logic.
+Do not create another gate.
+Do not create execution authority.
+Do not mutate live config.
+
+Required behavior:
+Add CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-prerequisite-clearing
+
+Output JSON must include:
+
+- status: PREREQS_BLOCKED or PREREQS_CLEARING_READY
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_prereq_clearing: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- source_statuses:
+  - R102 final preflight
+  - R104 tiny-live armed dry run
+  - R105 protocol
+  - R106 activation gate
+  - R109 cockpit
+  - R110 burn-down
+
+- prerequisite_groups:
+  - candidate_freshness
+  - approval_records
+  - binance_credentials_presence
+  - account_funding_read_only_check
+  - protective_orders_readiness
+  - live_adapter_boundary
+  - tiny_position_size_cap
+  - max_loss_cap
+  - environment_flag_review
+  - confirmation_phrase_preparation
+  - sacred_button_safety
+  - duplicate_source_conflicts
+
+Each group must include:
+- status: CLEAR / BLOCKED / NEEDS_OPERATOR_EVIDENCE / UNKNOWN
+- evidence_required
+- evidence_present
+- next_action
+- verification_command
+- owner
+- related_phase
+- safety_notes
+
+- cleared_count
+- blocked_count
+- operator_evidence_needed_count
+- unknown_count
+
+- next_operator_actions:
+  prioritized list for today
+
+- morning_live_readiness_sequence:
+  exact order:
+  1. Run first-live-burn-down
+  2. Confirm candidate freshness
+  3. Record approval intent
+  4. Complete R85/R86/R88 human review records
+  5. Configure Binance credential presence safely
+  6. Verify account/funding read-only
+  7. Verify protective order readiness
+  8. Verify adapter boundary
+  9. Define tiny size and max loss cap
+  10. Re-run final-live-preflight
+  11. Re-run tiny-live-armed-dry-run
+  12. Re-run one-tiny-live-order-protocol
+  13. Re-run first-live-activation-gate
+  14. Verify cockpit sacred button state
+  15. Stop if anything remains blocked
+
+- safety_summary:
+  - R106 remains authority
+  - cockpit is intent-only
+  - no order was placed
+  - live execution remains disabled by this phase
+
+Ledger:
+Write append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_prerequisite_clearing.ndjson
+
+Record:
+- event_type: FIRST_LIVE_PREREQUISITE_CLEARING
+- clearing_id
+- recorded_at_utc
+- status
+- prerequisite_groups
+- cleared_count
+- blocked_count
+- operator_evidence_needed_count
+- unknown_count
+- live_ready=false
+- execution_enabled_by_prereq_clearing=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R111_FIRST_LIVE_ACTIVATION_PREREQUISITE_CLEARING.md
+
+Include:
+- What R111 adds
+- What R111 does not add
+- How R111 uses R110 burn-down
+- Prerequisite groups
+- Evidence required per group
+- Morning live-readiness sequence
+- Safety constraints
+- Why this is still non-executing
+- How this prepares R112
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R111:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+
+R112 should focus on recording missing operator evidence/checklists safely:
+- approval intent evidence
+- human review evidence
+- read-only funding evidence
+- protective readiness evidence
+- tiny size/max loss evidence
+- no order placement unless separately explicitly authorized later
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- prerequisite clearing returns live_ready=false
+- prerequisite clearing returns execution_enabled_by_prereq_clearing=false
+- prerequisite clearing never places orders
+- prerequisite clearing never exposes secrets
+- prerequisite_groups contains all required groups
+- blocked/evidence/unknown counters are correct
+- sacred_button_safety reports can_place_order=false
+- source_statuses include R102/R104/R105/R106/R109/R110
+- morning_live_readiness_sequence includes all required steps
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused prerequisite-clearing tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-prerequisite-clearing
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Prerequisite clearing command added:
+Ledger used:
+R111 design doc:
+R112 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R111 prerequisite clearing status:
+Cleared groups:
+Blocked groups:
+Operator evidence needed:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R111 prerequisite-clearing package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
