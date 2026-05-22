@@ -1,0 +1,310 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+
+Phase:
+R115
+
+Branch:
+r115-first-live-evidence-recording-runbook
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create an operator runbook and command pack for safely recording first-live evidence using R114 guided actions.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R115 creates a runbook/command pack only.
+
+Context:
+R112 records operator evidence.
+R113 rechecks prerequisites after evidence.
+R114 generates exact evidence-guided commands for the active candidate/hash tuple.
+
+R115 must turn R114’s output into a safe operator runbook:
+- exact order
+- exact command packs
+- checkpoints
+- verification after each group
+- stop conditions
+- no live execution
+
+Main objective:
+Create a first-live evidence recording runbook that lets the operator safely record evidence group by group and recheck readiness after each group.
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R112_FIRST_LIVE_OPERATOR_EVIDENCE_RECORDING.md
+- docs/hammer_radar/live_readiness/R113_FIRST_LIVE_PREREQUISITE_RECHECK_AFTER_EVIDENCE.md
+- docs/hammer_radar/live_readiness/R114_FIRST_LIVE_EVIDENCE_GUIDED_CLEARING_ACTIONS.md
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_prerequisite_recheck_after_evidence.py
+- src/app/hammer_radar/operator/first_live_evidence_guided_actions.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/first_live_execution_design_checklist.json
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer docs plus a thin non-executing command pack builder.
+Do not duplicate R114 logic.
+Do not create another gate.
+Do not create execution authority.
+Use R114 as the source for generated evidence commands.
+
+Required behavior:
+Add CLI command:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-runbook
+
+Output JSON must include:
+
+- status: RUNBOOK_READY / RUNBOOK_BLOCKED
+- checked_at_utc
+- live_ready: false
+- execution_enabled_by_runbook: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+- active_tuple:
+  - candidate_id
+  - risk_contract_hash
+  - packet_hash
+  - tuple_status
+
+- runbook_sections:
+  1. tuple_verification
+  2. approval_records
+  3. account_and_funding
+  4. protective_orders
+  5. adapter_boundary
+  6. risk_limits
+  7. environment_review
+  8. sacred_button_review
+  9. emergency_and_position_review
+  10. final_recheck_sequence
+
+Each section must include:
+- section_id
+- title
+- purpose
+- commands
+- verification_commands
+- stop_conditions
+- safety_notes
+
+- command_pack:
+  - all_commands
+  - approval_record_commands
+  - account_funding_commands
+  - protective_order_commands
+  - adapter_boundary_commands
+  - risk_limit_commands
+  - environment_commands
+  - sacred_button_commands
+  - emergency_position_commands
+  - recheck_commands
+
+- stop_conditions:
+  Must include:
+  - candidate/hash tuple changed
+  - R106 gate reports unexpected status
+  - sacred button can_place_order true
+  - any output exposes secrets
+  - any output reports order_placed true
+  - any output reports execution_attempted true
+  - any Binance order endpoint appears in the flow
+  - any evidence note would include secrets
+  - any source reports paper_live_separation_intact false
+
+- operator_script_preview:
+  A safe bash script preview as string or list of lines.
+  It must:
+  - set -euo pipefail
+  - echo each section
+  - run evidence commands
+  - run status/recheck after each group
+  - never call Binance directly
+  - never edit env flags
+  - never place orders
+  - include warnings that operator must personally verify before running each group
+  - be clearly marked REVIEW_BEFORE_RUNNING
+
+- next_recheck_sequence:
+  - first-live-evidence-status
+  - first-live-prerequisite-recheck-after-evidence
+  - first-live-prerequisite-clearing
+  - first-live-burn-down
+  - first-live-activation-gate
+  - approval cockpit state curl
+
+- safety_summary:
+  - evidence runbook does not place orders
+  - evidence runbook does not enable live execution
+  - R106 remains authority
+  - R109 sacred button remains intent-only
+  - no secret values should be pasted into notes
+
+Ledger:
+Write append-only NDJSON:
+
+logs/hammer_radar_forward/first_live_evidence_runbooks.ndjson
+
+Record:
+- event_type: FIRST_LIVE_EVIDENCE_RUNBOOK
+- runbook_id
+- recorded_at_utc
+- status
+- active_tuple
+- runbook_sections_count
+- command_count
+- stop_conditions
+- live_ready=false
+- execution_enabled_by_runbook=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Docs:
+Create:
+
+docs/hammer_radar/live_readiness/R115_FIRST_LIVE_EVIDENCE_RECORDING_RUNBOOK.md
+
+Include:
+- What R115 adds
+- What R115 does not add
+- How it uses R114
+- Operator sequence
+- Command sections
+- Stop conditions
+- Script preview safety
+- Ledger location
+- Why this is non-executing
+- How this prepares R116
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R115:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+
+R116 should be an assisted evidence-recording run phase:
+- operator chooses which evidence sections to record
+- commands may be printed or optionally run only after explicit user authorization
+- still no order placement
+- still no live flag changes
+- still no Binance order endpoints
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+
+- runbook returns live_ready=false
+- runbook returns execution_enabled_by_runbook=false
+- runbook never places orders
+- runbook never exposes secrets
+- runbook includes active_tuple
+- runbook includes all required sections
+- runbook includes stop_conditions
+- runbook includes operator_script_preview
+- script preview contains no Binance order endpoint references
+- script preview contains REVIEW_BEFORE_RUNNING
+- command_pack includes R114 evidence commands
+- next_recheck_sequence includes R112/R113/R111/R110/R106/cockpit
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused runbook tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-evidence-runbook
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Runbook command added:
+Ledger used:
+R115 design doc:
+R116 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R115 runbook status:
+Generated command sections:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R115 runbook package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
