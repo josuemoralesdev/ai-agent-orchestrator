@@ -1,0 +1,254 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+
+PHASE:
+R122 Autonomous Lane Control Scaffold
+
+BRANCH:
+r122-autonomous-lane-control-scaffold
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: WIRING / INTEGRATION
+Duplicate risk: MEDIUM
+
+GOAL:
+Create a non-executing per-lane control scaffold so the operator can arm/disarm strategy lanes instead of approving stale individual signals.
+
+A lane is:
+symbol + timeframe + direction + entry_mode
+
+Example:
+BTCUSDT | 13m | long | ladder_close_50_618
+
+WHY:
+Manual approval of individual 4m/8m/13m signals is structurally too slow. The operator should arm a lane ahead of time, then the system waits for fresh matching signals under strict risk controls.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not create order payloads.
+- Do not call Binance order endpoints.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable live execution.
+- Do not remove R120/R121 work.
+- Do not alter global live gates to make tiny_live easier.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- live eligibility
+- strategy performance
+- tiny live risk contracts
+- final live preflight
+- first live activation gate
+- candidate revalidation watch
+- dual lane candidate watch
+- notification/operator commands
+- inspect.py CLI modes
+- configs/hammer_radar
+- R120/R121 docs/tasks if present
+
+Do not duplicate existing live eligibility logic. Reuse it where possible.
+
+REQUIRED CONFIG:
+Create:
+configs/hammer_radar/lane_controls.json
+
+Initial lanes:
+
+1. BTCUSDT 13m long ladder_close_50_618
+mode: armed_dry_run
+max_daily_trades: 1
+max_daily_loss_pct: 0.25
+freshness_seconds: 120
+cooldown_after_loss_minutes: 120
+require_protective_orders: true
+
+2. BTCUSDT 44m long ladder_close_50_618
+mode: paper
+max_daily_trades: 1
+max_daily_loss_pct: 0.25
+freshness_seconds: 300
+cooldown_after_loss_minutes: 180
+require_protective_orders: true
+
+3. BTCUSDT 8m long ladder_close_50_618
+mode: paper
+max_daily_trades: 1
+max_daily_loss_pct: 0.15
+freshness_seconds: 60
+cooldown_after_loss_minutes: 120
+require_protective_orders: true
+
+4. BTCUSDT 4m long ladder_close_50_618
+mode: paper
+max_daily_trades: 1
+max_daily_loss_pct: 0.10
+freshness_seconds: 30
+cooldown_after_loss_minutes: 120
+require_protective_orders: true
+
+All other lanes are disabled by default.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/lane_control.py
+
+It must expose functions to:
+- load lane controls
+- normalize lane keys
+- list lanes
+- get lane by tuple
+- evaluate lane permission against current live eligibility matrix
+- return compact status
+
+The evaluator must return:
+{
+  "status": "LANE_ALLOWED" | "LANE_BLOCKED" | "LANE_DISABLED",
+  "mode": "...",
+  "lane_key": "...",
+  "symbol": "...",
+  "timeframe": "...",
+  "direction": "...",
+  "entry_mode": "...",
+  "freshness_seconds": ...,
+  "risk_limits": {...},
+  "blockers": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false
+  }
+}
+
+IMPORTANT:
+tiny_live mode must still be blocked unless existing global live execution gates are ready.
+R122 only represents lane intent, not permission to trade.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+lane-control-status
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward lane-control-status
+
+Output should include:
+- status
+- generated_at
+- configured_lanes_count
+- active_lanes_count
+- lanes summary
+- eligible_future_tiny_live_lanes
+- top_blockers
+- safety summary
+
+Output must be compact JSON.
+Do not print giant recommendation arrays.
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+
+Explain:
+- why manual signal approval is too slow for 4m/8m/13m systems
+- lane arming model
+- global kill switch vs per-lane mode
+- why R122 does not execute orders
+- next phases:
+  - R123 fresh signal router
+  - R124 lane command interface
+  - R125 autonomous paper lane execution
+  - R126 first tiny-live lane execution
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R123_FRESH_SIGNAL_ROUTER.md
+
+R123 should route fresh candidate/signal events into lane-control evaluation.
+It must remain non-executing unless explicitly authorized later.
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_lane_control.py
+
+Test:
+- config loads
+- lane keys normalize consistently
+- 13m lane is armed_dry_run by default
+- 44m lane is paper by default
+- 8m/4m lanes are paper by default
+- unknown lane is disabled
+- safety flags are always false
+- tiny_live does not bypass global gates
+- CLI mode exists and returns compact status
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_control.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_control.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-status | jq .
+
+The smoke output must be compact and must not include giant recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Lane config created:
+Lane-control command added:
+R122 doc created:
+R123 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Lane summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R122 scaffold in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
