@@ -1156,6 +1156,19 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-control-status":
+        from src.app.hammer_radar.operator.lane_control import (
+            build_lane_control_status,
+            format_lane_control_status_json,
+        )
+
+        print(
+            format_lane_control_status_json(
+                build_lane_control_status(
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1810,6 +1823,8 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     dual_lane_candidate_watch_parser.add_argument("--write", action="store_true")
+
+    subparsers.add_parser("lane-control-status", parents=[parent])
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
