@@ -1074,6 +1074,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-live-targeted-clearing-pack":
+        from src.app.hammer_radar.operator.first_live_targeted_clearing_pack import (
+            build_first_live_targeted_clearing_pack,
+            format_first_live_targeted_clearing_pack_text,
+        )
+
+        print(
+            format_first_live_targeted_clearing_pack_text(
+                build_first_live_targeted_clearing_pack(
+                    candidate_id=args.candidate_id,
+                    log_dir=args.log_dir,
+                    lane=args.lane,
+                    all_evidence_lanes=args.all_evidence_lanes,
+                    authorization_check=args.authorization_check,
+                    record=not args.no_record,
+                )
+            )
+        )
     elif args.command == "source-warning-review":
         from src.app.hammer_radar.operator.source_warning_review import (
             build_source_warning_review,
@@ -1754,6 +1772,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default="normal|BTCUSDT|13m|long|ladder_close_50_618",
     )
     first_live_blocker_clearing_workbench_parser.add_argument("--no-record", action="store_true")
+
+    first_live_targeted_clearing_pack_parser = subparsers.add_parser("first-live-targeted-clearing-pack", parents=[parent])
+    first_live_targeted_clearing_pack_parser.add_argument(
+        "--candidate-id",
+        default="normal|BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_live_targeted_clearing_pack_parser.add_argument("--lane", default=None)
+    first_live_targeted_clearing_pack_parser.add_argument("--all-evidence-lanes", action="store_true")
+    first_live_targeted_clearing_pack_parser.add_argument("--authorization-check", action="store_true")
+    first_live_targeted_clearing_pack_parser.add_argument("--no-record", action="store_true")
 
     source_warning_review_parser = subparsers.add_parser("source-warning-review", parents=[parent])
     source_warning_review_parser.add_argument(

@@ -1,0 +1,360 @@
+You are working in ~/workspace/kernel/ai-agent-orchestrator-main.
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R120_FIRST_LIVE_TARGETED_CLEARING_OR_AUTHORIZATION_REQUEST.md
+
+Phase:
+R120
+
+Branch:
+r120-first-live-targeted-clearing-pack
+
+Assigned agent perspectives:
+- builder
+- index
+- qa
+- security
+
+Goal:
+Create the first-live targeted clearing pack that uses R119 blocker-clearing lanes to guide the operator through the next safe evidence-clearing actions.
+
+Classification:
+DIAGNOSTIC / AUDIT with WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, and DUPLICATE RISK.
+
+Non-negotiables:
+- Do not place orders.
+- Do not enable live trading.
+- Do not call Binance order endpoints.
+- Do not modify env flags.
+- Do not wire evidence to execution.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not expose secrets.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- R106 first-live activation gate remains authority.
+- R109 sacred button remains intent-only.
+- R120 must not execute live trading under any circumstance.
+- R120 must not request authorization unless R118 says READY_TO_REQUEST_FIRST_LIVE_AUTHORIZATION.
+- If R118 is blocked, R120 must choose targeted clearing mode.
+
+Context:
+R119 workbench showed:
+- WORKBENCH_READY
+- R118 final review remains FINAL_REVIEW_BLOCKED
+- R112 evidence status remains EVIDENCE_PARTIAL
+- R106 activation gate remains FIRST_LIVE_BLOCKED
+- paper_live_separation_intact=true
+- live_ready=false
+- no execution/no orders/no secrets
+
+Therefore R120 must focus on targeted clearing, not authorization.
+
+Main objective:
+Add a CLI command that chooses the next safest clearing lane and produces an exact operator pack:
+- what lane to clear first
+- why that lane is first
+- preview command
+- execute-evidence command with exact confirmation phrase
+- post-clear recheck sequence
+- stop conditions
+- whether authorization request is still blocked
+
+Required CLI command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-targeted-clearing-pack
+
+Optional args:
+- --lane <lane_id>
+- --all-evidence-lanes
+- --authorization-check
+
+Allowed lane ids:
+- evidence_records_lane
+- approval_records_lane
+- account_funding_read_only_lane
+- protective_orders_lane
+- live_adapter_boundary_lane
+- tiny_size_max_loss_lane
+- environment_flags_review_lane
+- sacred_button_safety_lane
+- emergency_and_position_review_lane
+- candidate_freshness_lane
+- final_gate_recheck_lane
+
+Output JSON must include:
+
+- status:
+  - TARGETED_CLEARING_READY
+  - TARGETED_CLEARING_BLOCKED_UNSAFE
+  - AUTHORIZATION_REQUEST_NOT_READY
+  - READY_TO_PREPARE_AUTHORIZATION_REQUEST
+
+Hard safety fields:
+- live_ready: false
+- execution_enabled_by_targeted_clearing: false
+- order_placed: false
+- execution_attempted: false
+- real_order_possible: false
+- secrets_shown: false
+
+Sections:
+
+1. active_tuple:
+- candidate_id
+- risk_contract_hash
+- packet_hash
+- tuple_status
+- source
+
+2. mode_decision:
+- selected_mode: TARGETED_CLEARING / AUTHORIZATION_PREP_CHECK
+- reason
+- r118_status
+- r119_status
+- can_request_authorization_now: true/false
+
+3. selected_lane:
+- lane_id
+- title
+- owner
+- current_status
+- target_status
+- can_clear_now
+- requires_secret_handling
+- requires_env_change
+- requires_live_order_capability
+- priority_reason
+
+Default lane selection:
+If no lane is specified, choose the best first lane using this priority:
+1. evidence_records_lane if evidence is partial/missing
+2. approval_records_lane
+3. sacred_button_safety_lane
+4. tiny_size_max_loss_lane
+5. account_funding_read_only_lane
+6. protective_orders_lane
+7. live_adapter_boundary_lane
+8. environment_flags_review_lane
+9. candidate_freshness_lane
+10. final_gate_recheck_lane
+
+4. operator_commands:
+- preview_command
+- execute_evidence_command if lane has evidence commands
+- status_recheck_commands
+- final_review_command
+- cockpit_state_command
+
+5. all_relevant_lane_commands:
+If --all-evidence-lanes is passed, include evidence commands for all evidence lanes from R119.
+Otherwise include only selected lane.
+
+6. exact_confirmation_phrase:
+I CONFIRM EVIDENCE RECORDING ONLY; NO LIVE ORDER; NO ENV CHANGE.
+
+7. stop_conditions:
+Must include:
+- active tuple changed
+- R118 remains blocked after evidence
+- sacred button can_place_order true
+- sacred button records_intent_only false
+- paper_live_separation_intact false
+- secrets shown
+- order placed true
+- execution attempted true
+- real_order_possible true
+- env flag change attempted
+- Binance order endpoint appears
+- operator has not personally verified the evidence
+- evidence note would contain secrets
+
+8. post_clear_recheck_sequence:
+Ordered commands:
+1. first-live-evidence-status
+2. first-live-prerequisite-recheck-after-evidence
+3. first-live-post-evidence-gate-recheck
+4. first-live-blocker-clearing-workbench
+5. first-live-activation-final-review
+6. first-live-activation-gate
+7. cockpit state curl
+
+9. authorization_status:
+- can_prepare_authorization_request: true/false
+- reason
+- required_before_authorization_request
+- future_phase_if_ready
+- future_phase_if_blocked
+
+10. safety_summary:
+- R120 does not place orders
+- R120 does not enable live execution
+- R120 does not change env flags
+- R120 does not call Binance order endpoints
+- R120 only prepares targeted clearing actions
+- R106 remains authority
+- R109 remains intent-only
+
+Ledger:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_live_targeted_clearing_packs.ndjson
+
+Record:
+- event_type: FIRST_LIVE_TARGETED_CLEARING_PACK
+- targeted_clearing_id
+- recorded_at_utc
+- status
+- active_tuple
+- mode_decision
+- selected_lane
+- authorization_status
+- live_ready=false
+- execution_enabled_by_targeted_clearing=false
+- order_placed=false
+- execution_attempted=false
+- real_order_possible=false
+- secrets_shown=false
+- source_surfaces_used
+
+Capability scan:
+Inspect:
+- docs/hammer_radar/live_readiness/R119_FIRST_LIVE_BLOCKER_CLEARING_WORKBENCH.md
+- docs/hammer_radar/live_readiness/R118_FIRST_LIVE_ACTIVATION_GATE_FINAL_REVIEW.md
+- docs/hammer_radar/live_readiness/R117_FIRST_LIVE_POST_EVIDENCE_GATE_RECHECK.md
+- docs/hammer_radar/live_readiness/R116_FIRST_LIVE_EVIDENCE_RECORDING_ASSISTED_RUN.md
+- src/app/hammer_radar/operator/first_live_blocker_clearing_workbench.py
+- src/app/hammer_radar/operator/first_live_activation_gate_final_review.py
+- src/app/hammer_radar/operator/first_live_evidence_assisted_run.py
+- src/app/hammer_radar/operator/first_live_operator_evidence.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/
+
+Reuse / extend preference:
+Prefer a thin targeted-clearing module and inspect.py command.
+Reuse R119/R118/R116/R106/R109 surfaces.
+Do not duplicate readiness logic.
+Do not create execution authority.
+Do not mutate config.
+Do not create authorization authority.
+
+Docs:
+Create:
+docs/hammer_radar/live_readiness/R120_FIRST_LIVE_TARGETED_CLEARING_PACK.md
+
+Include:
+- What R120 adds
+- What R120 does not add
+- Why R120 chooses targeted clearing while R118 is blocked
+- Lane selection priority
+- Command examples
+- Confirmation phrase
+- Post-clear recheck sequence
+- Authorization boundary
+- Ledger location
+- How this prepares R121
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R120:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+Create future task:
+codex_tasks/phases/R121_FIRST_LIVE_POST_TARGETED_CLEARING_RECHECK.md
+
+R121 should:
+- recheck evidence after operator uses R120/R116 commands
+- decide whether R118 moved closer to ready
+- if still blocked, produce next targeted lane
+- if ready, prepare explicit authorization request phase
+- remain non-executing unless explicitly authorized later
+
+Tests:
+Add/update tests under tests/hammer_radar/ covering:
+- targeted clearing returns live_ready=false
+- targeted clearing returns execution_enabled_by_targeted_clearing=false
+- targeted clearing never places orders
+- targeted clearing never exposes secrets
+- default lane selection chooses evidence_records_lane when evidence is partial
+- requested lane returns that lane if valid
+- invalid lane is rejected safely
+- authorization-check reports not ready when R118 blocked
+- ready R118 path returns READY_TO_PREPARE_AUTHORIZATION_REQUEST but still live_ready=false
+- stop conditions include safety blockers
+- post_clear_recheck_sequence includes R112/R113/R117/R119/R118/R106/R109
+- ledger write contains safety fields
+- paper/live separation remains intact
+
+Validation:
+Run:
+- git diff --check
+- py_compile on modified Python files
+- focused targeted-clearing tests
+- full tests/hammer_radar because inspect/operator runtime changed
+
+Safe smoke:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-targeted-clearing-pack
+
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-targeted-clearing-pack --lane sacred_button_safety_lane
+
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward first-live-targeted-clearing-pack --authorization-check
+
+Do not restart services.
+Do not call Binance.
+Do not send Telegram messages.
+
+Final report format:
+Report exactly:
+Branch:
+Assigned agent perspectives applied:
+Files created:
+Files modified:
+Capability scan summary:
+Reuse / Extend / Create decision:
+Duplicate risk report:
+Targeted clearing command added:
+Ledger used:
+R120 design doc:
+R121 draft task created:
+Phase index updated:
+Tests run:
+Validation results:
+Runtime behavior changed:
+R120 targeted clearing status:
+Selected lane:
+Authorization status:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R120 targeted-clearing pack in one pass.
+Prioritize today’s tiny-live objective without bypassing evidence, gate, and safety boundaries.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not stop at the first minor issue.
+Do not reduce scope unless blocked by a real safety concern.
+Do not perform live trading actions under any circumstance.
