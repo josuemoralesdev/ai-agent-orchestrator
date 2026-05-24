@@ -1,0 +1,389 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R124_LANE_COMMAND_INTERFACE.md
+
+PHASE:
+R124 Lane Command Interface
+
+BRANCH:
+r124-lane-command-interface
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: MEDIUM
+
+GOAL:
+Create a safe operator command interface for proposing and applying lane-control mode changes.
+
+WHY:
+R122 created autonomous lane controls.
+R123 routed fresh signals into lanes.
+R124 must let the operator manage lane modes safely:
+- disabled
+- paper
+- armed_dry_run
+- tiny_live
+
+This is still non-executing.
+Changing a lane mode is not permission to place an order.
+R106/global gates remain authority.
+R123 router remains non-executing.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not create order payloads.
+- Do not call Binance order endpoints.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106 or global gates.
+- Do not remove R120/R121/R122/R123 work.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+IMPORTANT DISTINCTION:
+R124 may update configs/hammer_radar/lane_controls.json only through explicit operator confirmation.
+R124 must not mutate .env, systemd, Binance settings, global kill switch, or live execution flags.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- lane_controls.json
+- live eligibility
+- strategy performance
+- final live preflight
+- first live activation gate
+- candidate revalidation watch
+- inspect.py CLI modes
+- approval/operator API surfaces
+- configs/hammer_radar
+- docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+- docs/hammer_radar/live_readiness/R123_FRESH_SIGNAL_ROUTER.md
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_fresh_signal_router.py
+
+REUSE / EXTEND:
+Reuse R122 lane_control functions.
+Reuse R123 fresh signal router surfaces where useful.
+Do not duplicate lane parsing logic.
+Do not duplicate live eligibility logic.
+Do not create another config format.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/lane_command_interface.py
+
+It must expose functions to:
+- load current lane config
+- validate requested lane mode change
+- build lane command preview
+- apply lane command only when explicitly confirmed
+- write append-only lane command audit ledger
+- return compact command result
+
+Supported actions:
+- list
+- preview-set-mode
+- set-mode
+- disable-lane
+- enable-paper
+- enable-armed-dry-run
+- request-tiny-live-mode
+
+Allowed modes:
+- disabled
+- paper
+- armed_dry_run
+- tiny_live
+
+Safety rules:
+1. Default behavior must be preview only.
+2. Actual config write requires:
+   - --apply
+   - exact confirmation phrase:
+     I CONFIRM LANE CONFIG CHANGE ONLY; NO ORDER; NO ENV CHANGE.
+3. tiny_live mode must require an additional explicit flag:
+   --request-tiny-live
+4. Even when a lane is set to tiny_live, lane evaluation must still report blockers unless R106/global gates are ready.
+5. No command may place orders, create order payloads, or call Binance.
+6. No command may mutate env files or global live flags.
+7. Unknown lanes must be rejected unless action explicitly creates a disabled lane, and default must be reject.
+8. Invalid mode must be rejected.
+9. Requests that would weaken risk limits must be blocked unless explicitly supported by future phases. R124 should only change mode, not risk limits.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+lane-control-command
+
+Expected command style, adapted to existing parser conventions:
+
+Preview list:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command --action list
+
+Preview set mode:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action preview-set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode armed_dry_run
+
+Apply mode:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode armed_dry_run \
+  --apply \
+  --confirm-lane-change "I CONFIRM LANE CONFIG CHANGE ONLY; NO ORDER; NO ENV CHANGE."
+
+Tiny-live request preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action request-tiny-live-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live
+
+R124 should not automatically apply tiny_live mode unless both --apply and exact confirmation are present.
+Even then, it is only a lane config intent, not execution permission.
+
+Output JSON must include:
+- status:
+  - LANE_COMMAND_LIST
+  - LANE_COMMAND_PREVIEW
+  - LANE_COMMAND_APPLIED
+  - LANE_COMMAND_REJECTED
+- generated_at
+- action
+- lane_key
+- requested_mode
+- previous_mode
+- resulting_mode
+- apply_requested
+- confirmation_valid
+- tiny_live_requested
+- config_written: true/false
+- ledger_written: true/false
+- blockers
+- warnings
+- lane_status_after_change
+- safety:
+  - order_placed: false
+  - real_order_placed: false
+  - execution_attempted: false
+  - order_payload_created: false
+  - network_allowed: false
+  - secrets_shown: false
+  - env_mutated: false
+  - global_live_flags_changed: false
+- source_surfaces_used
+
+AUDIT LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/lane_control_commands.ndjson
+
+Record:
+- event_type: LANE_CONTROL_COMMAND
+- command_id
+- recorded_at_utc
+- action
+- lane_key
+- requested_mode
+- previous_mode
+- resulting_mode
+- apply_requested
+- confirmation_valid
+- tiny_live_requested
+- config_written
+- status
+- blockers
+- warnings
+- safety fields
+- source_surfaces_used
+
+CONFIG WRITE:
+If applying a valid confirmed mode change:
+- update configs/hammer_radar/lane_controls.json
+- preserve formatting reasonably
+- preserve existing risk limits
+- only change mode
+- do not change any other lane fields unless required by schema normalization
+- write audit ledger
+
+REQUIRED API, ONLY IF EXISTING APPROVAL API PATTERN IS SIMPLE:
+If src/app/hammer_radar/operator/approval_api.py already has clean operator endpoints and tests are straightforward, add read-only/intent endpoints:
+- GET /operator/lane-control/status
+- POST /operator/lane-control/command
+
+The POST must follow the same rules as CLI:
+- preview by default
+- apply only with exact confirmation
+- no execution
+- no Binance
+- no env mutation
+
+If adding API adds too much risk, skip API and document CLI-only for R124.
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R124_LANE_COMMAND_INTERFACE.md
+
+Explain:
+- what R124 adds
+- why lane command interface is needed
+- why lane mode changes are not execution authority
+- how to list lanes
+- how to preview mode changes
+- how to apply confirmed mode changes
+- why tiny_live mode remains blocked by global gates
+- confirmation phrase
+- audit ledger
+- safety constraints
+- next phases:
+  - R125 autonomous paper lane execution
+  - R126 first tiny-live lane execution
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R124:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+
+R125 should implement autonomous paper lane execution only:
+- route fresh signals from R123
+- create paper execution records
+- respect lane modes
+- respect max_daily_trades and cooldowns
+- no real orders
+- no Binance order endpoint calls
+- no env mutation
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_lane_command_interface.py
+
+Test:
+- list action returns current lanes
+- preview-set-mode does not write config
+- set-mode without --apply does not write config
+- set-mode with wrong confirmation is rejected
+- set-mode with exact confirmation writes only mode
+- invalid mode rejected
+- unknown lane rejected
+- request tiny_live requires --request-tiny-live
+- tiny_live config change does not bypass global gates
+- risk limits are preserved on mode change
+- audit ledger is written on apply
+- safety flags are always false
+- CLI mode exists and returns compact status
+- no secrets are exposed
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_command_interface.py \
+  src/app/hammer_radar/operator/inspect.py
+
+If approval_api.py is modified, also compile it.
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_command_interface.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview list:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command --action list | jq .
+
+Preview set:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action preview-set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode armed_dry_run | jq .
+
+Rejected apply:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode armed_dry_run \
+  --apply \
+  --confirm-lane-change "wrong" | jq .
+
+Do not run a confirmed apply smoke unless tests use temp config files.
+The smoke output must be compact and must not include giant recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Lane command interface added:
+CLI command added:
+API endpoints added, if any:
+Audit ledger used:
+R124 doc created:
+R125 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R124 command interface in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.

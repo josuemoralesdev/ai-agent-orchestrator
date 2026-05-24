@@ -1182,6 +1182,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-control-command":
+        from src.app.hammer_radar.operator.lane_command_interface import (
+            apply_lane_command,
+            format_lane_command_result_json,
+        )
+
+        print(
+            format_lane_command_result_json(
+                apply_lane_command(
+                    action=args.action,
+                    lane_key=args.lane_key,
+                    mode=args.mode,
+                    apply=args.apply,
+                    confirm_lane_change=args.confirm_lane_change,
+                    request_tiny_live=args.request_tiny_live,
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1839,6 +1858,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("lane-control-status", parents=[parent])
     subparsers.add_parser("fresh-signal-router-status", parents=[parent])
+    lane_control_command_parser = subparsers.add_parser("lane-control-command", parents=[parent])
+    lane_control_command_parser.add_argument("--action", required=True)
+    lane_control_command_parser.add_argument("--lane-key", default=None)
+    lane_control_command_parser.add_argument("--mode", default=None)
+    lane_control_command_parser.add_argument("--apply", action="store_true")
+    lane_control_command_parser.add_argument("--confirm-lane-change", default=None)
+    lane_control_command_parser.add_argument("--request-tiny-live", action="store_true")
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
