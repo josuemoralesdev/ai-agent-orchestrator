@@ -1169,6 +1169,19 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "fresh-signal-router-status":
+        from src.app.hammer_radar.operator.fresh_signal_router import (
+            build_fresh_signal_router_status,
+            format_fresh_signal_router_status_json,
+        )
+
+        print(
+            format_fresh_signal_router_status_json(
+                build_fresh_signal_router_status(
+                    log_dir=args.log_dir,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1825,6 +1838,7 @@ def _build_parser() -> argparse.ArgumentParser:
     dual_lane_candidate_watch_parser.add_argument("--write", action="store_true")
 
     subparsers.add_parser("lane-control-status", parents=[parent])
+    subparsers.add_parser("fresh-signal-router-status", parents=[parent])
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
