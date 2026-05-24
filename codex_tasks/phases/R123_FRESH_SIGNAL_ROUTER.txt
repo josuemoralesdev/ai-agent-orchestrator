@@ -1,0 +1,278 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R123_FRESH_SIGNAL_ROUTER.md
+
+PHASE:
+R123 Fresh Signal Router
+
+BRANCH:
+r123-fresh-signal-router
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: MEDIUM
+
+GOAL:
+Create a non-executing fresh signal router that maps fresh Hammer Radar candidates/signals into R122 lane-control decisions.
+
+WHY:
+Manual approval of individual fast-timeframe signals is too slow. R122 created per-lane controls. R123 must now evaluate fresh candidate events against those lanes and return whether each signal is routed, blocked, expired, or ignored.
+
+This phase must not execute orders.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not create order payloads.
+- Do not call Binance order endpoints.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable live execution.
+- Do not remove R120/R121/R122 work.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create execution authority.
+- Do not create a live order endpoint.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R122 lane control
+- lane_controls.json
+- live eligibility
+- strategy performance
+- final live preflight
+- first live activation gate
+- candidate revalidation watch
+- dual lane candidate watch
+- notification/operator commands
+- paper candidates / latest signal sources
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+- configs/hammer_radar
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*candidate*
+- src/app/hammer_radar/operator/*signal*
+- src/app/hammer_radar/operator/*watch*
+- src/app/hammer_radar/operator/strategy_performance.py
+- configs/hammer_radar/lane_controls.json
+- tests/hammer_radar/test_lane_control.py
+- docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+
+REUSE / EXTEND:
+Reuse R122 lane_control functions.
+Reuse existing candidate/signal discovery surfaces where possible.
+Do not duplicate live eligibility logic.
+Do not duplicate signal parsing if existing helpers exist.
+If no clean existing source exists, build a thin adapter that accepts candidate-like dictionaries and supports a safe CLI snapshot using existing logs/readers.
+
+ROUTER CONCEPT:
+A routed signal/candidate must be evaluated as:
+
+lane key:
+symbol + timeframe + direction + entry_mode
+
+Route result:
+- ROUTED_TO_LANE
+- BLOCKED_BY_LANE
+- EXPIRED_SIGNAL
+- NO_MATCHING_LANE
+- ROUTER_NO_CANDIDATE
+- ROUTER_ERROR
+
+Freshness:
+Use the lane's freshness_seconds.
+A candidate is fresh only if now - candidate_timestamp <= freshness_seconds.
+
+Modes:
+- disabled: never route
+- paper: route as paper-only candidate
+- armed_dry_run: route as dry-run candidate only
+- tiny_live: still must be blocked unless global gates are ready; R123 does not execute
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/fresh_signal_router.py
+
+Expose functions:
+- normalize_candidate
+- build_lane_key_from_candidate
+- evaluate_candidate_against_lanes
+- build_fresh_signal_router_status
+
+Candidate normalization should support fields commonly seen in existing signals:
+- symbol
+- timeframe
+- direction
+- entry_mode
+- candidate_id or signal_id
+- generated_at / timestamp / closed_at / detected_at
+- score
+- tier
+- freshness_status if present
+
+Router output for each candidate:
+{
+  "route_status": "...",
+  "candidate_id": "...",
+  "lane_key": "...",
+  "symbol": "...",
+  "timeframe": "...",
+  "direction": "...",
+  "entry_mode": "...",
+  "candidate_age_seconds": ...,
+  "freshness_seconds": ...,
+  "lane_mode": "...",
+  "lane_status": "...",
+  "blockers": [...],
+  "route_action": "PAPER_OBSERVE" | "ARMED_DRY_RUN_OBSERVE" | "TINY_LIVE_BLOCKED_BY_GLOBAL_GATES" | "IGNORE",
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false
+  }
+}
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+fresh-signal-router-status
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward fresh-signal-router-status
+
+Output should include:
+- status
+- generated_at
+- candidates_seen_count
+- routed_count
+- expired_count
+- blocked_count
+- no_matching_lane_count
+- routed_candidates compact list
+- blocked_candidates compact list
+- expired_candidates compact list
+- lane_summary from R122
+- top_blockers
+- safety summary
+
+Output must be compact JSON.
+Do not print giant raw recommendation arrays.
+Do not print secrets.
+
+If no candidate source is available:
+Return status ROUTER_NO_CANDIDATE_SOURCE or ROUTER_NO_CANDIDATES, with safety fields false.
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R123_FRESH_SIGNAL_ROUTER.md
+
+Explain:
+- why lane routing replaces stale manual approval
+- how router maps candidates to lanes
+- freshness_seconds behavior
+- paper vs armed_dry_run vs tiny_live mode behavior
+- why R123 does not execute orders
+- next phases:
+  - R124 lane command interface
+  - R125 autonomous paper lane execution
+  - R126 first tiny-live lane execution
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R124_LANE_COMMAND_INTERFACE.md
+
+R124 should add safe operator commands/API/UI for changing lane modes:
+- disabled
+- paper
+- armed_dry_run
+- tiny_live
+It must remain non-executing and must not bypass global gates.
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_fresh_signal_router.py
+
+Test:
+- candidate normalizes correctly
+- lane key builds consistently
+- fresh candidate routes to matching 13m armed_dry_run lane
+- fresh candidate routes to 44m paper lane
+- stale candidate returns EXPIRED_SIGNAL
+- unknown lane returns NO_MATCHING_LANE
+- disabled lane returns BLOCKED_BY_LANE or LANE_DISABLED
+- tiny_live lane does not bypass global gates
+- safety flags are always false
+- CLI mode exists and returns compact status
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/fresh_signal_router.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_fresh_signal_router.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-signal-router-status | jq .
+
+The smoke output must be compact and must not include giant recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Fresh signal router command added:
+R123 doc created:
+R124 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Routing summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R123 router in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
