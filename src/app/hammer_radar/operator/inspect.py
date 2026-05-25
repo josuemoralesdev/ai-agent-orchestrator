@@ -1269,6 +1269,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "autonomous-paper-lane-executor-integration":
+        from src.app.hammer_radar.operator.autonomous_paper_lane_executor_integration import (
+            format_autonomous_paper_lane_executor_integration_status_json,
+            run_autonomous_paper_lane_executor_once,
+        )
+
+        print(
+            format_autonomous_paper_lane_executor_integration_status_json(
+                run_autonomous_paper_lane_executor_once(
+                    log_dir=args.log_dir,
+                    record_paper=args.record_paper,
+                    record_scheduler_tick=args.record_scheduler_tick,
+                    record_decisions=args.record_decisions,
+                    lane_key=args.lane_key,
+                    all_lanes=args.all_lanes,
+                    confirm_paper_integration=args.confirm_paper_integration,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1958,6 +1977,17 @@ def _build_parser() -> argparse.ArgumentParser:
     lane_autonomy_scheduler_parser.add_argument("--lane-key", default=None)
     lane_autonomy_scheduler_parser.add_argument("--all-lanes", action="store_true")
     lane_autonomy_scheduler_parser.add_argument("--confirm-scheduler-record", default=None)
+
+    autonomous_paper_lane_executor_integration_parser = subparsers.add_parser(
+        "autonomous-paper-lane-executor-integration",
+        parents=[parent],
+    )
+    autonomous_paper_lane_executor_integration_parser.add_argument("--record-paper", action="store_true")
+    autonomous_paper_lane_executor_integration_parser.add_argument("--record-scheduler-tick", action="store_true")
+    autonomous_paper_lane_executor_integration_parser.add_argument("--record-decisions", action="store_true")
+    autonomous_paper_lane_executor_integration_parser.add_argument("--lane-key", default=None)
+    autonomous_paper_lane_executor_integration_parser.add_argument("--all-lanes", action="store_true")
+    autonomous_paper_lane_executor_integration_parser.add_argument("--confirm-paper-integration", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
