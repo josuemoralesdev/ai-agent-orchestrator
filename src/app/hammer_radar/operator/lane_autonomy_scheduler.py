@@ -289,6 +289,7 @@ def _status_payload(
         "lanes_evaluated_count": int(loop_status.get("lanes_evaluated_count") or 0),
         "candidates_seen_count": int(loop_status.get("candidates_seen_count") or 0),
         "decisions_count": int(loop_status.get("decisions_count") or 0),
+        "decisions": decisions[:25],
         "recorded_decision_ids": list(recorded_decision_ids),
         "tick_recorded": bool(tick_recorded),
         "tick_id": tick_id,
