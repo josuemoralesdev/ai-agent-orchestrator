@@ -1251,6 +1251,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-autonomy-scheduler":
+        from src.app.hammer_radar.operator.lane_autonomy_scheduler import (
+            format_lane_autonomy_scheduler_status_json,
+            run_lane_autonomy_scheduler_once,
+        )
+
+        print(
+            format_lane_autonomy_scheduler_status_json(
+                run_lane_autonomy_scheduler_once(
+                    log_dir=args.log_dir,
+                    record_tick=args.record_tick,
+                    record_decisions=args.record_decisions,
+                    lane_key=args.lane_key,
+                    all_lanes=args.all_lanes,
+                    confirm_scheduler_record=args.confirm_scheduler_record,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1932,6 +1950,14 @@ def _build_parser() -> argparse.ArgumentParser:
     lane_autonomy_control_loop_parser.add_argument("--lane-key", default=None)
     lane_autonomy_control_loop_parser.add_argument("--all-lanes", action="store_true")
     lane_autonomy_control_loop_parser.add_argument("--confirm-decision-record", default=None)
+
+    lane_autonomy_scheduler_parser = subparsers.add_parser("lane-autonomy-scheduler", parents=[parent])
+    lane_autonomy_scheduler_parser.add_argument("--once", action="store_true")
+    lane_autonomy_scheduler_parser.add_argument("--record-tick", action="store_true")
+    lane_autonomy_scheduler_parser.add_argument("--record-decisions", action="store_true")
+    lane_autonomy_scheduler_parser.add_argument("--lane-key", default=None)
+    lane_autonomy_scheduler_parser.add_argument("--all-lanes", action="store_true")
+    lane_autonomy_scheduler_parser.add_argument("--confirm-scheduler-record", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

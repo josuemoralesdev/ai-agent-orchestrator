@@ -1,0 +1,356 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R128_LANE_AUTONOMY_SCHEDULER.md
+
+PHASE:
+R128 Lane Autonomy Scheduler
+
+BRANCH:
+r128-lane-autonomy-scheduler
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+GOAL:
+Create a non-executing scheduler scaffold for the R127 lane autonomy control loop.
+
+The scheduler should periodically run the lane autonomy decision loop and record autonomous decision snapshots, while still never placing real orders.
+
+CORE ARCHITECTURE:
+Operator controls:
+- global kill switch
+- per-lane mode/switch
+- timeframe/strategy authorization
+
+System controls:
+- fresh signal detection
+- lane matching
+- entry intent
+- size/risk policy intent
+- stop/take-profit policy intent
+- cooldown and daily limits
+- decision ledgering
+
+R128 turns this into a scheduled loop.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install or enable systemd service automatically.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R128 may create:
+- scheduler module
+- CLI command
+- dry-run scheduler report
+- optional systemd unit template docs only
+
+R128 must not actually install/start services.
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- R126 first tiny-live lane execution gate
+- R127 lane autonomy control loop
+- existing scheduler patterns
+- paper refresh scheduler
+- notification watcher
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/paper_refresh_scheduler.py
+- src/app/hammer_radar/operator/notification_watcher.py
+- src/app/hammer_radar/operator/inspect.py
+- docs/hammer_radar/live_readiness/R127_LANE_AUTONOMY_CONTROL_LOOP.md
+- tests/hammer_radar/test_lane_autonomy_control_loop.py
+
+REUSE / EXTEND:
+Reuse R127 lane autonomy control loop.
+Reuse existing scheduler/logging patterns if present.
+Do not duplicate lane/router logic.
+Do not create real execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+
+Expose functions:
+- build_lane_autonomy_scheduler_status
+- run_lane_autonomy_scheduler_once
+- build_scheduler_tick_record
+- append_scheduler_tick_record
+- load_scheduler_tick_records
+- summarize_scheduler_ticks
+
+Scheduler tick record:
+{
+  "event_type": "LANE_AUTONOMY_SCHEDULER_TICK",
+  "tick_id": "...",
+  "recorded_at_utc": "...",
+  "mode": "preview|record_decision",
+  "lanes_evaluated_count": ...,
+  "candidates_seen_count": ...,
+  "decisions_count": ...,
+  "recorded_decision_ids": [...],
+  "decision_summary": {...},
+  "top_blockers": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true
+  },
+  "source_surfaces_used": [...]
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/lane_autonomy_scheduler_ticks.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+lane-autonomy-scheduler
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-scheduler
+
+Default behavior:
+- preview only
+- no scheduler tick ledger write
+- no decision ledger write
+- compact status
+
+Supported args:
+- --once
+- --record-tick
+- --record-decisions
+- --lane-key <lane_key>
+- --all-lanes
+- --confirm-scheduler-record "<exact phrase>"
+
+Exact confirmation phrase:
+I CONFIRM AUTONOMY SCHEDULER RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+Behavior:
+1. Default:
+   - status: LANE_AUTONOMY_SCHEDULER_PREVIEW
+   - no tick ledger write
+   - no decision ledger write
+
+2. With --record-tick but missing/wrong confirmation:
+   - status: LANE_AUTONOMY_SCHEDULER_REJECTED
+   - no tick ledger write
+   - no decision ledger write
+
+3. With --record-tick and exact confirmation:
+   - status: LANE_AUTONOMY_SCHEDULER_TICK_RECORDED
+   - write scheduler tick record only
+   - if --record-decisions also provided, call R127 decision recording safely using same safety constraints
+   - never place orders
+   - never create order payloads
+   - never call Binance
+   - never mutate env
+
+Output JSON must include:
+- status
+- generated_at
+- once
+- record_tick_requested
+- record_decisions_requested
+- confirmation_valid
+- selected_lane_keys
+- lanes_evaluated_count
+- candidates_seen_count
+- decisions_count
+- recorded_decision_ids
+- tick_recorded
+- tick_id
+- decision_summary
+- top_blockers
+- scheduler_recommendation
+- safety
+- ledger_path
+- source_surfaces_used
+
+STOP CONDITIONS:
+Refuse tick/decision recording if:
+- confirmation invalid
+- any source safety field indicates order/execution/network/secrets
+- paper_live_separation_intact false
+- decision would imply direct order payload
+- selected lane not configured
+- route source error occurs
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R128_LANE_AUTONOMY_SCHEDULER.md
+
+Explain:
+- what R128 adds
+- why scheduling is the next step toward fully automated lane trading
+- preview vs record-tick mode
+- record-decisions behavior
+- why no real orders occur
+- suggested manual cron/systemd usage, docs only
+- confirmation phrase
+- scheduler ledger
+- safety constraints
+- next phases:
+  - R129 autonomous paper lane executor integration
+  - R130 first tiny-live autonomous lane authorization
+
+Optional docs-only file:
+Create:
+docs/hammer_radar/live_readiness/R128_SYSTEMD_TEMPLATE_NOT_INSTALLED.md
+
+Include an example systemd timer/service template for future review only.
+Clearly mark:
+NOT INSTALLED
+NOT ENABLED
+DO NOT COPY BLINDLY
+NO REAL ORDERS
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R128:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R129_AUTONOMOUS_PAPER_LANE_EXECUTOR_INTEGRATION.md
+
+R129 should connect scheduler ticks to autonomous paper lane execution:
+- paper only
+- no real orders
+- no Binance order endpoints
+- no env mutation
+- respect lane max daily trades/cooldowns
+- record paper executions automatically after confirmed paper scheduler mode
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_lane_autonomy_scheduler.py
+
+Test:
+- default preview writes no tick records
+- wrong confirmation rejects recording
+- exact confirmation records scheduler tick only
+- record-decisions records decision IDs only when confirmed
+- scheduler safety fields are always false
+- paper_live_separation_intact is true in normal safe flow
+- selected lane filters decisions
+- unsupported lane rejected
+- scheduler refuses when source safety violation exists
+- scheduler tick ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_autonomy_scheduler.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_autonomy_scheduler.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-scheduler | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-scheduler \
+  --record-tick \
+  --confirm-scheduler-record "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Lane autonomy scheduler added:
+CLI command added:
+Ledger used:
+R128 doc created:
+Systemd template doc created:
+R129 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Scheduler summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R128 lane autonomy scheduler in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
