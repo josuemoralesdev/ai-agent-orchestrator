@@ -1288,6 +1288,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-tiny-live-autonomous-lane-authorization":
+        from src.app.hammer_radar.operator.first_tiny_live_autonomous_lane_authorization import (
+            build_first_tiny_live_autonomous_lane_authorization,
+            format_first_tiny_live_autonomous_lane_authorization_json,
+        )
+
+        print(
+            format_first_tiny_live_autonomous_lane_authorization_json(
+                build_first_tiny_live_autonomous_lane_authorization(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_authorization=args.record_authorization,
+                    request_lane_mode_tiny_live=args.request_lane_mode_tiny_live,
+                    apply_lane_mode_change=args.apply_lane_mode_change,
+                    confirm_tiny_live_authorization=args.confirm_tiny_live_authorization,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1988,6 +2006,16 @@ def _build_parser() -> argparse.ArgumentParser:
     autonomous_paper_lane_executor_integration_parser.add_argument("--lane-key", default=None)
     autonomous_paper_lane_executor_integration_parser.add_argument("--all-lanes", action="store_true")
     autonomous_paper_lane_executor_integration_parser.add_argument("--confirm-paper-integration", default=None)
+
+    first_tiny_live_autonomous_lane_authorization_parser = subparsers.add_parser(
+        "first-tiny-live-autonomous-lane-authorization",
+        parents=[parent],
+    )
+    first_tiny_live_autonomous_lane_authorization_parser.add_argument("--lane-key", required=True)
+    first_tiny_live_autonomous_lane_authorization_parser.add_argument("--record-authorization", action="store_true")
+    first_tiny_live_autonomous_lane_authorization_parser.add_argument("--request-lane-mode-tiny-live", action="store_true")
+    first_tiny_live_autonomous_lane_authorization_parser.add_argument("--apply-lane-mode-change", action="store_true")
+    first_tiny_live_autonomous_lane_authorization_parser.add_argument("--confirm-tiny-live-authorization", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

@@ -1,0 +1,457 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R130_FIRST_TINY_LIVE_AUTONOMOUS_LANE_AUTHORIZATION.md
+
+PHASE:
+R130 First Tiny-Live Autonomous Lane Authorization
+
+BRANCH:
+r130-first-tiny-live-autonomous-lane-authorization
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the first tiny-live autonomous lane authorization layer.
+
+This phase must allow the operator to authorize a specific lane for future tiny-live autonomous operation under strict risk contracts and global safety gates.
+
+This phase must not place orders.
+
+CORE ARCHITECTURE:
+Operator controls:
+- global kill switch
+- per-lane ON/OFF or mode switch
+- timeframe/strategy authorization
+- explicit tiny-live authorization for a lane
+
+System controls:
+- fresh signal detection
+- lane matching
+- entry decision
+- position size/risk policy
+- stop/take-profit/exit policy
+- cooldown enforcement
+- max daily trades/loss enforcement
+- autonomous paper execution
+- tiny-live gate evaluation
+- future live adapter execution only after later explicit execution phase
+
+R130 turns a lane from “paper/armed_dry_run capable” into “authorized-for-tiny-live-review,” but it does not execute.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start systemd services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R130 may write an append-only tiny-live lane authorization ledger.
+R130 may optionally propose a lane mode update to tiny_live, but config mutation must be preview-only unless explicitly confirmed.
+R130 must not mutate lane_controls.json unless the module cleanly reuses R124 lane-command logic with exact confirmation.
+If config mutation is too risky, keep R130 authorization-ledger-only and document that R124 changes lane mode separately.
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- R126 first tiny-live lane execution gate
+- R127 lane autonomy control loop
+- R128 lane autonomy scheduler
+- R129 autonomous paper lane executor integration
+- lane_controls.json
+- tiny live risk contracts
+- first live activation gate
+- final live preflight
+- protective order status
+- live env boundary review
+- Binance connector status, status only
+- logs/hammer_radar_forward conventions
+- inspect.py CLI modes
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/binance_live_status.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R126_FIRST_TINY_LIVE_LANE_EXECUTION_GATE.md
+- docs/hammer_radar/live_readiness/R127_LANE_AUTONOMY_CONTROL_LOOP.md
+- docs/hammer_radar/live_readiness/R128_LANE_AUTONOMY_SCHEDULER.md
+- docs/hammer_radar/live_readiness/R129_AUTONOMOUS_PAPER_LANE_EXECUTOR_INTEGRATION.md
+- tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+- tests/hammer_radar/test_lane_autonomy_control_loop.py
+- tests/hammer_radar/test_lane_autonomy_scheduler.py
+- tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py
+
+REUSE / EXTEND:
+Reuse R122 lane controls.
+Reuse R124 lane command interface for any mode-change preview or apply semantics.
+Reuse R126 tiny-live lane execution gate.
+Reuse R129 autonomous paper executor integration proof.
+Reuse tiny live risk contracts.
+Reuse R106/global gate checks.
+Do not duplicate lane parsing logic.
+Do not duplicate eligibility logic.
+Do not create real execution logic.
+
+AUTHORIZATION CONCEPT:
+A lane may be authorized for future tiny-live autonomous operation only if:
+
+1. Lane exists.
+2. Lane is eligible for future tiny-live or explicitly allowed by config/risk contract.
+3. Lane has recent paper proof from R125/R129 or a recent autonomous paper integration record.
+4. R126 tiny-live gate has been evaluated for that lane.
+5. Risk contract exists.
+6. Max daily trades/loss/cooldown are present.
+7. Protective order policy is required.
+8. Emergency rollback path is acknowledged.
+9. Kill switch semantics are acknowledged.
+10. Operator supplies exact tiny-live authorization confirmation phrase.
+11. Safety fields remain false.
+12. No Binance/order/network/secret behavior occurs.
+
+R130 may still return AUTHORIZATION_BLOCKED if prerequisites are missing.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+
+Expose functions:
+- build_first_tiny_live_autonomous_lane_authorization
+- evaluate_lane_authorization_prerequisites
+- build_tiny_live_lane_authorization_packet
+- append_tiny_live_lane_authorization_record
+- load_tiny_live_lane_authorization_records
+- summarize_tiny_live_lane_authorizations
+
+Authorization status:
+- TINY_LIVE_AUTHORIZATION_PREVIEW
+- TINY_LIVE_AUTHORIZATION_REJECTED
+- TINY_LIVE_AUTHORIZATION_BLOCKED
+- TINY_LIVE_AUTHORIZATION_RECORDED
+- TINY_LIVE_AUTHORIZATION_READY_FOR_GATE_RECHECK
+
+Authorization record fields:
+{
+  "event_type": "FIRST_TINY_LIVE_AUTONOMOUS_LANE_AUTHORIZATION",
+  "authorization_id": "...",
+  "recorded_at_utc": "...",
+  "lane_key": "...",
+  "requested_mode": "tiny_live",
+  "previous_lane_mode": "...",
+  "authorization_status": "...",
+  "operator_confirmation_valid": true/false,
+  "r126_gate_status": "...",
+  "r129_paper_integration_status": "...",
+  "paper_proof_summary": {...},
+  "risk_contract_summary": {...},
+  "kill_switch_acknowledged": true/false,
+  "rollback_acknowledged": true/false,
+  "blockers": [...],
+  "warnings": [...],
+  "authorization_packet": {...},
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+Authorization packet:
+Must be non-executable.
+Must include:
+- lane_key
+- symbol
+- timeframe
+- direction
+- entry_mode
+- requested_mode: tiny_live
+- max_daily_trades
+- max_daily_loss_pct
+- cooldown_after_loss_minutes
+- freshness_seconds
+- require_protective_orders
+- paper_proof_reference if available
+- r126_readiness_hash if available
+- risk_contract_hash if available
+- authorization_hash
+- required_future_execution_confirmation_phrase
+
+Must not include:
+- API keys
+- secrets
+- signed payloads
+- executable exchange order payload
+- direct Binance endpoint
+- direct live quantity unless represented only as a risk policy/cap
+
+Required confirmation phrase:
+I CONFIRM TINY LIVE LANE AUTHORIZATION ONLY; NO ORDER; NO BINANCE CALL.
+
+This phrase authorizes recording the lane authorization only.
+It does not authorize order placement.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_tiny_live_autonomous_lane_authorizations.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+first-tiny-live-autonomous-lane-authorization
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-autonomous-lane-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-authorization
+- --request-lane-mode-tiny-live
+- --apply-lane-mode-change
+- --confirm-tiny-live-authorization "<exact phrase>"
+
+Default behavior:
+- preview only
+- no authorization ledger write
+- no config write
+- no lane mode change
+- compact output
+
+Behavior:
+1. Preview:
+   - status: TINY_LIVE_AUTHORIZATION_PREVIEW or TINY_LIVE_AUTHORIZATION_BLOCKED
+   - no ledger write
+   - no config write
+   - shows prerequisites/blockers
+
+2. record-authorization without exact confirmation:
+   - status: TINY_LIVE_AUTHORIZATION_REJECTED
+   - no ledger write
+   - no config write
+
+3. record-authorization with exact confirmation:
+   - writes authorization ledger only if safe
+   - status: TINY_LIVE_AUTHORIZATION_RECORDED or TINY_LIVE_AUTHORIZATION_BLOCKED
+   - no real orders
+   - no Binance
+   - no env mutation
+
+4. request/apply lane mode tiny_live:
+   - only preview by default
+   - if --apply-lane-mode-change is used, must require exact confirmation phrase
+   - must only call/reuse R124 lane command interface semantics if safe
+   - if R124 reuse is risky, reject with blocker and recommend R124 command
+
+Output JSON must include:
+- status
+- generated_at
+- lane_key
+- previous_lane_mode
+- requested_mode
+- record_authorization_requested
+- request_lane_mode_tiny_live
+- apply_lane_mode_change
+- confirmation_valid
+- authorization_recorded
+- authorization_id
+- config_written
+- authorization_packet
+- prerequisites
+- blockers
+- warnings
+- next_actions
+- safety
+- ledger_path
+- source_surfaces_used
+
+STOP CONDITIONS:
+Refuse authorization recording if:
+- lane unknown
+- confirmation invalid when recording requested
+- safety field indicates order/execution/network/secrets
+- paper_live_separation_intact false
+- risk contract missing
+- protective order policy absent
+- paper proof missing, unless explicitly returning BLOCKED preview
+- r126 gate reports unsafe state
+- authorization packet would contain executable payload
+- config write requested but R124 semantics cannot be safely reused
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R130_FIRST_TINY_LIVE_AUTONOMOUS_LANE_AUTHORIZATION.md
+
+Explain:
+- what R130 adds
+- what R130 does not add
+- why lane authorization is not order execution
+- how it uses R126 and R129
+- confirmation phrase
+- authorization packet
+- ledger
+- lane mode tiny_live request behavior
+- safety constraints
+- how this prepares later execution
+- next phases:
+  - R131 live lane kill-switch rehearsal
+  - R132 live adapter boundary final review
+  - R133 lane control cockpit UI
+  - R134 first tiny-live order payload dry authorization
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R130:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R131_LIVE_LANE_KILL_SWITCH_REHEARSAL.md
+
+R131 should rehearse kill switch and rollback for authorized tiny-live lanes:
+- no real orders
+- no Binance order endpoints
+- verify lane can be disabled
+- verify global kill switch semantics
+- verify rollback path
+- verify scheduler stops respecting lane
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_first_tiny_live_autonomous_lane_authorization.py
+
+Test:
+- preview writes no authorization record
+- wrong confirmation rejects recording
+- exact confirmation records authorization only when mocked prerequisites permit
+- unknown lane rejected
+- missing paper proof blocks authorization
+- R126 blocked state blocks ready authorization
+- authorization packet contains no secrets and no executable order payload
+- safety flags are always false
+- paper_live_separation_intact is true in normal safe flow
+- lane mode apply is preview-only unless apply flag and confirmation are present
+- config write either safely reuses R124 or is blocked with recommendation
+- ledger writes append-only authorization records
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_first_tiny_live_autonomous_lane_authorization.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-autonomous-lane-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-autonomous-lane-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-authorization \
+  --confirm-tiny-live-authorization "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not apply lane mode changes in real config during smoke.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Tiny-live autonomous lane authorization added:
+CLI command added:
+Ledger used:
+R130 doc created:
+R131 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Authorization summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R130 tiny-live autonomous lane authorization package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
