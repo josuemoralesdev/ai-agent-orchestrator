@@ -1,0 +1,410 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R129_AUTONOMOUS_PAPER_LANE_EXECUTOR_INTEGRATION.md
+
+PHASE:
+R129 Autonomous Paper Lane Executor Integration
+
+BRANCH:
+r129-autonomous-paper-lane-executor-integration
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Integrate the R128 lane autonomy scheduler with R125 autonomous paper lane execution so scheduled autonomy decisions can produce paper execution records automatically, while still never placing real orders.
+
+CORE ARCHITECTURE:
+Operator controls:
+- global kill switch
+- per-lane mode/switch
+- timeframe/strategy authorization
+
+System controls:
+- fresh signal detection
+- lane matching
+- entry intent
+- size/risk policy intent
+- stop/take-profit policy intent
+- cooldown and daily limits
+- autonomous paper execution ledgering
+- later tiny-live gate review
+
+R129 connects:
+R128 scheduler tick
+→ R127 autonomy decision
+→ R125 paper lane execution record
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start systemd services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R129 may write:
+- scheduler tick records
+- autonomy decision records
+- paper lane execution records
+
+R129 must not write:
+- real order records
+- exchange payloads
+- Binance requests
+- env changes
+- live flag changes
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- R126 first tiny-live lane execution gate
+- R127 lane autonomy control loop
+- R128 lane autonomy scheduler
+- paper lane execution ledgers
+- lane autonomy decision ledgers
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- docs/hammer_radar/live_readiness/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+- docs/hammer_radar/live_readiness/R127_LANE_AUTONOMY_CONTROL_LOOP.md
+- docs/hammer_radar/live_readiness/R128_LANE_AUTONOMY_SCHEDULER.md
+- tests/hammer_radar/test_autonomous_paper_lane_execution.py
+- tests/hammer_radar/test_lane_autonomy_control_loop.py
+- tests/hammer_radar/test_lane_autonomy_scheduler.py
+
+REUSE / EXTEND:
+Reuse R128 scheduler.
+Reuse R127 autonomy decisions.
+Reuse R125 paper lane execution record builder and ledger conventions.
+Reuse R123 fresh signal router.
+Reuse R122 lane controls.
+Do not duplicate lane parsing logic.
+Do not duplicate router logic.
+Do not create real execution logic.
+
+CORE BEHAVIOR:
+R129 creates a new integration layer that can:
+
+1. Run the lane autonomy scheduler once.
+2. Inspect autonomy decisions.
+3. Select decisions eligible for paper execution:
+   - PAPER_ENTRY_INTENT
+   - ARMED_DRY_RUN_INTENT
+   - optionally TINY_LIVE_GATE_REVIEW only as PAPER_SHADOW_FOR_TINY_LIVE
+4. Convert eligible decisions into paper lane execution records using R125 logic.
+5. Respect lane limits:
+   - max_daily_trades
+   - cooldown_after_loss_minutes
+   - max_daily_loss_pct as policy reference
+6. Refuse stale/blocked/ignore decisions.
+7. Return compact execution summary.
+8. Keep all safety fields false.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+
+Expose functions:
+- build_autonomous_paper_lane_executor_integration_status
+- select_paper_executable_decisions
+- build_paper_execution_from_autonomy_decision
+- run_autonomous_paper_lane_executor_once
+- append_paper_executor_integration_record
+- load_paper_executor_integration_records
+- summarize_paper_executor_integration_records
+
+Integration record fields:
+{
+  "event_type": "AUTONOMOUS_PAPER_LANE_EXECUTOR_INTEGRATION",
+  "integration_id": "...",
+  "recorded_at_utc": "...",
+  "mode": "preview|record_paper",
+  "scheduler_status": "...",
+  "decisions_seen_count": ...,
+  "paper_eligible_decisions_count": ...,
+  "paper_blocked_decisions_count": ...,
+  "paper_execution_records_created": ...,
+  "paper_execution_ids": [...],
+  "blocked_decisions": [...],
+  "top_blockers": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true
+  },
+  "source_surfaces_used": [...]
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/autonomous_paper_lane_executor_integrations.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+autonomous-paper-lane-executor-integration
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-executor-integration
+
+Default behavior:
+- preview only
+- no integration ledger write
+- no paper execution record write
+- compact status
+
+Supported args:
+- --record-paper
+- --record-scheduler-tick
+- --record-decisions
+- --lane-key <lane_key>
+- --all-lanes
+- --confirm-paper-integration "<exact phrase>"
+
+Exact confirmation phrase:
+I CONFIRM AUTONOMOUS PAPER LANE INTEGRATION ONLY; NO REAL ORDER; NO BINANCE CALL.
+
+Behavior:
+1. Without --record-paper:
+   - status: PAPER_EXECUTOR_INTEGRATION_PREVIEW
+   - no integration ledger write
+   - no paper execution write
+   - show candidate decisions and blockers
+
+2. With --record-paper but missing/wrong confirmation:
+   - status: PAPER_EXECUTOR_INTEGRATION_REJECTED
+   - no integration ledger write
+   - no paper execution write
+   - rejection_reason: missing or invalid paper integration confirmation
+
+3. With --record-paper and exact confirmation:
+   - status: PAPER_EXECUTOR_INTEGRATION_RECORDED or PAPER_EXECUTOR_INTEGRATION_PARTIAL
+   - may write integration record
+   - may write scheduler tick if --record-scheduler-tick
+   - may write autonomy decisions if --record-decisions
+   - may write paper execution records for eligible decisions
+   - never place real orders
+   - never create exchange payloads
+   - never call Binance
+   - never mutate env
+
+Output JSON must include:
+- status
+- generated_at
+- record_paper_requested
+- record_scheduler_tick_requested
+- record_decisions_requested
+- confirmation_valid
+- selected_lane_keys
+- scheduler_status
+- lanes_evaluated_count
+- candidates_seen_count
+- decisions_seen_count
+- paper_eligible_decisions_count
+- paper_blocked_decisions_count
+- paper_execution_records_created
+- paper_execution_ids
+- blocked_decisions compact list
+- top_blockers
+- integration_recorded
+- integration_id
+- safety
+- ledger_path
+- paper_execution_ledger_path
+- source_surfaces_used
+
+Decision eligibility:
+Eligible autonomy decisions:
+- PAPER_ENTRY_INTENT
+- ARMED_DRY_RUN_INTENT
+- TINY_LIVE_GATE_REVIEW only as paper shadow, not real order
+
+Not eligible:
+- IGNORE
+- PAPER_OBSERVE unless explicitly supported as observation-only record
+- BLOCKED
+- unknown values
+
+STOP CONDITIONS:
+Refuse paper integration recording if:
+- confirmation invalid
+- any source safety field indicates order/execution/network/secrets
+- paper_live_separation_intact false
+- decision would imply direct order payload
+- strategy intent includes direct live quantity
+- selected lane not configured
+- route source error occurs
+- max daily trades exceeded
+- cooldown active
+- paper execution builder reports unsafe state
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R129_AUTONOMOUS_PAPER_LANE_EXECUTOR_INTEGRATION.md
+
+Explain:
+- what R129 adds
+- how R128 scheduler connects to R125 paper execution
+- paper-only behavior
+- eligible autonomy decisions
+- confirmation phrase
+- integration ledger
+- paper execution ledger
+- safety constraints
+- why no Binance calls occur
+- next phases:
+  - R130 first tiny-live autonomous lane authorization
+  - R131 live lane kill-switch rehearsal
+  - R132 live adapter boundary final review
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R129:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R130_FIRST_TINY_LIVE_AUTONOMOUS_LANE_AUTHORIZATION.md
+
+R130 should create the first tiny-live autonomous lane authorization layer:
+- operator explicitly authorizes a lane for tiny_live mode
+- still no real order placement unless later phase explicitly enables adapter
+- must require R126 gate readiness
+- must require R129 paper proof
+- must include kill switch and rollback checks
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py
+
+Test:
+- preview mode writes no integration or paper execution records
+- wrong confirmation rejects recording
+- exact confirmation records integration and paper execution records only
+- PAPER_ENTRY_INTENT creates paper execution record
+- ARMED_DRY_RUN_INTENT creates armed dry-run paper execution record
+- TINY_LIVE_GATE_REVIEW creates paper shadow only, not real order
+- BLOCKED/IGNORE decisions do not create paper executions
+- max_daily_trades blocks additional records
+- cooldown blocks records
+- safety flags are always false
+- paper_live_separation_intact is true in normal safe flow
+- integration ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-executor-integration | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-executor-integration \
+  --record-paper \
+  --confirm-paper-integration "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+
+The smoke output must be compact and must not include giant raw recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Autonomous paper executor integration added:
+CLI command added:
+Ledger used:
+Paper execution ledger used:
+R129 doc created:
+R130 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Paper integration summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R129 autonomous paper executor integration in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
