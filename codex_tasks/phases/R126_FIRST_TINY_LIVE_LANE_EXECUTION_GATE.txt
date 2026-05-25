@@ -1,0 +1,419 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R126_FIRST_TINY_LIVE_LANE_EXECUTION.md
+
+PHASE:
+R126 First Tiny-Live Lane Execution Gate
+
+BRANCH:
+r126-first-tiny-live-lane-execution-gate
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the final non-executing first tiny-live lane execution gate.
+
+R126 must determine whether a fresh routed lane candidate has satisfied every precondition required to request explicit first tiny-live execution authorization.
+
+R126 must not place orders.
+
+WHY:
+R122 created lane controls.
+R123 routed fresh signals into lanes.
+R124 created the operator lane command interface.
+R125 created autonomous paper lane execution.
+
+Now R126 must compose those surfaces with R106/global live gates, risk contract, protective order readiness, candidate freshness, lane mode, and operator confirmation requirements into one final execution-readiness gate.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create a live order endpoint.
+- Do not implement real execution adapter behavior.
+- Do not remove R120/R121/R122/R123/R124/R125 work.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+IMPORTANT:
+R126 is a gate and decision packet only.
+It may create append-only gate review records.
+It may produce a tiny-live execution readiness packet.
+It must not create an executable exchange order payload.
+It must not call Binance.
+It must not place orders.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R106 first live activation gate
+- R120 targeted clearing pack
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- final live preflight
+- tiny live risk contract
+- protective order status
+- Binance connector status
+- live env boundary review
+- global kill switch/live flags
+- candidate revalidation watch
+- paper lane execution ledgers
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+- configs/hammer_radar
+
+Specifically inspect:
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/live_arming_preflight.py
+- src/app/hammer_radar/operator/binance_live_status.py
+- src/app/hammer_radar/execution/
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+- docs/hammer_radar/live_readiness/R123_FRESH_SIGNAL_ROUTER.md
+- docs/hammer_radar/live_readiness/R124_LANE_COMMAND_INTERFACE.md
+- docs/hammer_radar/live_readiness/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_fresh_signal_router.py
+- tests/hammer_radar/test_lane_command_interface.py
+- tests/hammer_radar/test_autonomous_paper_lane_execution.py
+
+REUSE / EXTEND:
+Reuse R106 first live activation gate.
+Reuse R122 lane control.
+Reuse R123 fresh signal router.
+Reuse R125 autonomous paper lane execution.
+Reuse existing risk contract/protective readiness/global boundary checks.
+Do not duplicate live eligibility logic.
+Do not duplicate lane parsing logic.
+Do not create real execution code.
+
+CORE CONCEPT:
+A first tiny-live lane execution gate may return READY only if:
+
+1. A fresh routed candidate exists.
+2. Candidate maps to a configured lane.
+3. Lane mode is tiny_live.
+4. Lane is eligible for future tiny live.
+5. Candidate is fresh under lane freshness_seconds.
+6. R125 has a recent paper execution or paper shadow proof for same lane/candidate tuple.
+7. R106 first-live activation gate is ready or equivalent required source status is satisfied.
+8. Global live gates are ready.
+9. Global kill switch is not active.
+10. Live execution flags are enabled outside this phase.
+11. Binance credential presence is verified without exposing secrets.
+12. Account/funding read-only check is present.
+13. Protective order readiness is true.
+14. Tiny size/max loss cap is present.
+15. No conflicting position is known.
+16. Emergency cancel path has been reviewed.
+17. Operator confirmation phrase is present and exact.
+18. Paper/live separation remains intact.
+19. All safety fields remain false.
+
+In current likely state, R126 should return BLOCKED.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+
+Expose functions:
+- build_first_tiny_live_lane_execution_gate
+- build_tiny_live_execution_readiness_packet
+- load_recent_paper_lane_executions
+- match_paper_proof_for_candidate
+- evaluate_tiny_live_lane_preconditions
+- append_tiny_live_gate_review_record
+
+Gate output must include:
+
+{
+  "status": "TINY_LIVE_EXECUTION_BLOCKED" | "TINY_LIVE_EXECUTION_READY",
+  "generated_at": "...",
+  "active_candidate": {...},
+  "lane": {...},
+  "lane_mode": "...",
+  "freshness": {...},
+  "paper_proof": {...},
+  "r106_gate": {...},
+  "global_gates": {...},
+  "risk_contract": {...},
+  "protective_readiness": {...},
+  "operator_confirmation": {...},
+  "readiness_packet": {...},
+  "blockers": [...],
+  "warnings": [...],
+  "next_actions": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true
+  },
+  "source_surfaces_used": [...]
+}
+
+Readiness packet:
+Must be non-executable.
+It may contain:
+- candidate_id
+- lane_key
+- symbol
+- timeframe
+- direction
+- entry_mode
+- lane_mode
+- risk_contract_hash
+- packet_hash if available
+- max_daily_trades
+- max_daily_loss_pct
+- max_loss_cap if available
+- freshness_seconds
+- paper_proof_id if available
+- required_confirmation_phrase
+- readiness_hash
+
+It must not contain:
+- API keys
+- secrets
+- signed payloads
+- exchange order payload
+- quantity that would be directly executable unless already safely represented as a risk cap
+- live endpoint target
+
+Required confirmation phrase:
+I CONFIRM FIRST TINY LIVE LANE EXECUTION REVIEW ONLY; NO ORDER PLACED BY R126.
+
+R126 must validate this phrase only as review evidence.
+Even with exact phrase, R126 must not place orders.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_tiny_live_lane_execution_gate_reviews.ndjson
+
+Record:
+- event_type: FIRST_TINY_LIVE_LANE_EXECUTION_GATE_REVIEW
+- review_id
+- recorded_at_utc
+- status
+- lane_key
+- candidate_id
+- readiness_hash
+- blockers
+- warnings
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- network_allowed=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+first-tiny-live-lane-execution-gate
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-lane-execution-gate
+
+Supported optional args:
+- --lane-key <lane_key>
+- --candidate-id <candidate_id>
+- --confirm-review-only "<phrase>"
+
+Default:
+- evaluate best current routed candidate if available
+- otherwise return BLOCKED with reason no fresh routed candidate
+
+Output must be compact enough for operator use:
+- status
+- generated_at
+- lane_key
+- candidate_id
+- lane_mode
+- blockers
+- next_actions
+- readiness_packet
+- safety
+- source_surfaces_used
+
+Do not dump giant raw arrays.
+
+STATUS RULES:
+Return TINY_LIVE_EXECUTION_READY only if all required preconditions are true.
+
+Return TINY_LIVE_EXECUTION_BLOCKED if:
+- no fresh candidate
+- no matching lane
+- lane mode not tiny_live
+- lane not eligible for tiny live
+- no recent paper proof
+- R106 is blocked
+- global gates blocked
+- kill switch active
+- protective readiness false
+- risk contract missing
+- operator confirmation missing
+- paper_live_separation_intact false
+- any safety field indicates order/execution/network/secrets
+- any source error occurs
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R126_FIRST_TINY_LIVE_LANE_EXECUTION_GATE.md
+
+Explain:
+- what R126 adds
+- what R126 does not add
+- why this is still non-executing
+- how R126 composes R122/R123/R124/R125/R106
+- tiny-live lane readiness criteria
+- readiness packet fields
+- required confirmation phrase
+- blockers and next actions
+- safety constraints
+- next phases:
+  - R127 live lane kill-switch rehearsal
+  - R128 first tiny-live order payload dry authorization
+  - R129 first real tiny-live execution adapter review
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R126:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R127_LIVE_LANE_KILL_SWITCH_REHEARSAL.md
+
+R127 should rehearse the live lane kill switch and rollback path:
+- no real orders
+- no Binance order endpoints
+- verify stop conditions
+- verify emergency disable path
+- verify lane mode rollback
+- verify global kill switch semantics
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+
+Test:
+- returns BLOCKED when no fresh candidate
+- returns BLOCKED when lane mode is not tiny_live
+- returns BLOCKED when R106 is blocked
+- returns BLOCKED when paper proof missing
+- returns BLOCKED when protective readiness false
+- returns BLOCKED when confirmation missing
+- can return READY only in fully mocked safe-ready state
+- readiness packet contains no secrets and no executable order payload
+- safety flags always false
+- paper_live_separation_intact true in normal safe blocked flow
+- ledger writes append-only gate review records
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Run:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-lane-execution-gate | jq .
+
+The smoke output must be compact and must not include giant raw recommendation arrays.
+
+DO NOT run anything that places orders.
+DO NOT call Binance.
+DO NOT mutate env files.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Tiny-live lane gate added:
+CLI command added:
+Ledger used:
+R126 doc created:
+R127 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Gate status:
+Main blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R126 tiny-live lane execution gate package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.

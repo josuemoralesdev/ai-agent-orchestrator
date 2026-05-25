@@ -1218,6 +1218,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-tiny-live-lane-execution-gate":
+        from src.app.hammer_radar.operator.first_tiny_live_lane_execution_gate import (
+            build_first_tiny_live_lane_execution_gate,
+            format_first_tiny_live_lane_execution_gate_json,
+        )
+
+        print(
+            format_first_tiny_live_lane_execution_gate_json(
+                build_first_tiny_live_lane_execution_gate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    candidate_id=args.candidate_id,
+                    confirm_review_only=args.confirm_review_only,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1888,6 +1904,11 @@ def _build_parser() -> argparse.ArgumentParser:
     autonomous_paper_lane_execution_parser.add_argument("--lane-key", default=None)
     autonomous_paper_lane_execution_parser.add_argument("--all-lanes", action="store_true")
     autonomous_paper_lane_execution_parser.add_argument("--confirm-paper-only", default=None)
+
+    first_tiny_live_lane_execution_gate_parser = subparsers.add_parser("first-tiny-live-lane-execution-gate", parents=[parent])
+    first_tiny_live_lane_execution_gate_parser.add_argument("--lane-key", default=None)
+    first_tiny_live_lane_execution_gate_parser.add_argument("--candidate-id", default=None)
+    first_tiny_live_lane_execution_gate_parser.add_argument("--confirm-review-only", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
