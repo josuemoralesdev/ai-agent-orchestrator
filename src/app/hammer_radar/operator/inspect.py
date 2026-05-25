@@ -1234,6 +1234,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-autonomy-control-loop":
+        from src.app.hammer_radar.operator.lane_autonomy_control_loop import (
+            build_lane_autonomy_control_loop_status,
+            format_lane_autonomy_control_loop_status_json,
+        )
+
+        print(
+            format_lane_autonomy_control_loop_status_json(
+                build_lane_autonomy_control_loop_status(
+                    log_dir=args.log_dir,
+                    record_decision=args.record_decision,
+                    lane_key=args.lane_key,
+                    all_lanes=args.all_lanes,
+                    confirm_decision_record=args.confirm_decision_record,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1909,6 +1926,12 @@ def _build_parser() -> argparse.ArgumentParser:
     first_tiny_live_lane_execution_gate_parser.add_argument("--lane-key", default=None)
     first_tiny_live_lane_execution_gate_parser.add_argument("--candidate-id", default=None)
     first_tiny_live_lane_execution_gate_parser.add_argument("--confirm-review-only", default=None)
+
+    lane_autonomy_control_loop_parser = subparsers.add_parser("lane-autonomy-control-loop", parents=[parent])
+    lane_autonomy_control_loop_parser.add_argument("--record-decision", action="store_true")
+    lane_autonomy_control_loop_parser.add_argument("--lane-key", default=None)
+    lane_autonomy_control_loop_parser.add_argument("--all-lanes", action="store_true")
+    lane_autonomy_control_loop_parser.add_argument("--confirm-decision-record", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
