@@ -1,0 +1,492 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+
+PHASE:
+R132 Live Adapter Boundary Final Review
+
+BRANCH:
+r132-live-adapter-boundary-final-review
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the final non-executing review of the live adapter boundary between autonomous lane intent and real exchange-facing execution.
+
+R132 must identify exactly what is required before any future phase may dry-authorize or execute a first tiny-live order.
+
+R132 must not place orders.
+
+CURRENT CONTEXT:
+R122 created lane controls.
+R123 routes fresh signals into lanes.
+R124 allows operator lane mode commands.
+R125 records autonomous paper lane executions.
+R126 evaluates first tiny-live lane execution gate.
+R127 created lane autonomy decision loop.
+R128 created autonomy scheduler.
+R129 integrated scheduler decisions with paper lane execution.
+R130 created tiny-live autonomous lane authorization.
+R131 rehearsed kill switch / rollback / lane disable semantics.
+
+R131 confirmed:
+- global kill switch blocks live intent
+- lane disable blocks live intent
+- rollback blocks live intent
+- scheduler respects disabled lane
+- paper/live separation intact
+
+Current remaining live blockers likely include:
+- recent autonomous paper proof missing
+- lane mode not tiny_live
+- R126 gate blocked
+- R106/global first-live activation gate not ready
+- global kill switch active
+- live execution flags disabled
+- protective readiness false or preview-only
+- live adapter not configured
+- Binance credential/account boundary not fully reviewed
+
+R132 must inspect and summarize these boundaries clearly.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start systemd services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R132 may inspect adapter modules.
+R132 may create adapter boundary review records.
+R132 may produce future dry authorization requirements.
+R132 must not produce an executable exchange order payload.
+R132 must not call Binance.
+R132 must not mutate live flags.
+R132 must not mutate lane config.
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- Binance connector
+- execution adapters
+- protective order status
+- live env boundary review
+- live arming preflight
+- final live preflight
+- first live activation gate
+- tiny live risk contract
+- R126 tiny-live execution gate
+- R130 lane authorization
+- R131 kill-switch rehearsal
+- lane controls
+- autonomous paper execution
+- logs/hammer_radar_forward conventions
+- inspect.py CLI modes
+
+Specifically inspect:
+- src/app/hammer_radar/execution/
+- src/app/hammer_radar/operator/binance_live_status.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/live_arming_preflight.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R126_FIRST_TINY_LIVE_LANE_EXECUTION_GATE.md
+- docs/hammer_radar/live_readiness/R130_FIRST_TINY_LIVE_AUTONOMOUS_LANE_AUTHORIZATION.md
+- docs/hammer_radar/live_readiness/R131_LIVE_LANE_KILL_SWITCH_REHEARSAL.md
+- tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+- tests/hammer_radar/test_first_tiny_live_autonomous_lane_authorization.py
+- tests/hammer_radar/test_live_lane_kill_switch_rehearsal.py
+
+REUSE / EXTEND:
+Reuse existing Binance status / connector status builders.
+Reuse live env boundary review.
+Reuse live arming preflight.
+Reuse final live preflight.
+Reuse R106 first-live activation gate.
+Reuse R126 tiny-live lane gate.
+Reuse R130 authorization status.
+Reuse R131 kill switch rehearsal.
+Do not duplicate live readiness logic.
+Do not create real execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+
+Expose functions:
+- build_live_adapter_boundary_final_review
+- inspect_live_adapter_boundary
+- inspect_order_payload_boundary
+- inspect_protective_order_boundary
+- inspect_credentials_boundary
+- inspect_network_boundary
+- inspect_kill_switch_boundary
+- inspect_lane_authorization_boundary
+- build_future_dry_authorization_requirements
+- append_live_adapter_boundary_review_record
+- load_live_adapter_boundary_review_records
+- summarize_live_adapter_boundary_reviews
+
+BOUNDARY AREAS:
+R132 must inspect and report:
+
+1. adapter_module_boundary
+   - which execution modules exist
+   - whether adapter is configured
+   - whether any adapter is live-capable
+   - whether adapter is currently dry-run only
+   - no calls made
+
+2. order_payload_boundary
+   - whether code can build an executable payload today
+   - whether R132 produced one
+   - must be false/no
+   - future dry authorization requirements
+
+3. credential_boundary
+   - key/secret presence as booleans only
+   - never print values
+   - whether credentials are missing/present/unknown
+   - whether status checks are read-only
+
+4. network_boundary
+   - whether R132 used network
+   - must be false
+   - whether future live adapter would require network
+   - list blocked network actions
+
+5. protective_order_boundary
+   - protective orders enabled?
+   - mode PREVIEW_ONLY / LIVE_READY / UNKNOWN
+   - stop/take-profit policy readiness
+   - whether protective orders are required by lane risk contract
+
+6. kill_switch_boundary
+   - global kill switch state
+   - lane disable behavior from R131
+   - rollback path from R131
+   - whether kill switch blocks live intent
+
+7. lane_authorization_boundary
+   - current lane mode
+   - tiny-live authorization status from R130
+   - R126 gate status
+   - recent paper proof status from R129/R125
+   - blockers
+
+8. global_gate_boundary
+   - R106 status
+   - final live preflight status
+   - live env boundary status
+   - live arming preflight status
+   - blockers
+
+9. dry_authorization_readiness
+   - whether next phase R133/R134 can build dry authorization packet
+   - required missing items
+
+REQUIRED OUTPUT:
+Boundary review output must include:
+
+{
+  "status": "LIVE_ADAPTER_BOUNDARY_REVIEW_READY" | "LIVE_ADAPTER_BOUNDARY_BLOCKED" | "LIVE_ADAPTER_BOUNDARY_ERROR",
+  "generated_at": "...",
+  "lane_key": "...",
+  "boundary_reviews": {
+    "adapter_module_boundary": {...},
+    "order_payload_boundary": {...},
+    "credential_boundary": {...},
+    "network_boundary": {...},
+    "protective_order_boundary": {...},
+    "kill_switch_boundary": {...},
+    "lane_authorization_boundary": {...},
+    "global_gate_boundary": {...},
+    "dry_authorization_readiness": {...}
+  },
+  "main_blockers": [...],
+  "future_dry_authorization_requirements": [...],
+  "next_actions": [...],
+  "safe_command_pack": {
+    "lane_status": "...",
+    "router_status": "...",
+    "paper_executor_preview": "...",
+    "paper_executor_record_recommended_template": "...",
+    "tiny_live_authorization_preview": "...",
+    "kill_switch_rehearsal": "...",
+    "r126_gate_check": "...",
+    "r106_gate_check": "...",
+    "final_preflight": "..."
+  },
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false,
+    "binance_order_endpoint_called": false,
+    "signed_request_created": false
+  },
+  "source_surfaces_used": [...]
+}
+
+STATUS RULES:
+Return LIVE_ADAPTER_BOUNDARY_REVIEW_READY if:
+- review completed
+- no safety violation
+- no order payload created
+- no network used
+- no secrets shown
+- boundary report is complete
+- even if live is blocked
+
+Return LIVE_ADAPTER_BOUNDARY_BLOCKED if:
+- review cannot complete
+- any safety violation exists
+- any source attempts order/network/secret behavior
+- paper_live_separation_intact false
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/live_adapter_boundary_final_reviews.ndjson
+
+Record:
+- event_type: LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW
+- review_id
+- recorded_at_utc
+- lane_key
+- status
+- boundary_reviews
+- main_blockers
+- future_dry_authorization_requirements
+- next_actions
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+live-adapter-boundary-final-review
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-boundary-final-review \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-review
+- --confirm-boundary-review "<exact phrase>"
+
+Default:
+- preview only
+- no ledger write
+- no config write
+- no env mutation
+- no network
+- no order payload
+
+Exact confirmation phrase:
+I CONFIRM LIVE ADAPTER BOUNDARY REVIEW ONLY; NO ORDER; NO BINANCE CALL.
+
+Behavior:
+1. Preview:
+   - status LIVE_ADAPTER_BOUNDARY_REVIEW_READY or BLOCKED
+   - no ledger write
+   - no config write
+   - no env mutation
+   - no network
+
+2. record-review without exact confirmation:
+   - status LIVE_ADAPTER_BOUNDARY_REVIEW_REJECTED
+   - no ledger write
+
+3. record-review with exact confirmation:
+   - write review ledger only
+   - no config write
+   - no env mutation
+   - no real orders
+   - no Binance
+   - no network
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+
+Explain:
+- what R132 adds
+- what R132 does not add
+- why adapter boundary review comes before dry authorization
+- adapter boundary areas
+- credential handling as booleans only
+- protective order boundary
+- kill switch boundary
+- lane authorization boundary
+- global gate boundary
+- why this is non-executing
+- confirmation phrase
+- ledger
+- next phases:
+  - R133 lane control cockpit UI
+  - R134 first tiny-live order payload dry authorization
+  - R135 live adapter execution rehearsal
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R132:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R133_LANE_CONTROL_COCKPIT_UI.md
+
+R133 should create/refactor the operator UI around lanes, not manual signal approvals:
+- global kill switch display
+- lane cards
+- router state
+- autonomy scheduler status
+- paper execution status
+- tiny-live gate status
+- boundary review status
+- no real order buttons
+- no Binance calls
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_live_adapter_boundary_final_review.py
+
+Test:
+- preview writes no review record
+- wrong confirmation rejects recording
+- exact confirmation records review only
+- adapter boundary does not create order payload
+- network boundary reports no network used
+- credential boundary reports booleans only and no secrets
+- protective order boundary included
+- kill switch boundary included
+- lane authorization boundary included
+- global gate boundary included
+- future dry authorization requirements included
+- safety flags always false
+- binance_order_endpoint_called false
+- signed_request_created false
+- paper_live_separation_intact true in normal safe flow
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/live_adapter_boundary_final_review.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_live_adapter_boundary_final_review.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-boundary-final-review \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-boundary-final-review \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-review \
+  --confirm-boundary-review "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not mutate config.
+Do not mutate env.
+Do not use network.
+Do not create order payload.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Live adapter boundary review added:
+CLI command added:
+Ledger used:
+R132 doc created:
+R133 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Boundary summary:
+Main blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R132 live adapter boundary final review package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.

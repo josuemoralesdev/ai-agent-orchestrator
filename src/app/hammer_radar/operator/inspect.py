@@ -1322,6 +1322,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-adapter-boundary-final-review":
+        from src.app.hammer_radar.operator.live_adapter_boundary_final_review import (
+            build_live_adapter_boundary_final_review_cli_payload,
+            format_live_adapter_boundary_final_review_json,
+        )
+
+        print(
+            format_live_adapter_boundary_final_review_json(
+                build_live_adapter_boundary_final_review_cli_payload(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_review=args.record_review,
+                    confirm_boundary_review=args.confirm_boundary_review,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2037,6 +2053,11 @@ def _build_parser() -> argparse.ArgumentParser:
     live_lane_kill_switch_rehearsal_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
     live_lane_kill_switch_rehearsal_parser.add_argument("--record-rehearsal", action="store_true")
     live_lane_kill_switch_rehearsal_parser.add_argument("--confirm-rehearsal-record", default=None)
+
+    live_adapter_boundary_review_parser = subparsers.add_parser("live-adapter-boundary-final-review", parents=[parent])
+    live_adapter_boundary_review_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
+    live_adapter_boundary_review_parser.add_argument("--record-review", action="store_true")
+    live_adapter_boundary_review_parser.add_argument("--confirm-boundary-review", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
