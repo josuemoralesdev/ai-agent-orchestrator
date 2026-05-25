@@ -1201,6 +1201,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "autonomous-paper-lane-execution":
+        from src.app.hammer_radar.operator.autonomous_paper_lane_execution import (
+            build_autonomous_paper_lane_execution_status,
+            format_autonomous_paper_lane_execution_status_json,
+        )
+
+        print(
+            format_autonomous_paper_lane_execution_status_json(
+                build_autonomous_paper_lane_execution_status(
+                    log_dir=args.log_dir,
+                    execute_paper=args.execute_paper,
+                    lane_key=args.lane_key,
+                    all_lanes=args.all_lanes,
+                    confirm_paper_only=args.confirm_paper_only,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -1865,6 +1882,12 @@ def _build_parser() -> argparse.ArgumentParser:
     lane_control_command_parser.add_argument("--apply", action="store_true")
     lane_control_command_parser.add_argument("--confirm-lane-change", default=None)
     lane_control_command_parser.add_argument("--request-tiny-live", action="store_true")
+
+    autonomous_paper_lane_execution_parser = subparsers.add_parser("autonomous-paper-lane-execution", parents=[parent])
+    autonomous_paper_lane_execution_parser.add_argument("--execute-paper", action="store_true")
+    autonomous_paper_lane_execution_parser.add_argument("--lane-key", default=None)
+    autonomous_paper_lane_execution_parser.add_argument("--all-lanes", action="store_true")
+    autonomous_paper_lane_execution_parser.add_argument("--confirm-paper-only", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

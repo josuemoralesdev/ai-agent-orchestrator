@@ -1,0 +1,386 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+
+PHASE:
+R125 Autonomous Paper Lane Execution
+
+BRANCH:
+r125-autonomous-paper-lane-execution
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+GOAL:
+Create autonomous paper lane execution for fresh routed signals using the R122/R123/R124 lane-control architecture.
+
+WHY:
+Manual signal approval is too slow for 4m/8m/13m lanes. R122 created lane controls, R123 routes fresh signals, and R124 allows operator-controlled lane modes. R125 must now let fresh routed signals create paper execution records automatically, with lane limits and cooldowns, but without any real orders.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create real execution authority.
+- Do not create a live order endpoint.
+- Do not remove R120/R121/R122/R123/R124 work.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+IMPORTANT:
+R125 may create paper execution records only.
+R125 may write append-only paper lane ledgers only.
+R125 must not touch Binance or real account state.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- lane_controls.json
+- paper execution ledgers
+- paper execution endpoints
+- strategy performance
+- final live preflight
+- first live activation gate
+- candidate revalidation watch
+- notification/operator commands
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+- configs/hammer_radar
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*paper*
+- src/app/hammer_radar/operator/*execution*
+- src/app/hammer_radar/operator/*candidate*
+- src/app/hammer_radar/operator/*signal*
+- src/app/hammer_radar/operator/*watch*
+- src/app/hammer_radar/execution/
+- configs/hammer_radar/lane_controls.json
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_fresh_signal_router.py
+- tests/hammer_radar/test_lane_command_interface.py
+- docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+- docs/hammer_radar/live_readiness/R123_FRESH_SIGNAL_ROUTER.md
+- docs/hammer_radar/live_readiness/R124_LANE_COMMAND_INTERFACE.md
+
+REUSE / EXTEND:
+Reuse R122 lane_control functions.
+Reuse R123 fresh_signal_router functions.
+Reuse R124 lane command/config conventions.
+Reuse existing paper execution / ledger conventions if present.
+Do not duplicate lane parsing logic.
+Do not duplicate live eligibility logic.
+Do not create real execution code.
+Do not use Binance connector for paper execution.
+
+CORE CONCEPT:
+A fresh routed candidate may produce a paper lane execution only if:
+
+1. route_status is ROUTED_TO_LANE
+2. lane mode is paper or armed_dry_run
+3. signal is fresh under lane freshness_seconds
+4. lane max_daily_trades is not exceeded
+5. lane cooldown_after_loss_minutes is not active
+6. paper/live separation remains intact
+7. safety fields remain false
+
+tiny_live mode:
+- In R125, tiny_live lanes must NOT create real orders.
+- tiny_live may create a PAPER_SHADOW_FOR_TINY_LIVE record only if safety allows.
+- It must clearly say no real order was placed.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+
+Expose functions:
+- load_paper_lane_executions
+- append_paper_lane_execution
+- compute_lane_daily_count
+- compute_lane_cooldown_status
+- build_paper_execution_from_routed_candidate
+- build_autonomous_paper_lane_execution_status
+
+Paper execution record fields:
+{
+  "event_type": "AUTONOMOUS_PAPER_LANE_EXECUTION",
+  "paper_execution_id": "...",
+  "recorded_at_utc": "...",
+  "candidate_id": "...",
+  "lane_key": "...",
+  "symbol": "...",
+  "timeframe": "...",
+  "direction": "...",
+  "entry_mode": "...",
+  "lane_mode": "...",
+  "route_status": "...",
+  "route_action": "...",
+  "paper_action": "PAPER_ENTRY_RECORDED" | "ARMED_DRY_RUN_ENTRY_RECORDED" | "PAPER_SHADOW_FOR_TINY_LIVE" | "PAPER_BLOCKED",
+  "entry_reference": {
+    "entry": null or numeric if available,
+    "stop": null or numeric if available,
+    "take_profit": null or numeric if available,
+    "score": null or numeric if available
+  },
+  "risk_limits": {
+    "max_daily_trades": ...,
+    "max_daily_loss_pct": ...,
+    "cooldown_after_loss_minutes": ...,
+    "require_protective_orders": ...
+  },
+  "blockers": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true
+  }
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/autonomous_paper_lane_executions.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+autonomous-paper-lane-execution
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-execution
+
+Default behavior:
+- preview only
+- does not write paper execution record
+- shows which candidates would be recorded
+
+Supported args:
+- --execute-paper
+- --lane-key <lane_key>
+- --all-lanes
+- --confirm-paper-only "<exact phrase>"
+
+Exact confirmation phrase:
+I CONFIRM PAPER LANE EXECUTION ONLY; NO REAL ORDER; NO BINANCE CALL.
+
+Behavior:
+1. Without --execute-paper:
+   - status: PAPER_LANE_PREVIEW
+   - no ledger execution record written
+   - shows routed fresh candidates and blockers
+   - safety fields false
+
+2. With --execute-paper but missing/wrong confirmation:
+   - status: PAPER_LANE_REJECTED
+   - no execution record written
+   - rejection_reason: missing or invalid paper-only confirmation
+
+3. With --execute-paper and exact confirmation:
+   - status: PAPER_LANE_RECORDED or PAPER_LANE_PARTIAL
+   - append paper execution records only for eligible routed candidates
+   - never place orders
+   - never create order payloads
+   - never call Binance
+   - never mutate env
+   - return recorded paper_execution_ids
+
+Output JSON must include:
+- status
+- generated_at
+- execute_paper_requested
+- confirmation_valid
+- selected_lane_keys
+- candidates_seen_count
+- routed_count
+- paper_recordable_count
+- paper_blocked_count
+- recorded_count
+- recorded_paper_execution_ids
+- skipped_candidates
+- lane_daily_counts
+- lane_cooldown_status
+- preview_records
+- safety:
+  - order_placed: false
+  - real_order_placed: false
+  - execution_attempted: false
+  - order_payload_created: false
+  - network_allowed: false
+  - secrets_shown: false
+  - paper_live_separation_intact: true
+- source_surfaces_used
+- ledger_path
+
+STOP CONDITIONS:
+Must refuse to record paper execution if:
+- candidate is stale
+- no matching lane
+- lane disabled
+- lane mode not paper/armed_dry_run/tiny_live shadow
+- max_daily_trades exceeded
+- cooldown active
+- paper_live_separation_intact false
+- any source reports order_placed/real_order_placed/execution_attempted/order_payload_created/network_allowed/secrets_shown true
+- confirmation invalid when --execute-paper is requested
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+
+Explain:
+- what R125 adds
+- why paper lane execution is the next bridge
+- how routed signals become paper records
+- lane mode behavior
+- freshness behavior
+- max daily trades
+- cooldowns
+- why no Binance calls occur
+- confirmation phrase
+- audit ledger
+- safety constraints
+- next phases:
+  - R126 first tiny-live lane execution
+  - R127 live lane kill-switch rehearsal
+  - R128 post-paper performance promotion
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R125:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R126_FIRST_TINY_LIVE_LANE_EXECUTION.md
+
+R126 should design the first tiny-live lane execution path, only after:
+- R125 paper lane execution works
+- fresh routed candidate exists
+- R106/global gates are ready
+- lane is explicitly configured
+- operator gives explicit live confirmation
+
+R126 must not be implemented in R125.
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_autonomous_paper_lane_execution.py
+
+Test:
+- preview mode records no paper executions
+- wrong confirmation rejects execution
+- exact confirmation records only paper records
+- fresh 13m armed_dry_run candidate creates ARMED_DRY_RUN_ENTRY_RECORDED
+- fresh 44m paper candidate creates PAPER_ENTRY_RECORDED
+- stale candidate is blocked
+- unknown lane blocked
+- max_daily_trades blocks additional records
+- cooldown blocks records when active
+- tiny_live lane creates paper shadow only, not real order
+- safety flags are always false
+- paper_live_separation_intact is true in normal flow
+- ledger writes append-only paper records
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/autonomous_paper_lane_execution.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_autonomous_paper_lane_execution.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-execution | jq .
+
+Rejected execute:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  autonomous-paper-lane-execution \
+  --execute-paper \
+  --confirm-paper-only "wrong" | jq .
+
+Do not run confirmed execute smoke unless tests use temp ledgers/mocks only.
+
+The smoke output must be compact and must not include giant raw recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Autonomous paper lane execution added:
+CLI command added:
+Ledger used:
+R125 doc created:
+R126 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Paper recordability summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R125 autonomous paper lane execution package in one pass.
+Prioritize today’s live-readiness path.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
