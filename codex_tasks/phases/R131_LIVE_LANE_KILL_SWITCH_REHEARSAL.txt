@@ -1,0 +1,461 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R131_LIVE_LANE_KILL_SWITCH_REHEARSAL.md
+
+PHASE:
+R131 Live Lane Kill-Switch + Tiny-Live Promotion Rehearsal
+
+BRANCH:
+r131-live-lane-kill-switch-rehearsal
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create a non-executing rehearsal layer that proves the system can safely stop, disable, rollback, and block a lane before that lane is ever allowed to operate as tiny_live.
+
+This phase must rehearse the transition from:
+armed_dry_run / paper
+to:
+tiny_live intent
+
+But it must not place orders, mutate live env, call Binance, or create exchange payloads.
+
+CURRENT CONTEXT:
+R130 currently reports:
+- TINY_LIVE_AUTHORIZATION_BLOCKED
+- blocker: recent autonomous paper proof is missing
+- blocker: R126 tiny-live gate is not ready
+
+R126 currently reports:
+- TINY_LIVE_EXECUTION_BLOCKED
+- blocker: no configured tiny_live lane
+
+Therefore R131 must focus on:
+1. Kill-switch semantics.
+2. Lane disable semantics.
+3. Rollback semantics.
+4. Scheduler/autonomy respect for disabled/killed lanes.
+5. Tiny-live promotion rehearsal only.
+6. Clear next actions for paper proof and tiny_live mode authorization.
+7. No execution.
+
+CORE ARCHITECTURE:
+Operator controls:
+- global kill switch
+- per-lane mode/switch
+- lane/timeframe/strategy authorization
+- final tiny-live authorization
+
+System controls:
+- fresh signal detection
+- lane matching
+- entry decision
+- size/risk policy
+- stop/take-profit/exit policy
+- cooldown and daily limits
+- paper proof
+- tiny-live gate review
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start systemd services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R131 may create rehearsal records.
+R131 may simulate/promote/rollback states in memory only.
+R131 must not mutate configs/hammer_radar/lane_controls.json unless explicitly told in a future phase.
+R131 must not change .env or any service configuration.
+R131 must not record real orders or live payloads.
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- R126 tiny-live lane execution gate
+- R127 lane autonomy control loop
+- R128 lane autonomy scheduler
+- R129 autonomous paper lane executor integration
+- R130 first tiny-live autonomous lane authorization
+- lane_controls.json
+- first live activation gate
+- final live preflight
+- live env boundary review
+- tiny live risk contracts
+- kill switch/global live flags
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/binance_live_status.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- tests/hammer_radar/test_first_tiny_live_autonomous_lane_authorization.py
+- tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+- tests/hammer_radar/test_lane_autonomy_scheduler.py
+- tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py
+
+REUSE / EXTEND:
+Reuse R122 lane control.
+Reuse R124 lane command interface semantics for mode changes, but do not mutate config.
+Reuse R126 tiny-live gate.
+Reuse R129 paper proof/integration status.
+Reuse R130 authorization status.
+Reuse R106/global gate checks.
+Do not duplicate lane parsing.
+Do not duplicate live eligibility.
+Do not create real execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+
+Expose functions:
+- build_live_lane_kill_switch_rehearsal
+- simulate_lane_disable
+- simulate_global_kill_switch_block
+- simulate_lane_mode_rollback
+- simulate_scheduler_respects_killed_lane
+- simulate_tiny_live_promotion_reversal
+- build_rehearsal_next_actions
+- append_live_lane_kill_switch_rehearsal_record
+- load_live_lane_kill_switch_rehearsal_records
+- summarize_live_lane_kill_switch_rehearsals
+
+REHEARSAL SCENARIOS:
+For selected lane, default BTCUSDT|13m|long|ladder_close_50_618:
+
+1. baseline_current_state
+   - read current lane mode
+   - read R130 authorization state
+   - read R126 tiny-live gate
+   - read R129 paper proof state
+   - do not mutate anything
+
+2. lane_disable_rehearsal
+   - simulate lane mode disabled
+   - confirm router/autonomy/scheduler would not execute or record live intent
+   - confirm decision becomes BLOCKED or IGNORE
+   - no config write
+
+3. global_kill_switch_rehearsal
+   - simulate global kill switch active
+   - confirm all tiny-live / live-intent paths blocked
+   - confirm paper/live separation remains intact
+   - no env write
+
+4. rollback_from_tiny_live_rehearsal
+   - simulate lane currently tiny_live
+   - simulate rollback to armed_dry_run or disabled
+   - confirm R126 becomes blocked
+   - confirm scheduler/autonomy no longer produces tiny-live review
+   - no config write
+
+5. scheduler_respects_lane_off_rehearsal
+   - simulate lane disabled
+   - confirm scheduler decisions for lane are stopped/blocked
+   - no scheduler service install/start
+
+6. paper_proof_gap_rehearsal
+   - identify exact command needed to produce recent autonomous paper proof using R129
+   - do not run it
+   - include safe command template with confirmation phrase
+
+7. tiny_live_promotion_rehearsal
+   - identify exact R124/R130 sequence to request tiny_live mode/authorization
+   - do not apply it
+   - include safe preview commands and blocked reasons
+
+REQUIRED OUTPUT:
+Rehearsal output must include:
+
+{
+  "status": "KILL_SWITCH_REHEARSAL_READY" | "KILL_SWITCH_REHEARSAL_BLOCKED" | "KILL_SWITCH_REHEARSAL_ERROR",
+  "generated_at": "...",
+  "lane_key": "...",
+  "current_lane_mode": "...",
+  "scenarios": [...],
+  "kill_switch_verdict": {
+    "global_kill_switch_blocks_live_intent": true/false,
+    "lane_disable_blocks_live_intent": true/false,
+    "rollback_blocks_live_intent": true/false,
+    "scheduler_respects_disabled_lane": true/false,
+    "paper_live_separation_intact": true/false
+  },
+  "current_blockers": [...],
+  "next_actions": [...],
+  "safe_command_pack": {
+    "paper_proof_preview": "...",
+    "paper_proof_confirmed_record_command": "...",
+    "tiny_live_authorization_preview": "...",
+    "tiny_live_mode_preview": "...",
+    "r126_gate_check": "...",
+    "r130_authorization_check": "..."
+  },
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+STATUS RULES:
+Return KILL_SWITCH_REHEARSAL_READY if:
+- all rehearsal scenarios completed
+- all safety fields false
+- paper_live_separation_intact true
+- kill switch and lane disable simulations block live/tiny-live intent
+- config_written false
+- env_mutated false
+
+Return KILL_SWITCH_REHEARSAL_BLOCKED if:
+- any rehearsal cannot be evaluated
+- any safety surface reports order/execution/network/secrets
+- paper_live_separation_intact false
+- simulation indicates scheduler would ignore disabled/killed lane
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/live_lane_kill_switch_rehearsals.ndjson
+
+Record:
+- event_type: LIVE_LANE_KILL_SWITCH_REHEARSAL
+- rehearsal_id
+- recorded_at_utc
+- lane_key
+- status
+- current_lane_mode
+- scenario_count
+- kill_switch_verdict
+- current_blockers
+- next_actions
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+live-lane-kill-switch-rehearsal
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-lane-kill-switch-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-rehearsal
+- --confirm-rehearsal-record "<exact phrase>"
+
+Default:
+- preview only
+- no rehearsal ledger write
+- no config write
+- no env mutation
+
+Exact confirmation phrase:
+I CONFIRM KILL SWITCH REHEARSAL RECORDING ONLY; NO ORDER; NO CONFIG CHANGE.
+
+Behavior:
+1. Preview:
+   - status KILL_SWITCH_REHEARSAL_READY or BLOCKED
+   - no ledger write
+   - no config write
+
+2. record-rehearsal without exact confirmation:
+   - status KILL_SWITCH_REHEARSAL_REJECTED
+   - no ledger write
+   - no config write
+
+3. record-rehearsal with exact confirmation:
+   - write rehearsal ledger only
+   - no config write
+   - no env mutation
+   - no real orders
+   - no Binance
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R131_LIVE_LANE_KILL_SWITCH_REHEARSAL.md
+
+Explain:
+- what R131 adds
+- what R131 does not add
+- why kill-switch rehearsal comes before live
+- global kill switch vs lane disable vs rollback
+- how scheduler must respect disabled/killed lanes
+- why this is non-executing
+- paper proof gap and how R129 solves it
+- tiny_live lane mode gap and how R124/R130 solve it
+- confirmation phrase
+- ledger
+- next phases:
+  - R132 live adapter boundary final review
+  - R133 lane control cockpit UI
+  - R134 first tiny-live order payload dry authorization
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R131:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+
+R132 should inspect the live adapter boundary:
+- no real orders
+- no Binance order endpoint calls
+- identify exact adapter gaps
+- identify how order payload dry authorization should be structured
+- verify protective order requirements
+- verify credentials are present only as booleans
+- no secrets printed
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_live_lane_kill_switch_rehearsal.py
+
+Test:
+- preview writes no rehearsal record
+- wrong confirmation rejects recording
+- exact confirmation records rehearsal only
+- lane disable simulation blocks live intent
+- global kill switch simulation blocks live intent
+- rollback simulation blocks tiny_live intent
+- scheduler respects disabled lane
+- paper proof gap includes R129 command
+- tiny_live promotion gap includes R124/R130 command hints
+- safety flags are always false
+- config_written is false
+- env_mutated is false
+- paper_live_separation_intact is true in normal safe flow
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_live_lane_kill_switch_rehearsal.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-lane-kill-switch-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-lane-kill-switch-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-rehearsal \
+  --confirm-rehearsal-record "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not mutate config.
+Do not mutate env.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Kill-switch rehearsal added:
+CLI command added:
+Ledger used:
+R131 doc created:
+R132 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Kill-switch verdict:
+Current blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R131 kill-switch rehearsal package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
