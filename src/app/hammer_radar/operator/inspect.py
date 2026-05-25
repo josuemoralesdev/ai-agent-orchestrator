@@ -1306,6 +1306,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-lane-kill-switch-rehearsal":
+        from src.app.hammer_radar.operator.live_lane_kill_switch_rehearsal import (
+            build_live_lane_kill_switch_rehearsal_cli_payload,
+            format_live_lane_kill_switch_rehearsal_json,
+        )
+
+        print(
+            format_live_lane_kill_switch_rehearsal_json(
+                build_live_lane_kill_switch_rehearsal_cli_payload(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_rehearsal=args.record_rehearsal,
+                    confirm_rehearsal_record=args.confirm_rehearsal_record,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2016,6 +2032,11 @@ def _build_parser() -> argparse.ArgumentParser:
     first_tiny_live_autonomous_lane_authorization_parser.add_argument("--request-lane-mode-tiny-live", action="store_true")
     first_tiny_live_autonomous_lane_authorization_parser.add_argument("--apply-lane-mode-change", action="store_true")
     first_tiny_live_autonomous_lane_authorization_parser.add_argument("--confirm-tiny-live-authorization", default=None)
+
+    live_lane_kill_switch_rehearsal_parser = subparsers.add_parser("live-lane-kill-switch-rehearsal", parents=[parent])
+    live_lane_kill_switch_rehearsal_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
+    live_lane_kill_switch_rehearsal_parser.add_argument("--record-rehearsal", action="store_true")
+    live_lane_kill_switch_rehearsal_parser.add_argument("--confirm-rehearsal-record", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
