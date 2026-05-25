@@ -1,0 +1,432 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R127 Lane Autonomy Control Loop Scaffold
+
+BRANCH:
+r127-lane-autonomy-control-loop-scaffold
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: WIRING / INTEGRATION, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Create the non-executing autonomous lane control loop scaffold.
+
+This phase converts the architecture from manual per-signal approval toward the correct operating model:
+
+Operator arms/disarms lanes.
+System autonomously watches fresh signals.
+System decides entry eligibility, size/risk intent, paper/dry-run/tiny-live intent, and exit policy intent.
+System records decisions.
+No real orders are placed in R127.
+
+CORE ARCHITECTURE:
+The operator controls:
+- global kill switch
+- per-lane switch/mode
+- per-timeframe/strategy authorization
+
+The system controls:
+- fresh signal detection
+- lane matching
+- entry decision
+- size/risk intent
+- stop/take-profit policy intent
+- cooldown enforcement
+- max daily trades/loss enforcement
+- paper/dry-run/tiny-live intent selection
+- decision ledgering
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not remove R120-R126 work.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not run sudo.
+
+IMPORTANT:
+R127 is a control-loop scaffold and decision engine only.
+It may write append-only autonomous lane decision records.
+It must not place orders.
+It must not create executable order payloads.
+It must not call Binance.
+It must not mutate lane config unless future explicit command phase authorizes it.
+
+CAPABILITY SCAN FIRST:
+Before coding, inspect existing modules/docs/tests related to:
+- R122 lane control
+- R123 fresh signal router
+- R124 lane command interface
+- R125 autonomous paper lane execution
+- R126 first tiny-live lane execution gate
+- lane_controls.json
+- paper lane execution ledgers
+- final live preflight
+- first live activation gate
+- tiny live risk contracts
+- protective order status
+- candidate revalidation watch
+- strategy performance
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+- configs/hammer_radar
+
+Specifically inspect:
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R122_AUTONOMOUS_LANE_CONTROL.md
+- docs/hammer_radar/live_readiness/R123_FRESH_SIGNAL_ROUTER.md
+- docs/hammer_radar/live_readiness/R124_LANE_COMMAND_INTERFACE.md
+- docs/hammer_radar/live_readiness/R125_AUTONOMOUS_PAPER_LANE_EXECUTION.md
+- docs/hammer_radar/live_readiness/R126_FIRST_TINY_LIVE_LANE_EXECUTION_GATE.md
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_fresh_signal_router.py
+- tests/hammer_radar/test_lane_command_interface.py
+- tests/hammer_radar/test_autonomous_paper_lane_execution.py
+- tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+
+REUSE / EXTEND:
+Reuse R122 lane_control functions.
+Reuse R123 fresh_signal_router functions.
+Reuse R125 paper lane execution evaluation/ledger conventions.
+Reuse R126 tiny-live gate decision.
+Reuse existing risk contract/protective/global boundary checks.
+Do not duplicate lane parsing logic.
+Do not duplicate live eligibility logic.
+Do not create real execution code.
+
+CORE LOOP MODEL:
+For each lane:
+1. Read lane mode.
+2. Read fresh routed candidates.
+3. Match candidate to lane.
+4. Check freshness.
+5. Check lane mode.
+6. Check lane limits:
+   - max_daily_trades
+   - max_daily_loss_pct
+   - cooldown_after_loss_minutes
+   - require_protective_orders
+7. Choose autonomous decision:
+   - IGNORE
+   - PAPER_OBSERVE
+   - PAPER_ENTRY_INTENT
+   - ARMED_DRY_RUN_INTENT
+   - TINY_LIVE_GATE_REVIEW
+   - BLOCKED
+8. Determine non-executing strategy intent:
+   - entry_reference if available
+   - stop_reference if available
+   - take_profit_reference if available
+   - size_policy: from risk limits, not direct live quantity
+   - exit_policy: protective orders required / preview only
+9. Record decision to append-only ledger.
+10. Return compact operator status.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+
+Expose functions:
+- build_lane_autonomy_control_loop_status
+- evaluate_lane_autonomy_decision
+- build_non_executing_strategy_intent
+- append_lane_autonomy_decision
+- load_lane_autonomy_decisions
+- summarize_lane_autonomy_decisions
+
+Decision record fields:
+{
+  "event_type": "LANE_AUTONOMY_DECISION",
+  "decision_id": "...",
+  "recorded_at_utc": "...",
+  "lane_key": "...",
+  "lane_mode": "...",
+  "candidate_id": "...",
+  "route_status": "...",
+  "autonomy_decision": "IGNORE|PAPER_OBSERVE|PAPER_ENTRY_INTENT|ARMED_DRY_RUN_INTENT|TINY_LIVE_GATE_REVIEW|BLOCKED",
+  "strategy_intent": {
+    "entry_reference": null or numeric,
+    "stop_reference": null or numeric,
+    "take_profit_reference": null or numeric,
+    "score": null or numeric,
+    "size_policy": {
+      "type": "risk_contract_reference",
+      "max_daily_loss_pct": ...,
+      "max_daily_trades": ...,
+      "direct_live_quantity": null
+    },
+    "exit_policy": {
+      "protective_orders_required": true/false,
+      "protective_order_mode": "REQUIRED|PREVIEW_ONLY|UNKNOWN",
+      "direct_exchange_payload": null
+    }
+  },
+  "blockers": [...],
+  "warnings": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true
+  },
+  "source_surfaces_used": [...]
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/lane_autonomy_decisions.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+lane-autonomy-control-loop
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-control-loop
+
+Default behavior:
+- preview only
+- no decision ledger write
+- compact status
+
+Supported args:
+- --record-decision
+- --lane-key <lane_key>
+- --all-lanes
+- --confirm-decision-record "<exact phrase>"
+
+Exact confirmation phrase:
+I CONFIRM AUTONOMY DECISION RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+Behavior:
+1. Without --record-decision:
+   - status: LANE_AUTONOMY_PREVIEW
+   - no decision ledger write
+   - show decisions that would be recorded
+   - safety fields false
+
+2. With --record-decision but missing/wrong confirmation:
+   - status: LANE_AUTONOMY_REJECTED
+   - no decision ledger write
+   - rejection_reason: missing or invalid decision-record confirmation
+
+3. With --record-decision and exact confirmation:
+   - status: LANE_AUTONOMY_RECORDED or LANE_AUTONOMY_PARTIAL
+   - append decision records only
+   - never place orders
+   - never create order payloads
+   - never call Binance
+   - never mutate env
+   - return recorded decision_ids
+
+Output JSON must include:
+- status
+- generated_at
+- record_decision_requested
+- confirmation_valid
+- selected_lane_keys
+- lanes_evaluated_count
+- candidates_seen_count
+- decisions_count
+- recorded_count
+- recorded_decision_ids
+- decisions compact list
+- top_blockers
+- safety
+- source_surfaces_used
+- ledger_path
+
+Decision compact item:
+{
+  "lane_key": "...",
+  "lane_mode": "...",
+  "candidate_id": "...",
+  "route_status": "...",
+  "autonomy_decision": "...",
+  "strategy_intent_summary": {
+    "has_entry_reference": true/false,
+    "has_stop_reference": true/false,
+    "has_take_profit_reference": true/false,
+    "size_policy_type": "...",
+    "exit_policy": "..."
+  },
+  "blockers": [...]
+}
+
+STOP CONDITIONS:
+Must refuse decision recording if:
+- any safety field from source indicates order/execution/network/secrets
+- paper_live_separation_intact false
+- confirmation invalid
+- selected lane not configured
+- route source returns error
+- decision would imply direct executable order payload
+- strategy intent includes direct live quantity instead of risk policy
+- exit policy includes direct exchange payload
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R127_LANE_AUTONOMY_CONTROL_LOOP.md
+
+Explain:
+- what R127 adds
+- why this is the real autonomous model
+- operator switches vs system decisions
+- how lane modes produce autonomy decisions
+- how strategy intent is non-executing
+- why no Binance calls occur
+- confirmation phrase
+- decision ledger
+- safety constraints
+- next phases:
+  - R128 lane autonomy scheduler
+  - R129 autonomous paper lane executor integration
+  - R130 first tiny-live autonomous lane authorization
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R127:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R128_LANE_AUTONOMY_SCHEDULER.md
+
+R128 should schedule the lane-autonomy control loop periodically in non-executing or paper-only mode:
+- no real orders
+- no Binance order endpoints
+- no env mutation
+- configurable cadence
+- audit ledger
+- operator status summary
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_lane_autonomy_control_loop.py
+
+Test:
+- preview mode writes no decision records
+- wrong confirmation rejects recording
+- exact confirmation records decision records only
+- paper lane produces PAPER_ENTRY_INTENT or PAPER_OBSERVE for fresh paper route
+- armed_dry_run lane produces ARMED_DRY_RUN_INTENT for fresh routed candidate
+- tiny_live lane produces TINY_LIVE_GATE_REVIEW, not order
+- stale/no candidate produces BLOCKED or IGNORE
+- strategy intent contains no direct executable order payload
+- size policy has direct_live_quantity null
+- safety flags are always false
+- paper_live_separation_intact is true in normal safe flow
+- ledger writes append-only decision records
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_autonomy_control_loop.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_autonomy_control_loop.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-control-loop | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-autonomy-control-loop \
+  --record-decision \
+  --confirm-decision-record "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+
+The smoke output must be compact and must not include giant raw recommendation arrays.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Lane autonomy loop added:
+CLI command added:
+Ledger used:
+R127 doc created:
+R128 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Autonomy decision summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R127 lane autonomy control loop scaffold in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
