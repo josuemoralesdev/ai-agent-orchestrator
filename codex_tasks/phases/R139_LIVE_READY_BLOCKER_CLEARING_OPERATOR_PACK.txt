@@ -1,0 +1,559 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R139_LIVE_READY_BLOCKER_CLEARING_OPERATOR_PACK.md
+
+PHASE:
+R139 Live-Ready Blocker Clearing Operator Pack
+
+BRANCH:
+r139-live-ready-blocker-clearing-operator-pack
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the operator-facing blocker clearing pack that turns the R138/R138.5 burn-down into an exact, safe, ordered sequence of operator actions.
+
+R139 must generate:
+- exact blocker clearing order
+- safe commands to inspect each blocker
+- safe commands to record evidence where already supported
+- commands to preview lane mode / authorization changes
+- commands that must NOT be run yet
+- preconditions before each command
+- expected state movement after each step
+- rollback/safety notes
+- probability movement estimate after each completed stage
+
+R139 must not place orders.
+
+WHY:
+R138 created the live-ready burn-down.
+R138.5 validated the command pack safety.
+R139 now needs to convert that map into an operator pack that the user can follow without guessing.
+
+This is still non-executing.
+It must not clear live gates automatically.
+It must not mutate env or config unless explicitly future-authorized.
+It must not call Binance.
+
+CURRENT ARCHITECTURE:
+Operator controls:
+- global kill switch
+- lane/timeframe/strategy switch
+- tiny-live lane authorization
+- final future live authorization
+
+System controls:
+- signal detection
+- lane matching
+- entry decision
+- size/risk policy
+- stop/take-profit policy
+- cooldown/daily limit enforcement
+- paper proof
+- tiny-live gate review
+- future live adapter execution after explicit future authorization
+
+CURRENT KNOWN BLOCKERS LIKELY INCLUDE:
+- recent autonomous paper proof missing
+- selected lane not tiny_live
+- tiny-live authorization missing/blocked
+- R126 tiny-live gate blocked
+- R106/global first-live activation gate blocked
+- final preflight recheck required
+- live env boundary recheck required
+- live arming preflight recheck required
+- global kill switch active
+- live execution disabled
+- live orders disabled
+- connector mode DRY_RUN_ONLY
+- live adapter not configured
+- Binance API key missing
+- Binance API secret missing
+- protective orders disabled
+- protective mode PREVIEW_ONLY
+- stop policy not ready
+- take-profit policy not ready
+- protective dry payload not ready
+- order payload dry authorization blocked
+- no fresh routed candidate
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R139 may create:
+- blocker clearing operator pack
+- command pack
+- safety warnings
+- staged progression report
+- operator checklist
+- append-only operator pack ledger
+- CLI command
+- docs/tests
+
+R139 must not:
+- execute the clearing commands
+- mutate config
+- mutate env
+- call Binance
+- create payloads
+- sign requests
+- place orders
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R138 autonomous lane live-ready burn-down
+- R138.5 command pack sanity
+- R137 protective payload dry preview boundary
+- R136 protective order dry policy review
+- R135 live adapter execution rehearsal
+- R134 dry authorization
+- R133 cockpit UI
+- R132 live adapter boundary
+- R131 kill-switch rehearsal
+- R130 tiny-live autonomous lane authorization
+- R129 autonomous paper executor integration
+- R126 tiny-live gate
+- R124 lane command interface
+- R122 lane control
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/burn_down_command_pack_sanity.py
+- src/app/hammer_radar/operator/protective_payload_dry_preview_boundary.py
+- src/app/hammer_radar/operator/protective_order_dry_policy_review.py
+- src/app/hammer_radar/operator/live_adapter_execution_rehearsal.py
+- src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py
+- src/app/hammer_radar/operator/lane_control_cockpit.py
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- docs/hammer_radar/live_readiness/
+- tests/hammer_radar/
+
+REUSE / EXTEND:
+Reuse R138 burn-down.
+Reuse R138.5 command pack sanity.
+Reuse existing command pack patterns.
+Reuse R124/R129/R130/R126/R131/R132/R134/R136/R137 safe commands.
+Do not duplicate readiness logic.
+Do not create execution logic.
+Do not execute commands automatically.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/live_ready_blocker_clearing_operator_pack.py
+
+Expose functions:
+- build_live_ready_blocker_clearing_operator_pack
+- build_clearing_stages_from_burn_down
+- build_safe_operator_commands_for_stage
+- classify_commands_as_safe_preview_record_or_future_only
+- build_expected_state_progression
+- build_rollback_and_stop_notes
+- validate_operator_pack_safety
+- append_blocker_clearing_operator_pack_record
+- load_blocker_clearing_operator_pack_records
+- summarize_blocker_clearing_operator_packs
+
+PACK STATUS:
+- BLOCKER_CLEARING_PACK_READY
+- BLOCKER_CLEARING_PACK_BLOCKED
+- BLOCKER_CLEARING_PACK_REJECTED
+- BLOCKER_CLEARING_PACK_ERROR
+
+R139 should return READY if the pack was generated safely, even if live remains blocked.
+It should return BLOCKED only if the pack cannot be safely generated.
+
+CLEARING STAGES:
+Build stages in this order:
+
+Stage 1: Visibility and current truth
+- cockpit state
+- burn-down
+- command pack sanity
+- lane status
+- router status
+
+Stage 2: Paper proof
+- preview R129 autonomous paper executor integration
+- record paper integration template only if confirmation phrase is explicit
+- verify paper proof after recording
+
+Stage 3: Lane tiny_live intent
+- preview lane mode / authorization state
+- R130 authorization preview
+- R124 lane command preview
+- do not apply mode automatically
+- mark apply as future explicit operator action only
+
+Stage 4: Tiny-live gate recheck
+- R126 gate check
+- R130 authorization check
+- R131 kill-switch rehearsal
+- R132 adapter boundary review
+
+Stage 5: Protective readiness
+- R136 protective policy review
+- R137 protective payload dry preview boundary
+- identify missing stop/take-profit references
+
+Stage 6: Credentials and adapter boundary
+- credential presence check as booleans only
+- R132 adapter boundary
+- no secrets
+- no network
+- no signed requests
+
+Stage 7: Global gates
+- final-live-preflight
+- first-live-activation-gate
+- live-env-boundary-review
+- live-arming-preflight
+- global kill switch review
+- no env mutation in R139
+
+Stage 8: Dry authorization readiness
+- R134 dry authorization check
+- R135 adapter rehearsal check
+- identify whether R140/R141 can proceed
+
+Stage 9: Future explicit live authorization
+- list what future phase must do
+- no current command to execute live
+- final operator confirmation required later
+
+OPERATOR COMMAND TYPES:
+Each command item must be classified:
+
+- SAFE_READ_ONLY
+- SAFE_PREVIEW
+- SAFE_RECORD_EVIDENCE_WITH_CONFIRMATION
+- FUTURE_EXPLICIT_APPLY_ONLY
+- FUTURE_PHASE_ONLY
+- FORBIDDEN
+
+Command pack may include:
+- read-only commands
+- preview commands
+- record evidence templates with exact confirmation phrases
+
+Command pack must not include active commands that:
+- call Binance
+- execute orders
+- mutate env
+- mutate config without clearly marking future explicit apply only
+- restart services
+- disable kill switch
+- enable live flags
+
+REQUIRED OUTPUT:
+{
+  "status": "BLOCKER_CLEARING_PACK_READY|BLOCKER_CLEARING_PACK_BLOCKED|BLOCKER_CLEARING_PACK_REJECTED|BLOCKER_CLEARING_PACK_ERROR",
+  "generated_at": "...",
+  "lane_key": "...",
+  "live_ready_now": false,
+  "stages": [...],
+  "next_three_actions": [...],
+  "expected_state_progression": [...],
+  "probability_ladder": [...],
+  "forbidden_actions": [...],
+  "operator_warnings": [...],
+  "rollback_and_stop_notes": [...],
+  "pack_safety_validation": {...},
+  "record_pack_requested": false,
+  "confirmation_valid": false,
+  "pack_recorded": false,
+  "pack_id": null,
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+STAGE ITEM FORMAT:
+{
+  "stage_no": 1,
+  "title": "...",
+  "objective": "...",
+  "why_this_stage_matters": "...",
+  "preconditions": [...],
+  "commands": [
+    {
+      "label": "...",
+      "command_type": "SAFE_READ_ONLY|SAFE_PREVIEW|SAFE_RECORD_EVIDENCE_WITH_CONFIRMATION|FUTURE_EXPLICIT_APPLY_ONLY|FUTURE_PHASE_ONLY|FORBIDDEN",
+      "command": "... or null",
+      "expected_result": "...",
+      "do_not_run_now": true/false,
+      "safety_note": "..."
+    }
+  ],
+  "exit_criteria": [...],
+  "probability_after_stage_pct": number
+}
+
+NEXT THREE ACTIONS:
+Return the immediate next three safe actions.
+They must not include live execution or config/env mutation.
+At current state, likely:
+1. refresh cockpit/burn-down
+2. preview R129 paper executor integration
+3. if safe, record autonomous paper proof with exact confirmation template
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM BLOCKER CLEARING OPERATOR PACK RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+This records the pack only.
+It does not authorize command execution.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/live_ready_blocker_clearing_operator_packs.ndjson
+
+Record:
+- event_type: LIVE_READY_BLOCKER_CLEARING_OPERATOR_PACK
+- pack_id
+- recorded_at_utc
+- status
+- lane_key
+- stages
+- next_three_actions
+- expected_state_progression
+- probability_ladder
+- forbidden_actions
+- operator_warnings
+- rollback_and_stop_notes
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+live-ready-blocker-clearing-operator-pack
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-ready-blocker-clearing-operator-pack \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-pack
+- --confirm-operator-pack "<exact phrase>"
+
+Default:
+- preview only
+- no ledger write
+- no command execution
+- no config write
+- no env mutation
+- no network
+- no signed request
+- no payload
+
+Behavior:
+1. Preview:
+   - status READY or BLOCKED
+   - no ledger write
+   - no command execution
+
+2. record-pack without exact confirmation:
+   - status BLOCKER_CLEARING_PACK_REJECTED
+   - no ledger write
+
+3. record-pack with exact confirmation:
+   - write pack ledger only if safe
+   - no command execution
+   - no network
+   - no order placement
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R139_LIVE_READY_BLOCKER_CLEARING_OPERATOR_PACK.md
+
+Explain:
+- what R139 adds
+- what R139 does not add
+- how it turns R138 burn-down into operator stages
+- command classifications
+- next three actions
+- probability ladder
+- forbidden actions
+- safety constraints
+- how this prepares R140/R141
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R139:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R140_OPERATOR_EXECUTES_SAFE_CLEARING_PACK.md
+
+R140 should assist the operator in executing only the safe clearing stages:
+- no real orders
+- no Binance calls
+- may record paper proof using existing R129 confirmation
+- may run read-only rechecks
+- may not mutate env or live flags
+- lane mode apply must remain explicitly separated and confirmed
+- must produce before/after comparison
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_live_ready_blocker_clearing_operator_pack.py
+
+Test:
+- preview writes no pack record
+- wrong confirmation rejects recording
+- exact confirmation records pack only
+- stages include all required stage titles
+- next_three_actions contains max 3 actions
+- commands are classified
+- forbidden commands are not included as runnable actions
+- command pack contains no Binance/order/env mutation commands
+- probability ladder included and bounded 0-100
+- safety flags are always false
+- paper_live_separation_intact true in normal safe flow
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/live_ready_blocker_clearing_operator_pack.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_live_ready_blocker_clearing_operator_pack.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-ready-blocker-clearing-operator-pack \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-ready-blocker-clearing-operator-pack \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-pack \
+  --confirm-operator-pack "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not execute generated commands in this Codex phase.
+Do not mutate config.
+Do not mutate env.
+Do not use network.
+Do not create order payload.
+Do not create signed request.
+Do not create protective payload.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Operator clearing pack added:
+CLI command added:
+Ledger used:
+R139 doc created:
+R140 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Next three actions:
+Stage summary:
+Probability ladder:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R139 operator clearing pack in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
