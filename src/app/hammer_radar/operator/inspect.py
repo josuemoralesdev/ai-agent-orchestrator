@@ -1169,6 +1169,20 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-control-cockpit-state":
+        from src.app.hammer_radar.operator.lane_control_cockpit import (
+            build_lane_control_cockpit_state,
+            format_lane_control_cockpit_state_json,
+        )
+
+        print(
+            format_lane_control_cockpit_state_json(
+                build_lane_control_cockpit_state(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                )
+            )
+        )
     elif args.command == "fresh-signal-router-status":
         from src.app.hammer_radar.operator.fresh_signal_router import (
             build_fresh_signal_router_status,
@@ -1994,6 +2008,8 @@ def _build_parser() -> argparse.ArgumentParser:
     dual_lane_candidate_watch_parser.add_argument("--write", action="store_true")
 
     subparsers.add_parser("lane-control-status", parents=[parent])
+    lane_control_cockpit_parser = subparsers.add_parser("lane-control-cockpit-state", parents=[parent])
+    lane_control_cockpit_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
     subparsers.add_parser("fresh-signal-router-status", parents=[parent])
     lane_control_command_parser = subparsers.add_parser("lane-control-command", parents=[parent])
     lane_control_command_parser.add_argument("--action", required=True)
