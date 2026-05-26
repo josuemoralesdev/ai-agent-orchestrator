@@ -1494,6 +1494,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "fresh-candidate-paper-proof-capture-loop":
+        from src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop import (
+            format_fresh_candidate_paper_proof_capture_loop_json,
+            run_fresh_candidate_paper_proof_capture_loop,
+        )
+
+        print(
+            format_fresh_candidate_paper_proof_capture_loop_json(
+                run_fresh_candidate_paper_proof_capture_loop(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    watch_all_recommended_lanes=args.watch_all_recommended_lanes,
+                    max_iterations=args.max_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    run_watch_loop=args.run_watch_loop,
+                    record_watch=args.record_watch,
+                    confirm_watch_loop=args.confirm_watch_loop,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2316,6 +2337,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     post_clearing_live_ready_recheck_parser.add_argument("--record-recheck", action="store_true")
     post_clearing_live_ready_recheck_parser.add_argument("--confirm-post-clearing-recheck", default=None)
+
+    fresh_candidate_watch_parser = subparsers.add_parser(
+        "fresh-candidate-paper-proof-capture-loop",
+        parents=[parent],
+    )
+    fresh_candidate_watch_parser.add_argument("--lane-key", action="append", default=None)
+    fresh_candidate_watch_parser.add_argument("--lane-keys", default=None)
+    fresh_candidate_watch_parser.add_argument("--watch-all-recommended-lanes", action="store_true")
+    fresh_candidate_watch_parser.add_argument("--max-iterations", type=int, default=5)
+    fresh_candidate_watch_parser.add_argument("--sleep-seconds", type=int, default=60)
+    fresh_candidate_watch_parser.add_argument("--run-watch-loop", action="store_true")
+    fresh_candidate_watch_parser.add_argument("--record-watch", action="store_true")
+    fresh_candidate_watch_parser.add_argument("--confirm-watch-loop", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

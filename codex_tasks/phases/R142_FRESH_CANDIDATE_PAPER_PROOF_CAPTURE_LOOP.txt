@@ -1,0 +1,516 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R142_FRESH_CANDIDATE_PAPER_PROOF_CAPTURE_LOOP.md
+
+PHASE:
+R142 Fresh Candidate Paper Proof Capture Loop
+
+BRANCH:
+r142-fresh-candidate-paper-proof-capture-loop
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Create a safe bounded watcher loop that checks for fresh eligible lane candidates and captures autonomous paper proof through existing R129/R140 safe paths when eligible.
+
+This is watch-only / paper-proof-only.
+
+R142 must not place orders.
+R142 must not call Binance.
+R142 must not mutate env/config.
+R142 must not enable live.
+R142 must not create payloads.
+R142 must not sign requests.
+
+WATCHED LANES:
+Primary:
+BTCUSDT|13m|long|ladder_close_50_618
+
+Secondary:
+BTCUSDT|44m|long|ladder_close_50_618
+
+WHY THESE LANES:
+13m long ladder_close_50_618:
+- strong usable sample
+- eligible future tiny-live class
+- current primary lane
+
+44m long ladder_close_50_618:
+- better win rate and avg pnl
+- smaller sample but valid future tiny-live candidate class
+- gives the watcher a second valid door instead of staring at one stale lane like a dramatic candle monk
+
+CURRENT CONTEXT:
+R141 concluded:
+- next_operator_move = WAIT_FOR_FRESH_CANDIDATE
+- no fresh routed candidate
+- only stale paper evidence
+- watcher mode should be SAFE_WATCH_ONLY
+- R141 watcher handoff was plan-only, no loop started
+
+R142 now implements the bounded safe loop.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance/account/balance/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not disable global kill switch.
+- Do not enable live orders.
+- Do not bypass R106/global gates.
+- Do not alter global live gates.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not add systemd units.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R142 may:
+- run a bounded internal loop when explicitly requested
+- collect read-only snapshots
+- call R129 preview builders
+- call R140 safe clearing executor only with its safe paper-proof confirmation phrase
+- record watcher loop ledger
+- stop when paper proof is captured
+- stop on timeout / safety issue / operator limit
+
+R142 must not:
+- execute generated shell commands
+- mutate live state
+- call exchange
+- create live/paper order payloads outside existing safe paper paths
+- bypass R129/R140 to invent fake proof
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/post_clearing_live_ready_recheck.py
+- src/app/hammer_radar/operator/operator_executes_safe_clearing_pack.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/live_ready_blocker_clearing_operator_pack.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_post_clearing_live_ready_recheck.py
+- tests/hammer_radar/test_operator_executes_safe_clearing_pack.py
+- tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py if present
+- docs/hammer_radar/live_readiness/R141_POST_CLEARING_LIVE_READY_RECHECK.md
+
+REUSE / EXTEND:
+Reuse R141 watcher handoff semantics.
+Reuse R140 safe clearing executor.
+Reuse R129 paper proof path.
+Reuse R128 scheduler preview.
+Reuse R123 fresh router.
+Reuse R138/R139 summaries for before/after.
+Do not duplicate readiness logic.
+Do not implement live execution.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+
+Expose:
+- build_fresh_candidate_paper_proof_capture_loop_preview
+- run_fresh_candidate_paper_proof_capture_loop
+- build_watched_lane_specs
+- collect_watcher_iteration_snapshot
+- evaluate_watcher_iteration
+- attempt_paper_proof_capture_for_lane
+- build_watcher_loop_summary
+- append_fresh_candidate_watch_record
+- load_fresh_candidate_watch_records
+- summarize_fresh_candidate_watch_records
+
+STATUS:
+- FRESH_CANDIDATE_WATCH_PREVIEW
+- FRESH_CANDIDATE_WATCH_REJECTED
+- FRESH_CANDIDATE_WATCH_RUNNING
+- FRESH_CANDIDATE_WATCH_CAPTURED_PAPER_PROOF
+- FRESH_CANDIDATE_WATCH_TIMEOUT
+- FRESH_CANDIDATE_WATCH_SAFETY_STOP
+- FRESH_CANDIDATE_WATCH_NO_ELIGIBLE_CANDIDATE
+- FRESH_CANDIDATE_WATCH_ERROR
+
+DEFAULT:
+Preview only.
+No loop.
+No ledger write except optional preview record if explicitly requested.
+No evidence recording.
+
+LOOP EXECUTION:
+Loop execution requires exact confirmation phrase.
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL.
+
+This authorizes:
+- bounded watch loop
+- read-only checks
+- safe paper proof capture through R129/R140 if eligible
+
+It does not authorize:
+- live order
+- Binance call
+- env/config mutation
+- live flag mutation
+- lane mode mutation
+
+CLI ARGS:
+- --lane-key <lane_key> optional, may be repeated if inspect.py supports repeated args
+- --watch-all-recommended-lanes
+- --max-iterations <int>, default 5, max 180
+- --sleep-seconds <int>, default 60, min 10, max 300
+- --run-watch-loop
+- --record-watch
+- --confirm-watch-loop <phrase>
+
+If repeated --lane-key is hard in existing parser, support comma-separated:
+--lane-keys "BTCUSDT|13m|long|ladder_close_50_618,BTCUSDT|44m|long|ladder_close_50_618"
+
+Keep implementation simple and compatible with existing inspect.py patterns.
+
+WATCHED LANE DEFAULTS:
+If no lane specified and --watch-all-recommended-lanes is true:
+- watch 13m long ladder_close_50_618
+- watch 44m long ladder_close_50_618
+
+If neither lane specified nor watch-all flag:
+- default to 13m long ladder_close_50_618 for backward compatibility
+
+ITERATION FLOW:
+For each iteration:
+1. collect generated_at
+2. for each lane:
+   - fresh router status
+   - lane autonomy scheduler preview
+   - autonomous paper lane executor integration preview
+   - R141 post-clearing recheck
+   - R138 burn-down light summary
+3. determine if any lane has eligible paper decisions
+4. if eligible:
+   - attempt paper proof capture through R140 safe clearing executor OR directly through R129 safe record path if R140 delegates to R129
+   - use exact safe paper confirmation:
+     I CONFIRM AUTONOMOUS PAPER LANE INTEGRATION ONLY; NO REAL ORDER; NO BINANCE CALL.
+   - verify evidence captured
+   - stop loop with FRESH_CANDIDATE_WATCH_CAPTURED_PAPER_PROOF
+5. if none eligible:
+   - record iteration summary
+   - sleep if more iterations remain
+6. stop on:
+   - proof captured
+   - timeout / max iterations
+   - safety violation
+   - exception
+   - operator invalid confirmation
+
+IMPORTANT PAPER PROOF RULE:
+R142 must not create proof directly.
+It must use R129/R140 safe proof path.
+If R129/R140 says no eligible decision, R142 must not force proof.
+
+REQUIRED OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "watch_started": false,
+  "watch_completed": false,
+  "watch_all_recommended_lanes": false,
+  "watched_lanes": [...],
+  "max_iterations": ...,
+  "sleep_seconds": ...,
+  "iterations_completed": 0,
+  "paper_proof_captured": false,
+  "captured_lane_key": null,
+  "captured_evidence_ids": [],
+  "iteration_summaries": [...],
+  "final_lane_statuses": {...},
+  "next_operator_move": "...",
+  "watcher_recommendation": "...",
+  "record_watch_requested": false,
+  "confirmation_valid": false,
+  "watch_recorded": false,
+  "watch_id": null,
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+ITERATION SUMMARY FORMAT:
+{
+  "iteration": 1,
+  "started_at": "...",
+  "completed_at": "...",
+  "lanes": [
+    {
+      "lane_key": "...",
+      "fresh_routed_count": ...,
+      "paper_eligible_decisions_count": ...,
+      "paper_blocked_decisions_count": ...,
+      "top_blockers": [...],
+      "r141_next_operator_move": "...",
+      "capture_attempted": false,
+      "capture_status": "NOT_ATTEMPTED|CAPTURED|SKIPPED_NO_ELIGIBLE_DECISION|BLOCKED|ERROR",
+      "evidence_ids": []
+    }
+  ],
+  "safety": {...}
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/fresh_candidate_paper_proof_capture_loop.ndjson
+
+Record:
+- event_type: FRESH_CANDIDATE_PAPER_PROOF_CAPTURE_LOOP
+- watch_id
+- recorded_at_utc
+- status
+- watched_lanes
+- max_iterations
+- sleep_seconds
+- iterations_completed
+- paper_proof_captured
+- captured_lane_key
+- captured_evidence_ids
+- iteration_summaries
+- final_lane_statuses
+- next_operator_move
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+fresh-candidate-paper-proof-capture-loop
+
+Preview command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes
+
+Run bounded watch loop command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 30 \
+  --sleep-seconds 60 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL."
+
+Short manual test command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 2 \
+  --sleep-seconds 10 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL."
+
+Behavior:
+1. Preview:
+   - status FRESH_CANDIDATE_WATCH_PREVIEW
+   - no loop
+   - no sleep
+   - no evidence recording
+
+2. run-watch-loop without exact confirmation:
+   - status FRESH_CANDIDATE_WATCH_REJECTED
+   - no loop
+   - no sleep
+   - no evidence recording
+
+3. run-watch-loop with exact confirmation:
+   - bounded loop
+   - safe checks only
+   - paper proof capture only through R129/R140 if eligible
+   - append watch ledger if --record-watch
+   - no live execution
+   - no Binance
+   - no env/config mutation
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R142_FRESH_CANDIDATE_PAPER_PROOF_CAPTURE_LOOP.md
+
+Explain:
+- what R142 adds
+- what R142 does not add
+- why watcher loop is required after R141
+- watched lanes
+- confirmation phrase
+- loop limits
+- stop conditions
+- paper proof capture rules
+- safety constraints
+- manual commands
+- how to run short test vs longer watch
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R142:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R143_POST_WATCH_CAPTURE_LIVE_READY_RECHECK.md
+
+R143 should run after R142 captures paper proof or times out:
+- no real orders
+- no Binance calls
+- compare before/after proof state
+- if proof captured, re-evaluate tiny_live lane authorization for 13m/44m
+- if timeout, recommend next watch window
+- update live odds
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+
+Test:
+- preview does not run loop
+- preview writes no evidence
+- wrong confirmation rejects loop
+- exact confirmation runs bounded loop with mocked no eligible candidates
+- no eligible candidates => timeout/no eligible status
+- eligible candidate triggers R129/R140 safe path only
+- proof is not created directly by R142
+- stops after capture
+- supports watching 13m and 44m recommended lanes
+- max_iterations and sleep_seconds bounds enforced
+- safety flags always false
+- ledger append-only when record-watch true
+- CLI exists
+- no Binance/order/payload/network/env/config mutation
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  | jq '.status, .watch_started, .watched_lanes, .paper_proof_captured, .next_operator_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --run-watch-loop \
+  --confirm-watch-loop "wrong" \
+  | jq '.status, .confirmation_valid, .watch_started, .paper_proof_captured, .safety'
+
+Short safe loop smoke:
+Do not run long loop in Codex.
+If implementation needs runtime smoke, run max-iterations 1 and sleep-seconds 10 only:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 1 \
+  --sleep-seconds 10 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .watch_started, .iterations_completed, .paper_proof_captured, .captured_lane_key, .next_operator_move, .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Watcher loop added:
+Watched lanes:
+CLI command added:
+Ledger used:
+R142 doc created:
+R143 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Watcher summary:
+Paper proof capture result:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not expand into live execution.
+Do not install services.
+Do not run long watcher loops in Codex.
+Do not perform live trading actions.
