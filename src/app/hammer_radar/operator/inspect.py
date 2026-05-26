@@ -1416,6 +1416,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "autonomous-lane-live-ready-burn-down":
+        from src.app.hammer_radar.operator.autonomous_lane_live_ready_burn_down import (
+            build_autonomous_lane_live_ready_burn_down_cli_payload,
+            format_autonomous_lane_live_ready_burn_down_json,
+        )
+
+        print(
+            format_autonomous_lane_live_ready_burn_down_json(
+                build_autonomous_lane_live_ready_burn_down_cli_payload(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_burn_down=args.record_burn_down,
+                    confirm_burn_down=args.confirm_burn_down,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2185,6 +2201,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     protective_payload_dry_preview_boundary_parser.add_argument("--record-preview", action="store_true")
     protective_payload_dry_preview_boundary_parser.add_argument("--confirm-protective-preview", default=None)
+
+    autonomous_lane_live_ready_burn_down_parser = subparsers.add_parser(
+        "autonomous-lane-live-ready-burn-down",
+        parents=[parent],
+    )
+    autonomous_lane_live_ready_burn_down_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    autonomous_lane_live_ready_burn_down_parser.add_argument("--record-burn-down", action="store_true")
+    autonomous_lane_live_ready_burn_down_parser.add_argument("--confirm-burn-down", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
