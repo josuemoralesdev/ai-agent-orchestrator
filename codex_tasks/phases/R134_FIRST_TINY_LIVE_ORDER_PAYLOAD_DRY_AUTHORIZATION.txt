@@ -1,0 +1,507 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R134_FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION.md
+
+PHASE:
+R134 First Tiny-Live Order Payload Dry Authorization
+
+BRANCH:
+r134-first-tiny-live-order-payload-dry-authorization
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the first non-executing tiny-live order payload dry authorization layer.
+
+R134 must produce a dry authorization packet that describes the required first tiny-live order intent boundaries without creating an executable exchange payload, without signing anything, without calling Binance, and without placing orders.
+
+This phase prepares for a future live adapter execution rehearsal but does not execute.
+
+CURRENT CONTEXT:
+R122: lane controls.
+R123: fresh signal router.
+R124: lane command interface.
+R125: autonomous paper lane execution.
+R126: tiny-live lane execution gate.
+R127: lane autonomy loop.
+R128: autonomy scheduler.
+R129: autonomous paper lane executor integration.
+R130: tiny-live autonomous lane authorization.
+R131: kill-switch rehearsal.
+R132: live adapter boundary final review.
+R133: lane control cockpit UI.
+
+R132 reported that:
+- live-capable connector code exists.
+- connector mode is DRY_RUN_ONLY.
+- live order adapter is not configured.
+- Binance key/secret are missing from current process env.
+- protective orders are disabled / PREVIEW_ONLY.
+- lane remains armed_dry_run, not tiny_live.
+- recent autonomous paper proof is missing.
+- R106/global gate remains blocked.
+- R134 dry authorization is not ready until boundaries clear.
+
+R134 must respect those blockers and report dry authorization as BLOCKED unless all prerequisites are satisfied.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R134 may create:
+- dry authorization packet
+- dry authorization review ledger
+- compact operator status
+
+R134 must not create:
+- executable payload
+- signed payload
+- Binance request
+- real order
+- network request
+- env/config mutation
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R132 live adapter boundary final review
+- R126 tiny-live lane execution gate
+- R130 tiny-live autonomous lane authorization
+- R131 kill-switch rehearsal
+- R129 paper executor integration
+- R125 paper lane execution
+- R122 lane control
+- Binance connector
+- execution safety modules
+- protective order status
+- tiny live risk contracts
+- final live preflight
+- first live activation gate
+- live env boundary review
+- inspect.py CLI modes
+- approval_api cockpit routes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/execution/binance_futures_connector.py
+- src/app/hammer_radar/execution/safety.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+- docs/hammer_radar/live_readiness/R133_LANE_CONTROL_COCKPIT_UI.md
+- tests/hammer_radar/test_live_adapter_boundary_final_review.py
+- tests/hammer_radar/test_first_tiny_live_lane_execution_gate.py
+- tests/hammer_radar/test_first_tiny_live_autonomous_lane_authorization.py
+
+REUSE / EXTEND:
+Reuse R132 boundary review.
+Reuse R126 gate.
+Reuse R130 authorization.
+Reuse R131 kill-switch rehearsal.
+Reuse R129 paper proof state.
+Reuse tiny live risk contract.
+Reuse connector status builders only if they are read-only and do not create signed requests.
+Do not duplicate live readiness logic.
+Do not create real execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py
+
+Expose functions:
+- build_first_tiny_live_order_payload_dry_authorization
+- evaluate_dry_authorization_prerequisites
+- build_non_executable_order_intent_packet
+- build_non_executable_protective_intent_packet
+- build_dry_authorization_hash
+- append_dry_authorization_review_record
+- load_dry_authorization_review_records
+- summarize_dry_authorization_reviews
+
+DRY AUTHORIZATION STATUS:
+- DRY_AUTHORIZATION_PREVIEW
+- DRY_AUTHORIZATION_REJECTED
+- DRY_AUTHORIZATION_BLOCKED
+- DRY_AUTHORIZATION_READY
+
+R134 should usually return DRY_AUTHORIZATION_BLOCKED in current state.
+
+REQUIRED PREREQUISITES:
+A dry authorization packet may be READY only if:
+
+1. Selected lane exists.
+2. Lane mode is tiny_live.
+3. R126 tiny-live execution gate is READY.
+4. R130 tiny-live authorization is recorded or ready.
+5. R131 kill-switch rehearsal is ready.
+6. R132 live adapter boundary review is ready and complete.
+7. Recent autonomous paper proof exists through R125/R129.
+8. Risk contract exists and includes max loss / protective policy.
+9. Protective orders are ready or explicitly represented as non-executing dry requirement.
+10. Credential presence is verified as booleans only.
+11. R106/global gate readiness is satisfied or explicitly blocks readiness.
+12. Operator confirmation phrase is exact when recording review.
+13. Safety fields are all false.
+14. No executable payload is created.
+15. No signed request is created.
+16. No network is used.
+
+DRY AUTHORIZATION PACKET:
+Must be non-executable.
+
+Include:
+{
+  "packet_type": "FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION",
+  "packet_version": "R134",
+  "lane_key": "...",
+  "candidate_id": "... or null",
+  "symbol": "...",
+  "timeframe": "...",
+  "direction": "...",
+  "entry_mode": "...",
+  "lane_mode": "...",
+  "risk_contract_hash": "... or null",
+  "paper_proof_reference": "... or null",
+  "r126_readiness_hash": "... or null",
+  "r130_authorization_hash": "... or null",
+  "r132_boundary_review_reference": "... or null",
+  "entry_intent": {
+    "entry_reference": null or numeric,
+    "side": "BUY|SELL|UNKNOWN",
+    "order_type_intent": "MARKET|LIMIT|UNKNOWN",
+    "direct_exchange_payload": null,
+    "signed_request": null
+  },
+  "size_policy": {
+    "type": "risk_contract_reference",
+    "direct_live_quantity": null,
+    "max_daily_loss_pct": ...,
+    "max_daily_trades": ...
+  },
+  "protective_intent": {
+    "stop_required": true/false,
+    "take_profit_required": true/false,
+    "stop_reference": null or numeric,
+    "take_profit_reference": null or numeric,
+    "direct_exchange_payload": null,
+    "signed_request": null
+  },
+  "kill_switch_policy": {...},
+  "dry_authorization_hash": "...",
+  "required_future_execution_confirmation_phrase": "..."
+}
+
+Must NOT include:
+- API keys
+- API secret
+- signed payload
+- signature
+- executable Binance payload
+- direct Binance endpoint
+- direct live quantity
+- recvWindow/timestamp/signature material
+- network target
+- anything that can be sent directly to an exchange
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM FIRST TINY LIVE DRY AUTHORIZATION ONLY; NO ORDER; NO BINANCE CALL.
+
+This phrase records dry authorization review only.
+It does not authorize order placement.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/first_tiny_live_order_payload_dry_authorizations.ndjson
+
+Record:
+- event_type: FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION
+- dry_authorization_id
+- recorded_at_utc
+- status
+- lane_key
+- dry_authorization_hash
+- prerequisites
+- blockers
+- warnings
+- dry_authorization_packet
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+first-tiny-live-order-payload-dry-authorization
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-order-payload-dry-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-dry-authorization
+- --confirm-dry-authorization "<exact phrase>"
+
+Default:
+- preview only
+- no ledger write
+- no payload write
+- no config write
+- no env mutation
+- no network
+- no signed request
+
+Behavior:
+1. Preview:
+   - status DRY_AUTHORIZATION_PREVIEW or DRY_AUTHORIZATION_BLOCKED
+   - no ledger write
+   - no payload write
+   - no network
+   - no order payload
+
+2. record-dry-authorization without exact confirmation:
+   - status DRY_AUTHORIZATION_REJECTED
+   - no ledger write
+
+3. record-dry-authorization with exact confirmation:
+   - write review ledger only if safe
+   - no executable payload
+   - no signed request
+   - no network
+   - no order placement
+
+Output JSON must include:
+- status
+- generated_at
+- lane_key
+- record_dry_authorization_requested
+- confirmation_valid
+- dry_authorization_recorded
+- dry_authorization_id
+- dry_authorization_packet
+- prerequisites
+- blockers
+- warnings
+- next_actions
+- safety
+- ledger_path
+- source_surfaces_used
+
+SAFETY FIELDS:
+Always include:
+{
+  "order_placed": false,
+  "real_order_placed": false,
+  "execution_attempted": false,
+  "order_payload_created": false,
+  "executable_payload_created": false,
+  "signed_request_created": false,
+  "network_allowed": false,
+  "binance_order_endpoint_called": false,
+  "binance_test_order_endpoint_called": false,
+  "secrets_shown": false,
+  "paper_live_separation_intact": true,
+  "env_mutated": false,
+  "config_written": false,
+  "global_live_flags_changed": false
+}
+
+STOP CONDITIONS:
+Return blocked/rejected if:
+- confirmation invalid when recording requested
+- lane unknown
+- lane not tiny_live
+- R126 not ready
+- R130 authorization missing/blocked
+- R131 kill-switch rehearsal missing/blocked
+- R132 boundary review missing/blocked
+- recent paper proof missing
+- risk contract missing
+- protective readiness missing
+- credential boundary missing
+- global gate blocked
+- packet would include executable payload
+- packet would include signed request
+- network would be used
+- any safety field flips true
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R134_FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION.md
+
+Explain:
+- what R134 adds
+- what R134 does not add
+- why dry authorization comes after R132 boundary review
+- why packet is non-executable
+- what fields are forbidden
+- prerequisites
+- confirmation phrase
+- ledger
+- command examples
+- safety constraints
+- how this prepares R135
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R134:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R135_LIVE_ADAPTER_EXECUTION_REHEARSAL.md
+
+R135 should rehearse the live adapter execution path without placing orders:
+- no real orders
+- no Binance order endpoint calls
+- no signed request
+- verify adapter function boundaries
+- verify protective payload preview remains non-executable
+- verify stop conditions
+- use R134 dry authorization packet only
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_first_tiny_live_order_payload_dry_authorization.py
+
+Test:
+- preview writes no ledger record
+- wrong confirmation rejects recording
+- exact confirmation records dry authorization review only in mocked-ready safe state
+- blocked when lane is not tiny_live
+- blocked when R126 not ready
+- blocked when R130 missing/blocked
+- blocked when R132 missing/blocked
+- blocked when recent paper proof missing
+- dry authorization packet contains no secrets
+- dry authorization packet contains no executable exchange payload
+- direct_live_quantity is null
+- signed_request is null
+- executable_payload_created false
+- binance_order_endpoint_called false
+- binance_test_order_endpoint_called false
+- safety flags are always false
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_first_tiny_live_order_payload_dry_authorization.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-order-payload-dry-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  first-tiny-live-order-payload-dry-authorization \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-dry-authorization \
+  --confirm-dry-authorization "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not mutate config.
+Do not mutate env.
+Do not use network.
+Do not create order payload.
+Do not create signed request.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Dry authorization layer added:
+CLI command added:
+Ledger used:
+R134 doc created:
+R135 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Dry authorization summary:
+Main blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R134 dry authorization package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
