@@ -1462,6 +1462,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "operator-executes-safe-clearing-pack":
+        from src.app.hammer_radar.operator.operator_executes_safe_clearing_pack import (
+            build_operator_executes_safe_clearing_pack,
+            format_operator_executes_safe_clearing_pack_json,
+        )
+
+        print(
+            format_operator_executes_safe_clearing_pack_json(
+                build_operator_executes_safe_clearing_pack(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    execute_safe_clearing=args.execute_safe_clearing,
+                    confirm_safe_clearing=args.confirm_safe_clearing,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2262,6 +2278,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     live_ready_blocker_clearing_operator_pack_parser.add_argument("--record-pack", action="store_true")
     live_ready_blocker_clearing_operator_pack_parser.add_argument("--confirm-operator-pack", default=None)
+
+    operator_executes_safe_clearing_pack_parser = subparsers.add_parser(
+        "operator-executes-safe-clearing-pack",
+        parents=[parent],
+    )
+    operator_executes_safe_clearing_pack_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    operator_executes_safe_clearing_pack_parser.add_argument("--execute-safe-clearing", action="store_true")
+    operator_executes_safe_clearing_pack_parser.add_argument("--confirm-safe-clearing", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
