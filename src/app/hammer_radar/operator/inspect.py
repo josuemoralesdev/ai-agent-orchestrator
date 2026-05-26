@@ -1478,6 +1478,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "post-clearing-live-ready-recheck":
+        from src.app.hammer_radar.operator.post_clearing_live_ready_recheck import (
+            build_post_clearing_live_ready_recheck,
+            format_post_clearing_live_ready_recheck_json,
+        )
+
+        print(
+            format_post_clearing_live_ready_recheck_json(
+                build_post_clearing_live_ready_recheck(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_recheck=args.record_recheck,
+                    confirm_post_clearing_recheck=args.confirm_post_clearing_recheck,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2289,6 +2305,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     operator_executes_safe_clearing_pack_parser.add_argument("--execute-safe-clearing", action="store_true")
     operator_executes_safe_clearing_pack_parser.add_argument("--confirm-safe-clearing", default=None)
+
+    post_clearing_live_ready_recheck_parser = subparsers.add_parser(
+        "post-clearing-live-ready-recheck",
+        parents=[parent],
+    )
+    post_clearing_live_ready_recheck_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    post_clearing_live_ready_recheck_parser.add_argument("--record-recheck", action="store_true")
+    post_clearing_live_ready_recheck_parser.add_argument("--confirm-post-clearing-recheck", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

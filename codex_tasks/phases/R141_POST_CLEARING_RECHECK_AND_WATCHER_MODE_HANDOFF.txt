@@ -1,0 +1,394 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R141_POST_CLEARING_LIVE_READY_RECHECK.md
+
+PHASE:
+R141 Post-Clearing Live-Ready Recheck + Watcher Mode Handoff
+
+BRANCH:
+r141-post-clearing-recheck-and-watcher-handoff
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Create the post-R140 live-ready recheck and watcher-mode handoff.
+
+R141 must answer one question clearly:
+
+What is the next correct operator mode after R140?
+
+Possible answers:
+- WAIT_FOR_FRESH_CANDIDATE
+- RECORD_AUTONOMOUS_PAPER_PROOF
+- AUTHORIZE_TINY_LIVE_LANE
+- RERUN_GLOBAL_GATES
+- RERUN_PROTECTIVE_BOUNDARIES
+- LIVE_READY_REVIEW_NEXT
+- STOP_STILL_BLOCKED
+
+If the next move is WAIT_FOR_FRESH_CANDIDATE, R141 must produce a safe watcher-mode handoff plan so the system stops building more gates and waits for a fresh routed candidate properly.
+
+R141 must not place orders.
+
+CURRENT CONTEXT:
+R140 safe clearing executor exists and is committed.
+Recent R140 preview showed:
+- no eligible paper proof
+- paper candidate stale
+- paper_eligible_decisions_count = 0
+- lane mode armed_dry_run
+- R126 tiny-live gate blocked
+- R130 authorization blocked
+- R106/global gate blocked
+- global kill switch active
+- live execution/orders disabled
+- protective policy blocked
+- credentials missing
+- adapter boundary blocked
+- today probability around 1% from burn-down because no fresh eligible candidate
+
+R141 must not pretend gates can clear without fresh market evidence.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not disable global kill switch.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/operator_executes_safe_clearing_pack.py
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/live_ready_blocker_clearing_operator_pack.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py
+- src/app/hammer_radar/operator/protective_order_dry_policy_review.py
+- src/app/hammer_radar/operator/protective_payload_dry_preview_boundary.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_operator_executes_safe_clearing_pack.py
+- docs/hammer_radar/live_readiness/R140_OPERATOR_EXECUTES_SAFE_CLEARING_PACK.md
+
+REUSE / EXTEND:
+Reuse R140.
+Reuse R138 burn-down.
+Reuse R139 clearing pack.
+Reuse R129 paper proof status.
+Reuse R123 router status.
+Reuse R128 scheduler status.
+Reuse R126/R130/R131/R132/R134/R136/R137 status builders.
+Do not duplicate readiness logic.
+Do not execute clearing automatically.
+Do not create live execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/post_clearing_live_ready_recheck.py
+
+Expose:
+- build_post_clearing_live_ready_recheck
+- collect_post_clearing_source_statuses
+- compare_safe_clearing_to_current_burn_down
+- determine_next_operator_move
+- build_fresh_candidate_wait_plan
+- build_paper_proof_capture_plan
+- build_tiny_live_authorization_readiness
+- build_watcher_mode_handoff
+- append_post_clearing_recheck_record
+- load_post_clearing_recheck_records
+- summarize_post_clearing_rechecks
+
+STATUS:
+- POST_CLEARING_RECHECK_READY
+- POST_CLEARING_RECHECK_BLOCKED
+- POST_CLEARING_RECHECK_REJECTED
+- POST_CLEARING_RECHECK_ERROR
+
+NEXT_OPERATOR_MOVE ENUM:
+- WAIT_FOR_FRESH_CANDIDATE
+- RECORD_AUTONOMOUS_PAPER_PROOF
+- AUTHORIZE_TINY_LIVE_LANE
+- RERUN_GLOBAL_GATES
+- RERUN_PROTECTIVE_BOUNDARIES
+- LIVE_READY_REVIEW_NEXT
+- STOP_STILL_BLOCKED
+
+DECISION RULES:
+- If no fresh routed candidate or R129 says stale candidates only:
+  next_operator_move = WAIT_FOR_FRESH_CANDIDATE.
+- If R129 has eligible paper decisions but no paper proof recorded:
+  next_operator_move = RECORD_AUTONOMOUS_PAPER_PROOF.
+- If paper proof exists but lane is not tiny_live:
+  next_operator_move = AUTHORIZE_TINY_LIVE_LANE.
+- If lane is tiny_live and R126/R130 are blocked mainly by global/protective/env:
+  next_operator_move = RERUN_GLOBAL_GATES or RERUN_PROTECTIVE_BOUNDARIES.
+- If all gates are near-ready:
+  next_operator_move = LIVE_READY_REVIEW_NEXT.
+- If safety violation appears:
+  next_operator_move = STOP_STILL_BLOCKED.
+
+WATCHER MODE HANDOFF:
+If next_operator_move is WAIT_FOR_FRESH_CANDIDATE, produce watcher_mode_handoff:
+
+{
+  "enabled_recommendation": true,
+  "mode": "SAFE_WATCH_ONLY",
+  "purpose": "Wait for a fresh routed lane candidate and capture paper proof through R129/R140 when eligible.",
+  "watch_interval_seconds_recommended": 60,
+  "max_runtime_minutes_recommended": 180,
+  "stop_conditions": [
+    "fresh eligible paper decision captured",
+    "safety violation",
+    "router error",
+    "lane config changed unexpectedly",
+    "operator stops watcher",
+    "time limit reached"
+  ],
+  "safe_watch_commands": [...],
+  "what_to_do_when_fresh_candidate_appears": [...],
+  "what_not_to_do": [...]
+}
+
+Watcher mode in R141 must be a handoff plan only.
+Do not implement a daemon/service here.
+Do not install systemd.
+Do not run loops.
+Do not mutate anything.
+
+REQUIRED OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "lane_key": "...",
+  "live_ready_now": false,
+  "next_operator_move": "...",
+  "why": "...",
+  "source_statuses": {...},
+  "fresh_candidate_status": {...},
+  "paper_proof_status": {...},
+  "lane_mode_status": {...},
+  "gate_statuses": {...},
+  "protective_statuses": {...},
+  "credential_adapter_statuses": {...},
+  "blocker_summary": {...},
+  "probability_update": {
+    "tiny_live_tonight_pct": ...,
+    "tiny_live_next_session_pct": ...,
+    "reason": "..."
+  },
+  "watcher_mode_handoff": {...},
+  "recommended_commands": [...],
+  "do_not_run_yet": [...],
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+COMMAND PACK:
+Recommended commands must be safe only.
+Include:
+- fresh-signal-router-status
+- lane-autonomy-scheduler preview
+- autonomous-paper-lane-executor-integration preview
+- operator-executes-safe-clearing-pack preview
+- R126 gate check
+- R130 authorization preview
+- R138 burn-down
+- R139 pack
+- R133 cockpit state if available
+
+Do not include:
+- Binance command
+- order command
+- signed request command
+- env mutation
+- config mutation
+- systemctl restart
+- sudo
+- live flag enabling
+- kill switch disabling
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM POST CLEARING RECHECK RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+LEDGER:
+logs/hammer_radar_forward/post_clearing_live_ready_rechecks.ndjson
+
+REQUIRED CLI:
+Wire into inspect.py:
+
+post-clearing-live-ready-recheck
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-clearing-live-ready-recheck \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-recheck
+- --confirm-post-clearing-recheck <phrase>
+
+Default:
+- preview only
+- no ledger write
+- no command execution
+- no config/env/network/payload
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R141_POST_CLEARING_LIVE_READY_RECHECK.md
+
+Explain:
+- what R141 adds
+- why it comes after R140
+- next_operator_move meanings
+- why WAIT_FOR_FRESH_CANDIDATE is valid and not failure
+- watcher mode handoff
+- how it updates odds
+- safe command pack
+- no live execution
+
+UPDATE PHASE INDEX:
+Update PHASE_INDEX.md with R141.
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R142_FRESH_CANDIDATE_PAPER_PROOF_CAPTURE_LOOP.md
+
+R142 should implement a safe bounded watch loop:
+- no real orders
+- no Binance calls
+- no env/config mutation
+- poll fresh router / R129 eligibility
+- when eligible, capture paper proof through R129/R140 safe path
+- stop after proof, timeout, safety issue, or operator stop
+- produce before/after proof state
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_post_clearing_live_ready_recheck.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects recording
+- exact confirmation records recheck only
+- stale/no candidate => WAIT_FOR_FRESH_CANDIDATE
+- eligible paper decision => RECORD_AUTONOMOUS_PAPER_PROOF
+- paper proof exists but lane not tiny_live => AUTHORIZE_TINY_LIVE_LANE
+- watcher_mode_handoff included when waiting for fresh candidate
+- watcher_mode_handoff is plan only and does not run a loop
+- command pack contains only safe commands
+- probability update bounded 0-100
+- safety flags always false
+- ledger append-only
+- CLI exists
+- no Binance/order/payload/network/env/config mutation
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/post_clearing_live_ready_recheck.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_post_clearing_live_ready_recheck.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-clearing-live-ready-recheck \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  | jq '.status, .next_operator_move, .why, .probability_update, .watcher_mode_handoff, .recommended_commands[0:3], .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Post-clearing recheck added:
+Watcher handoff added:
+CLI command added:
+Ledger used:
+R141 doc created:
+R142 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Next operator move:
+Watcher mode handoff:
+Probability update:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not expand into live execution.
+Do not run watcher loop yet.
+Do not perform live trading actions.
