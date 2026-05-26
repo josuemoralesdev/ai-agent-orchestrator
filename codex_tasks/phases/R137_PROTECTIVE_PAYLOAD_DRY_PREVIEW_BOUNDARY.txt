@@ -1,0 +1,557 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R137_PROTECTIVE_PAYLOAD_DRY_PREVIEW_BOUNDARY.md
+
+PHASE:
+R137 Protective Payload Dry Preview Boundary
+
+BRANCH:
+r137-protective-payload-dry-preview-boundary
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create the protective payload dry preview boundary layer.
+
+R137 must define what a future non-executable protective stop-loss / take-profit payload preview would look like, while still proving that no executable payload, signed request, Binance endpoint call, or real order is created.
+
+R137 follows R136, which defined the protective order dry policy review.
+
+R137 must not place orders.
+
+WHY:
+R136 made protective policy explicit.
+R137 must now prepare the boundary for future protective payload previews:
+- stop-loss preview
+- take-profit preview
+- required references
+- validation
+- forbidden executable fields
+- no signing
+- no network
+- no endpoint calls
+
+This is required before any future first tiny-live execution adapter can be trusted.
+
+CURRENT CONTEXT:
+R122 lane controls.
+R123 fresh signal router.
+R124 lane command interface.
+R125 autonomous paper lane execution.
+R126 tiny-live lane execution gate.
+R127 lane autonomy loop.
+R128 autonomy scheduler.
+R129 autonomous paper executor integration.
+R130 tiny-live autonomous lane authorization.
+R131 kill-switch rehearsal.
+R132 live adapter boundary final review.
+R133 lane control cockpit UI.
+R134 first tiny-live order payload dry authorization.
+R135 live adapter execution rehearsal.
+R136 protective order dry policy review.
+
+Known blockers:
+- connector mode is DRY_RUN_ONLY
+- live order adapter not configured
+- BINANCE_API_KEY / BINANCE_API_SECRET missing
+- protective orders disabled / PREVIEW_ONLY
+- stop/take-profit policy not live-ready
+- lane not tiny_live
+- recent autonomous paper proof missing
+- R106/global gate blocked
+
+R137 must focus only on the protective payload preview boundary and must preserve all safety constraints.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R137 may create:
+- non-executable protective preview packet
+- forbidden payload map
+- validation result
+- preview ledger
+- CLI command
+- docs/tests
+
+R137 must not create:
+- executable stop-loss payload
+- executable take-profit payload
+- signed request
+- Binance request
+- real order
+- network request
+- env/config mutation
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R136 protective order dry policy review
+- R135 live adapter execution rehearsal
+- R134 dry authorization
+- R132 live adapter boundary
+- binance futures connector protective helpers
+- protective order status
+- tiny live risk contract
+- lane risk limits
+- autonomous paper execution entry/stop/take-profit references
+- first live activation gate
+- final live preflight
+- live env boundary review
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/protective_order_dry_policy_review.py
+- src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py
+- src/app/hammer_radar/operator/live_adapter_execution_rehearsal.py
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/execution/binance_futures_connector.py
+- src/app/hammer_radar/execution/safety.py
+- src/app/hammer_radar/execution/base.py
+- src/app/hammer_radar/execution/paper.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_execution.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R134_FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION.md
+- docs/hammer_radar/live_readiness/R135_LIVE_ADAPTER_EXECUTION_REHEARSAL.md
+- docs/hammer_radar/live_readiness/R136_PROTECTIVE_ORDER_DRY_POLICY_REVIEW.md
+- tests/hammer_radar/test_first_tiny_live_order_payload_dry_authorization.py
+- tests/hammer_radar/test_live_adapter_execution_rehearsal.py
+- tests/hammer_radar/test_protective_order_dry_policy_review.py
+
+REUSE / EXTEND:
+Reuse R136 protective policy packet.
+Reuse R134 dry authorization packet if available.
+Reuse R135 adapter rehearsal boundaries.
+Reuse R132 connector/protective status builders only if read-only and non-signing.
+Reuse tiny live risk contract.
+Reuse R125/R129 paper proof references if available.
+Reuse lane controls.
+Do not duplicate live readiness logic.
+Do not create real execution logic.
+Do not call connector functions that create signed payloads, order payloads, or network requests.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/protective_payload_dry_preview_boundary.py
+
+Expose functions:
+- build_protective_payload_dry_preview_boundary
+- evaluate_protective_preview_prerequisites
+- build_non_executable_stop_loss_preview
+- build_non_executable_take_profit_preview
+- build_protective_preview_packet
+- build_protective_preview_forbidden_field_report
+- build_future_protective_payload_requirements
+- append_protective_payload_dry_preview_record
+- load_protective_payload_dry_preview_records
+- summarize_protective_payload_dry_previews
+
+PREVIEW STATUS:
+- PROTECTIVE_PAYLOAD_PREVIEW
+- PROTECTIVE_PAYLOAD_REJECTED
+- PROTECTIVE_PAYLOAD_BLOCKED
+- PROTECTIVE_PAYLOAD_READY_FOR_FUTURE_DRY_RUN
+
+R137 should usually return BLOCKED or PREVIEW in current state.
+
+PROTECTIVE PREVIEW AREAS:
+1. policy_source_boundary
+   - R136 policy exists?
+   - protective policy hash available?
+   - stop/take-profit policy references present?
+   - policy is non-executable?
+
+2. stop_loss_preview_boundary
+   - can build abstract stop preview?
+   - stop reference present?
+   - side/direction relation validated?
+   - direct exchange payload must be null
+   - signed request must be null
+   - endpoint must be null
+
+3. take_profit_preview_boundary
+   - can build abstract take-profit preview?
+   - take-profit reference present?
+   - side/direction relation validated?
+   - direct exchange payload must be null
+   - signed request must be null
+   - endpoint must be null
+
+4. risk_validation_boundary
+   - stop distance reasonable if data available
+   - take-profit distance reasonable if data available
+   - max loss cap reference present if available
+   - direct live quantity null
+
+5. forbidden_fields_boundary
+   - no symbol-side-type-quantity payload that can be sent directly
+   - no timestamp
+   - no recvWindow
+   - no signature
+   - no API key
+   - no endpoint URL
+   - no signed material
+   - no network target
+
+6. connector_boundary
+   - connector protective status read-only
+   - protective endpoints not called
+   - protective payload builder not invoked if it creates exchange-like payload
+   - no network
+
+7. future_requirements
+   - exact items required before any future protective payload dry run
+
+REQUIRED OUTPUT:
+{
+  "status": "PROTECTIVE_PAYLOAD_PREVIEW|PROTECTIVE_PAYLOAD_REJECTED|PROTECTIVE_PAYLOAD_BLOCKED|PROTECTIVE_PAYLOAD_READY_FOR_FUTURE_DRY_RUN",
+  "generated_at": "...",
+  "lane_key": "...",
+  "record_preview_requested": false,
+  "confirmation_valid": false,
+  "preview_recorded": false,
+  "preview_id": null,
+  "preview_areas": {...},
+  "protective_preview_packet": {...},
+  "forbidden_field_report": {...},
+  "future_protective_payload_requirements": [...],
+  "main_blockers": [...],
+  "next_actions": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+PROTECTIVE PREVIEW PACKET:
+Must be non-executable and abstract.
+
+Include:
+{
+  "packet_type": "PROTECTIVE_PAYLOAD_DRY_PREVIEW_BOUNDARY",
+  "packet_version": "R137",
+  "lane_key": "...",
+  "symbol": "...",
+  "timeframe": "...",
+  "direction": "...",
+  "entry_mode": "...",
+  "policy_hash": "... or null",
+  "entry_reference": null or numeric,
+  "stop_loss_preview": {
+    "preview_type": "NON_EXECUTABLE_STOP_LOSS_PREVIEW",
+    "required": true/false,
+    "reference": null or numeric,
+    "source": "...",
+    "side_intent": "SELL|BUY|UNKNOWN",
+    "order_type_intent": "STOP_MARKET|STOP_LIMIT|UNKNOWN",
+    "direct_exchange_payload": null,
+    "signed_request": null,
+    "endpoint": null,
+    "quantity": null
+  },
+  "take_profit_preview": {
+    "preview_type": "NON_EXECUTABLE_TAKE_PROFIT_PREVIEW",
+    "required": true/false,
+    "reference": null or numeric,
+    "source": "...",
+    "side_intent": "SELL|BUY|UNKNOWN",
+    "order_type_intent": "TAKE_PROFIT_MARKET|TAKE_PROFIT_LIMIT|UNKNOWN",
+    "direct_exchange_payload": null,
+    "signed_request": null,
+    "endpoint": null,
+    "quantity": null
+  },
+  "risk_validation": {...},
+  "forbidden_fields_present": [],
+  "protective_preview_hash": "..."
+}
+
+Must NOT include:
+- API keys
+- API secret
+- signed payload
+- signature
+- executable Binance payload
+- protective order endpoint
+- direct Binance endpoint
+- direct live quantity
+- recvWindow/timestamp/signature material
+- network target
+- anything that can be sent directly to an exchange
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM PROTECTIVE PAYLOAD DRY PREVIEW ONLY; NO ORDER; NO BINANCE CALL.
+
+This records protective payload preview boundary only.
+It does not authorize order placement.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/protective_payload_dry_preview_boundaries.ndjson
+
+Record:
+- event_type: PROTECTIVE_PAYLOAD_DRY_PREVIEW_BOUNDARY
+- preview_id
+- recorded_at_utc
+- status
+- lane_key
+- protective_preview_hash
+- preview_areas
+- protective_preview_packet
+- forbidden_field_report
+- future_protective_payload_requirements
+- main_blockers
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+protective-payload-dry-preview-boundary
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  protective-payload-dry-preview-boundary \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-preview
+- --confirm-protective-preview "<exact phrase>"
+
+Default:
+- preview only
+- no ledger write
+- no payload write
+- no config write
+- no env mutation
+- no network
+- no signed request
+
+Behavior:
+1. Preview:
+   - status PREVIEW or BLOCKED
+   - no ledger write
+   - no executable payload
+   - no network
+   - no order payload
+
+2. record-preview without exact confirmation:
+   - status PROTECTIVE_PAYLOAD_REJECTED
+   - no ledger write
+
+3. record-preview with exact confirmation:
+   - write preview ledger only if safe
+   - no executable payload
+   - no protective payload
+   - no signed request
+   - no network
+   - no order placement
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R137_PROTECTIVE_PAYLOAD_DRY_PREVIEW_BOUNDARY.md
+
+Explain:
+- what R137 adds
+- what R137 does not add
+- how it uses R136
+- why preview packet is non-executable
+- forbidden fields
+- stop-loss preview boundary
+- take-profit preview boundary
+- risk validation boundary
+- connector boundary
+- confirmation phrase
+- ledger
+- how this prepares R138/R139
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R137:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R138_AUTONOMOUS_LANE_LIVE_READY_BURN_DOWN.md
+
+R138 should produce a live-ready burn-down that ranks remaining blockers in exact execution order:
+- paper proof
+- tiny_live lane mode
+- authorization
+- protective readiness
+- credential presence
+- global gate
+- adapter readiness
+- final confirmation
+No real orders.
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_protective_payload_dry_preview_boundary.py
+
+Test:
+- preview writes no review record
+- wrong confirmation rejects recording
+- exact confirmation records preview only in mocked-ready safe state
+- protective preview packet contains no secrets
+- protective preview packet contains no executable exchange payload
+- stop_loss direct_exchange_payload is null
+- stop_loss signed_request is null
+- stop_loss endpoint is null
+- stop_loss quantity is null
+- take_profit direct_exchange_payload is null
+- take_profit signed_request is null
+- take_profit endpoint is null
+- take_profit quantity is null
+- forbidden_fields_present is empty in safe preview
+- protective_payload_created false
+- executable_payload_created false
+- binance_order_endpoint_called false
+- binance_test_order_endpoint_called false
+- protective_order_endpoint_called false
+- blocked when R136 policy missing/blocked
+- blocked when stop/take-profit references missing
+- future requirements included
+- safety flags are always false
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/protective_payload_dry_preview_boundary.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_protective_payload_dry_preview_boundary.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  protective-payload-dry-preview-boundary \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  protective-payload-dry-preview-boundary \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-preview \
+  --confirm-protective-preview "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not mutate config.
+Do not mutate env.
+Do not use network.
+Do not create order payload.
+Do not create signed request.
+Do not create protective payload.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Protective payload dry preview boundary added:
+CLI command added:
+Ledger used:
+R137 doc created:
+R138 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Protective preview summary:
+Main blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R137 protective payload dry preview boundary package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.

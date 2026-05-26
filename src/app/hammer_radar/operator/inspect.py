@@ -1400,6 +1400,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "protective-payload-dry-preview-boundary":
+        from src.app.hammer_radar.operator.protective_payload_dry_preview_boundary import (
+            build_protective_payload_dry_preview_boundary,
+            format_protective_payload_dry_preview_boundary_json,
+        )
+
+        print(
+            format_protective_payload_dry_preview_boundary_json(
+                build_protective_payload_dry_preview_boundary(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_preview=args.record_preview,
+                    confirm_protective_preview=args.confirm_protective_preview,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2158,6 +2174,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     protective_order_dry_policy_review_parser.add_argument("--record-review", action="store_true")
     protective_order_dry_policy_review_parser.add_argument("--confirm-protective-review", default=None)
+
+    protective_payload_dry_preview_boundary_parser = subparsers.add_parser(
+        "protective-payload-dry-preview-boundary",
+        parents=[parent],
+    )
+    protective_payload_dry_preview_boundary_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    protective_payload_dry_preview_boundary_parser.add_argument("--record-preview", action="store_true")
+    protective_payload_dry_preview_boundary_parser.add_argument("--confirm-protective-preview", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
