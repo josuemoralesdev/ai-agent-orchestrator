@@ -1,0 +1,428 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R133_LANE_CONTROL_COCKPIT_UI.md
+
+PHASE:
+R133 Lane Control Cockpit UI
+
+BRANCH:
+r133-lane-control-cockpit-ui
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT, DUPLICATE RISK
+Duplicate risk: MEDIUM
+
+GOAL:
+Create a read-only operator cockpit UI for the autonomous lane architecture.
+
+Design direction:
+Option D:
+Thread Launcher-style Control Tower + MasonShift sacred gate accents.
+
+This UI must be aesthetic, compact, operational, and safe.
+It must show the lane system clearly without exposing dangerous controls.
+
+CORE UX PRINCIPLE:
+The operator should understand the whole system in 5 seconds:
+
+- Is the system safe?
+- Which lanes are enabled?
+- Which lanes are paper / armed dry run / tiny_live?
+- Is there a fresh routed signal?
+- Is autonomous paper proof present?
+- Is tiny-live gate blocked or near-ready?
+- What is the next safest action?
+
+NON-NEGOTIABLES:
+- Read-only UI only.
+- Do not place real orders.
+- Do not create Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not send signed requests.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not create live action buttons.
+- Do not create order buttons.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R133 is a cockpit UI, not an execution interface.
+Allowed UI actions:
+- refresh
+- copy command
+- view blockers
+- inspect lane details
+
+Forbidden UI actions:
+- place order
+- enable live
+- bypass gate
+- send to Binance
+- mutate env
+- write lane config
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/endpoints/UI patterns related to:
+- approval_api.py
+- R108/R109 operator approval cockpit UI
+- lane control status
+- fresh signal router
+- lane autonomy scheduler
+- autonomous paper lane executor integration
+- first tiny-live lane execution gate
+- tiny-live autonomous lane authorization
+- kill-switch rehearsal
+- live adapter boundary final review
+- inspect CLI modes
+- FastAPI HTMLResponse patterns
+
+Specifically inspect:
+- src/app/hammer_radar/operator/approval_api.py
+- src/app/hammer_radar/operator/first_live_operator_approval_cockpit.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/operator/inspect.py
+- docs/hammer_radar/live_readiness/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+- tests/hammer_radar/
+
+REUSE / EXTEND:
+Reuse existing FastAPI approval_api app.
+Reuse existing cockpit UI patterns if present.
+Reuse backend builders from R122-R132.
+Do not duplicate readiness logic.
+Do not create separate frontend build system unless one already exists.
+Prefer simple HTML/CSS/JS served by FastAPI, as existing cockpit pattern likely does.
+Keep it dependency-light.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/lane_control_cockpit.py
+
+Expose functions:
+- build_lane_control_cockpit_state
+- render_lane_control_cockpit_html
+- compact_lane_card_state
+- compact_global_safety_state
+- compact_next_action_state
+- build_cockpit_command_pack
+
+The state builder must compose:
+
+1. lane_control_status
+   from R122 lane control
+
+2. fresh_signal_router_status
+   from R123 router
+
+3. lane_autonomy_scheduler_status
+   from R128 scheduler
+
+4. paper_lane_executor_integration_status
+   from R129 integration
+
+5. first_tiny_live_lane_execution_gate
+   from R126 gate
+
+6. tiny_live_authorization_status
+   from R130 authorization
+
+7. live_lane_kill_switch_rehearsal
+   from R131 rehearsal
+
+8. live_adapter_boundary_final_review
+   from R132 boundary review
+
+Default lane:
+BTCUSDT|13m|long|ladder_close_50_618
+
+REQUIRED API ROUTES:
+Wire into:
+src/app/hammer_radar/operator/approval_api.py
+
+Add routes:
+
+GET /operator/lane-cockpit
+- returns HTMLResponse
+- read-only UI
+
+GET /operator/lane-cockpit/state
+- returns compact JSON
+
+No POST endpoints in R133.
+No mutation endpoints.
+No execution endpoints.
+
+REQUIRED UI DESIGN:
+Name:
+Hammer Control Tower
+
+Visual direction:
+- dark graphite background
+- large lane cards
+- Thread Launcher-style clean layout
+- MasonShift sacred gate accents
+- one red sacred-eye visual only for final tiny-live gate state
+- green/amber/red/purple status accents
+- minimalist typography
+- huge readable statuses
+- compact blocker chips
+- copyable command snippets
+
+Layout:
+
+1. Top global safety bar:
+- SYSTEM SAFE / SYSTEM BLOCKED / SYSTEM REVIEW
+- order_placed
+- network_allowed
+- secrets_shown
+- global kill switch status if available
+- paper_live_separation_intact
+
+2. Lane cards grid:
+Each lane card should show:
+- symbol/timeframe/direction
+- entry_mode
+- current mode
+- lane status
+- freshness window
+- live eligibility summary
+- latest route status
+- autonomy decision summary
+- paper proof summary
+- tiny-live gate status
+- top blockers
+- next action
+
+3. Sacred gate panel:
+- red masonic-eye inspired visual
+- final tiny-live gate status
+- no click action
+- copy gate check command
+- show “READ ONLY” / “NO ORDER BUTTON”
+
+4. Right-side next-action panel:
+- primary next action
+- why
+- safe command to copy
+- phase target, e.g. R134 if ready later
+
+5. Bottom feed:
+- router summary
+- scheduler summary
+- paper integration summary
+- boundary summary
+- recent blockers
+
+JS behavior:
+- auto-refresh every 10 seconds
+- manual refresh button
+- copy command buttons
+- no dangerous POST actions
+- if state fetch fails, show safe degraded state
+
+REQUIRED STATE JSON:
+GET /operator/lane-cockpit/state must include:
+
+{
+  "status": "LANE_COCKPIT_READY" | "LANE_COCKPIT_DEGRADED",
+  "generated_at": "...",
+  "read_only": true,
+  "no_order_buttons": true,
+  "global_safety": {...},
+  "lanes": [...],
+  "selected_lane": {...},
+  "router_summary": {...},
+  "scheduler_summary": {...},
+  "paper_executor_summary": {...},
+  "tiny_live_gate_summary": {...},
+  "authorization_summary": {...},
+  "kill_switch_summary": {...},
+  "adapter_boundary_summary": {...},
+  "next_action": {...},
+  "command_pack": {...},
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false,
+    "binance_order_endpoint_called": false,
+    "signed_request_created": false
+  },
+  "source_surfaces_used": [...]
+}
+
+Command pack must include safe copy commands only:
+- lane-control-status
+- fresh-signal-router-status
+- lane-autonomy-scheduler
+- autonomous-paper-lane-executor-integration preview
+- first-tiny-live-lane-execution-gate
+- first-tiny-live-autonomous-lane-authorization preview
+- live-lane-kill-switch-rehearsal
+- live-adapter-boundary-final-review
+
+No command pack item may include live order execution, Binance call, env mutation, or config write.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+lane-control-cockpit-state
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-cockpit-state
+
+Output compact JSON same as state endpoint.
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R133_LANE_CONTROL_COCKPIT_UI.md
+
+Explain:
+- what R133 adds
+- why the UI must be lane-based, not signal approval based
+- Option D design choice
+- read-only safety
+- routes
+- state endpoint
+- no order buttons
+- command copy behavior
+- how to run locally
+- how this prepares R134
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R133:
+- status
+- purpose
+- command/routes
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R134_FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION.md
+
+R134 should create the first tiny-live order payload dry authorization packet:
+- no real order
+- no Binance call
+- no signed request
+- only after cockpit/boundary/gate state is visible
+- must use R132 boundary requirements
+- must be explicit current-turn authorization only
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_lane_control_cockpit.py
+
+Test:
+- cockpit state returns read_only true
+- cockpit state returns no_order_buttons true
+- safety flags are always false
+- command pack contains only safe commands
+- command pack contains no Binance/order/env mutation commands
+- lane cards include configured lanes
+- selected lane includes tiny-live gate summary
+- adapter boundary summary included
+- next action included
+- HTML renders Hammer Control Tower
+- HTML includes sacred gate panel
+- HTML includes no form/action for order placement
+- state endpoint route exists
+- HTML route exists
+- CLI mode exists and returns compact state
+- degraded state remains safe if one source fails
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_control_cockpit.py \
+  src/app/hammer_radar/operator/approval_api.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_control_cockpit.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+If approval API is running locally on 8015:
+curl -s http://127.0.0.1:8015/operator/lane-cockpit/state | jq '.status, .read_only, .no_order_buttons, .global_safety, .next_action, .safety'
+
+If not running, do CLI smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-cockpit-state | jq '.status, .read_only, .no_order_buttons, .global_safety, .next_action, .safety'
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Cockpit UI added:
+Routes added:
+CLI command added:
+R133 doc created:
+R134 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+UI summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R133 lane control cockpit UI package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Make it aesthetically clean from the start: Thread Launcher layout discipline + MasonShift sacred gate accent.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.

@@ -80,6 +80,10 @@ from src.app.hammer_radar.operator.first_live_operator_approval_cockpit import (
     operator_approval_cockpit_html,
     record_operator_approval_cockpit_intent,
 )
+from src.app.hammer_radar.operator.lane_control_cockpit import (
+    build_lane_control_cockpit_state,
+    render_lane_control_cockpit_html,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -749,6 +753,18 @@ def operator_approval_cockpit_state(
     candidate_id: str = "normal|BTCUSDT|13m|long|ladder_close_50_618",
 ) -> dict:
     return build_operator_approval_cockpit_state(candidate_id=candidate_id, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/operator/lane-cockpit", response_class=HTMLResponse)
+def operator_lane_cockpit() -> str:
+    return render_lane_control_cockpit_html()
+
+
+@app.get("/operator/lane-cockpit/state")
+def operator_lane_cockpit_state(
+    lane_key: str = "BTCUSDT|13m|long|ladder_close_50_618",
+) -> dict:
+    return build_lane_control_cockpit_state(lane_key=lane_key, log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/operator/approval-cockpit/intent")
