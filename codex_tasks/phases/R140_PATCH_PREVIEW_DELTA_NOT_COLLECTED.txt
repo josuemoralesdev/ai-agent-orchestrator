@@ -1,0 +1,71 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow AGENTS.md and codex_tasks/CODEX_RULES.md.
+
+PHASE:
+R140 patch preview delta not collected
+
+BRANCH:
+current branch r140-operator-executes-safe-clearing-pack
+
+GOAL:
+Fix R140 preview/rejected reporting so it does not show fake blocker/probability improvement when after_snapshot is not collected.
+
+PROBLEM:
+operator-executes-safe-clearing-pack preview currently has:
+- after_snapshot: {}
+- blocker_movement.after counts all zero
+- delta_total: -28
+- probability after values: 0
+This incorrectly implies blockers cleared in preview mode.
+
+REQUIRED FIX:
+In src/app/hammer_radar/operator/operator_executes_safe_clearing_pack.py:
+
+1. If after_snapshot is missing/empty/NOT_COLLECTED:
+   - blocker_movement.after must be "NOT_COLLECTED" or a structured object with status "NOT_COLLECTED"
+   - clearing_delta.blocker_counts.after must be "NOT_COLLECTED" or status "NOT_COLLECTED"
+   - delta_total must be 0 or null, not negative
+   - probability_movement after fields must be null or "NOT_COLLECTED", not 0
+   - probability deltas must be 0 or null, not negative
+   - per-surface after statuses must remain "NOT_COLLECTED"
+
+2. Only calculate real deltas when after_snapshot was actually collected.
+
+3. Add/update tests in tests/hammer_radar/test_operator_executes_safe_clearing_pack.py:
+   - preview mode does not report fake blocker clearing
+   - rejected mode does not report fake blocker clearing
+   - after_snapshot empty results in NOT_COLLECTED delta state
+   - safety flags remain false
+
+NON-NEGOTIABLES:
+- No orders.
+- No Binance.
+- No network.
+- No env/config mutation.
+- No signed requests.
+- No payload creation.
+- Do not commit, merge, or tag.
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/operator_executes_safe_clearing_pack.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_operator_executes_safe_clearing_pack.py
+
+Run smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  operator-executes-safe-clearing-pack \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  | jq '.status, .after_snapshot, .blocker_movement, .probability_movement, .safety'
+
+REPORT:
+Files modified:
+Tests run:
+Smoke summary:
+Safety result:
