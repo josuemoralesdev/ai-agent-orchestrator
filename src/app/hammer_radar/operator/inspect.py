@@ -1352,6 +1352,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "first-tiny-live-order-payload-dry-authorization":
+        from src.app.hammer_radar.operator.first_tiny_live_order_payload_dry_authorization import (
+            build_first_tiny_live_order_payload_dry_authorization,
+            format_first_tiny_live_order_payload_dry_authorization_json,
+        )
+
+        print(
+            format_first_tiny_live_order_payload_dry_authorization_json(
+                build_first_tiny_live_order_payload_dry_authorization(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_dry_authorization=args.record_dry_authorization,
+                    confirm_dry_authorization=args.confirm_dry_authorization,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2074,6 +2090,20 @@ def _build_parser() -> argparse.ArgumentParser:
     live_adapter_boundary_review_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
     live_adapter_boundary_review_parser.add_argument("--record-review", action="store_true")
     live_adapter_boundary_review_parser.add_argument("--confirm-boundary-review", default=None)
+
+    first_tiny_live_order_payload_dry_authorization_parser = subparsers.add_parser(
+        "first-tiny-live-order-payload-dry-authorization",
+        parents=[parent],
+    )
+    first_tiny_live_order_payload_dry_authorization_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    first_tiny_live_order_payload_dry_authorization_parser.add_argument(
+        "--record-dry-authorization",
+        action="store_true",
+    )
+    first_tiny_live_order_payload_dry_authorization_parser.add_argument("--confirm-dry-authorization", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
