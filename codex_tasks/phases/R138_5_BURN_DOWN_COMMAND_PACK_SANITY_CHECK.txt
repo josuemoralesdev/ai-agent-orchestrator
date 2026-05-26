@@ -1,0 +1,146 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+
+PHASE:
+R138.5 Burn-Down Command Pack Sanity Check
+
+BRANCH:
+r138-5-burn-down-command-pack-sanity-check
+
+GOAL:
+Add a small safety/UX layer that validates the R138 autonomous lane live-ready burn-down command pack and produces a compact next-3-safe-actions view.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not create payloads.
+- Do not create signed requests.
+- Do not mutate env.
+- Do not mutate config.
+- Do not run sudo.
+- Do not commit/merge/tag.
+
+CAPABILITY SCAN:
+Inspect:
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_autonomous_lane_live_ready_burn_down.py
+- docs/hammer_radar/live_readiness/R138_AUTONOMOUS_LANE_LIVE_READY_BURN_DOWN.md
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/burn_down_command_pack_sanity.py
+
+Expose:
+- build_burn_down_command_pack_sanity
+- validate_safe_command_pack
+- build_next_three_safe_actions
+
+It must call/reuse R138 burn-down builder.
+
+Validation must reject commands containing dangerous terms:
+- execute_live_order
+- submit_test_order
+- submit_protective_test
+- build_signed
+- signature
+- BINANCE_API_SECRET
+- BINANCE_API_KEY=
+- /fapi/v1/order
+- --apply
+- systemctl restart
+- sudo
+- export HAMMER_LIVE
+- HAMMER_ALLOW_LIVE_ORDERS=true
+- HAMMER_GLOBAL_KILL_SWITCH=false
+
+Output:
+{
+  "status": "COMMAND_PACK_SAFE" | "COMMAND_PACK_UNSAFE",
+  "lane_key": "...",
+  "unsafe_command_count": 0,
+  "unsafe_findings": [],
+  "next_three_safe_actions": [
+    {"rank": 1, "action": "...", "command": "...", "why": "..."}
+  ],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "env_mutated": false,
+    "config_written": false
+  }
+}
+
+CLI:
+Wire into inspect.py:
+
+burn-down-command-pack-sanity
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  burn-down-command-pack-sanity \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+DOC:
+Create:
+docs/hammer_radar/live_readiness/R138_5_BURN_DOWN_COMMAND_PACK_SANITY_CHECK.md
+
+TEST:
+Create:
+tests/hammer_radar/test_burn_down_command_pack_sanity.py
+
+Cover:
+- safe command pack returns COMMAND_PACK_SAFE
+- dangerous command terms are rejected
+- next_three_safe_actions has max 3 items
+- safety flags false
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/burn_down_command_pack_sanity.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_burn_down_command_pack_sanity.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_autonomous_lane_live_ready_burn_down.py
+
+SMOKE:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  burn-down-command-pack-sanity \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  | jq '.status, .unsafe_command_count, .next_three_safe_actions, .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Command added:
+Tests run:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Keep it small.
+Finish fast.
+Do not expand scope.
+Do not touch live execution.
