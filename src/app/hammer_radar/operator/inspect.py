@@ -1368,6 +1368,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "live-adapter-execution-rehearsal":
+        from src.app.hammer_radar.operator.live_adapter_execution_rehearsal import (
+            build_live_adapter_execution_rehearsal,
+            format_live_adapter_execution_rehearsal_json,
+        )
+
+        print(
+            format_live_adapter_execution_rehearsal_json(
+                build_live_adapter_execution_rehearsal(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_rehearsal=args.record_rehearsal,
+                    confirm_adapter_rehearsal=args.confirm_adapter_rehearsal,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2104,6 +2120,17 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     first_tiny_live_order_payload_dry_authorization_parser.add_argument("--confirm-dry-authorization", default=None)
+
+    live_adapter_execution_rehearsal_parser = subparsers.add_parser(
+        "live-adapter-execution-rehearsal",
+        parents=[parent],
+    )
+    live_adapter_execution_rehearsal_parser.add_argument(
+        "--lane-key",
+        default="BTCUSDT|13m|long|ladder_close_50_618",
+    )
+    live_adapter_execution_rehearsal_parser.add_argument("--record-rehearsal", action="store_true")
+    live_adapter_execution_rehearsal_parser.add_argument("--confirm-adapter-rehearsal", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

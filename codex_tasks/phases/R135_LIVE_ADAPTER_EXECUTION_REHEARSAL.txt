@@ -1,0 +1,478 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+- codex_tasks/phases/R135_LIVE_ADAPTER_EXECUTION_REHEARSAL.md
+
+PHASE:
+R135 Live Adapter Execution Rehearsal
+
+BRANCH:
+r135-live-adapter-execution-rehearsal
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+GOAL:
+Create a non-executing live adapter execution rehearsal layer.
+
+R135 must rehearse the path from R134 dry authorization packet to the live adapter boundary without creating executable exchange payloads, signed requests, network calls, or real orders.
+
+This phase must prove:
+- which adapter functions would be involved later
+- which functions remain forbidden now
+- which stop conditions block execution
+- which protective order requirements remain unresolved
+- what exact future phase must implement before real tiny-live execution
+
+R135 must not place orders.
+
+CURRENT CONTEXT:
+R122 lane controls.
+R123 fresh signal router.
+R124 lane command interface.
+R125 autonomous paper lane execution.
+R126 tiny-live lane execution gate.
+R127 lane autonomy loop.
+R128 autonomy scheduler.
+R129 autonomous paper executor integration.
+R130 tiny-live autonomous lane authorization.
+R131 kill-switch rehearsal.
+R132 live adapter boundary final review.
+R133 lane control cockpit UI.
+R134 first tiny-live order payload dry authorization.
+
+R132 found:
+- live-capable connector code exists in binance_futures_connector.py
+- connector mode is DRY_RUN_ONLY
+- live order adapter not configured
+- Binance API key/secret missing in current process env
+- protective orders disabled / PREVIEW_ONLY
+- R106/global gate blocked
+- recent paper proof missing
+- lane still armed_dry_run, not tiny_live
+
+R134 created dry authorization packet/review behavior but must remain non-executing.
+
+R135 must rehearse the next boundary only.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not bypass R106/global gates.
+- Do not alter global live gates to make tiny_live easier.
+- Do not implement real execution adapter behavior.
+- Do not create a live order endpoint.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+IMPORTANT:
+R135 may create:
+- rehearsal packet
+- adapter function map
+- blocked function list
+- stop condition report
+- rehearsal ledger
+
+R135 must not create:
+- executable exchange payload
+- signed payload
+- Binance request
+- real order
+- network request
+- env/config mutation
+
+CAPABILITY SCAN FIRST:
+Inspect existing modules/docs/tests related to:
+- R134 dry authorization
+- R132 live adapter boundary review
+- binance_futures_connector.py
+- execution safety modules
+- protective order preview/status
+- tiny live risk contract
+- first live activation gate
+- final live preflight
+- live env boundary review
+- lane controls
+- R126 tiny-live gate
+- R130 authorization
+- R131 kill-switch rehearsal
+- R129 paper proof/integration
+- inspect.py CLI modes
+- logs/hammer_radar_forward conventions
+
+Specifically inspect:
+- src/app/hammer_radar/operator/first_tiny_live_order_payload_dry_authorization.py
+- src/app/hammer_radar/operator/live_adapter_boundary_final_review.py
+- src/app/hammer_radar/execution/binance_futures_connector.py
+- src/app/hammer_radar/execution/safety.py
+- src/app/hammer_radar/execution/base.py
+- src/app/hammer_radar/execution/binance_stub.py
+- src/app/hammer_radar/execution/paper.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/first_tiny_live_autonomous_lane_authorization.py
+- src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract.py
+- src/app/hammer_radar/operator/final_live_preflight.py
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/live_env_boundary_review.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R132_LIVE_ADAPTER_BOUNDARY_FINAL_REVIEW.md
+- docs/hammer_radar/live_readiness/R134_FIRST_TINY_LIVE_ORDER_PAYLOAD_DRY_AUTHORIZATION.md
+- tests/hammer_radar/test_first_tiny_live_order_payload_dry_authorization.py
+- tests/hammer_radar/test_live_adapter_boundary_final_review.py
+
+REUSE / EXTEND:
+Reuse R134 dry authorization.
+Reuse R132 boundary review.
+Reuse connector status/read-only builders only.
+Reuse R131 kill-switch rehearsal.
+Reuse R126/R130 state.
+Do not duplicate live readiness logic.
+Do not create real execution logic.
+Do not call connector functions that create signed payloads or network requests.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/live_adapter_execution_rehearsal.py
+
+Expose functions:
+- build_live_adapter_execution_rehearsal
+- inspect_adapter_rehearsal_path
+- build_forbidden_adapter_function_map
+- build_rehearsal_stop_conditions
+- build_protective_rehearsal_requirements
+- build_future_execution_adapter_requirements
+- append_live_adapter_execution_rehearsal_record
+- load_live_adapter_execution_rehearsal_records
+- summarize_live_adapter_execution_rehearsals
+
+REHEARSAL STATUS:
+- LIVE_ADAPTER_REHEARSAL_PREVIEW
+- LIVE_ADAPTER_REHEARSAL_REJECTED
+- LIVE_ADAPTER_REHEARSAL_BLOCKED
+- LIVE_ADAPTER_REHEARSAL_READY_FOR_FUTURE_IMPLEMENTATION
+
+R135 should usually return BLOCKED or PREVIEW in current state.
+
+REHEARSAL AREAS:
+1. dry_authorization_boundary
+   - R134 status
+   - dry authorization packet exists or missing
+   - dry authorization hash if available
+   - must be non-executable
+
+2. adapter_function_boundary
+   - list available connector functions
+   - classify as:
+     - READ_ONLY_STATUS_OK
+     - PAYLOAD_PREVIEW_FORBIDDEN_IN_R135
+     - SIGNING_FORBIDDEN
+     - NETWORK_FORBIDDEN
+     - EXECUTION_FORBIDDEN
+   - do not call forbidden functions
+
+3. payload_boundary
+   - executable_payload_created must be false
+   - order_payload_created must be false
+   - signed_request_created must be false
+   - direct_exchange_payload must be null
+
+4. protective_boundary
+   - protective orders required
+   - protective readiness status
+   - stop/take-profit policy readiness
+   - protective payload creation forbidden in R135
+
+5. credential_boundary
+   - credentials present as booleans only
+   - no values printed
+   - no signed request
+
+6. network_boundary
+   - network_allowed false
+   - binance_order_endpoint_called false
+   - binance_test_order_endpoint_called false
+   - account/balance endpoints not called
+
+7. kill_switch_boundary
+   - R131 status
+   - global kill switch blocks live intent
+   - lane disable blocks live intent
+   - rollback blocks live intent
+
+8. global_gate_boundary
+   - R106/global gate status
+   - final preflight status
+   - live env boundary status
+   - blockers
+
+9. future_execution_requirements
+   - exact missing items before live adapter can be implemented
+
+REQUIRED OUTPUT:
+{
+  "status": "LIVE_ADAPTER_REHEARSAL_PREVIEW|LIVE_ADAPTER_REHEARSAL_REJECTED|LIVE_ADAPTER_REHEARSAL_BLOCKED|LIVE_ADAPTER_REHEARSAL_READY_FOR_FUTURE_IMPLEMENTATION",
+  "generated_at": "...",
+  "lane_key": "...",
+  "record_rehearsal_requested": false,
+  "confirmation_valid": false,
+  "rehearsal_recorded": false,
+  "rehearsal_id": null,
+  "rehearsal_areas": {...},
+  "forbidden_function_map": [...],
+  "stop_conditions": [...],
+  "future_execution_adapter_requirements": [...],
+  "main_blockers": [...],
+  "next_actions": [...],
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM LIVE ADAPTER REHEARSAL ONLY; NO ORDER; NO BINANCE CALL.
+
+This records rehearsal only.
+It does not authorize order placement.
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/live_adapter_execution_rehearsals.ndjson
+
+Record:
+- event_type: LIVE_ADAPTER_EXECUTION_REHEARSAL
+- rehearsal_id
+- recorded_at_utc
+- status
+- lane_key
+- rehearsal_areas
+- forbidden_function_map
+- stop_conditions
+- future_execution_adapter_requirements
+- main_blockers
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+live-adapter-execution-rehearsal
+
+Command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-execution-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618"
+
+Supported args:
+- --lane-key <lane_key>
+- --record-rehearsal
+- --confirm-adapter-rehearsal "<exact phrase>"
+
+Default:
+- preview only
+- no ledger write
+- no payload write
+- no config write
+- no env mutation
+- no network
+- no signed request
+
+Behavior:
+1. Preview:
+   - status PREVIEW or BLOCKED
+   - no ledger write
+   - no payload write
+   - no network
+   - no order payload
+
+2. record-rehearsal without exact confirmation:
+   - status LIVE_ADAPTER_REHEARSAL_REJECTED
+   - no ledger write
+
+3. record-rehearsal with exact confirmation:
+   - write rehearsal ledger only if safe
+   - no executable payload
+   - no signed request
+   - no network
+   - no order placement
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R135_LIVE_ADAPTER_EXECUTION_REHEARSAL.md
+
+Explain:
+- what R135 adds
+- what R135 does not add
+- how it uses R134 and R132
+- forbidden adapter functions
+- stop conditions
+- protective order rehearsal requirements
+- credential handling as booleans only
+- why no network/signing/order occurs
+- confirmation phrase
+- ledger
+- next phases:
+  - R136 Protective Order Dry Policy Review
+  - R137 First Tiny-Live Execution Adapter Implementation Plan
+  - R138 First Tiny-Live Execution Final Authorization
+
+UPDATE PHASE INDEX:
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Add R135:
+- status
+- purpose
+- command
+- safety state
+- artifact path
+- agent roles
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R136_PROTECTIVE_ORDER_DRY_POLICY_REVIEW.md
+
+R136 should focus on protective stop/take-profit dry policy:
+- no Binance calls
+- no signed requests
+- no real orders
+- define exact protective order requirements
+- verify stop/take-profit policy against risk contract
+- prepare future payload dry preview boundaries
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_live_adapter_execution_rehearsal.py
+
+Test:
+- preview writes no rehearsal record
+- wrong confirmation rejects recording
+- exact confirmation records rehearsal only
+- forbidden function map includes signing/network/execution functions as forbidden
+- executable_payload_created false
+- order_payload_created false
+- signed_request_created false
+- binance_order_endpoint_called false
+- binance_test_order_endpoint_called false
+- protective_order_endpoint_called false
+- credentials are booleans only and no values shown
+- stop conditions include global gate/protective/credential blockers
+- safety flags always false
+- paper_live_separation_intact true in normal safe flow
+- ledger append-only
+- CLI mode exists and returns compact status
+- no Binance/order payload/network calls occur
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/live_adapter_execution_rehearsal.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_live_adapter_execution_rehearsal.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+Recommended:
+Do not run duplicate full repo suite unless non-Hammer shared infra was modified.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-execution-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" | jq .
+
+Rejected record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  live-adapter-execution-rehearsal \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --record-rehearsal \
+  --confirm-adapter-rehearsal "wrong" | jq .
+
+Do not run confirmed record smoke unless tests use temp ledgers/mocks only.
+Do not mutate config.
+Do not mutate env.
+Do not use network.
+Do not create order payload.
+Do not create signed request.
+
+REPORT:
+At the end, report exactly:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Live adapter execution rehearsal added:
+CLI command added:
+Ledger used:
+R135 doc created:
+R136 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Rehearsal summary:
+Main blockers:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Operate with high autonomy inside the safety boundaries above.
+Do not pause for clarification unless execution safety is genuinely ambiguous.
+Complete the full R135 live adapter execution rehearsal package in one pass.
+Prioritize autonomous lane architecture over manual signal approval.
+Use existing repo patterns.
+Run every validation relevant to changed files.
+If validation fails, inspect, fix, rerun, and report final state.
+Do not perform live trading actions under any circumstance.
