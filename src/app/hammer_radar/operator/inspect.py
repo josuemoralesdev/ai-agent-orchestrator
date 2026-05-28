@@ -1556,6 +1556,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "entry-mode-derivation-bridge":
+        from src.app.hammer_radar.operator.entry_mode_derivation_bridge import (
+            build_entry_mode_derivation_bridge_status,
+            format_entry_mode_derivation_bridge_json,
+        )
+
+        print(
+            format_entry_mode_derivation_bridge_json(
+                build_entry_mode_derivation_bridge_status(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    trace_all_unlocked_lanes=args.trace_all_unlocked_lanes,
+                    latest_signals=args.latest_signals,
+                    record_bridge=args.record_bridge,
+                    confirm_bridge=args.confirm_bridge,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2416,6 +2435,17 @@ def _build_parser() -> argparse.ArgumentParser:
     signal_to_watcher_trace_parser.add_argument("--signal-id", default=None)
     signal_to_watcher_trace_parser.add_argument("--record-trace", action="store_true")
     signal_to_watcher_trace_parser.add_argument("--confirm-trace", default=None)
+
+    entry_mode_derivation_bridge_parser = subparsers.add_parser(
+        "entry-mode-derivation-bridge",
+        parents=[parent],
+    )
+    entry_mode_derivation_bridge_parser.add_argument("--lane-key", action="append", default=None)
+    entry_mode_derivation_bridge_parser.add_argument("--lane-keys", default=None)
+    entry_mode_derivation_bridge_parser.add_argument("--trace-all-unlocked-lanes", action="store_true")
+    entry_mode_derivation_bridge_parser.add_argument("--latest-signals", type=int, default=100)
+    entry_mode_derivation_bridge_parser.add_argument("--record-bridge", action="store_true")
+    entry_mode_derivation_bridge_parser.add_argument("--confirm-bridge", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

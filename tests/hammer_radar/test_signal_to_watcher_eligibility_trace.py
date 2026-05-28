@@ -19,6 +19,7 @@ from src.app.hammer_radar.operator.signal_to_watcher_eligibility_trace import (
     SIGNAL_MATCHES_TIMEFRAME_DIRECTION_BUT_ENTRY_MODE_MISMATCH,
     SIGNAL_MATCHES_WATCHED_LANE_AND_ELIGIBLE,
     SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING,
+    SIGNAL_NOT_FOUND_IN_PAPER_SCAN,
     SIGNAL_TIMEFRAME_NOT_WATCHED,
     SIGNAL_WATCHER_TRACE_READY,
     SIGNAL_WATCHER_TRACE_RECORDED,
@@ -114,18 +115,19 @@ class SignalToWatcherEligibilityTraceTests(unittest.TestCase):
         self.assertTrue(context["unlock_contract_status"]["fallback_used"])
         self.assertEqual([PRIMARY_UNLOCK_LANE, SECONDARY_UNLOCK_LANE], [lane["lane_key"] for lane in context["watched_lanes"]])
 
-    def test_signal_matching_watched_lane_with_null_entry_mode_classifies_as_missing(self) -> None:
+    def test_signal_matching_watched_lane_with_null_entry_mode_uses_bridge_fields(self) -> None:
         self._write_unlock_contract([PRIMARY_UNLOCK_LANE])
         self._write_signal(self._signal(entry_mode=None))
 
         payload = build_signal_to_watcher_eligibility_trace(log_dir=self.log_dir, trace_all_unlocked_lanes=True, now=self.now)
 
-        self.assertEqual(
-            SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING,
-            payload["signal_traces"][0]["gap_classification"],
-        )
+        self.assertEqual(SIGNAL_NOT_FOUND_IN_PAPER_SCAN, payload["signal_traces"][0]["gap_classification"])
+        self.assertIsNone(payload["signal_traces"][0]["before_bridge_entry_mode"])
+        self.assertEqual("ladder_close_50_618", payload["signal_traces"][0]["after_bridge_entry_mode"])
+        self.assertEqual(PRIMARY_UNLOCK_LANE, payload["signal_traces"][0]["after_bridge_lane_key"])
+        self.assertTrue(payload["signal_traces"][0]["bridge_would_match_watched_lane"])
         self.assertEqual([PRIMARY_UNLOCK_LANE], payload["signal_traces"][0]["possible_watched_lane_keys"])
-        self.assertEqual([], payload["signal_traces"][0]["matched_watched_lane_keys"])
+        self.assertEqual([PRIMARY_UNLOCK_LANE], payload["signal_traces"][0]["matched_watched_lane_keys"])
 
     def test_signal_with_non_watched_timeframe_classifies_as_timeframe_not_watched(self) -> None:
         self._write_unlock_contract([PRIMARY_UNLOCK_LANE])
@@ -163,13 +165,14 @@ class SignalToWatcherEligibilityTraceTests(unittest.TestCase):
         )
         self.assertEqual([PRIMARY_UNLOCK_LANE], payload["signal_traces"][0]["matched_watched_lane_keys"])
 
-    def test_aggregate_gap_counts_and_best_next_move_are_included(self) -> None:
+    def test_aggregate_gap_counts_reflect_post_bridge_blocker(self) -> None:
         self._write_unlock_contract([PRIMARY_UNLOCK_LANE])
         self._write_signal(self._signal(entry_mode=None))
 
         payload = build_signal_to_watcher_eligibility_trace(log_dir=self.log_dir, trace_all_unlocked_lanes=True, now=self.now)
 
-        self.assertEqual(1, payload["aggregate_gap_counts"][SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING])
+        self.assertNotIn(SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING, payload["aggregate_gap_counts"])
+        self.assertEqual(1, payload["aggregate_gap_counts"][SIGNAL_NOT_FOUND_IN_PAPER_SCAN])
         self.assertIn("R145", payload["best_next_engineering_move"])
 
     def test_ledger_append_only(self) -> None:

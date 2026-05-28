@@ -27,6 +27,10 @@ from src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop impo
     evaluate_watcher_iteration,
     load_fresh_candidate_watch_records,
 )
+from src.app.hammer_radar.operator.entry_mode_derivation_bridge import (
+    DERIVATION_SOURCE,
+    normalize_signal_for_watched_lane,
+)
 from src.app.hammer_radar.operator.fresh_signal_router import (
     ROUTED_TO_LANE,
     build_lane_key_from_candidate,
@@ -96,6 +100,7 @@ SOURCE_SURFACES_USED = [
     "logs/hammer_radar_forward/fresh_candidate_paper_proof_capture_loop.ndjson",
     "operator.tiny_live_lane_unlock_contract.build_lane_unlock_contract(status_only=True)",
     "operator.fresh_signal_router.evaluate_candidate_against_lanes",
+    "operator.entry_mode_derivation_bridge.normalize_signal_for_watched_lane",
     "operator.autonomous_paper_lane_executor_integration.run_autonomous_paper_lane_executor_once(preview)",
     f"logs/hammer_radar_forward/{LEDGER_FILENAME}",
 ]
@@ -301,6 +306,26 @@ def trace_signal_entry_mode_derivation(signal: Mapping[str, Any]) -> dict[str, A
         "entry_mode_missing": raw_entry_mode is None,
         "derivation_source": "fresh_signal_router.normalize_candidate_default" if raw_entry_mode is None else "signal_record",
         "derived_lane_key": build_lane_key_from_candidate(normalized),
+    }
+
+
+def trace_signal_entry_mode_bridge(
+    signal: Mapping[str, Any],
+    *,
+    watched_lanes: list[Mapping[str, Any]],
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    normalized = normalize_signal_for_watched_lane(signal, watched_lanes=watched_lanes, now=now)
+    return {
+        "before_bridge_entry_mode": normalized.get("before_bridge_entry_mode"),
+        "after_bridge_entry_mode": normalized.get("after_bridge_entry_mode"),
+        "after_bridge_lane_key": normalized.get("after_bridge_lane_key"),
+        "bridge_would_match_watched_lane": bool(normalized.get("bridge_would_match_watched_lane")),
+        "bridge_would_still_block_reason": normalized.get("bridge_would_still_block_reason"),
+        "freshness_status_after_bridge": normalized.get("freshness_status_after_bridge"),
+        "derived_entry_mode": bool(normalized.get("derived_entry_mode")),
+        "derivation_source": normalized.get("derivation_source") or DERIVATION_SOURCE,
+        "normalized_signal": normalized,
     }
 
 
@@ -571,15 +596,17 @@ def _build_single_signal_trace(
     now: datetime,
 ) -> dict[str, Any]:
     entry_trace = trace_signal_entry_mode_derivation(signal)
-    matched_exact = _matched_lane_keys(signal, watched_lanes, exact=True)
+    bridge = trace_signal_entry_mode_bridge(signal, watched_lanes=watched_lanes, now=now)
+    bridged_signal = bridge["normalized_signal"] if isinstance(bridge.get("normalized_signal"), Mapping) else signal
+    matched_exact = _matched_lane_keys(bridged_signal, watched_lanes, exact=True)
     possible = _matched_lane_keys(signal, watched_lanes, exact=False)
-    lane_key_for_preview = matched_exact[0] if matched_exact else (entry_trace.get("derived_lane_key") if possible else None)
+    lane_key_for_preview = matched_exact[0] if matched_exact else (bridge.get("after_bridge_lane_key") if possible else None)
     paper_scan = trace_signal_to_paper_scan(signal, paper_scans)
-    router = trace_signal_to_fresh_router(signal, log_dir=log_dir, now=now)
-    paper_executor = trace_signal_to_paper_executor(signal, lane_key=lane_key_for_preview, log_dir=log_dir, now=now)
+    router = trace_signal_to_fresh_router(bridged_signal, log_dir=log_dir, now=now)
+    paper_executor = trace_signal_to_paper_executor(bridged_signal, lane_key=lane_key_for_preview, log_dir=log_dir, now=now)
     watcher = trace_signal_to_watcher_consumption(signal, log_dir=log_dir, lane_key=lane_key_for_preview)
     gap = classify_signal_watcher_gap(
-        signal=signal,
+        signal=bridged_signal,
         watched_lanes=watched_lanes,
         paper_scan_match=paper_scan,
         fresh_router_match=router,
@@ -592,10 +619,16 @@ def _build_single_signal_trace(
         "timeframe": _timeframe(signal),
         "direction": _direction(signal),
         "entry_mode": _entry_mode(signal),
+        "before_bridge_entry_mode": bridge.get("before_bridge_entry_mode"),
+        "after_bridge_entry_mode": bridge.get("after_bridge_entry_mode"),
+        "after_bridge_lane_key": bridge.get("after_bridge_lane_key"),
+        "bridge_would_match_watched_lane": bool(bridge.get("bridge_would_match_watched_lane")),
+        "bridge_would_still_block_reason": bridge.get("bridge_would_still_block_reason"),
         "signal_timestamp": _timestamp(signal),
         "matched_watched_lane_keys": matched_exact,
         "possible_watched_lane_keys": possible,
         "entry_mode_derivation": entry_trace,
+        "entry_mode_derivation_bridge": {key: value for key, value in bridge.items() if key != "normalized_signal"},
         "paper_scan_match": paper_scan,
         "fresh_router_match": router,
         "paper_executor_match": paper_executor,
@@ -828,4 +861,3 @@ def _sanitize(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_sanitize(item) for item in value]
     return value
-

@@ -1,0 +1,448 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R145 Entry Mode Derivation Bridge / Paper Scan Candidate Normalization
+
+BRANCH:
+r145-entry-mode-derivation-bridge
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+GOAL:
+Fix the signal-to-watcher gap discovered by R144.
+
+Visible BTCUSDT signals can match watched lane symbol/timeframe/direction, but raw signal records often have:
+entry_mode = null
+
+R144 proved fresh_signal_router can derive:
+ladder_close_50_618
+
+and derive lane keys like:
+BTCUSDT|13m|long|ladder_close_50_618
+BTCUSDT|44m|long|ladder_close_50_618
+
+But R142 watcher eligibility still treats raw entry_mode null as not exactly matching watched lane keys.
+
+R145 must create a safe normalization bridge so BTCUSDT 13m/44m long signals with missing entry_mode can be normalized into the correct watched lane key before watcher/paper eligibility decisions.
+
+This is NOT live execution.
+This is NOT Binance.
+This is NOT order placement.
+This is a lane-candidate normalization bridge.
+
+TARGET LANES:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+CURRENT VERIFIED CONTEXT:
+R143 recorded tiny-live lane unlock contract:
+- execution_state: UNLOCKED_WAITING_FOR_CONDITIONS
+- lanes: 13m long ladder_close_50_618 and 44m long ladder_close_50_618
+- no order/Binance/payload/env/global mutation
+
+R144 trace found:
+- SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING: 10
+- SIGNAL_TIMEFRAME_NOT_WATCHED: 84
+- SIGNAL_DIRECTION_NOT_WATCHED: 6
+
+Specific 44m long signal:
+BTCUSDT|44m|long|2026-05-28T12:39:59.999000+00:00
+- entry_mode: null
+- fresh_router_derived_entry_mode: ladder_close_50_618
+- derived_lane_key: BTCUSDT|44m|long|ladder_close_50_618
+- gap: SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING
+- route_status after delay: EXPIRED_SIGNAL
+- paper_executor blocked because stale, but the lane derivation itself is valid
+
+DESIRED RESULT:
+When a fresh BTCUSDT 13m/44m long signal appears with entry_mode null:
+- derive entry_mode = ladder_close_50_618 through the same logic used by fresh_signal_router
+- normalize candidate lane_key
+- allow R142/R129 paper proof path to evaluate it as the watched unlocked lane
+- if fresh and otherwise eligible, paper proof capture can proceed
+- if stale, it must remain blocked as stale
+- no live execution
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance/account/balance/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not bypass protective policy.
+- Do not change live readiness gates to pass.
+- Do not widen watched lanes beyond R143 unlocked lanes.
+- Do not add shorts.
+- Do not add 4m/8m/22m/88m/222m/4H/55m lanes.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/signal_to_watcher_eligibility_trace.py
+- src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py if present
+- docs/hammer_radar/live_readiness/R144_SIGNAL_TO_WATCHER_ELIGIBILITY_TRACE.md
+
+REUSE / EXTEND:
+Reuse fresh_signal_router entry_mode derivation logic.
+Reuse R142 watched lane specs.
+Reuse R143 unlocked lane contract/status.
+Reuse R144 trace classification if helpful.
+Do not duplicate router rules in multiple places if avoidable.
+Prefer a small shared helper that normalizes signal/candidate into lane_key.
+
+IMPLEMENTATION OBJECTIVE:
+Introduce a shared safe candidate normalization helper used by:
+- fresh_signal_router if appropriate
+- R142 watcher loop
+- autonomous_paper_lane_executor_integration
+- R144 trace, if useful
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+
+Expose:
+- derive_entry_mode_for_signal
+- derive_lane_key_for_signal
+- normalize_signal_for_watched_lane
+- normalize_candidate_for_unlocked_watched_lanes
+- build_entry_mode_derivation_bridge_preview
+- build_entry_mode_derivation_bridge_status
+- append_entry_mode_derivation_bridge_record
+- load_entry_mode_derivation_bridge_records
+- summarize_entry_mode_derivation_bridge_records
+
+STATUS ENUM:
+- ENTRY_MODE_DERIVATION_BRIDGE_PREVIEW
+- ENTRY_MODE_DERIVATION_BRIDGE_READY
+- ENTRY_MODE_DERIVATION_BRIDGE_REJECTED
+- ENTRY_MODE_DERIVATION_BRIDGE_RECORDED
+- ENTRY_MODE_DERIVATION_BRIDGE_BLOCKED
+- ENTRY_MODE_DERIVATION_BRIDGE_ERROR
+
+NORMALIZATION RULES:
+1. Only normalize BTCUSDT signals/candidates.
+2. Only normalize lanes included in R143 unlocked contract or explicit CLI lane keys.
+3. Only normalize watched long lanes:
+   - 13m long
+   - 44m long
+4. If entry_mode already exists:
+   - preserve it.
+5. If entry_mode is null and symbol/timeframe/direction match unlocked watched lane:
+   - derive entry_mode = ladder_close_50_618
+   - derive lane_key = symbol|timeframe|direction|ladder_close_50_618
+   - mark derived_entry_mode = true
+   - mark derivation_source = "R145_ENTRY_MODE_DERIVATION_BRIDGE"
+6. If signal is stale:
+   - normalization may occur, but eligibility must remain blocked by freshness.
+7. If timeframe/direction not watched:
+   - do not normalize into a watched lane.
+8. Do not change raw log records in place.
+9. Do not mutate signals.ndjson or historical ledgers.
+10. Normalization is runtime/read-path only unless an explicit R145 bridge ledger record is requested.
+
+REQUIRED INTEGRATION:
+Patch R142 / R129-safe paper proof path so that when it evaluates recent signals/candidates:
+- it can use normalized lane_key / derived entry_mode for watched lanes
+- fresh_routed_count may become > 0 only for fresh normalized watched-lane signals
+- paper_eligible_decisions_count may become > 0 only if existing paper executor logic agrees
+- stale signals still block as stale
+- no proof is forced
+- no fake eligibility
+
+Patch R144 trace so it can report:
+- before_bridge_entry_mode
+- after_bridge_entry_mode
+- after_bridge_lane_key
+- bridge_would_match_watched_lane
+- bridge_would_still_block_reason if stale/not eligible
+
+CLI ARGS:
+For bridge preview/status:
+- --lane-key <lane_key>, repeated if parser supports it
+- --lane-keys <comma-separated>
+- --trace-all-unlocked-lanes
+- --latest-signals <int>, default 100, max 1000
+- --record-bridge
+- --confirm-bridge <phrase>
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM ENTRY MODE DERIVATION BRIDGE RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+This records the bridge diagnostic/status only.
+It does not authorize:
+- order placement
+- Binance call
+- live execution
+- env mutation
+- config mutation
+- global flag mutation
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "bridge_recorded": false,
+  "bridge_id": null,
+  "watched_lanes": [...],
+  "unlock_contract_status": {...},
+  "normalization_rules": {...},
+  "recent_signal_bridge_summary": {
+    "signals_checked": ...,
+    "would_normalize_count": ...,
+    "would_match_watched_lane_count": ...,
+    "would_remain_stale_count": ...,
+    "not_watched_count": ...
+  },
+  "normalized_signal_examples": [
+    {
+      "signal_id": "...",
+      "raw_entry_mode": null,
+      "derived_entry_mode": "ladder_close_50_618",
+      "derived_lane_key": "...",
+      "would_match_watched_lane": true,
+      "freshness_status_after_bridge": "FRESH|STALE|UNKNOWN",
+      "paper_eligible_after_bridge": true/false/null,
+      "blocked_reason_after_bridge": "..."
+    }
+  ],
+  "r142_effect_preview": {
+    "expected_change": "fresh signals can be evaluated against watched lane keys",
+    "does_not_force_paper_proof": true,
+    "does_not_bypass_freshness": true
+  },
+  "best_next_engineering_move": "...",
+  "recommended_next_commands": [...],
+  "record_bridge_requested": false,
+  "confirmation_valid": false,
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/entry_mode_derivation_bridge_records.ndjson
+
+Record:
+- event_type: ENTRY_MODE_DERIVATION_BRIDGE
+- bridge_id
+- recorded_at_utc
+- status
+- watched_lanes
+- normalization_rules
+- recent_signal_bridge_summary
+- normalized_signal_examples
+- r142_effect_preview
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+entry-mode-derivation-bridge
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  entry-mode-derivation-bridge \
+  --trace-all-unlocked-lanes
+
+Record bridge diagnostic:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  entry-mode-derivation-bridge \
+  --trace-all-unlocked-lanes \
+  --record-bridge \
+  --confirm-bridge "I CONFIRM ENTRY MODE DERIVATION BRIDGE RECORDING ONLY; NO ORDER; NO BINANCE CALL."
+
+Post-bridge R144 preview should show the missing-entry-mode gap reduced or clarified with bridge status:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  | jq '.aggregate_gap_counts, .best_next_engineering_move, .signal_traces[0:5]'
+
+Post-bridge R142 preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  | jq '.status, .watched_lanes, .final_lane_statuses, .next_operator_move, .safety'
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R145_ENTRY_MODE_DERIVATION_BRIDGE.md
+
+Explain:
+- why R145 exists
+- R144 findings
+- runtime normalization rules
+- why this does not bypass freshness
+- why this does not create paper proof directly
+- why this does not authorize live execution
+- commands
+- expected post-R145 behavior
+
+UPDATE PHASE INDEX:
+Update docs/hammer_radar/live_readiness/PHASE_INDEX.md with R145.
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R146_POST_BRIDGE_WATCHER_PROOF_CAPTURE_RECHECK.md
+
+R146 should:
+- rerun R142 watcher after R145 bridge
+- confirm fresh normalized watched lane candidates are now visible when conditions occur
+- if fresh + eligible, capture paper proof through R129/R140
+- if stale, report stale only
+- no Binance
+- no live execution
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_entry_mode_derivation_bridge.py
+
+Update related tests if integration touches them:
+- tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- tests/hammer_radar/test_autonomous_paper_lane_executor_integration.py if present
+
+Test:
+- preview writes no bridge record
+- wrong confirmation rejects recording
+- exact confirmation records bridge diagnostic only
+- null entry_mode for BTCUSDT 13m long normalizes to ladder_close_50_618 watched lane
+- null entry_mode for BTCUSDT 44m long normalizes to ladder_close_50_618 watched lane
+- non-watched timeframe does not normalize into watched lane
+- watched timeframe but short direction does not normalize into long watched lane
+- existing entry_mode is preserved
+- stale signal remains stale after normalization
+- normalization does not create paper proof directly
+- R142/R129 integration can consume normalized lane key for fresh eligible mocked candidate
+- R144 trace includes after_bridge fields
+- safety flags always false
+- no Binance/order/payload/network/env/config/global mutation
+- ledger append-only
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/entry_mode_derivation_bridge.py \
+  src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py \
+  src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py \
+  src/app/hammer_radar/operator/signal_to_watcher_eligibility_trace.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_entry_mode_derivation_bridge.py
+
+Run focused related tests:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py \
+  tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Bridge preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  entry-mode-derivation-bridge \
+  --trace-all-unlocked-lanes \
+  | jq '.status, .watched_lanes, .recent_signal_bridge_summary, .normalized_signal_examples[0:5], .r142_effect_preview, .safety'
+
+R144 after bridge:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  | jq '.status, .aggregate_gap_counts, .best_next_engineering_move, .signal_traces[0:3], .safety'
+
+R142 preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  | jq '.status, .watched_lanes, .final_lane_statuses, .next_operator_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  entry-mode-derivation-bridge \
+  --trace-all-unlocked-lanes \
+  --record-bridge \
+  --confirm-bridge "wrong" \
+  | jq '.status, .confirmation_valid, .bridge_recorded, .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Bridge helper added:
+Integration surfaces patched:
+R144 after-bridge fields:
+R142/R129 normalization effect:
+CLI command added:
+Ledger used:
+R145 doc created:
+R146 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not widen lanes.
+Do not add shorts.
+Do not bypass freshness.
+Do not create paper proof directly.
+Do not expand into live execution.
+Do not perform live trading actions.
