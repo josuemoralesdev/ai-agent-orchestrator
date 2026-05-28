@@ -1515,6 +1515,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-lane-unlock-contract":
+        from src.app.hammer_radar.operator.tiny_live_lane_unlock_contract import (
+            build_lane_unlock_contract,
+            format_tiny_live_lane_unlock_contract_json,
+        )
+
+        print(
+            format_tiny_live_lane_unlock_contract_json(
+                build_lane_unlock_contract(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    unlock_all_recommended_lanes=args.unlock_all_recommended_lanes,
+                    record_unlock_contract=args.record_unlock_contract,
+                    confirm_unlock_contract=args.confirm_unlock_contract,
+                    apply_lane_mode_if_safe=args.apply_lane_mode_if_safe,
+                    status_only=args.status_only,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2350,6 +2370,18 @@ def _build_parser() -> argparse.ArgumentParser:
     fresh_candidate_watch_parser.add_argument("--run-watch-loop", action="store_true")
     fresh_candidate_watch_parser.add_argument("--record-watch", action="store_true")
     fresh_candidate_watch_parser.add_argument("--confirm-watch-loop", default=None)
+
+    tiny_live_lane_unlock_parser = subparsers.add_parser(
+        "tiny-live-lane-unlock-contract",
+        parents=[parent],
+    )
+    tiny_live_lane_unlock_parser.add_argument("--lane-key", action="append", default=None)
+    tiny_live_lane_unlock_parser.add_argument("--lane-keys", default=None)
+    tiny_live_lane_unlock_parser.add_argument("--unlock-all-recommended-lanes", action="store_true")
+    tiny_live_lane_unlock_parser.add_argument("--record-unlock-contract", action="store_true")
+    tiny_live_lane_unlock_parser.add_argument("--confirm-unlock-contract", default=None)
+    tiny_live_lane_unlock_parser.add_argument("--apply-lane-mode-if-safe", action="store_true")
+    tiny_live_lane_unlock_parser.add_argument("--status-only", action="store_true")
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
