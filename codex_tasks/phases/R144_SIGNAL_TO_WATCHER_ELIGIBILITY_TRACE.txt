@@ -1,0 +1,432 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R144 Signal-to-Watcher Eligibility Trace
+
+BRANCH:
+r144-signal-to-watcher-eligibility-trace
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Build a trace tool that explains why visible BTCUSDT signals do or do not become R142 watcher-eligible paper proof candidates.
+
+The operator has now recorded R143 tiny-live lane unlock contract:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+Execution state:
+- UNLOCKED_WAITING_FOR_CONDITIONS
+
+But R142 watcher still times out because:
+- fresh_routed_count = 0
+- paper_eligible_decisions_count = 0
+- visible signals exist in signals.ndjson
+- many visible signal records have entry_mode = null
+- paper scan surface may show BTCUSDT high-priority watches that do not match watched lane keys
+
+R144 must answer:
+Why did a visible signal not become a watcher-eligible lane candidate?
+
+This is a trace/audit phase only.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance/account/balance/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not enable global live execution.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not alter global live gates.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CURRENT VERIFIED FACTS:
+Recent signals included:
+- BTCUSDT 13m long with entry_mode null
+- BTCUSDT 44m long with entry_mode null
+- BTCUSDT 13m short with entry_mode null
+- BTCUSDT 44m short with entry_mode null
+R142 watches:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+R142 final status:
+- FRESH_CANDIDATE_WATCH_TIMEOUT
+- 180 iterations
+- paper_proof_captured false
+- fresh_routed_count 0
+- paper_eligible_decisions_count 0
+R143 status:
+- UNLOCKED_WAITING_FOR_CONDITIONS
+- unlock contract id is visible after R143.1
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/lane_autonomy_control_loop.py
+- src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson usage patterns
+- logs/hammer_radar_forward/fresh_candidate_paper_proof_capture_loop.ndjson usage patterns
+- tests/hammer_radar/
+- docs/hammer_radar/live_readiness/
+
+REUSE / EXTEND:
+Reuse existing readers/parsers if available.
+Reuse R142 watched lane specs.
+Reuse R143 unlock contract status.
+Reuse fresh router and paper executor preview logic.
+Do not duplicate eligibility logic if a builder already exposes it.
+Do not change eligibility rules in R144.
+Do not patch router behavior in this phase.
+Trace first. Patch later only after trace proves exact defect.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/signal_to_watcher_eligibility_trace.py
+
+Expose:
+- build_signal_to_watcher_eligibility_trace
+- load_recent_signal_records
+- load_recent_paper_scan_records
+- build_unlocked_watched_lane_context
+- match_signals_to_watched_lanes
+- trace_signal_entry_mode_derivation
+- trace_signal_to_paper_scan
+- trace_signal_to_fresh_router
+- trace_signal_to_paper_executor
+- trace_signal_to_watcher_consumption
+- classify_signal_watcher_gap
+- build_signal_trace_summary
+- append_signal_to_watcher_trace_record
+- load_signal_to_watcher_trace_records
+- summarize_signal_to_watcher_traces
+
+STATUS ENUM:
+- SIGNAL_WATCHER_TRACE_READY
+- SIGNAL_WATCHER_TRACE_REJECTED
+- SIGNAL_WATCHER_TRACE_RECORDED
+- SIGNAL_WATCHER_TRACE_BLOCKED
+- SIGNAL_WATCHER_TRACE_ERROR
+
+GAP CLASSIFICATION ENUM:
+- SIGNAL_MATCHES_WATCHED_LANE_AND_ELIGIBLE
+- SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING
+- SIGNAL_MATCHES_TIMEFRAME_DIRECTION_BUT_ENTRY_MODE_MISMATCH
+- SIGNAL_TIMEFRAME_NOT_WATCHED
+- SIGNAL_DIRECTION_NOT_WATCHED
+- SIGNAL_SYMBOL_NOT_WATCHED
+- SIGNAL_STALE_BY_WATCHER_RULES
+- SIGNAL_NOT_FOUND_IN_PAPER_SCAN
+- SIGNAL_FOUND_IN_SCAN_BUT_NOT_ROUTED
+- SIGNAL_ROUTED_BUT_NOT_PAPER_ELIGIBLE
+- SIGNAL_BLOCKED_BY_PAPER_EXECUTOR
+- SIGNAL_BLOCKED_BY_UNLOCK_CONTRACT_ABSENCE
+- SIGNAL_BLOCKED_BY_LANE_MODE
+- SIGNAL_BLOCKED_BY_UNKNOWN_REASON
+
+DEFAULT TRACE SCOPE:
+- latest 100 signals
+- latest 200 paper scans
+- watched unlocked lanes from R143 status
+- fallback watched lanes:
+  - BTCUSDT|13m|long|ladder_close_50_618
+  - BTCUSDT|44m|long|ladder_close_50_618
+
+CLI ARGS:
+- --lane-key <lane_key>, repeated if parser supports it
+- --lane-keys <comma-separated>
+- --trace-all-unlocked-lanes
+- --latest-signals <int>, default 100, max 1000
+- --latest-scans <int>, default 200, max 5000
+- --signal-id <signal_id>, optional specific signal trace
+- --record-trace
+- --confirm-trace <phrase>
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM SIGNAL TO WATCHER TRACE RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+This records the trace only.
+It does not authorize:
+- order placement
+- Binance call
+- live execution
+- lane config mutation
+- env mutation
+- global flag mutation
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "trace_recorded": false,
+  "trace_id": null,
+  "trace_scope": {...},
+  "unlock_contract_status": {...},
+  "watched_lanes": [...],
+  "latest_signal_summary": {...},
+  "paper_scan_summary": {...},
+  "signal_traces": [
+    {
+      "signal_id": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "13m",
+      "direction": "long",
+      "entry_mode": null,
+      "matched_watched_lane_keys": [],
+      "possible_watched_lane_keys": [...],
+      "paper_scan_match": {...},
+      "fresh_router_match": {...},
+      "paper_executor_match": {...},
+      "watcher_consumption_match": {...},
+      "gap_classification": "...",
+      "why_not_watcher_eligible": "...",
+      "next_fix_hint": "..."
+    }
+  ],
+  "aggregate_gap_counts": {...},
+  "best_next_engineering_move": "...",
+  "recommended_next_commands": [...],
+  "record_trace_requested": false,
+  "confirmation_valid": false,
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+TRACE LOGIC REQUIREMENTS:
+For every recent signal:
+1. Parse symbol/timeframe/direction/entry_mode/signal_id.
+2. Compare against watched lane specs:
+   - symbol exact
+   - timeframe exact
+   - direction exact
+   - entry_mode exact
+3. If entry_mode is null:
+   - classify as SIGNAL_MATCHES_WATCHED_LANE_BUT_ENTRY_MODE_MISSING if symbol/timeframe/direction match a watched lane but entry_mode missing.
+4. Search recent paper scans for same symbol/timeframe/direction near same timestamp when possible.
+5. Check whether scan had entry_mode, paper_eligible, blockers, score, tier.
+6. Call fresh router / paper executor preview if safe and available to compare current status.
+7. Explain exactly why watcher ignored it.
+8. Provide next_fix_hint.
+
+IMPORTANT:
+Do not change any production logic in R144.
+Only add trace/reporting.
+
+EXPECTED LIKELY FINDING:
+Signals may exist for BTCUSDT 13m/44m long, but entry_mode may be null, so they do not match:
+BTCUSDT|13m|long|ladder_close_50_618
+BTCUSDT|44m|long|ladder_close_50_618
+
+If confirmed, best_next_engineering_move should recommend:
+R145 Entry Mode Derivation Bridge / Paper Scan Candidate Normalization
+
+LEDGER:
+Use append-only NDJSON:
+logs/hammer_radar_forward/signal_to_watcher_eligibility_traces.ndjson
+
+Record:
+- event_type: SIGNAL_TO_WATCHER_ELIGIBILITY_TRACE
+- trace_id
+- recorded_at_utc
+- status
+- watched_lanes
+- trace_scope
+- aggregate_gap_counts
+- signal_traces
+- best_next_engineering_move
+- recommended_next_commands
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+signal-to-watcher-eligibility-trace
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes
+
+Specific signal:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  --signal-id "BTCUSDT|44m|long|2026-05-28T12:39:59.999000+00:00"
+
+Record trace:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  --record-trace \
+  --confirm-trace "I CONFIRM SIGNAL TO WATCHER TRACE RECORDING ONLY; NO ORDER; NO BINANCE CALL."
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R144_SIGNAL_TO_WATCHER_ELIGIBILITY_TRACE.md
+
+Explain:
+- why R144 exists
+- difference between visible signal and watcher-eligible lane candidate
+- current unlocked lanes
+- trace surfaces
+- gap classifications
+- commands
+- how this prepares R145
+
+UPDATE PHASE INDEX:
+Update docs/hammer_radar/live_readiness/PHASE_INDEX.md with R144.
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R145_ENTRY_MODE_DERIVATION_BRIDGE.md
+
+R145 should fix the exact gap R144 identifies, likely:
+- derive/attach entry_mode for eligible BTCUSDT 13m/44m signals
+- normalize paper scan candidates into lane keys
+- ensure fresh router emits watched lane candidates when timeframe/direction/entry logic match
+- no live execution
+- no Binance calls
+- no env/global mutation
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py
+
+Test:
+- preview writes no trace
+- wrong confirmation rejects recording
+- exact confirmation records trace only
+- unlocked lanes are read from R143 status when available
+- fallback lanes work if no contract exists
+- signal matching watched lane with null entry_mode classifies as ENTRY_MODE_MISSING
+- signal with non-watched timeframe classifies as TIMEFRAME_NOT_WATCHED
+- signal with non-watched direction classifies as DIRECTION_NOT_WATCHED
+- signal with exact lane key classifies as eligible or next surface-dependent classification
+- aggregate_gap_counts are included
+- best_next_engineering_move is included
+- ledger append-only
+- CLI exists
+- no Binance/order/payload/network/env/config/global mutation
+- safety flags always false
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/signal_to_watcher_eligibility_trace.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  | jq '.status, .watched_lanes, .aggregate_gap_counts, .best_next_engineering_move, .signal_traces[0:5], .safety'
+
+Specific recent 44m long signal:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  --signal-id "BTCUSDT|44m|long|2026-05-28T12:39:59.999000+00:00" \
+  | jq '.status, .signal_traces, .aggregate_gap_counts, .best_next_engineering_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-to-watcher-eligibility-trace \
+  --trace-all-unlocked-lanes \
+  --record-trace \
+  --confirm-trace "wrong" \
+  | jq '.status, .confirmation_valid, .trace_recorded, .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Trace tool added:
+Watched lanes traced:
+CLI command added:
+Ledger used:
+R144 doc created:
+R145 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Aggregate gap counts:
+Best next engineering move:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not change router behavior.
+Do not change signal eligibility.
+Do not expand into live execution.
+Do not perform live trading actions.
