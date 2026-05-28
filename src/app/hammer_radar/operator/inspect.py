@@ -1575,6 +1575,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "post-bridge-watcher-proof-capture-recheck":
+        from src.app.hammer_radar.operator.post_bridge_watcher_proof_capture_recheck import (
+            build_post_bridge_watcher_proof_capture_recheck,
+            format_post_bridge_watcher_proof_capture_recheck_json,
+        )
+
+        print(
+            format_post_bridge_watcher_proof_capture_recheck_json(
+                build_post_bridge_watcher_proof_capture_recheck(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    trace_all_unlocked_lanes=args.trace_all_unlocked_lanes,
+                    latest_signals=args.latest_signals,
+                    record_recheck=args.record_recheck,
+                    confirm_post_bridge_recheck=args.confirm_post_bridge_recheck,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2446,6 +2465,17 @@ def _build_parser() -> argparse.ArgumentParser:
     entry_mode_derivation_bridge_parser.add_argument("--latest-signals", type=int, default=100)
     entry_mode_derivation_bridge_parser.add_argument("--record-bridge", action="store_true")
     entry_mode_derivation_bridge_parser.add_argument("--confirm-bridge", default=None)
+
+    post_bridge_recheck_parser = subparsers.add_parser(
+        "post-bridge-watcher-proof-capture-recheck",
+        parents=[parent],
+    )
+    post_bridge_recheck_parser.add_argument("--lane-key", action="append", default=None)
+    post_bridge_recheck_parser.add_argument("--lane-keys", default=None)
+    post_bridge_recheck_parser.add_argument("--trace-all-unlocked-lanes", action="store_true")
+    post_bridge_recheck_parser.add_argument("--latest-signals", type=int, default=100)
+    post_bridge_recheck_parser.add_argument("--record-recheck", action="store_true")
+    post_bridge_recheck_parser.add_argument("--confirm-post-bridge-recheck", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
