@@ -24,7 +24,6 @@ from src.app.hammer_radar.operator.tiny_live_lane_unlock_contract import (
     UNLOCKED_WAITING_FOR_CONDITIONS,
     build_default_unlock_lane_specs,
     build_lane_unlock_contract,
-    build_lane_unlock_status,
     build_tiny_live_lane_unlock_contract_preview,
     load_lane_unlock_contract_records,
 )
@@ -155,12 +154,21 @@ class TinyLiveLaneUnlockContractTests(unittest.TestCase):
             confirm_unlock_contract=CONFIRM_TINY_LIVE_LANE_UNLOCK_CONTRACT_PHRASE,
             now=self.now,
         )
-        status = build_lane_unlock_status(log_dir=self.log_dir, now=self.now)
+        status = build_lane_unlock_contract(log_dir=self.log_dir, status_only=True, now=self.now)
 
         self.assertEqual(UNLOCKED_WAITING_FOR_CONDITIONS, status["status"])
+        self.assertEqual(UNLOCKED_WAITING_FOR_CONDITIONS, status["execution_state"])
         self.assertEqual(second["unlock_contract_id"], status["unlock_contract_id"])
+        self.assertEqual(second["unlock_contract_id"], status["latest_contract_id"])
         self.assertNotEqual(first["unlock_contract_id"], status["unlock_contract_id"])
         self.assertEqual([SECONDARY_UNLOCK_LANE], [lane["lane_key"] for lane in status["lanes"]])
+        self.assertTrue(status["lanes"])
+        self.assertFalse(status["safety"]["order_placed"])
+        self.assertFalse(status["safety"]["real_order_placed"])
+        self.assertFalse(status["safety"]["execution_attempted"])
+        self.assertFalse(status["safety"]["order_payload_created"])
+        self.assertFalse(status["safety"]["executable_payload_created"])
+        self.assertFalse(status["safety"]["signed_request_created"])
 
     def test_ledger_append_only(self) -> None:
         for lane_key in (PRIMARY_UNLOCK_LANE, SECONDARY_UNLOCK_LANE):

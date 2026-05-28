@@ -423,6 +423,7 @@ def _status_payload(
         "lanes": [_normalize_lane_record(lane) for lane in lanes],
         "unlock_contract_recorded": bool(unlock_contract_recorded),
         "unlock_contract_id": unlock_contract_id,
+        "latest_contract_id": unlock_contract_id,
         "execution_state": execution_state,
         "operator_intent_valid": bool(operator_intent_valid),
         "confirmation_valid": bool(confirmation_valid),

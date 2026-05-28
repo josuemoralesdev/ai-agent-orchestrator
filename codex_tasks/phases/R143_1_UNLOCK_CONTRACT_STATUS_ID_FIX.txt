@@ -1,0 +1,75 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow AGENTS.md and codex_tasks/CODEX_RULES.md.
+
+PHASE:
+R143.1 Unlock Contract Status ID Fix
+
+BRANCH:
+r143-1-unlock-contract-status-id-fix
+
+GOAL:
+Fix tiny-live-lane-unlock-contract --status-only so it surfaces the latest unlock contract id correctly.
+
+CURRENT BUG:
+After recording a contract, record output returns:
+unlock_contract_id = tiny_live_lane_unlock_...
+
+But status-only returns:
+latest_contract_id = null
+
+while execution_state is correctly UNLOCKED_WAITING_FOR_CONDITIONS.
+
+REQUIRED FIX:
+In:
+src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+
+Ensure status-only/latest status output includes:
+- latest_contract_id or unlock_contract_id populated from latest ledger record
+- execution_state remains UNLOCKED_WAITING_FOR_CONDITIONS
+- lanes populated from latest contract
+- safety unchanged
+
+Update tests:
+tests/hammer_radar/test_tiny_live_lane_unlock_contract.py
+
+Add/adjust test:
+- exact confirmation records contract
+- status-only reads latest contract
+- latest_contract_id equals recorded unlock_contract_id
+- lanes are populated
+- safety flags remain false
+
+NON-NEGOTIABLES:
+- No orders.
+- No Binance.
+- No payloads.
+- No signed requests.
+- No env mutation.
+- No global live flag mutation.
+- No config mutation.
+- Do not touch AGENTS.md.
+- Do not commit/merge/tag.
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_tiny_live_lane_unlock_contract.py
+
+Smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-lane-unlock-contract \
+  --status-only \
+  | jq '.status, .execution_state, .latest_contract_id, .lanes, .safety'
+
+REPORT:
+Files modified:
+Tests run:
+Smoke summary:
+Safety result:
