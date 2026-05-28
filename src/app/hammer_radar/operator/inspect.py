@@ -1535,6 +1535,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "signal-to-watcher-eligibility-trace":
+        from src.app.hammer_radar.operator.signal_to_watcher_eligibility_trace import (
+            build_signal_to_watcher_eligibility_trace,
+            format_signal_to_watcher_eligibility_trace_json,
+        )
+
+        print(
+            format_signal_to_watcher_eligibility_trace_json(
+                build_signal_to_watcher_eligibility_trace(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    trace_all_unlocked_lanes=args.trace_all_unlocked_lanes,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    signal_id=args.signal_id,
+                    record_trace=args.record_trace,
+                    confirm_trace=args.confirm_trace,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2382,6 +2403,19 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_lane_unlock_parser.add_argument("--confirm-unlock-contract", default=None)
     tiny_live_lane_unlock_parser.add_argument("--apply-lane-mode-if-safe", action="store_true")
     tiny_live_lane_unlock_parser.add_argument("--status-only", action="store_true")
+
+    signal_to_watcher_trace_parser = subparsers.add_parser(
+        "signal-to-watcher-eligibility-trace",
+        parents=[parent],
+    )
+    signal_to_watcher_trace_parser.add_argument("--lane-key", action="append", default=None)
+    signal_to_watcher_trace_parser.add_argument("--lane-keys", default=None)
+    signal_to_watcher_trace_parser.add_argument("--trace-all-unlocked-lanes", action="store_true")
+    signal_to_watcher_trace_parser.add_argument("--latest-signals", type=int, default=100)
+    signal_to_watcher_trace_parser.add_argument("--latest-scans", type=int, default=200)
+    signal_to_watcher_trace_parser.add_argument("--signal-id", default=None)
+    signal_to_watcher_trace_parser.add_argument("--record-trace", action="store_true")
+    signal_to_watcher_trace_parser.add_argument("--confirm-trace", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
