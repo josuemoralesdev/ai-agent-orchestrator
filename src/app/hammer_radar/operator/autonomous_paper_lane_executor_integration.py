@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.autonomous_paper_lane_execution import (
     load_paper_lane_executions,
 )
 from src.app.hammer_radar.operator.fresh_signal_router import ROUTED_TO_LANE
+from src.app.hammer_radar.operator.entry_mode_derivation_bridge import normalize_candidates_for_lane_key
 from src.app.hammer_radar.operator.lane_autonomy_control_loop import (
     ARMED_DRY_RUN_INTENT,
     BLOCKED,
@@ -70,6 +71,7 @@ PAPER_EXECUTOR_INTEGRATION_SAFETY = {
 }
 SOURCE_SURFACES_USED = [
     "operator.lane_autonomy_scheduler.run_lane_autonomy_scheduler_once",
+    "operator.entry_mode_derivation_bridge.normalize_candidates_for_lane_key",
     "operator.lane_autonomy_control_loop autonomy decisions",
     "operator.autonomous_paper_lane_execution.build_paper_execution_from_routed_candidate",
     "operator.autonomous_paper_lane_execution.append_paper_lane_execution",
@@ -181,6 +183,11 @@ def run_autonomous_paper_lane_executor_once(
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     controls = load_lane_controls(config_path)
     selected_lane_keys = _selected_lane_keys(controls, lane_key=lane_key, all_lanes=all_lanes)
+    scheduler_candidates = (
+        normalize_candidates_for_lane_key(list(candidates), lane_key=lane_key, now=generated_at)
+        if candidates is not None and lane_key
+        else candidates
+    )
     confirmation_valid = confirm_paper_integration == CONFIRM_PAPER_INTEGRATION_PHRASE
     recording_allowed = bool(record_paper and confirmation_valid)
     scheduler_status = run_lane_autonomy_scheduler_once(
@@ -191,7 +198,7 @@ def run_autonomous_paper_lane_executor_once(
         lane_key=lane_key,
         all_lanes=all_lanes,
         confirm_scheduler_record=CONFIRM_AUTONOMY_SCHEDULER_RECORDING_PHRASE if recording_allowed else None,
-        candidates=candidates,
+        candidates=scheduler_candidates,
         now=generated_at,
         live_eligibility_matrix=live_eligibility_matrix,
         global_gate=global_gate,

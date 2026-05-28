@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.archive import get_log_dir, get_signals_path, load_signals
 from src.app.hammer_radar.operator.autonomous_lane_live_ready_burn_down import (
     DEFAULT_LANE_KEY,
     SAFETY as R138_SAFETY,
@@ -27,6 +27,7 @@ from src.app.hammer_radar.operator.autonomous_paper_lane_executor_integration im
     run_autonomous_paper_lane_executor_once,
 )
 from src.app.hammer_radar.operator.fresh_signal_router import build_fresh_signal_router_status
+from src.app.hammer_radar.operator.entry_mode_derivation_bridge import normalize_candidates_for_lane_key
 from src.app.hammer_radar.operator.lane_autonomy_scheduler import run_lane_autonomy_scheduler_once
 from src.app.hammer_radar.operator.operator_executes_safe_clearing_pack import (
     CONFIRM_SAFE_CLEARING_PHRASE,
@@ -79,6 +80,7 @@ SAFETY = {
 
 SOURCE_SURFACES_USED = [
     "operator.fresh_signal_router.build_fresh_signal_router_status",
+    "operator.entry_mode_derivation_bridge.normalize_candidates_for_lane_key",
     "operator.lane_autonomy_scheduler.run_lane_autonomy_scheduler_once",
     "operator.autonomous_paper_lane_executor_integration.run_autonomous_paper_lane_executor_once",
     "operator.post_clearing_live_ready_recheck.build_post_clearing_live_ready_recheck",
@@ -342,12 +344,14 @@ def collect_watcher_iteration_snapshot(
 ) -> dict[str, Any]:
     generated_at = now or datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
-    router = build_fresh_signal_router_status(log_dir=resolved_log_dir, now=generated_at)
+    candidates = _normalized_watcher_candidates(log_dir=resolved_log_dir, lane_key=lane_key, now=generated_at)
+    router = build_fresh_signal_router_status(log_dir=resolved_log_dir, candidates=candidates, now=generated_at)
     scheduler = run_lane_autonomy_scheduler_once(
         log_dir=resolved_log_dir,
         record_tick=False,
         record_decisions=False,
         lane_key=lane_key,
+        candidates=candidates,
         now=generated_at,
     )
     paper = run_autonomous_paper_lane_executor_once(
@@ -356,6 +360,7 @@ def collect_watcher_iteration_snapshot(
         record_scheduler_tick=False,
         record_decisions=False,
         lane_key=lane_key,
+        candidates=candidates,
         now=generated_at,
     )
     r141 = build_post_clearing_live_ready_recheck(
@@ -382,6 +387,13 @@ def collect_watcher_iteration_snapshot(
             "source_surfaces_used": _source_surfaces(router, scheduler, paper, r141, burn_down),
         }
     )
+
+
+def _normalized_watcher_candidates(*, log_dir: Path, lane_key: str, now: datetime) -> list[dict[str, Any]] | None:
+    source_path = get_signals_path(log_dir)
+    if not source_path.exists():
+        return None
+    return normalize_candidates_for_lane_key(load_signals(log_dir), lane_key=lane_key, now=now)
 
 
 def evaluate_watcher_iteration(snapshot: Mapping[str, Any]) -> dict[str, Any]:
