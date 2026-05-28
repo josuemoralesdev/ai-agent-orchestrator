@@ -1,0 +1,334 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R146 Post-Bridge Watcher Proof Capture Recheck
+
+BRANCH:
+r146-post-bridge-watcher-proof-capture-recheck
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Recheck R142 watcher proof capture behavior after R145 entry-mode derivation bridge.
+
+R145 fixed the signal-to-watcher gap where BTCUSDT 13m/44m long signals had entry_mode null but could be safely normalized into:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+R146 must verify that:
+1. normalized watched-lane candidates are visible to watcher/paper proof logic,
+2. stale candidates remain blocked,
+3. fresh eligible normalized candidates can trigger the safe R129/R140 paper proof path,
+4. no live execution occurs.
+
+This phase must not place orders.
+
+CURRENT VERIFIED STATE:
+R143 recorded tiny-live lane unlock contract:
+- execution_state: UNLOCKED_WAITING_FOR_CONDITIONS
+- lanes: 13m long and 44m long ladder_close_50_618
+
+R145 recorded bridge:
+- status: ENTRY_MODE_DERIVATION_BRIDGE_RECORDED
+- would_normalize_count: 10
+- would_match_watched_lane_count: 10
+- would_remain_stale_count: 10
+- does_not_bypass_freshness: true
+- does_not_force_paper_proof: true
+- safety clean
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance/account/balance/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate lane config.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not widen lanes.
+- Do not add shorts.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/operator_executes_safe_clearing_pack.py
+- src/app/hammer_radar/operator/signal_to_watcher_eligibility_trace.py
+- src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+- src/app/hammer_radar/operator/autonomous_lane_live_ready_burn_down.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_entry_mode_derivation_bridge.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- tests/hammer_radar/test_signal_to_watcher_eligibility_trace.py
+- docs/hammer_radar/live_readiness/R145_ENTRY_MODE_DERIVATION_BRIDGE.md
+
+REUSE / EXTEND:
+Reuse R145 normalization bridge.
+Reuse R142 watcher loop.
+Reuse R129/R140 safe paper proof capture path.
+Reuse R143 unlock status.
+Reuse R144 trace status.
+Do not duplicate eligibility logic.
+Do not add live execution.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/post_bridge_watcher_proof_capture_recheck.py
+
+Expose:
+- build_post_bridge_watcher_proof_capture_recheck
+- collect_post_bridge_watcher_state
+- evaluate_normalized_candidate_visibility
+- evaluate_post_bridge_paper_capture_readiness
+- build_post_bridge_safe_watch_command
+- build_post_bridge_recheck_summary
+- append_post_bridge_recheck_record
+- load_post_bridge_recheck_records
+- summarize_post_bridge_rechecks
+
+STATUS ENUM:
+- POST_BRIDGE_RECHECK_READY
+- POST_BRIDGE_RECHECK_REJECTED
+- POST_BRIDGE_RECHECK_RECORDED
+- POST_BRIDGE_RECHECK_BLOCKED
+- POST_BRIDGE_RECHECK_ERROR
+
+DECISION ENUM:
+next_operator_move:
+- RUN_R142_WATCHER
+- CAPTURE_PAPER_PROOF_AVAILABLE
+- WAIT_FOR_FRESH_NORMALIZED_CANDIDATE
+- RERUN_R145_TRACE
+- STOP_SAFETY_BLOCK
+- BUILD_R147_AFTER_PAPER_PROOF_RECHECK
+
+DECISION RULES:
+- If safety violation exists: STOP_SAFETY_BLOCK.
+- If R145 bridge not recorded or unavailable: RERUN_R145_TRACE.
+- If normalized watched-lane candidates exist but all stale: WAIT_FOR_FRESH_NORMALIZED_CANDIDATE.
+- If a fresh normalized watched-lane candidate exists but no proof captured: RUN_R142_WATCHER or CAPTURE_PAPER_PROOF_AVAILABLE.
+- If paper proof captured: BUILD_R147_AFTER_PAPER_PROOF_RECHECK.
+- If no normalized candidates exist in latest window: RUN_R142_WATCHER.
+
+REQUIRED OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "trace_recorded": false,
+  "recheck_id": null,
+  "unlock_contract_status": {...},
+  "bridge_status": {...},
+  "watched_lanes": [...],
+  "normalized_candidate_visibility": {
+    "signals_checked": ...,
+    "normalized_watched_lane_count": ...,
+    "fresh_normalized_count": ...,
+    "stale_normalized_count": ...,
+    "examples": [...]
+  },
+  "paper_capture_readiness": {
+    "paper_proof_captured": false,
+    "paper_eligible_decisions_count": ...,
+    "paper_blocked_decisions_count": ...,
+    "top_blockers": [...]
+  },
+  "next_operator_move": "...",
+  "why": "...",
+  "recommended_commands": [...],
+  "do_not_run_yet": [...],
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "safety": {
+    "order_placed": false,
+    "real_order_placed": false,
+    "execution_attempted": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "protective_payload_created": false,
+    "signed_request_created": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false,
+    "binance_test_order_endpoint_called": false,
+    "protective_order_endpoint_called": false,
+    "secrets_shown": false,
+    "paper_live_separation_intact": true,
+    "env_mutated": false,
+    "config_written": false,
+    "global_live_flags_changed": false
+  },
+  "source_surfaces_used": [...]
+}
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM POST BRIDGE WATCHER RECHECK RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+LEDGER:
+logs/hammer_radar_forward/post_bridge_watcher_proof_capture_rechecks.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+post-bridge-watcher-proof-capture-recheck
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-bridge-watcher-proof-capture-recheck \
+  --trace-all-unlocked-lanes
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-bridge-watcher-proof-capture-recheck \
+  --trace-all-unlocked-lanes \
+  --record-recheck \
+  --confirm-post-bridge-recheck "I CONFIRM POST BRIDGE WATCHER RECHECK RECORDING ONLY; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE WATCH COMMAND IN OUTPUT:
+If next_operator_move is RUN_R142_WATCHER or WAIT_FOR_FRESH_NORMALIZED_CANDIDATE, include a recommended command like:
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 60 \
+  --sleep-seconds 60 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL."
+
+Do not include Binance/order/global flag commands.
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R146_POST_BRIDGE_WATCHER_PROOF_CAPTURE_RECHECK.md
+
+Explain:
+- why R146 follows R145
+- what changed after the bridge
+- why stale remains blocked
+- how to run R142 safely after the bridge
+- what result leads to R147
+- no live execution
+
+UPDATE PHASE INDEX:
+Update docs/hammer_radar/live_readiness/PHASE_INDEX.md with R146.
+
+REQUIRED FUTURE TASK:
+Create:
+codex_tasks/phases/R147_AFTER_PAPER_PROOF_LIVE_READY_RECHECK.md
+
+R147 should only run after paper proof is captured:
+- re-evaluate R126/R130/protective/global gates
+- confirm unlocked lanes are still unlocked
+- prepare tiny-live condition-ready review
+- no Binance
+- no order placement
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_post_bridge_watcher_proof_capture_recheck.py
+
+Test:
+- preview writes no recheck
+- wrong confirmation rejects record
+- exact confirmation records recheck only
+- if R145 bridge missing -> RERUN_R145_TRACE
+- stale normalized candidates -> WAIT_FOR_FRESH_NORMALIZED_CANDIDATE
+- fresh normalized mocked candidate -> RUN_R142_WATCHER or CAPTURE_PAPER_PROOF_AVAILABLE
+- captured proof mocked -> BUILD_R147_AFTER_PAPER_PROOF_RECHECK
+- recommended commands are safe only
+- safety flags always false
+- no Binance/order/payload/network/env/config/global mutation
+- ledger append-only
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/post_bridge_watcher_proof_capture_recheck.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_post_bridge_watcher_proof_capture_recheck.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-bridge-watcher-proof-capture-recheck \
+  --trace-all-unlocked-lanes \
+  | jq '.status, .normalized_candidate_visibility, .paper_capture_readiness, .next_operator_move, .why, .recommended_commands[0:2], .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-bridge-watcher-proof-capture-recheck \
+  --trace-all-unlocked-lanes \
+  --record-recheck \
+  --confirm-post-bridge-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .safety'
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Post-bridge recheck added:
+CLI command added:
+Ledger used:
+R146 doc created:
+R147 draft task created:
+Tests run:
+Validation results:
+Smoke output summary:
+Next operator move:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not bypass freshness.
+Do not create proof directly.
+Do not perform live trading actions.
