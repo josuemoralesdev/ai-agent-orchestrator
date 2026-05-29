@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -1510,9 +1511,15 @@ def main() -> int:
                     watch_all_recommended_lanes=args.watch_all_recommended_lanes,
                     max_iterations=args.max_iterations,
                     sleep_seconds=args.sleep_seconds,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    iteration_timeout_seconds=args.iteration_timeout_seconds,
+                    heartbeat_every=args.heartbeat_every,
+                    heartbeat_ledger_path=args.heartbeat_ledger_path,
                     run_watch_loop=args.run_watch_loop,
                     record_watch=args.record_watch,
                     confirm_watch_loop=args.confirm_watch_loop,
+                    progress_fn=(lambda line: print(line, file=sys.stderr, flush=True)) if args.run_watch_loop else None,
                 )
             )
         )
@@ -2467,6 +2474,11 @@ def _build_parser() -> argparse.ArgumentParser:
     fresh_candidate_watch_parser.add_argument("--watch-all-recommended-lanes", action="store_true")
     fresh_candidate_watch_parser.add_argument("--max-iterations", type=int, default=5)
     fresh_candidate_watch_parser.add_argument("--sleep-seconds", type=int, default=60)
+    fresh_candidate_watch_parser.add_argument("--latest-signals", type=int, default=250)
+    fresh_candidate_watch_parser.add_argument("--latest-scans", type=int, default=500)
+    fresh_candidate_watch_parser.add_argument("--iteration-timeout-seconds", type=int, default=30)
+    fresh_candidate_watch_parser.add_argument("--heartbeat-every", type=int, default=1)
+    fresh_candidate_watch_parser.add_argument("--heartbeat-ledger-path", default=None)
     fresh_candidate_watch_parser.add_argument("--run-watch-loop", action="store_true")
     fresh_candidate_watch_parser.add_argument("--record-watch", action="store_true")
     fresh_candidate_watch_parser.add_argument("--confirm-watch-loop", default=None)

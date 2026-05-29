@@ -1,0 +1,369 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R150 Fast Fresh Proof Watch Heartbeat + Bounded Scan
+
+BRANCH:
+r150-fast-fresh-proof-watch-heartbeat-bounded-scan
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Fix fresh-candidate-paper-proof-capture-loop so long watch windows are safe, observable, and bounded.
+
+Current verified state:
+- Binance read-only connector is READY_READ_ONLY.
+- Target lanes are now tiny_live:
+  - BTCUSDT|13m|long|ladder_close_50_618
+  - BTCUSDT|44m|long|ladder_close_50_618
+- R145 entry-mode derivation bridge works.
+- R149 fast lane-control-status works.
+- R149 post-tiny-live-mode-fresh-proof-watch generated a 12h watcher command.
+- Human operator ran:
+  fresh-candidate-paper-proof-capture-loop --max-iterations 720 --sleep-seconds 60 --run-watch-loop --record-watch
+- The process ran ~2 hours at ~99.9% CPU.
+- It wrote no new ledger record.
+- The ledger mtime did not change.
+- The old latest ledger entry still showed the previous 60-iteration timeout.
+- The operator killed the stuck process.
+- Config remains intact and target lanes are still tiny_live.
+
+Problem:
+The watcher is not safe for long windows because it can spend too long in an iteration before writing any progress/heartbeat. It likely scans too much history or calls a heavy evaluation path. Long watcher mode needs:
+- heartbeat/progress records
+- bounded scan windows
+- iteration timeout/guard
+- fast path only
+- no heavy global gates
+- no Binance
+- no live execution
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not widen lanes.
+- Do not add shorts.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CRITICAL SAFETY PRINCIPLE:
+The watcher records paper proof only.
+It must not trade.
+It must not use exchange/network paths.
+It must not create executable payloads.
+It must not make stale candidates fresh.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_autonomy_scheduler.py
+- src/app/hammer_radar/operator/autonomous_paper_lane_executor_integration.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/post_tiny_live_mode_fresh_proof_watch.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- tests/hammer_radar/test_post_tiny_live_mode_fresh_proof_watch.py
+- tests/hammer_radar/test_fast_tiny_live_lane_status.py
+- docs/hammer_radar/live_readiness/R149_FAST_TINY_LIVE_LANE_STATUS_AND_PROOF_WATCH_PREP.md
+
+REUSE / EXTEND:
+Reuse R145 normalization.
+Reuse R149 fast lane status.
+Reuse existing safe paper proof capture behavior.
+Do not duplicate live readiness logic.
+Do not call heavy first-live activation gate.
+Do not call deep Markov/Miro/candle archive from watcher loop.
+Do not change trading strategy rules.
+Do not change freshness rules.
+
+IMPLEMENTATION REQUIREMENTS:
+
+1. Add bounded scan options to fresh-candidate-paper-proof-capture-loop:
+- --latest-signals <int>, default 250, max 5000
+- --latest-scans <int>, default 500, max 10000 if relevant
+- --iteration-timeout-seconds <int>, default 30
+- --heartbeat-every <int>, default 1
+- --heartbeat-ledger-path optional if existing ledger structure supports it
+
+If adding CLI args is too intrusive, add equivalent internal defaults:
+- latest signals capped
+- iteration guard
+- heartbeat every iteration
+
+2. Add heartbeat/progress record.
+Create append-only NDJSON:
+logs/hammer_radar_forward/fresh_candidate_paper_proof_watch_heartbeats.ndjson
+
+Each heartbeat should include:
+{
+  "event_type": "FRESH_CANDIDATE_PAPER_PROOF_WATCH_HEARTBEAT",
+  "watch_id": "...",
+  "generated_at": "...",
+  "iteration": 1,
+  "max_iterations": 720,
+  "sleep_seconds": 60,
+  "status": "WATCH_ITERATION_STARTED|WATCH_ITERATION_COMPLETED|WATCH_ITERATION_TIMEOUT|WATCH_CAPTURED_PROOF|WATCH_EXITED",
+  "elapsed_seconds": ...,
+  "lanes": [...],
+  "candidates_checked": ...,
+  "fresh_normalized_count": ...,
+  "stale_normalized_count": ...,
+  "paper_proof_captured": false,
+  "captured_lane_key": null,
+  "next_operator_move": "...",
+  "safety": {...}
+}
+
+3. Add final record even on timeout/abort where possible.
+If one iteration exceeds iteration-timeout-seconds:
+- do not continue burning CPU silently
+- record WATCH_ITERATION_TIMEOUT heartbeat
+- return status FRESH_CANDIDATE_WATCH_ITERATION_TIMEOUT or FRESH_CANDIDATE_WATCH_BLOCKED_BY_PERFORMANCE_GUARD
+- safety clean
+- no proof captured unless actually captured before timeout
+
+4. Add fast-mode output.
+The main loop output should include:
+- watch_id
+- heartbeat_path
+- latest heartbeat fields
+- performance_guard_enabled true
+- bounded_scan_limits
+- iterations_completed
+- current_iteration_status
+- safety
+
+5. Make long watch observable.
+When run in tmux, the command should print at least one line per iteration or flush a compact progress line, unless existing CLI output patterns forbid it.
+Acceptable output:
+WATCH heartbeat iteration=1 status=completed fresh=0 stale=12 captured=false elapsed=0.42s
+
+6. Ensure no heavy path.
+For the watch loop, use:
+- latest signals bounded reader, not full archive if possible
+- fast lane status sentinel, not full global gate
+- no first-live activation gate
+- no live preflight
+- no Markov/Miro/candle archive
+- no strategy full audit
+
+7. If existing readers always read full files, add a safe tail reader:
+- load_recent_ndjson(path, limit)
+- read from end or efficient deque
+- tolerate malformed lines
+- return only latest N records
+
+8. Keep proof logic honest:
+- fresh candidates only
+- target lanes only
+- tiny_live lanes only
+- normalized entry_mode via R145 allowed
+- stale remains stale
+- paper proof not forced
+
+REQUIRED CLI:
+Update existing mode:
+fresh-candidate-paper-proof-capture-loop
+
+Add args if possible:
+- --latest-signals
+- --latest-scans
+- --iteration-timeout-seconds
+- --heartbeat-every
+
+Example safe 12h command after patch:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 720 \
+  --sleep-seconds 60 \
+  --latest-signals 250 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL."
+
+REQUIRED MODULE:
+If helpful, create:
+src/app/hammer_radar/operator/watch_heartbeat.py
+
+Expose:
+- append_watch_heartbeat
+- build_watch_heartbeat_record
+- load_recent_watch_heartbeats
+- summarize_watch_heartbeats
+- load_recent_ndjson_records
+
+If simpler, implement directly in fresh_candidate_paper_proof_capture_loop.py.
+
+STATUS ENUM additions:
+- FRESH_CANDIDATE_WATCH_HEARTBEAT_READY
+- FRESH_CANDIDATE_WATCH_ITERATION_TIMEOUT
+- FRESH_CANDIDATE_WATCH_BLOCKED_BY_PERFORMANCE_GUARD
+- FRESH_CANDIDATE_WATCH_CAPTURED_PAPER_PROOF
+- FRESH_CANDIDATE_WATCH_TIMEOUT
+
+TESTS:
+Update/create:
+tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py
+
+Test:
+- preview uses bounded latest signals, not full-history required
+- watch loop writes heartbeat on iteration start/completion
+- long watch command records heartbeat before sleeping
+- iteration timeout produces timeout status and heartbeat
+- monkeypatch heavy gate functions to raise; watcher must not call them
+- fresh normalized tiny_live candidate can still capture paper proof in mocked data
+- stale candidate remains stale and no proof captured
+- malformed recent log lines do not crash tail reader
+- heartbeat ledger append-only
+- safety flags always false
+- no Binance/order/payload/network/env/config/global mutation
+- CLI accepts --latest-signals and --iteration-timeout-seconds
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py \
+  src/app/hammer_radar/operator/inspect.py
+
+If a helper is created, include it in py_compile.
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py \
+  tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_post_tiny_live_mode_fresh_proof_watch.py \
+  tests/hammer_radar/test_fast_tiny_live_lane_status.py \
+  tests/hammer_radar/test_post_bridge_watcher_proof_capture_recheck.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Short 2-iteration watcher:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fresh-candidate-paper-proof-capture-loop \
+  --watch-all-recommended-lanes \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --latest-signals 250 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-watch-loop \
+  --record-watch \
+  --confirm-watch-loop "I CONFIRM FRESH CANDIDATE PAPER PROOF WATCH ONLY; NO ORDER; NO BINANCE CALL." \
+  | tail -80
+
+Heartbeat check:
+tail -n 5 logs/hammer_radar_forward/fresh_candidate_paper_proof_watch_heartbeats.ndjson \
+  | jq '.status, .iteration, .max_iterations, .paper_proof_captured, .captured_lane_key, .elapsed_seconds, .safety'
+
+Final ledger check:
+tail -n 1 logs/hammer_radar_forward/fresh_candidate_paper_proof_capture_loop.ndjson \
+  | jq '.status, .max_iterations, .iterations_completed, .paper_proof_captured, .captured_lane_key, .safety'
+
+Post tiny-live watch prep still works:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  post-tiny-live-mode-fresh-proof-watch \
+  --all-target-lanes \
+  --include-watch-command \
+  | jq '.status, .next_operator_move, .safe_watch_command, .safety'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R150_FAST_FRESH_PROOF_WATCH_HEARTBEAT_BOUNDED_SCAN.md
+
+Explain:
+- why R150 exists
+- what happened with the stuck 720 watcher
+- heartbeat ledger
+- bounded scan limits
+- iteration timeout guard
+- safe 12h command
+- no live execution / no Binance / no order
+- next step after captured proof
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R150.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R151_AFTER_FRESH_PROOF_TINY_LIVE_READY_RECHECK.md
+
+R151 should:
+- run after fresh paper proof is captured
+- recheck tiny-live gates
+- recheck live safety
+- recheck Binance read-only/funding evidence
+- prepare final tiny-live readiness packet
+- no live execution unless explicitly authorized in a later phase
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Heartbeat added:
+Bounded scan added:
+Heavy path avoided:
+Performance guard added:
+CLI args added:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended operator action after merge:
+
+Aggressive mode:
+Complete in one pass.
+Do not start long watcher automatically.
+Do not perform live trading actions.

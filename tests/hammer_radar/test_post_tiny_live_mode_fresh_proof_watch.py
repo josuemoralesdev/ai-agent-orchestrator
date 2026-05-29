@@ -87,8 +87,11 @@ def test_target_lanes_safe_watch_command_and_forbidden_commands(
         assert "global gate has not enabled execution" in lane["blockers"]
 
     assert "fresh-candidate-paper-proof-capture-loop" in payload["safe_watch_command"]
-    assert "--max-iterations 60" in payload["safe_watch_command"]
+    assert "--max-iterations 720" in payload["safe_watch_command"]
     assert "--sleep-seconds 60" in payload["safe_watch_command"]
+    assert "--latest-signals 250" in payload["safe_watch_command"]
+    assert "--iteration-timeout-seconds 30" in payload["safe_watch_command"]
+    assert "--heartbeat-every 1" in payload["safe_watch_command"]
     commands = "\n".join([payload["safe_watch_command"], *payload["post_watch_recheck_commands"]])
     for forbidden in ("live-connector-submit", "global live flag arming", "kill switch disable"):
         assert forbidden not in commands
