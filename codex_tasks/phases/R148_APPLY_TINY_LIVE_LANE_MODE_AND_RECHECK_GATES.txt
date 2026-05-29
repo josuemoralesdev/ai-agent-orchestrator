@@ -1,0 +1,454 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R148 Apply Tiny-Live Lane Mode and Recheck Gates
+
+BRANCH:
+r148-apply-tiny-live-lane-mode-and-recheck-gates
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Create an operator-safe apply-and-recheck workflow for moving the already-unlocked eligible lanes into tiny_live mode through the fixed R147 fast lane mode path.
+
+This phase should make the operator step explicit, safe, auditable, and recheckable.
+
+Target lane mode changes:
+- BTCUSDT|13m|long|ladder_close_50_618: armed_dry_run -> tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618: paper -> tiny_live
+
+Critical distinction:
+tiny_live lane mode is only lane intent.
+It is NOT live execution permission.
+It is NOT global live arming.
+It is NOT order placement.
+
+Desired state after operator apply:
+TINY_LIVE_LANES_WAITING_FOR_CONDITIONS
+
+Not:
+LIVE_ORDER_READY
+Not:
+FIRST_LIVE_ACTIVATION_READY
+Not:
+ORDER_PLACED
+
+CURRENT VERIFIED CONTEXT:
+- R143 tiny-live lane unlock contract recorded.
+- R145 entry-mode derivation bridge recorded and working.
+- R146 post-bridge watcher recheck confirms normalized watched-lane candidates are visible but stale.
+- Binance read-only connector is READY_READ_ONLY.
+- R147 fixed lane-control-command so tiny_live mode preview is fast and does not call the heavy first-live activation gate chain.
+- R147 preview showed both lanes can result in tiny_live while remaining blocked by global gates.
+- R147 safety remained clean.
+- R147 wrong confirmation rejected cleanly.
+- 13m current mode before apply: armed_dry_run.
+- 44m current mode before apply: paper.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not widen lanes.
+- Do not add shorts.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+IMPORTANT:
+Codex must NOT run the confirmed real apply command against the real config.
+Codex may implement the command, docs, tests, previews, and rejected apply smoke only.
+The human operator will run the real confirmed apply after merge on main.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/first_tiny_live_lane_execution_gate.py
+- src/app/hammer_radar/operator/post_bridge_watcher_proof_capture_recheck.py
+- src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/binance_readonly.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- docs/hammer_radar/live_readiness/R147_FAST_LANE_TINY_LIVE_MODE_INTENT_PATH.md
+- tests/hammer_radar/test_lane_command_fast_tiny_live_mode_path.py
+- tests/hammer_radar/
+
+REUSE / EXTEND:
+Reuse R147 fast lane-control-command path.
+Reuse lane-control status.
+Reuse tiny-live gate preview.
+Reuse post-bridge watcher proof capture recheck.
+Reuse Binance read-only status if safely available.
+Do not duplicate lane mutation logic.
+Do not call heavy first-live activation gate in apply/recheck workflow.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/apply_tiny_live_lane_mode_recheck.py
+
+Expose:
+- build_apply_tiny_live_lane_mode_recheck_preview
+- build_default_tiny_live_lane_targets
+- validate_tiny_live_lane_targets
+- build_lane_mode_apply_commands
+- build_lane_mode_recheck_commands
+- build_tiny_live_lane_mode_recheck_status
+- append_tiny_live_lane_mode_recheck_record
+- load_tiny_live_lane_mode_recheck_records
+- summarize_tiny_live_lane_mode_rechecks
+
+STATUS ENUM:
+- TINY_LIVE_LANE_MODE_RECHECK_PREVIEW
+- TINY_LIVE_LANE_MODE_RECHECK_READY
+- TINY_LIVE_LANE_MODE_RECHECK_REJECTED
+- TINY_LIVE_LANE_MODE_RECHECK_RECORDED
+- TINY_LIVE_LANE_MODE_RECHECK_BLOCKED
+- TINY_LIVE_LANE_MODE_RECHECK_ERROR
+
+DECISION ENUM:
+next_operator_move:
+- APPLY_TINY_LIVE_LANE_MODE_ON_MAIN
+- RECHECK_TINY_LIVE_GATES
+- RUN_POST_BRIDGE_WATCHER
+- WAIT_FOR_FRESH_NORMALIZED_CANDIDATE
+- STOP_SAFETY_BLOCK
+
+TARGET LANES:
+Default when --all-target-lanes:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+CLI ARGS:
+- --lane-key <lane_key>, repeated if parser supports it
+- --lane-keys <comma-separated>
+- --all-target-lanes
+- --record-recheck
+- --confirm-recheck <phrase>
+- --include-apply-commands
+- --include-post-apply-recheck-commands
+
+REQUIRED CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE LANE MODE RECHECK RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+This records the recheck/runbook only.
+It does not apply config changes.
+It does not authorize live execution.
+It does not call Binance.
+It does not place orders.
+
+REQUIRED OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "target_lanes": [...],
+  "current_lane_modes": {
+    "<lane_key>": {
+      "current_mode": "...",
+      "target_mode": "tiny_live",
+      "needs_apply": true/false,
+      "eligible_future_tiny_live": true/false,
+      "safety": {...}
+    }
+  },
+  "binance_readonly_summary": {
+    "connector_status": "...",
+    "read_only": true,
+    "api_key_present": true/false,
+    "api_secret_present": true/false,
+    "live_execution_enabled": false,
+    "order_placed": false
+  },
+  "apply_commands": [
+    "safe human-run command..."
+  ],
+  "post_apply_recheck_commands": [
+    "lane-control-status",
+    "first-tiny-live-lane-execution-gate for 13m",
+    "first-tiny-live-lane-execution-gate for 44m",
+    "post-bridge-watcher-proof-capture-recheck",
+    "fresh-candidate-paper-proof-capture-loop safe watcher command"
+  ],
+  "expected_after_apply": {
+    "lane_modes": "tiny_live",
+    "live_execution_enabled": false,
+    "global_kill_switch_remains_authoritative": true,
+    "orders_allowed": false,
+    "remaining_blockers_likely": [
+      "fresh autonomous paper proof missing",
+      "fresh normalized candidate missing",
+      "global gates not ready",
+      "kill switch active",
+      "live flags disabled"
+    ]
+  },
+  "next_operator_move": "...",
+  "why": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed: false
+- real_order_placed: false
+- execution_attempted: false
+- order_payload_created: false
+- executable_payload_created: false
+- protective_payload_created: false
+- signed_request_created: false
+- network_allowed: false
+- binance_order_endpoint_called: false
+- binance_test_order_endpoint_called: false
+- protective_order_endpoint_called: false
+- secrets_shown: false
+- paper_live_separation_intact: true
+- env_mutated: false
+- config_written: false
+- global_live_flags_changed: false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_lane_mode_rechecks.ndjson
+
+Record:
+- event_type: TINY_LIVE_LANE_MODE_RECHECK
+- recheck_id
+- recorded_at_utc
+- status
+- target_lanes
+- current_lane_modes
+- binance_readonly_summary
+- apply_commands
+- post_apply_recheck_commands
+- expected_after_apply
+- next_operator_move
+- why
+- safety
+- source_surfaces_used
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+apply-tiny-live-lane-mode-recheck
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  apply-tiny-live-lane-mode-recheck \
+  --all-target-lanes \
+  --include-apply-commands \
+  --include-post-apply-recheck-commands
+
+Record recheck/runbook:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  apply-tiny-live-lane-mode-recheck \
+  --all-target-lanes \
+  --include-apply-commands \
+  --include-post-apply-recheck-commands \
+  --record-recheck \
+  --confirm-recheck "I CONFIRM TINY LIVE LANE MODE RECHECK RECORDING ONLY; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  apply-tiny-live-lane-mode-recheck \
+  --all-target-lanes \
+  --record-recheck \
+  --confirm-recheck "wrong"
+
+HUMAN-RUN COMMANDS TO INCLUDE IN OUTPUT, BUT DO NOT EXECUTE IN CODEX:
+Apply 13m:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live \
+  --apply \
+  --confirm-lane-change "<EXACT_EXISTING_CONFIRMATION_PHRASE>"
+
+Apply 44m:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live \
+  --apply \
+  --confirm-lane-change "<EXACT_EXISTING_CONFIRMATION_PHRASE>"
+
+Find exact confirmation phrase from source/tests, do not invent it.
+If the existing lane-control command already exposes expected_confirmation_phrase, use that.
+
+POST-APPLY RECHECK COMMANDS:
+Include:
+1. lane-control-status filtered target lanes
+2. first-tiny-live-lane-execution-gate for 13m
+3. first-tiny-live-lane-execution-gate for 44m
+4. post-bridge-watcher-proof-capture-recheck
+5. binance-readonly-status
+6. live-safety
+7. safe 60-minute watcher command
+
+DO NOT include:
+- live-connector-submit
+- global live env edits
+- kill switch disable
+- order/test-order submit
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R148_APPLY_TINY_LIVE_LANE_MODE_AND_RECHECK_GATES.md
+
+Explain:
+- why R148 follows R147
+- tiny_live lane mode as intent only
+- exact apply commands
+- exact recheck commands
+- expected blockers after apply
+- no live execution
+- no Binance order calls
+- no global flag mutation
+- next step after fresh paper proof
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R148.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R149_POST_TINY_LIVE_MODE_FRESH_PROOF_WATCH.md
+
+R149 should:
+- run or formalize watcher after target lanes are tiny_live
+- capture fresh normalized candidate paper proof if present
+- recheck tiny-live gate after proof
+- no Binance
+- no live execution
+- no global flag mutation
+
+TESTS:
+Create:
+tests/hammer_radar/test_apply_tiny_live_lane_mode_recheck.py
+
+Test:
+- preview writes no recheck
+- wrong confirmation rejects record
+- exact confirmation records recheck only
+- default target lanes are 13m/44m long ladder_close_50_618
+- detects current lane modes and needs_apply
+- includes apply commands but does not execute them
+- includes post-apply recheck commands
+- command list does not include live-connector-submit, kill switch disable, or env live flag changes
+- expected_after_apply says live_execution_enabled false and orders_allowed false
+- safety flags all false
+- no Binance/order/payload/network/env/config/global mutation
+- ledger append-only
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/apply_tiny_live_lane_mode_recheck.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_apply_tiny_live_lane_mode_recheck.py
+
+Run focused related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_lane_command_fast_tiny_live_mode_path.py \
+  tests/hammer_radar/test_post_bridge_watcher_proof_capture_recheck.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  apply-tiny-live-lane-mode-recheck \
+  --all-target-lanes \
+  --include-apply-commands \
+  --include-post-apply-recheck-commands \
+  | jq '.status, .target_lanes, .current_lane_modes, .binance_readonly_summary, .expected_after_apply, .next_operator_move, .why, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  apply-tiny-live-lane-mode-recheck \
+  --all-target-lanes \
+  --record-recheck \
+  --confirm-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .recheck_recorded, .safety'
+
+Do NOT run confirmed lane-control apply in Codex.
+Do NOT mutate real lane_controls.json in Codex.
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+R148 recheck/runbook added:
+Apply commands generated:
+Post-apply recheck commands generated:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended operator action after merge:
+
+Aggressive mode:
+Complete in one pass.
+Do not execute the real lane mode apply commands.
+Do not perform live trading actions.

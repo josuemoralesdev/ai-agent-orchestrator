@@ -1594,6 +1594,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "apply-tiny-live-lane-mode-recheck":
+        from src.app.hammer_radar.operator.apply_tiny_live_lane_mode_recheck import (
+            build_tiny_live_lane_mode_recheck_status,
+            format_tiny_live_lane_mode_recheck_json,
+        )
+
+        print(
+            format_tiny_live_lane_mode_recheck_json(
+                build_tiny_live_lane_mode_recheck_status(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    all_target_lanes=args.all_target_lanes,
+                    record_recheck=args.record_recheck,
+                    confirm_recheck=args.confirm_recheck,
+                    include_apply_commands=args.include_apply_commands,
+                    include_post_apply_recheck_commands=args.include_post_apply_recheck_commands,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2476,6 +2496,18 @@ def _build_parser() -> argparse.ArgumentParser:
     post_bridge_recheck_parser.add_argument("--latest-signals", type=int, default=100)
     post_bridge_recheck_parser.add_argument("--record-recheck", action="store_true")
     post_bridge_recheck_parser.add_argument("--confirm-post-bridge-recheck", default=None)
+
+    apply_tiny_live_lane_mode_recheck_parser = subparsers.add_parser(
+        "apply-tiny-live-lane-mode-recheck",
+        parents=[parent],
+    )
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--lane-key", action="append", default=None)
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--lane-keys", default=None)
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--all-target-lanes", action="store_true")
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--record-recheck", action="store_true")
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--confirm-recheck", default=None)
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--include-apply-commands", action="store_true")
+    apply_tiny_live_lane_mode_recheck_parser.add_argument("--include-post-apply-recheck-commands", action="store_true")
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
