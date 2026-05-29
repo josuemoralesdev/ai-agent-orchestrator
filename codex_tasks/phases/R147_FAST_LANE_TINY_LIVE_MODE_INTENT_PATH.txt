@@ -1,0 +1,285 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R147 Fast Lane Tiny-Live Mode Intent Path
+
+BRANCH:
+r147-fast-lane-tiny-live-mode-intent-path
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Fix lane-control-command so previewing/applying a lane mode intent change to tiny_live does not call the heavy first-live activation gate / final preflight / Markov / candle archive chain.
+
+Current issue:
+- lane-control-command preview for 13m eventually returned.
+- lane-control-command preview for 44m hung until operator canceled.
+- stack trace shows lane_command_interface -> evaluate_lane_permission -> _load_global_gate -> build_first_live_activation_gate -> tiny_live_armed_dry_run -> final_live_preflight -> human packet -> live arming preflight -> Miro/Markov/candle archive.
+- This is too expensive and wrong for an operator-owned lane mode intent preview/apply.
+
+Required design:
+Lane mode command must be fast and bounded.
+It may show that global gates are not ready through a lightweight/cached/sentinel global gate status.
+It must not load the full first-live activation gate unless explicitly requested by a separate deep review command.
+
+CRITICAL SAFETY PRINCIPLE:
+Setting lane mode to tiny_live is only operator lane intent.
+It must not enable live execution.
+It must not disable kill switch.
+It must not place orders.
+It must not create order payloads.
+It must not call Binance.
+It must not mutate env/global flags.
+
+The correct state after applying tiny_live lane mode is:
+TINY_LIVE_LANE_WAITING_FOR_CONDITIONS
+
+Not:
+LIVE_ORDER_READY
+Not:
+FIRST_LIVE_ACTIVATION_READY
+Not:
+ORDER_PLACED
+
+TARGET LANES:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+CURRENT VERIFIED CONTEXT:
+- Binance read-only connector is READY_READ_ONLY.
+- R143 unlock contract is recorded.
+- R145 entry-mode bridge is recorded and working.
+- R146 confirms normalized watched-lane candidates are visible but stale.
+- lane-control-status shows 13m mode=armed_dry_run, 44m mode=paper.
+- first-tiny-live-lane-execution-gate blocks 13m by lane mode not tiny_live: armed_dry_run.
+- first-tiny-live-lane-execution-gate blocks 44m by lane mode not tiny_live: paper.
+- lane-control-command preview currently calls a heavy global gate path and can hang.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not widen lanes.
+- Do not add shorts.
+- Do not install/start services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/lane_command_interface.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- tests/hammer_radar/test_lane_control*.py if present
+- tests/hammer_radar/test_*lane*command*.py if present
+- tests/hammer_radar/test_approval_api.py lane-control sections if relevant
+- docs/hammer_radar/live_readiness/
+
+REQUIRED IMPLEMENTATION:
+1. Add a fast/light global gate sentinel for lane-control preview/apply.
+
+In lane_control.py or lane_command_interface.py, create a lightweight global gate object used only for lane mode preview/apply unless deep review is explicitly requested.
+
+It should represent:
+{
+  "status": "GLOBAL_GATE_NOT_EVALUATED_FAST_LANE_MODE_PATH",
+  "ready": false,
+  "execution_enabled": false,
+  "global_kill_switch_active": true,
+  "allow_live_orders": false,
+  "blockers": [
+    "global gate not evaluated in fast lane mode path",
+    "live execution remains disabled",
+    "global kill switch remains authoritative"
+  ]
+}
+
+This sentinel must ensure lane permission evaluation can still report tiny_live mode as blocked by global gates without calling build_first_live_activation_gate.
+
+2. Modify lane-control-command preview/apply path:
+- For action=set-mode with --request-tiny-live:
+  - use fast global gate sentinel by default
+  - do not call first-live-activation-gate
+  - return quickly
+  - preserve safety false flags
+  - if apply is not requested: config_written=false
+  - if apply requested and confirmation valid: write only lane_controls.json mode change
+  - no env/global mutation
+
+3. Add optional deep review flag only if simple:
+- --deep-global-gate-review
+If present, old behavior may call heavy gate. Default must be fast.
+If adding CLI flag is risky, do not add it; just make lane-control-command fast and leave deep review to separate existing commands.
+
+4. Confirmation phrase:
+Find existing expected confirmation phrase from source/tests.
+Do not invent a new one unless tests make that current behavior clear.
+If existing phrase is currently unclear, expose expected_confirmation_phrase in preview output.
+
+5. Output must clearly say:
+- "lane mode is operator intent only; it is not execution permission"
+- "global gates were not deeply evaluated in fast lane mode path"
+- "live execution remains disabled"
+- "global kill switch remains authoritative"
+
+6. Ensure first-tiny-live-lane-execution-gate still blocks after lane mode tiny_live if other blockers remain:
+- missing paper proof
+- no fresh candidate
+- global gate not ready
+- kill switch/global live flags disabled
+
+REQUIRED TESTS:
+Create or update relevant tests:
+- tests/hammer_radar/test_lane_command_fast_tiny_live_mode_path.py
+
+Test:
+- preview set-mode tiny_live returns fast without calling build_first_live_activation_gate
+- use monkeypatch to make build_first_live_activation_gate raise if called; preview must still pass
+- preview for 13m tiny_live includes resulting_mode tiny_live, config_written false
+- preview for 44m tiny_live includes resulting_mode tiny_live, config_written false
+- apply with wrong confirmation rejects and writes no config
+- apply with correct confirmation writes lane_controls.json mode only in temp config path
+- apply does not mutate env/global flags
+- apply does not call Binance/network/order/payload
+- safety flags remain false
+- output includes fast global gate sentinel/blockers
+- lane mode tiny_live does not mark execution ready
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/lane_command_interface.py \
+  src/app/hammer_radar/operator/lane_control.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_lane_command_fast_tiny_live_mode_path.py
+
+Run focused related tests:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py \
+  tests/hammer_radar/test_post_bridge_watcher_proof_capture_recheck.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview 13m:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live \
+  | jq '.status, .previous_mode, .requested_mode, .resulting_mode, .apply_requested, .config_written, .lane_status_after_change, .warnings, .safety'
+
+Preview 44m:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live \
+  | jq '.status, .previous_mode, .requested_mode, .resulting_mode, .apply_requested, .config_written, .lane_status_after_change, .warnings, .safety'
+
+Rejected apply:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  lane-control-command \
+  --action set-mode \
+  --lane-key "BTCUSDT|13m|long|ladder_close_50_618" \
+  --mode tiny_live \
+  --request-tiny-live \
+  --apply \
+  --confirm-lane-change "wrong" \
+  | jq '.status, .confirmation_valid, .config_written, .safety'
+
+Do NOT run confirmed apply in Codex against real config.
+Confirmed apply will be operator-run manually after merge.
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R147_FAST_LANE_TINY_LIVE_MODE_INTENT_PATH.md
+
+Explain:
+- why R147 exists
+- lane mode intent vs live execution permission
+- fast global gate sentinel
+- why first-live activation gate is not called in lane mode preview/apply
+- commands
+- safety constraints
+- next operator step
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R147.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R148_APPLY_TINY_LIVE_LANE_MODE_AND_RECHECK_GATES.md
+
+R148 should:
+- apply tiny_live lane mode for 13m/44m via fixed fast path
+- verify lane-control-status
+- rerun tiny-live gates
+- rerun post-bridge watcher recheck
+- no Binance
+- no live execution
+- no global env mutation
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Fast lane mode path added:
+Heavy gate avoided:
+CLI output summary:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not run confirmed apply on real config.
+Do not perform live trading actions.

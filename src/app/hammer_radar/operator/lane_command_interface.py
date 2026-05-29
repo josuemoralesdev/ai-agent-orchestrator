@@ -17,6 +17,7 @@ from uuid import uuid4
 from src.app.hammer_radar.operator.lane_control import (
     DEFAULT_CONFIG_PATH,
     SAFETY_FALSE,
+    build_fast_lane_mode_global_gate_sentinel,
     evaluate_lane_permission,
     load_lane_controls,
 )
@@ -28,6 +29,7 @@ LANE_COMMAND_LIST = "LANE_COMMAND_LIST"
 LANE_COMMAND_PREVIEW = "LANE_COMMAND_PREVIEW"
 LANE_COMMAND_APPLIED = "LANE_COMMAND_APPLIED"
 LANE_COMMAND_REJECTED = "LANE_COMMAND_REJECTED"
+TINY_LIVE_LANE_WAITING_FOR_CONDITIONS = "TINY_LIVE_LANE_WAITING_FOR_CONDITIONS"
 
 ALLOWED_ACTIONS = {
     "list",
@@ -53,6 +55,7 @@ COMMAND_SAFETY_FALSE = {
 SOURCE_SURFACES_USED = [
     "operator.lane_control.load_lane_controls",
     "operator.lane_control.evaluate_lane_permission",
+    "operator.lane_control.build_fast_lane_mode_global_gate_sentinel",
     "configs/hammer_radar/lane_controls.json",
     "R106 first-live activation gate remains authoritative for tiny_live",
 ]
@@ -108,6 +111,9 @@ def validate_requested_lane_mode_change(
         warnings.append("lane mode is operator intent only; it is not execution permission")
     if requested_mode == "tiny_live":
         warnings.append("tiny_live lane mode remains blocked unless R106/global gates are ready")
+        warnings.append("global gates were not deeply evaluated in fast lane mode path")
+        warnings.append("live execution remains disabled")
+        warnings.append("global kill switch remains authoritative")
 
     return {
         "valid": not blockers,
@@ -161,6 +167,7 @@ def build_lane_command_preview(
         status = LANE_COMMAND_PREVIEW
 
     controls_after = _controls_with_mode(validation["controls"], lane_key, resulting_mode)
+    lane_global_gate = _global_gate_for_lane_mode_path(resulting_mode, global_gate)
     return _command_result(
         status=status,
         generated_at=generated_at,
@@ -176,13 +183,15 @@ def build_lane_command_preview(
         ledger_written=False,
         blockers=validation["blockers"],
         warnings=validation["warnings"],
+        lane_mode_intent_state=_lane_mode_intent_state(resulting_mode, validation["blockers"]),
         lane_status_after_change=_lane_status_after_change(
             lane_key=lane_key,
             controls=controls_after,
             log_dir=log_dir,
             live_eligibility_matrix=live_eligibility_matrix,
-            global_gate=global_gate,
+            global_gate=lane_global_gate,
         ),
+        global_gate_status=_compact_global_gate_status(lane_global_gate),
         lanes=_compact_lanes(validation["controls"]) if action_name == "list" else None,
     )
 
@@ -222,17 +231,23 @@ def apply_lane_command(
     path = Path(config_path) if config_path is not None else DEFAULT_CONFIG_PATH
     _write_lane_mode(path, str(lane_key), str(preview["resulting_mode"]))
     controls_after = load_current_lane_config(path)
+    lane_global_gate = _global_gate_for_lane_mode_path(preview.get("resulting_mode"), global_gate)
     applied = {
         **preview,
         "status": LANE_COMMAND_APPLIED,
         "config_written": True,
+        "lane_mode_intent_state": _lane_mode_intent_state(
+            preview.get("resulting_mode"),
+            preview.get("blockers") or [],
+        ),
         "lane_status_after_change": _lane_status_after_change(
             lane_key=lane_key,
             controls=controls_after,
             log_dir=log_dir,
             live_eligibility_matrix=live_eligibility_matrix,
-            global_gate=global_gate,
+            global_gate=lane_global_gate,
         ),
+        "global_gate_status": _compact_global_gate_status(lane_global_gate),
     }
     ledger_written = _append_lane_command_ledger(applied, log_dir=log_dir)
     return {**applied, "ledger_written": ledger_written}
@@ -258,7 +273,9 @@ def _command_result(
     ledger_written: bool,
     blockers: list[str],
     warnings: list[str],
+    lane_mode_intent_state: str | None,
     lane_status_after_change: dict[str, Any] | None,
+    global_gate_status: dict[str, Any] | None,
     lanes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
@@ -276,7 +293,9 @@ def _command_result(
         "ledger_written": bool(ledger_written),
         "blockers": list(blockers),
         "warnings": list(warnings),
+        "lane_mode_intent_state": lane_mode_intent_state,
         "lane_status_after_change": lane_status_after_change,
+        "global_gate_status": global_gate_status,
         "safety": dict(COMMAND_SAFETY_FALSE),
         "source_surfaces_used": list(SOURCE_SURFACES_USED),
     }
@@ -301,11 +320,13 @@ def _append_lane_command_ledger(payload: Mapping[str, Any], *, log_dir: str | Pa
         "apply_requested": payload.get("apply_requested"),
         "confirmation_valid": payload.get("confirmation_valid"),
         "tiny_live_requested": payload.get("tiny_live_requested"),
+        "lane_mode_intent_state": payload.get("lane_mode_intent_state"),
         "config_written": payload.get("config_written"),
         "status": payload.get("status"),
         "blockers": list(payload.get("blockers") or []),
         "warnings": list(payload.get("warnings") or []),
         "safety": dict(payload.get("safety") or COMMAND_SAFETY_FALSE),
+        "global_gate_status": dict(payload.get("global_gate_status") or {}),
         "source_surfaces_used": list(payload.get("source_surfaces_used") or SOURCE_SURFACES_USED),
     }
     with (ledger_dir / LANE_COMMAND_LEDGER).open("a", encoding="utf-8") as handle:
@@ -375,6 +396,39 @@ def _controls_with_mode(controls: Mapping[str, Any], lane_key: str | None, mode:
         "lanes": lanes,
         "lane_map": {str(lane.get("lane_key")): lane for lane in lanes},
     }
+
+
+def _global_gate_for_lane_mode_path(
+    resulting_mode: object,
+    global_gate: Mapping[str, Any] | None,
+) -> Mapping[str, Any] | None:
+    if global_gate is not None:
+        return global_gate
+    if str(resulting_mode or "").strip().lower() == "tiny_live":
+        return build_fast_lane_mode_global_gate_sentinel()
+    return None
+
+
+def _compact_global_gate_status(global_gate: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if global_gate is None:
+        return None
+    return {
+        "status": global_gate.get("status"),
+        "ready": bool(global_gate.get("ready")),
+        "execution_enabled": bool(global_gate.get("execution_enabled")),
+        "execution_enabled_by_gate": bool(global_gate.get("execution_enabled_by_gate")),
+        "global_kill_switch_active": bool(global_gate.get("global_kill_switch_active")),
+        "allow_live_orders": bool(global_gate.get("allow_live_orders")),
+        "blockers": list(global_gate.get("blockers") or [])[:5],
+    }
+
+
+def _lane_mode_intent_state(resulting_mode: object, blockers: object) -> str | None:
+    if blockers:
+        return None
+    if str(resulting_mode or "").strip().lower() == "tiny_live":
+        return TINY_LIVE_LANE_WAITING_FOR_CONDITIONS
+    return None
 
 
 def _compact_lanes(controls: Mapping[str, Any]) -> list[dict[str, Any]]:

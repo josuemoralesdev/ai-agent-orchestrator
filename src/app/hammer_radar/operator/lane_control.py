@@ -38,6 +38,13 @@ SAFETY_FALSE = {
     "secrets_shown": False,
 }
 
+FAST_LANE_MODE_GLOBAL_GATE_STATUS = "GLOBAL_GATE_NOT_EVALUATED_FAST_LANE_MODE_PATH"
+FAST_LANE_MODE_GLOBAL_GATE_BLOCKERS = [
+    "global gate not evaluated in fast lane mode path",
+    "live execution remains disabled",
+    "global kill switch remains authoritative",
+]
+
 
 def normalize_lane_key(symbol: object, timeframe: object, direction: object, entry_mode: object) -> str:
     return "|".join(
@@ -68,6 +75,18 @@ def load_lane_controls(config_path: str | Path | None = None) -> dict[str, Any]:
 def list_lanes(controls: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     loaded = controls if controls is not None else load_lane_controls()
     return list(loaded.get("lanes") or [])
+
+
+def build_fast_lane_mode_global_gate_sentinel() -> dict[str, Any]:
+    return {
+        "status": FAST_LANE_MODE_GLOBAL_GATE_STATUS,
+        "ready": False,
+        "execution_enabled": False,
+        "execution_enabled_by_gate": False,
+        "global_kill_switch_active": True,
+        "allow_live_orders": False,
+        "blockers": list(FAST_LANE_MODE_GLOBAL_GATE_BLOCKERS),
+    }
 
 
 def get_lane_by_tuple(
@@ -123,6 +142,7 @@ def evaluate_lane_permission(
             blockers.append("global first-live activation gate is not FIRST_LIVE_ACTIVATION_READY")
         if bool(gate.get("execution_enabled_by_gate")) is not True:
             blockers.append("global gate has not enabled execution")
+        blockers.extend(str(item) for item in (gate.get("blockers") or [])[:3] if item)
         status = LANE_ALLOWED if not blockers else LANE_BLOCKED
     else:
         status = LANE_BLOCKED
