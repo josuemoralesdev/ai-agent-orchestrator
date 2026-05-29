@@ -44,6 +44,11 @@ FAST_LANE_MODE_GLOBAL_GATE_BLOCKERS = [
     "live execution remains disabled",
     "global kill switch remains authoritative",
 ]
+FAST_LANE_STATUS_GLOBAL_GATE_BLOCKERS = [
+    "global gate not evaluated in fast lane status path",
+    "live execution remains disabled",
+    "global kill switch remains authoritative",
+]
 
 
 def normalize_lane_key(symbol: object, timeframe: object, direction: object, entry_mode: object) -> str:
@@ -89,6 +94,12 @@ def build_fast_lane_mode_global_gate_sentinel() -> dict[str, Any]:
     }
 
 
+def build_fast_lane_status_global_gate_sentinel() -> dict[str, Any]:
+    sentinel = build_fast_lane_mode_global_gate_sentinel()
+    sentinel["blockers"] = list(FAST_LANE_STATUS_GLOBAL_GATE_BLOCKERS)
+    return sentinel
+
+
 def get_lane_by_tuple(
     symbol: object,
     timeframe: object,
@@ -114,6 +125,7 @@ def evaluate_lane_permission(
     controls: Mapping[str, Any] | None = None,
     live_eligibility_matrix: Mapping[str, Any] | None = None,
     global_gate: Mapping[str, Any] | None = None,
+    deep_global_gate_review: bool = False,
     log_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     loaded = controls if controls is not None else load_lane_controls()
@@ -135,7 +147,12 @@ def evaluate_lane_permission(
             status = LANE_BLOCKED
             blockers.append(_eligibility_blocker(eligibility))
     elif mode == "tiny_live":
-        gate = global_gate if global_gate is not None else _load_global_gate(log_dir=log_dir)
+        if global_gate is not None:
+            gate = global_gate
+        elif deep_global_gate_review:
+            gate = _load_global_gate(log_dir=log_dir)
+        else:
+            gate = build_fast_lane_status_global_gate_sentinel()
         if _eligibility_recommendation(eligibility) != ELIGIBLE_FOR_FUTURE_TINY_LIVE:
             blockers.append(_eligibility_blocker(eligibility))
         if gate.get("status") != FIRST_LIVE_ACTIVATION_READY:
@@ -171,6 +188,7 @@ def build_lane_control_status(
     log_dir: str | Path | None = None,
     config_path: str | Path | None = None,
     live_eligibility_matrix: Mapping[str, Any] | None = None,
+    deep_global_gate_review: bool = False,
 ) -> dict[str, Any]:
     controls = load_lane_controls(config_path)
     matrix = live_eligibility_matrix if live_eligibility_matrix is not None else build_live_eligibility_matrix(log_dir=log_dir)
@@ -182,6 +200,12 @@ def build_lane_control_status(
             lane["entry_mode"],
             controls=controls,
             live_eligibility_matrix=matrix,
+            global_gate=(
+                build_fast_lane_status_global_gate_sentinel()
+                if str(lane.get("mode") or "").strip().lower() == "tiny_live" and not deep_global_gate_review
+                else None
+            ),
+            deep_global_gate_review=deep_global_gate_review,
             log_dir=log_dir,
         )
         for lane in list_lanes(controls)
@@ -309,7 +333,7 @@ def _lane_summary(lane: Mapping[str, Any]) -> dict[str, Any]:
         "freshness_seconds": lane.get("freshness_seconds"),
         "risk_limits": lane.get("risk_limits"),
         "live_eligibility": lane.get("live_eligibility"),
-        "blockers": list(lane.get("blockers") or [])[:3],
+        "blockers": list(lane.get("blockers") or [])[:5],
         "safety": lane.get("safety"),
     }
 

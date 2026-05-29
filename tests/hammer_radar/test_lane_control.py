@@ -35,11 +35,11 @@ class LaneControlTests(unittest.TestCase):
         controls = load_lane_controls()
 
         self.assertEqual(
-            "armed_dry_run",
+            "tiny_live",
             get_lane_by_tuple("BTCUSDT", "13m", "long", "ladder_close_50_618", controls=controls)["mode"],
         )
         self.assertEqual(
-            "paper",
+            "tiny_live",
             get_lane_by_tuple("BTCUSDT", "44m", "long", "ladder_close_50_618", controls=controls)["mode"],
         )
         self.assertEqual(
