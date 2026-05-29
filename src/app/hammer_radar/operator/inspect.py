@@ -1166,6 +1166,7 @@ def main() -> int:
             format_lane_control_status_json(
                 build_lane_control_status(
                     log_dir=args.log_dir,
+                    deep_global_gate_review=args.deep_global_gate_review,
                 )
             )
         )
@@ -1611,6 +1612,25 @@ def main() -> int:
                     confirm_recheck=args.confirm_recheck,
                     include_apply_commands=args.include_apply_commands,
                     include_post_apply_recheck_commands=args.include_post_apply_recheck_commands,
+                )
+            )
+        )
+    elif args.command == "post-tiny-live-mode-fresh-proof-watch":
+        from src.app.hammer_radar.operator.post_tiny_live_mode_fresh_proof_watch import (
+            build_post_tiny_live_mode_fresh_proof_watch_preview,
+            format_post_tiny_live_mode_fresh_proof_watch_json,
+        )
+
+        print(
+            format_post_tiny_live_mode_fresh_proof_watch_json(
+                build_post_tiny_live_mode_fresh_proof_watch_preview(
+                    log_dir=args.log_dir,
+                    lane_keys=args.lane_key,
+                    lane_keys_csv=args.lane_keys,
+                    all_target_lanes=args.all_target_lanes,
+                    include_watch_command=args.include_watch_command,
+                    record_watch_prep=args.record_watch_prep,
+                    confirm_watch_prep=args.confirm_watch_prep,
                 )
             )
         )
@@ -2269,7 +2289,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     dual_lane_candidate_watch_parser.add_argument("--write", action="store_true")
 
-    subparsers.add_parser("lane-control-status", parents=[parent])
+    lane_control_status_parser = subparsers.add_parser("lane-control-status", parents=[parent])
+    lane_control_status_parser.add_argument("--deep-global-gate-review", action="store_true")
     lane_control_cockpit_parser = subparsers.add_parser("lane-control-cockpit-state", parents=[parent])
     lane_control_cockpit_parser.add_argument("--lane-key", default="BTCUSDT|13m|long|ladder_close_50_618")
     subparsers.add_parser("fresh-signal-router-status", parents=[parent])
@@ -2508,6 +2529,17 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_tiny_live_lane_mode_recheck_parser.add_argument("--confirm-recheck", default=None)
     apply_tiny_live_lane_mode_recheck_parser.add_argument("--include-apply-commands", action="store_true")
     apply_tiny_live_lane_mode_recheck_parser.add_argument("--include-post-apply-recheck-commands", action="store_true")
+
+    post_tiny_live_mode_watch_parser = subparsers.add_parser(
+        "post-tiny-live-mode-fresh-proof-watch",
+        parents=[parent],
+    )
+    post_tiny_live_mode_watch_parser.add_argument("--lane-key", action="append", default=None)
+    post_tiny_live_mode_watch_parser.add_argument("--lane-keys", default=None)
+    post_tiny_live_mode_watch_parser.add_argument("--all-target-lanes", action="store_true")
+    post_tiny_live_mode_watch_parser.add_argument("--include-watch-command", action="store_true")
+    post_tiny_live_mode_watch_parser.add_argument("--record-watch-prep", action="store_true")
+    post_tiny_live_mode_watch_parser.add_argument("--confirm-watch-prep", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

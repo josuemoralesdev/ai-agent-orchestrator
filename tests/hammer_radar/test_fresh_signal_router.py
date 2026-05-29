@@ -27,6 +27,8 @@ from src.app.hammer_radar.operator.strategy_performance import ELIGIBLE_FOR_FUTU
 
 class FreshSignalRouterTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.tmp.name)
         self.now = datetime(2026, 5, 23, 22, 40, tzinfo=UTC)
         self.matrix = {
             "recommendations": [
@@ -54,6 +56,9 @@ class FreshSignalRouterTests(unittest.TestCase):
                 },
             ]
         }
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
 
     def test_candidate_normalizes_correctly(self) -> None:
         candidate = normalize_candidate(
@@ -85,6 +90,7 @@ class FreshSignalRouterTests(unittest.TestCase):
     def test_fresh_candidate_routes_to_matching_13m_armed_dry_run_lane(self) -> None:
         payload = evaluate_candidate_against_lanes(
             self._candidate("13m", generated_at=self.now - timedelta(seconds=30)),
+            controls=self._controls_with_modes({"13m": "armed_dry_run"}),
             live_eligibility_matrix=self.matrix,
             now=self.now,
         )
@@ -97,6 +103,7 @@ class FreshSignalRouterTests(unittest.TestCase):
     def test_fresh_candidate_routes_to_44m_paper_lane(self) -> None:
         payload = evaluate_candidate_against_lanes(
             self._candidate("44m", generated_at=self.now - timedelta(seconds=60)),
+            controls=self._controls_with_modes({"44m": "paper"}),
             live_eligibility_matrix=self.matrix,
             now=self.now,
         )
@@ -166,6 +173,7 @@ class FreshSignalRouterTests(unittest.TestCase):
             candidates=[self._candidate("13m", generated_at=self.now - timedelta(seconds=30))],
             now=self.now,
             live_eligibility_matrix=self.matrix,
+            config_path=self._write_config({"13m": "armed_dry_run"}),
         )
 
         self.assertEqual(SAFETY_FALSE, status["safety"])
@@ -208,6 +216,43 @@ class FreshSignalRouterTests(unittest.TestCase):
             "entry_mode": "ladder_close_50_618",
             "generated_at": generated_at.isoformat(),
         }
+
+    def _controls_with_modes(self, modes: dict[str, str]) -> dict[str, object]:
+        controls = load_lane_controls()
+        lanes = []
+        for lane in controls["lanes"]:
+            copied = dict(lane)
+            timeframe = str(copied.get("timeframe") or "")
+            if timeframe in modes:
+                copied["mode"] = modes[timeframe]
+            lanes.append(copied)
+        return {**controls, "lanes": lanes, "lane_map": {lane["lane_key"]: lane for lane in lanes}}
+
+    def _write_config(self, modes: dict[str, str]) -> Path:
+        path = self.tmp_path / "lane_controls.json"
+        controls = self._controls_with_modes(modes)
+        raw = {
+            "schema_version": controls["schema_version"],
+            "default_mode": controls["default_mode"],
+            "notes": controls.get("notes", []),
+            "lanes": [
+                {
+                    "symbol": lane["symbol"],
+                    "timeframe": lane["timeframe"],
+                    "direction": lane["direction"],
+                    "entry_mode": lane["entry_mode"],
+                    "mode": lane["mode"],
+                    "max_daily_trades": lane["max_daily_trades"],
+                    "max_daily_loss_pct": lane["max_daily_loss_pct"],
+                    "freshness_seconds": lane["freshness_seconds"],
+                    "cooldown_after_loss_minutes": lane["cooldown_after_loss_minutes"],
+                    "require_protective_orders": lane["require_protective_orders"],
+                }
+                for lane in controls["lanes"]
+            ],
+        }
+        path.write_text(json.dumps(raw, sort_keys=True) + "\n", encoding="utf-8")
+        return path
 
 
 if __name__ == "__main__":

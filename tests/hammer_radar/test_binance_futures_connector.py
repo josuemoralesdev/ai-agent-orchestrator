@@ -46,7 +46,17 @@ class BinanceFuturesConnectorTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.log_dir = Path(self.temp_dir.name)
-        self.env_patch = patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(self.log_dir)}, clear=False)
+        self.env_patch = patch.dict(
+            "os.environ",
+            {
+                LOG_DIR_ENV_VAR: str(self.log_dir),
+                "BINANCE_API_KEY": "",
+                "BINANCE_API_SECRET": "",
+                "BINANCE_CONNECTOR_MODE": "",
+                "BINANCE_LIVE_TRADING_ENABLED": "",
+            },
+            clear=False,
+        )
         self.env_patch.start()
         self.client = TestClient(app)
 
