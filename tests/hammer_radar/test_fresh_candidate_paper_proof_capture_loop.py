@@ -14,6 +14,7 @@ from src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop impo
     CONFIRM_FRESH_CANDIDATE_WATCH_LOOP_PHRASE,
     EVENT_TYPE,
     FRESH_CANDIDATE_WATCH_CAPTURED_PAPER_PROOF,
+    FRESH_CANDIDATE_WATCH_ITERATION_TIMEOUT,
     FRESH_CANDIDATE_WATCH_PREVIEW,
     FRESH_CANDIDATE_WATCH_REJECTED,
     FRESH_CANDIDATE_WATCH_TIMEOUT,
@@ -102,6 +103,10 @@ class FreshCandidatePaperProofCaptureLoopTests(unittest.TestCase):
         self.assertTrue(payload["watch_started"])
         self.assertTrue(payload["watch_completed"])
         self.assertEqual(2, payload["iterations_completed"])
+        self.assertTrue(payload["performance_guard_enabled"])
+        self.assertEqual({"latest_signals": 250, "latest_scans": 500}, payload["bounded_scan_limits"])
+        self.assertTrue(payload["heartbeat_path"].endswith("fresh_candidate_paper_proof_watch_heartbeats.ndjson"))
+        self.assertEqual("WATCH_EXITED", payload["latest_heartbeat"]["status"])
         self.assertFalse(payload["paper_proof_captured"])
         self.assertEqual("SKIPPED_NO_ELIGIBLE_DECISION", payload["iteration_summaries"][0]["lanes"][0]["capture_status"])
         sleep_fn.assert_called_once_with(10.0)
@@ -130,6 +135,7 @@ class FreshCandidatePaperProofCaptureLoopTests(unittest.TestCase):
 
         self.assertEqual(FRESH_CANDIDATE_WATCH_CAPTURED_PAPER_PROOF, payload["status"])
         self.assertEqual(1, payload["iterations_completed"])
+        self.assertEqual("WATCH_EXITED", payload["latest_heartbeat"]["status"])
         self.assertTrue(payload["paper_proof_captured"])
         self.assertEqual(PRIMARY_WATCHED_LANE, payload["captured_lane_key"])
         self.assertEqual(["paper-1"], payload["captured_evidence_ids"])
@@ -154,13 +160,19 @@ class FreshCandidatePaperProofCaptureLoopTests(unittest.TestCase):
     def test_bounds_are_enforced(self) -> None:
         payload = build_fresh_candidate_paper_proof_capture_loop_preview(
             log_dir=self.log_dir,
-            max_iterations=999,
+            max_iterations=999999,
             sleep_seconds=1,
+            latest_signals=999999,
+            latest_scans=999999,
+            iteration_timeout_seconds=999999,
             now=self.now,
         )
 
-        self.assertEqual(180, payload["max_iterations"])
-        self.assertEqual(10, payload["sleep_seconds"])
+        self.assertEqual(1440, payload["max_iterations"])
+        self.assertEqual(1, payload["sleep_seconds"])
+        self.assertEqual(5000, payload["bounded_scan_limits"]["latest_signals"])
+        self.assertEqual(10000, payload["bounded_scan_limits"]["latest_scans"])
+        self.assertEqual(300, payload["iteration_timeout_seconds"])
 
     def test_ledger_append_only_when_record_watch_true(self) -> None:
         with patch(
@@ -212,6 +224,62 @@ class FreshCandidatePaperProofCaptureLoopTests(unittest.TestCase):
 
         self.assertIn("fresh-candidate-paper-proof-capture-loop", result.stdout)
 
+    def test_cli_accepts_bounded_watch_arguments(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "src.app.hammer_radar.operator.inspect",
+                "--log-dir",
+                str(self.log_dir),
+                "fresh-candidate-paper-proof-capture-loop",
+                "--latest-signals",
+                "250",
+                "--iteration-timeout-seconds",
+                "30",
+            ],
+            check=True,
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONPATH": "."},
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(250, payload["bounded_scan_limits"]["latest_signals"])
+        self.assertEqual(30, payload["iteration_timeout_seconds"])
+
+    def test_iteration_timeout_records_timeout_heartbeat(self) -> None:
+        def slow_snapshot(**kwargs: object) -> dict[str, object]:
+            time.sleep(2)
+            return self._snapshot(routed=0, eligible=0)
+
+        import time
+
+        with patch(
+            "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.collect_watcher_iteration_snapshot",
+            side_effect=slow_snapshot,
+        ):
+            payload = run_fresh_candidate_paper_proof_capture_loop(
+                log_dir=self.log_dir,
+                max_iterations=2,
+                sleep_seconds=10,
+                iteration_timeout_seconds=1,
+                run_watch_loop=True,
+                confirm_watch_loop=CONFIRM_FRESH_CANDIDATE_WATCH_LOOP_PHRASE,
+                sleep_fn=Mock(),
+                now=self.now,
+            )
+
+        self.assertEqual(FRESH_CANDIDATE_WATCH_ITERATION_TIMEOUT, payload["status"])
+        self.assertEqual(1, payload["iterations_completed"])
+        self.assertEqual("WATCH_EXITED", payload["latest_heartbeat"]["status"])
+        heartbeat_path = self.log_dir / "fresh_candidate_paper_proof_watch_heartbeats.ndjson"
+        statuses = [json.loads(line)["status"] for line in heartbeat_path.read_text(encoding="utf-8").splitlines()]
+        self.assertIn("WATCH_ITERATION_STARTED", statuses)
+        self.assertIn("WATCH_ITERATION_TIMEOUT", statuses)
+        self.assertIn("WATCH_EXITED", statuses)
+
     def test_no_binance_order_payload_network_env_or_config_mutation(self) -> None:
         from src.app.hammer_radar.execution import binance_futures_connector
 
@@ -256,6 +324,143 @@ class FreshCandidatePaperProofCaptureLoopTests(unittest.TestCase):
         self.assertFalse(payload["safety"]["env_mutated"])
         self.assertFalse(payload["safety"]["config_written"])
         self.assertFalse(payload["safety"]["global_live_flags_changed"])
+
+    def test_preview_uses_bounded_recent_signal_reader(self) -> None:
+        recent = []
+        for index in range(10):
+            recent.append(
+                {
+                    "signal_id": f"signal-{index}",
+                    "symbol": "BTCUSDT",
+                    "timeframe": "13m",
+                    "direction": "long",
+                    "generated_at": self.now.isoformat(),
+                }
+            )
+        signals_path = self.log_dir / "signals.ndjson"
+        signals_path.parent.mkdir(parents=True, exist_ok=True)
+        with signals_path.open("a", encoding="utf-8") as handle:
+            for row in recent:
+                handle.write(json.dumps(row) + "\n")
+
+        with (
+            patch(
+                "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.build_fresh_signal_router_status",
+                return_value={"routed_count": 0, "top_blockers": [], "safety": self._safe()},
+            ) as router,
+            patch(
+                "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.run_lane_autonomy_scheduler_once",
+                return_value={"status": "LANE_AUTONOMY_SCHEDULER_PREVIEW", "safety": self._safe()},
+            ),
+            patch(
+                "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.run_autonomous_paper_lane_executor_once",
+                return_value={
+                    "status": "PAPER_EXECUTOR_INTEGRATION_PREVIEW",
+                    "paper_eligible_decisions_count": 0,
+                    "paper_blocked_decisions_count": 0,
+                    "safety": self._safe(),
+                },
+            ),
+            patch(
+                "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.load_lane_controls",
+                return_value={
+                    "lane_map": {
+                        PRIMARY_WATCHED_LANE: {
+                            "lane_key": PRIMARY_WATCHED_LANE,
+                            "timeframe": "13m",
+                            "direction": "long",
+                            "entry_mode": "ladder_close_50_618",
+                        }
+                    }
+                },
+            ),
+        ):
+            payload = run_fresh_candidate_paper_proof_capture_loop(
+                log_dir=self.log_dir,
+                max_iterations=1,
+                sleep_seconds=10,
+                latest_signals=3,
+                run_watch_loop=True,
+                confirm_watch_loop=CONFIRM_FRESH_CANDIDATE_WATCH_LOOP_PHRASE,
+                sleep_fn=Mock(),
+                now=self.now,
+            )
+
+        self.assertEqual(3, router.call_args.kwargs["candidates"].__len__())
+        self.assertEqual(3, payload["iteration_summaries"][0]["candidates_checked"])
+
+    def test_fast_watch_snapshot_does_not_call_heavy_global_gate_or_matrix(self) -> None:
+        signal = {
+            "signal_id": "fresh-1",
+            "symbol": "BTCUSDT",
+            "timeframe": "13m",
+            "direction": "long",
+            "generated_at": self.now.isoformat(),
+        }
+        signals_path = self.log_dir / "signals.ndjson"
+        signals_path.parent.mkdir(parents=True, exist_ok=True)
+        signals_path.write_text(json.dumps(signal) + "\n", encoding="utf-8")
+
+        def fail_heavy(*args: object, **kwargs: object) -> None:
+            raise AssertionError("heavy gate or matrix must not be called")
+
+        with (
+            patch(
+                "src.app.hammer_radar.operator.lane_control._load_global_gate",
+                side_effect=fail_heavy,
+            ),
+            patch(
+                "src.app.hammer_radar.operator.first_live_activation_gate.build_first_live_activation_gate",
+                side_effect=fail_heavy,
+            ),
+            patch(
+                "src.app.hammer_radar.operator.strategy_performance.build_live_eligibility_matrix",
+                side_effect=fail_heavy,
+            ),
+            patch(
+                "src.app.hammer_radar.operator.fresh_candidate_paper_proof_capture_loop.load_lane_controls",
+                return_value={
+                    "lane_map": {
+                        PRIMARY_WATCHED_LANE: {
+                            "lane_key": PRIMARY_WATCHED_LANE,
+                            "timeframe": "13m",
+                            "direction": "long",
+                            "entry_mode": "ladder_close_50_618",
+                        }
+                    }
+                },
+            ),
+            patch(
+                "src.app.hammer_radar.operator.fresh_signal_router.load_lane_controls",
+                return_value={
+                    "lane_map": {
+                        PRIMARY_WATCHED_LANE: {
+                            "lane_key": PRIMARY_WATCHED_LANE,
+                            "symbol": "BTCUSDT",
+                            "timeframe": "13m",
+                            "direction": "long",
+                            "entry_mode": "ladder_close_50_618",
+                            "mode": "tiny_live",
+                            "freshness_seconds": 120,
+                        }
+                    },
+                    "lanes": [],
+                },
+            ),
+        ):
+            payload = run_fresh_candidate_paper_proof_capture_loop(
+                log_dir=self.log_dir,
+                max_iterations=1,
+                sleep_seconds=10,
+                latest_signals=1,
+                run_watch_loop=True,
+                confirm_watch_loop=CONFIRM_FRESH_CANDIDATE_WATCH_LOOP_PHRASE,
+                sleep_fn=Mock(),
+                now=self.now,
+            )
+
+        self.assertEqual(FRESH_CANDIDATE_WATCH_TIMEOUT, payload["status"])
+        self.assertTrue(payload["iteration_summaries"][0]["lanes"][0]["safety"]["paper_live_separation_intact"])
 
     def _snapshot(self, *, routed: int, eligible: int) -> dict[str, object]:
         return {
