@@ -1,0 +1,442 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R154 Promotion Candidate Audit From Expanded Paper
+
+BRANCH:
+r154-promotion-candidate-audit-from-expanded-paper
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: EXTENSION OF EXISTING CAPABILITY, WIRING / INTEGRATION, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R151 proved the 12h watcher was healthy but too narrow.
+R152 added aggressive paper-only lane expansion for BTCUSDT across:
+- 4m long/short
+- 8m long/short
+- 13m long/short
+- 44m long/short
+while preserving:
+- 13m long tiny_live
+- 44m long tiny_live
+
+R153 added expanded paper watch and opportunity recheck.
+
+R154 must rank expanded paper lane families for future tiny-live consideration using paper-only evidence and recent outcomes. It must not promote anything. It must not mutate config. It must not call Binance. It must not place orders.
+
+CRITICAL SAFETY PRINCIPLE:
+This is an audit only.
+It identifies future promotion candidates.
+It does NOT promote lanes.
+It does NOT set any lane to tiny_live.
+It does NOT authorize live shorts.
+It does NOT call Binance.
+It does NOT place orders.
+
+CURRENT EXPECTED CONFIG:
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|4m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|4m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|44m|short|ladder_close_50_618 mode=paper
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any new lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/candidate_source_freshness_audit.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/paper_executions.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- tests/hammer_radar/test_expanded_paper_watch.py
+- tests/hammer_radar/test_paper_opportunity_expansion.py
+- tests/hammer_radar/test_candidate_source_freshness_audit.py
+- docs/hammer_radar/live_readiness/R153_EXPANDED_PAPER_WATCH_AND_OPPORTUNITY_RECHECK.md
+
+REUSE / EXTEND:
+Reuse expanded paper watch records.
+Reuse strategy performance/outcome parsing if available.
+Reuse lane_controls.json.
+Reuse R145 entry-mode normalization where needed.
+Do not duplicate scoring logic if existing performance modules already expose usable summaries.
+Do not build a second trading strategy system.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/promotion_candidate_audit.py
+
+Expose:
+- build_promotion_candidate_audit
+- build_lane_family_key
+- load_recent_outcome_records
+- load_recent_expanded_paper_watch_records
+- build_lane_family_performance_summary
+- build_lane_family_opportunity_summary
+- score_promotion_candidate_family
+- classify_promotion_candidate_readiness
+- append_promotion_candidate_audit_record
+- load_promotion_candidate_audit_records
+- summarize_promotion_candidate_audits
+
+STATUS ENUM:
+- PROMOTION_CANDIDATE_AUDIT_READY
+- PROMOTION_CANDIDATE_AUDIT_REJECTED
+- PROMOTION_CANDIDATE_AUDIT_RECORDED
+- PROMOTION_CANDIDATE_AUDIT_BLOCKED
+- PROMOTION_CANDIDATE_AUDIT_ERROR
+
+READINESS ENUM:
+- NOT_ENOUGH_EVIDENCE
+- PAPER_ONLY_CONTINUE_COLLECTING
+- WATCHLIST_FOR_FUTURE_TINY_LIVE
+- STRONG_PAPER_CANDIDATE_REQUIRES_REVIEW
+- DO_NOT_PROMOTE
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+PROMOTION FAMILY SCOPE:
+Audit BTCUSDT lane families from lane_controls.json:
+- 4m long ladder_close_50_618
+- 4m short ladder_close_50_618
+- 8m long ladder_close_50_618
+- 8m short ladder_close_50_618
+- 13m long ladder_close_50_618
+- 13m short ladder_close_50_618
+- 44m long ladder_close_50_618
+- 44m short ladder_close_50_618
+
+The existing 13m/44m long tiny_live lanes can be included as incumbent tiny_live references, but do not recommend changing them unless evidence says keep/review.
+
+SCORING INPUTS:
+Use available data from:
+- outcomes.ndjson
+- paper_executions.ndjson
+- expanded_paper_watch.ndjson
+- signals.ndjson
+- multi_symbol_paper_scans.ndjson
+- strategy_performance surfaces if reliable
+
+For each lane family, compute when possible:
+- signal_count
+- fresh_candidate_count
+- stale_candidate_count
+- paper_outcome_count
+- win_count
+- loss_count
+- stop_count
+- win_rate_pct
+- avg_pnl_pct
+- total_pnl_pct
+- fill_rate_pct if available
+- recent_direction_pressure
+- freshness_hit_rate_pct
+- evidence_window_start/end
+- sample_count_quality
+
+If fields are missing, do not invent them. Return null/unknown and classify accordingly.
+
+SCORING RULES:
+Do not recommend future tiny_live unless evidence is meaningful.
+
+Suggested thresholds:
+- minimum paper outcome sample count for strong consideration: 30
+- minimum fresh candidate sample count: 10
+- win_rate target: >= 52% preferred
+- avg_pnl positive preferred
+- stop count should not dominate
+- freshness hit rate should be non-zero
+
+Short lanes:
+- may be WATCHLIST_FOR_FUTURE_TINY_LIVE or STRONG_PAPER_CANDIDATE_REQUIRES_REVIEW
+- must never be auto-promoted
+- must explicitly say future short tiny_live requires separate strategy review:
+  opposite golden pocket as resistance, short-specific stop/TP, and operator approval
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "audit_recorded": false,
+  "audit_id": null,
+  "record_audit_requested": false,
+  "confirmation_valid": false,
+  "lane_families": {
+    "<lane_key>": {
+      "mode": "paper|tiny_live",
+      "direction": "...",
+      "timeframe": "...",
+      "entry_mode": "ladder_close_50_618",
+      "performance": {...},
+      "opportunity": {...},
+      "promotion_score": ...,
+      "readiness": "...",
+      "why": "...",
+      "risks": [...],
+      "recommended_next_action": "..."
+    }
+  },
+  "ranked_candidates": [...],
+  "incumbent_tiny_live_review": {...},
+  "short_lane_review": {
+    "shorts_seen": true/false,
+    "best_short_family": "...",
+    "shorts_remain_paper_only": true,
+    "requires_future_short_strategy_review": true
+  },
+  "recommended_next_operator_move": "KEEP_COLLECTING_EXPANDED_PAPER|RUN_R155_SHORT_STRATEGY_REVIEW|RUN_R155_PROMOTION_PACKET_FOR_TOP_PAPER_LANE|WAIT_FOR_MORE_EVIDENCE",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live"
+  ],
+  "safe_commands": [...],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/promotion_candidate_audits.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM PROMOTION CANDIDATE AUDIT RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+promotion-candidate-audit
+
+Args:
+- --latest-outcomes <int>, default 5000
+- --latest-signals <int>, default 2000
+- --latest-watch-records <int>, default 200
+- --include-paper-lanes
+- --include-tiny-live-incumbents
+- --record-audit
+- --confirm-promotion-audit <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  promotion-candidate-audit \
+  --latest-outcomes 5000 \
+  --latest-signals 2000 \
+  --latest-watch-records 200 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  promotion-candidate-audit \
+  --record-audit \
+  --confirm-promotion-audit "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  promotion-candidate-audit \
+  --latest-outcomes 5000 \
+  --latest-signals 2000 \
+  --latest-watch-records 200 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents \
+  --record-audit \
+  --confirm-promotion-audit "I CONFIRM PROMOTION CANDIDATE AUDIT RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- expanded-paper-watch preview command
+- expanded-paper-watch record command
+- promotion-candidate-audit record command
+- candidate-source-freshness-audit command
+- no live commands
+- no lane mode apply commands
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_promotion_candidate_audit.py
+
+Test:
+- preview writes no audit
+- wrong confirmation rejects record
+- exact confirmation records audit only
+- paper lanes included
+- tiny_live incumbents included as reference only
+- short lanes remain paper-only
+- no lane mode apply commands emitted
+- no live commands emitted
+- ranking handles missing outcome fields
+- ranking identifies insufficient evidence
+- ranking can identify strong paper candidate from mocked positive samples
+- stop-dominated candidate becomes DO_NOT_PROMOTE or PAPER_ONLY_CONTINUE_COLLECTING
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/promotion_candidate_audit.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_promotion_candidate_audit.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_expanded_paper_watch.py \
+  tests/hammer_radar/test_paper_opportunity_expansion.py \
+  tests/hammer_radar/test_candidate_source_freshness_audit.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  promotion-candidate-audit \
+  --latest-outcomes 5000 \
+  --latest-signals 2000 \
+  --latest-watch-records 200 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents \
+  | jq '.status, .ranked_candidates[0:8], .incumbent_tiny_live_review, .short_lane_review, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  promotion-candidate-audit \
+  --record-audit \
+  --confirm-promotion-audit "wrong" \
+  | jq '.status, .confirmation_valid, .audit_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R154_PROMOTION_CANDIDATE_AUDIT_FROM_EXPANDED_PAPER.md
+
+Explain:
+- why R154 follows R153
+- paper evidence ranking
+- why no lane gets promoted here
+- how short lanes are handled
+- what thresholds mean
+- safe commands
+- no live execution
+- next possible phase
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R154.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R155_SHORT_STRATEGY_REVIEW_OR_TOP_LANE_PROMOTION_PACKET.md
+
+R155 should:
+- branch depending on R154 result
+- if best evidence is short: review short strategy specifically, including opposite golden pocket as resistance
+- if best evidence is long paper lane: build promotion packet only
+- no lane mode change without future explicit operator approval
+- no live execution
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Promotion audit added:
+Ranked candidates:
+Best paper lane family:
+Short review:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.

@@ -1697,6 +1697,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "promotion-candidate-audit":
+        from src.app.hammer_radar.operator.promotion_candidate_audit import (
+            build_promotion_candidate_audit,
+            format_promotion_candidate_audit_json,
+        )
+
+        print(
+            format_promotion_candidate_audit_json(
+                build_promotion_candidate_audit(
+                    log_dir=args.log_dir,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    latest_watch_records=args.latest_watch_records,
+                    include_paper_lanes=args.include_paper_lanes,
+                    include_tiny_live_incumbents=args.include_tiny_live_incumbents,
+                    record_audit=args.record_audit,
+                    confirm_promotion_audit=args.confirm_promotion_audit,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2640,6 +2660,18 @@ def _build_parser() -> argparse.ArgumentParser:
     expanded_paper_watch_parser.add_argument("--include-tiny-live-targets-as-observed", action="store_true")
     expanded_paper_watch_parser.add_argument("--record-watch", action="store_true")
     expanded_paper_watch_parser.add_argument("--confirm-expanded-paper-watch", default=None)
+
+    promotion_candidate_audit_parser = subparsers.add_parser(
+        "promotion-candidate-audit",
+        parents=[parent],
+    )
+    promotion_candidate_audit_parser.add_argument("--latest-outcomes", type=int, default=5000)
+    promotion_candidate_audit_parser.add_argument("--latest-signals", type=int, default=2000)
+    promotion_candidate_audit_parser.add_argument("--latest-watch-records", type=int, default=200)
+    promotion_candidate_audit_parser.add_argument("--include-paper-lanes", action="store_true")
+    promotion_candidate_audit_parser.add_argument("--include-tiny-live-incumbents", action="store_true")
+    promotion_candidate_audit_parser.add_argument("--record-audit", action="store_true")
+    promotion_candidate_audit_parser.add_argument("--confirm-promotion-audit", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
