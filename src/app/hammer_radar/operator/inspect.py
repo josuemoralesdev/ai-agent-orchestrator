@@ -1641,6 +1641,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "candidate-source-freshness-audit":
+        from src.app.hammer_radar.operator.candidate_source_freshness_audit import (
+            build_candidate_source_freshness_audit,
+            format_candidate_source_freshness_audit_json,
+        )
+
+        print(
+            format_candidate_source_freshness_audit_json(
+                build_candidate_source_freshness_audit(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    watch_id=args.watch_id,
+                    record_audit=args.record_audit,
+                    confirm_audit=args.confirm_audit,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2552,6 +2570,16 @@ def _build_parser() -> argparse.ArgumentParser:
     post_tiny_live_mode_watch_parser.add_argument("--include-watch-command", action="store_true")
     post_tiny_live_mode_watch_parser.add_argument("--record-watch-prep", action="store_true")
     post_tiny_live_mode_watch_parser.add_argument("--confirm-watch-prep", default=None)
+
+    candidate_source_audit_parser = subparsers.add_parser(
+        "candidate-source-freshness-audit",
+        parents=[parent],
+    )
+    candidate_source_audit_parser.add_argument("--latest-signals", type=int, default=1000)
+    candidate_source_audit_parser.add_argument("--latest-scans", type=int, default=2000)
+    candidate_source_audit_parser.add_argument("--watch-id", default=None)
+    candidate_source_audit_parser.add_argument("--record-audit", action="store_true")
+    candidate_source_audit_parser.add_argument("--confirm-audit", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
