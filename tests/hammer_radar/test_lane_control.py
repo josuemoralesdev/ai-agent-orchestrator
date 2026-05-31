@@ -23,7 +23,7 @@ class LaneControlTests(unittest.TestCase):
 
         self.assertEqual("1.0", controls["schema_version"])
         self.assertEqual("disabled", controls["default_mode"])
-        self.assertEqual(4, len(controls["lanes"]))
+        self.assertEqual(8, len(controls["lanes"]))
 
     def test_lane_keys_normalize_consistently(self) -> None:
         self.assertEqual(
@@ -49,6 +49,22 @@ class LaneControlTests(unittest.TestCase):
         self.assertEqual(
             "paper",
             get_lane_by_tuple("BTCUSDT", "4m", "long", "ladder_close_50_618", controls=controls)["mode"],
+        )
+        self.assertEqual(
+            "paper",
+            get_lane_by_tuple("BTCUSDT", "4m", "short", "ladder_close_50_618", controls=controls)["mode"],
+        )
+        self.assertEqual(
+            "paper",
+            get_lane_by_tuple("BTCUSDT", "8m", "short", "ladder_close_50_618", controls=controls)["mode"],
+        )
+        self.assertEqual(
+            "paper",
+            get_lane_by_tuple("BTCUSDT", "13m", "short", "ladder_close_50_618", controls=controls)["mode"],
+        )
+        self.assertEqual(
+            "paper",
+            get_lane_by_tuple("BTCUSDT", "44m", "short", "ladder_close_50_618", controls=controls)["mode"],
         )
 
     def test_unknown_lane_is_disabled(self) -> None:
@@ -136,8 +152,8 @@ class LaneControlTests(unittest.TestCase):
     def test_compact_status_omits_giant_recommendation_arrays(self) -> None:
         payload = build_lane_control_status(live_eligibility_matrix={"recommendations": []})
 
-        self.assertEqual(4, payload["configured_lanes_count"])
-        self.assertEqual(4, payload["active_lanes_count"])
+        self.assertEqual(8, payload["configured_lanes_count"])
+        self.assertEqual(8, payload["active_lanes_count"])
         self.assertIn("lanes", payload)
         self.assertNotIn("recommendations", payload)
 
@@ -157,8 +173,8 @@ class LaneControlTests(unittest.TestCase):
         )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(4, payload["configured_lanes_count"])
-        self.assertEqual(4, payload["active_lanes_count"])
+        self.assertEqual(8, payload["configured_lanes_count"])
+        self.assertEqual(8, payload["active_lanes_count"])
         self.assertNotIn("recommendations", payload)
         self.assertLess(len(result.stdout), 8000)
 
