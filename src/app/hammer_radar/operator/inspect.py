@@ -1678,6 +1678,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "expanded-paper-watch":
+        from src.app.hammer_radar.operator.expanded_paper_watch import (
+            build_expanded_paper_watch_preview,
+            format_expanded_paper_watch_json,
+        )
+
+        print(
+            format_expanded_paper_watch_json(
+                build_expanded_paper_watch_preview(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    all_paper_lanes=args.all_paper_lanes,
+                    include_tiny_live_targets_as_observed=args.include_tiny_live_targets_as_observed,
+                    record_watch=args.record_watch,
+                    confirm_expanded_paper_watch=args.confirm_expanded_paper_watch,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2610,6 +2629,17 @@ def _build_parser() -> argparse.ArgumentParser:
     paper_opportunity_expansion_parser.add_argument("--apply", action="store_true")
     paper_opportunity_expansion_parser.add_argument("--confirm-paper-expansion", default=None)
     paper_opportunity_expansion_parser.add_argument("--record-expansion", action="store_true")
+
+    expanded_paper_watch_parser = subparsers.add_parser(
+        "expanded-paper-watch",
+        parents=[parent],
+    )
+    expanded_paper_watch_parser.add_argument("--latest-signals", type=int, default=1000)
+    expanded_paper_watch_parser.add_argument("--latest-scans", type=int, default=2000)
+    expanded_paper_watch_parser.add_argument("--all-paper-lanes", action="store_true")
+    expanded_paper_watch_parser.add_argument("--include-tiny-live-targets-as-observed", action="store_true")
+    expanded_paper_watch_parser.add_argument("--record-watch", action="store_true")
+    expanded_paper_watch_parser.add_argument("--confirm-expanded-paper-watch", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
