@@ -53,6 +53,54 @@
       "freshness_seconds": 30,
       "cooldown_after_loss_minutes": 120,
       "require_protective_orders": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "4m",
+      "direction": "short",
+      "entry_mode": "ladder_close_50_618",
+      "mode": "paper",
+      "max_daily_trades": 1,
+      "max_daily_loss_pct": 0.1,
+      "freshness_seconds": 30,
+      "cooldown_after_loss_minutes": 120,
+      "require_protective_orders": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "8m",
+      "direction": "short",
+      "entry_mode": "ladder_close_50_618",
+      "mode": "paper",
+      "max_daily_trades": 1,
+      "max_daily_loss_pct": 0.15,
+      "freshness_seconds": 60,
+      "cooldown_after_loss_minutes": 120,
+      "require_protective_orders": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "13m",
+      "direction": "short",
+      "entry_mode": "ladder_close_50_618",
+      "mode": "paper",
+      "max_daily_trades": 1,
+      "max_daily_loss_pct": 0.2,
+      "freshness_seconds": 120,
+      "cooldown_after_loss_minutes": 120,
+      "require_protective_orders": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "44m",
+      "direction": "short",
+      "entry_mode": "ladder_close_50_618",
+      "mode": "paper",
+      "max_daily_trades": 1,
+      "max_daily_loss_pct": 0.2,
+      "freshness_seconds": 300,
+      "cooldown_after_loss_minutes": 180,
+      "require_protective_orders": true
     }
   ]
 }
