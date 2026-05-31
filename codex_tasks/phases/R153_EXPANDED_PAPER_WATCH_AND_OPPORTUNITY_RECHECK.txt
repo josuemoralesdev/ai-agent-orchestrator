@@ -1,0 +1,382 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R153 Expanded Paper Watch and Opportunity Recheck
+
+BRANCH:
+r153-expanded-paper-watch-and-opportunity-recheck
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R151 proved the 12h watcher was healthy but too narrow:
+- source feed live
+- watcher healthy
+- target tiny-live lanes got no fresh proof
+- short signals and wrong-timeframe signals were active
+
+R152 added an aggressive paper-only expansion tool:
+- preserve 13m long tiny_live
+- preserve 44m long tiny_live
+- add 4m/8m/13m/44m short paper lanes
+- preserve 4m/8m long paper lanes
+
+Now R153 must make the expanded paper scope observable and usable:
+- confirm expanded config state
+- run bounded paper watch across all paper lanes
+- collect opportunity distribution across long/short/timeframes
+- identify which paper lane family is producing fresh eligible candidates
+- keep live execution completely blocked
+
+CRITICAL SAFETY PRINCIPLE:
+Expanded paper watch is paper-only.
+It must not create live permission.
+It must not change lane modes.
+It must not call Binance.
+It must not place orders.
+It must not create executable payloads.
+
+CURRENT EXPECTED CONFIG AFTER HUMAN APPLY:
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|4m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|4m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|44m|short|ladder_close_50_618 mode=paper
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any new lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/watch_heartbeat.py
+- src/app/hammer_radar/operator/candidate_source_freshness_audit.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_paper_opportunity_expansion.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- tests/hammer_radar/test_candidate_source_freshness_audit.py
+- docs/hammer_radar/live_readiness/R152_AGGRESSIVE_PAPER_ONLY_OPPORTUNITY_EXPANSION.md
+
+REUSE / EXTEND:
+Reuse R150 bounded scan + heartbeat.
+Reuse R145 entry-mode normalization.
+Reuse lane_controls.json.
+Reuse R152 paper expansion definitions.
+Do not create a second lane system.
+Do not duplicate strategy scoring.
+Do not use live gate logic for paper lane observation.
+
+REQUIRED DESIGN:
+The old watcher focuses on recommended tiny-live lanes. R153 must add an expanded paper observation surface that can inspect all BTCUSDT paper lanes without creating live permission.
+
+Two acceptable implementation paths:
+1. Extend fresh-candidate-paper-proof-capture-loop with paper scope options.
+2. Create a new separate expanded-paper-watch command.
+
+Prefer separate command to avoid contaminating tiny-live proof semantics.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/expanded_paper_watch.py
+
+Expose:
+- build_expanded_paper_watch_preview
+- build_expanded_paper_lane_scope
+- evaluate_expanded_paper_candidates
+- build_expanded_paper_distribution
+- build_expanded_paper_safe_watch_command
+- append_expanded_paper_watch_record
+- load_expanded_paper_watch_records
+- summarize_expanded_paper_watch_records
+
+STATUS ENUM:
+- EXPANDED_PAPER_WATCH_PREVIEW
+- EXPANDED_PAPER_WATCH_READY
+- EXPANDED_PAPER_WATCH_REJECTED
+- EXPANDED_PAPER_WATCH_RECORDED
+- EXPANDED_PAPER_WATCH_TIMEOUT
+- EXPANDED_PAPER_WATCH_CAPTURED_PAPER_SIGNAL
+- EXPANDED_PAPER_WATCH_BLOCKED
+- EXPANDED_PAPER_WATCH_ERROR
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "record_watch_requested": false,
+  "confirmation_valid": false,
+  "watch_recorded": false,
+  "watch_id": null,
+  "expanded_scope": {
+    "paper_lanes": [...],
+    "tiny_live_lanes_observed_but_not_changed": [...],
+    "directions_covered": ["long", "short"],
+    "timeframes_covered": [...]
+  },
+  "lane_config_state": {
+    "<lane_key>": {
+      "mode": "paper|tiny_live",
+      "is_paper_observation_lane": true/false,
+      "is_tiny_live_target": true/false
+    }
+  },
+  "candidate_distribution": {
+    "latest_signals_checked": ...,
+    "by_timeframe_direction": {...},
+    "fresh_by_lane": {...},
+    "stale_by_lane": {...},
+    "top_fresh_lanes": [...],
+    "top_stale_lanes": [...]
+  },
+  "paper_opportunity_summary": {
+    "fresh_paper_candidates_count": ...,
+    "paper_capture_candidates": [...],
+    "short_paper_candidates_count": ...,
+    "long_paper_candidates_count": ...,
+    "best_next_paper_lane_family": "..."
+  },
+  "recommended_next_operator_move": "RUN_EXPANDED_PAPER_WATCH|RECORD_EXPANDED_PAPER_EVIDENCE|WAIT_FOR_FRESH_PAPER_CANDIDATE|RUN_R154_PROMOTION_CANDIDATE_AUDIT",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/expanded_paper_watch.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM EXPANDED PAPER WATCH RECORDING ONLY; NO LIVE LANES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+expanded-paper-watch
+
+Args:
+- --latest-signals <int>, default 1000
+- --latest-scans <int>, default 2000
+- --all-paper-lanes
+- --include-tiny-live-targets-as-observed
+- --record-watch
+- --confirm-expanded-paper-watch <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  expanded-paper-watch \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --all-paper-lanes \
+  --include-tiny-live-targets-as-observed
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  expanded-paper-watch \
+  --all-paper-lanes \
+  --record-watch \
+  --confirm-expanded-paper-watch "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  expanded-paper-watch \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --all-paper-lanes \
+  --include-tiny-live-targets-as-observed \
+  --record-watch \
+  --confirm-expanded-paper-watch "I CONFIRM EXPANDED PAPER WATCH RECORDING ONLY; NO LIVE LANES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- expanded-paper-watch preview command
+- expanded-paper-watch record command
+- candidate-source-freshness-audit command
+- paper-opportunity-expansion preview command
+- no live commands
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_expanded_paper_watch.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects record
+- exact confirmation records watch only
+- paper scope includes paper lanes long/short
+- tiny_live lanes are observed but not mutated
+- short lanes remain paper
+- no new tiny_live lanes created
+- candidate distribution counts by timeframe/direction
+- fresh/stale lane distribution works
+- safe commands contain no live submit/order/global arming
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/expanded_paper_watch.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_expanded_paper_watch.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_paper_opportunity_expansion.py \
+  tests/hammer_radar/test_candidate_source_freshness_audit.py \
+  tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  expanded-paper-watch \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --all-paper-lanes \
+  --include-tiny-live-targets-as-observed \
+  | jq '.status, .expanded_scope, .candidate_distribution, .paper_opportunity_summary, .recommended_next_operator_move, .recommended_next_engineering_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  expanded-paper-watch \
+  --all-paper-lanes \
+  --record-watch \
+  --confirm-expanded-paper-watch "wrong" \
+  | jq '.status, .confirmation_valid, .watch_recorded, .safety'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R153_EXPANDED_PAPER_WATCH_AND_OPPORTUNITY_RECHECK.md
+
+Explain:
+- why R153 follows R152
+- paper expansion purpose
+- how expanded paper watch works
+- why tiny-live lanes remain unchanged
+- why short lanes are paper-only
+- safe commands
+- no live execution
+- next possible R154 promotion candidate audit
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R153.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R154_PROMOTION_CANDIDATE_AUDIT_FROM_EXPANDED_PAPER.md
+
+R154 should:
+- use expanded paper watch records and recent outcome stats
+- identify which lane families deserve future tiny_live consideration
+- compare long/short/timeframes
+- no lane mode promotion without future explicit operator approval
+- no live execution
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Expanded paper watch added:
+Paper scope:
+Tiny-live lanes preserved:
+Candidate distribution summary:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended operator action after merge:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.
