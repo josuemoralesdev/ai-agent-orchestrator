@@ -1659,6 +1659,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "paper-opportunity-expansion":
+        from src.app.hammer_radar.operator.paper_opportunity_expansion import (
+            build_paper_opportunity_expansion_preview,
+            format_paper_opportunity_expansion_json,
+        )
+
+        print(
+            format_paper_opportunity_expansion_json(
+                build_paper_opportunity_expansion_preview(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    include_default_expansion=args.include_default_expansion,
+                    apply=args.apply,
+                    confirm_paper_expansion=args.confirm_paper_expansion,
+                    record_expansion=args.record_expansion,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2580,6 +2599,17 @@ def _build_parser() -> argparse.ArgumentParser:
     candidate_source_audit_parser.add_argument("--watch-id", default=None)
     candidate_source_audit_parser.add_argument("--record-audit", action="store_true")
     candidate_source_audit_parser.add_argument("--confirm-audit", default=None)
+
+    paper_opportunity_expansion_parser = subparsers.add_parser(
+        "paper-opportunity-expansion",
+        parents=[parent],
+    )
+    paper_opportunity_expansion_parser.add_argument("--latest-signals", type=int, default=1000)
+    paper_opportunity_expansion_parser.add_argument("--latest-scans", type=int, default=2000)
+    paper_opportunity_expansion_parser.add_argument("--include-default-expansion", action="store_true")
+    paper_opportunity_expansion_parser.add_argument("--apply", action="store_true")
+    paper_opportunity_expansion_parser.add_argument("--confirm-paper-expansion", default=None)
+    paper_opportunity_expansion_parser.add_argument("--record-expansion", action="store_true")
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

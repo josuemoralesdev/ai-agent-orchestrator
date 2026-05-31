@@ -1,0 +1,445 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R152 Aggressive Paper-Only Candidate Opportunity Expansion
+
+BRANCH:
+r152-aggressive-paper-only-opportunity-expansion
+
+PHASE CLASSIFICATION:
+Primary: EXTENSION OF EXISTING CAPABILITY
+Secondary: WIRING / INTEGRATION, DIAGNOSTIC / AUDIT, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R151 proved the 12h R150 watcher was healthy but captured no proof:
+- source feed is alive
+- services are active
+- watcher completed 720/720
+- paper_proof_captured=false
+- starvation_classification=TARGET_LANE_SIGNALS_ALL_STALE
+- target_lane_fresh_count=0
+- short_candidate_count was non-zero
+- wrong_timeframe_count was non-zero
+
+Current live target lanes are too narrow for proof discovery:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+We need to aggressively expand PAPER-ONLY opportunity visibility across scanned BTCUSDT timeframes and both directions so the system can collect candidate flow/proof/statistics without waiting forever on two long lanes.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase expands PAPER visibility only.
+It does NOT expand live execution.
+It does NOT set new lanes to tiny_live.
+It does NOT authorize shorts live.
+It does NOT call Binance.
+It does NOT place orders.
+
+TARGET OUTCOME:
+- Keep current tiny_live lanes unchanged:
+  - BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+  - BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- Add or surface paper-only lanes for both long and short across actively scanned BTCUSDT timeframes.
+- Make watcher/proof/audit surfaces able to see paper-only expanded opportunities.
+- Produce an opportunity distribution report and safe watch command.
+- No live execution.
+
+CURRENT VERIFIED STATE:
+- R143 unlock contract recorded.
+- R145 entry-mode bridge working.
+- R149 lane-control-status fast.
+- R150 watcher heartbeat + bounded scan working.
+- R151 source freshness audit says source feed is live and target candidates were stale.
+- lane_controls.json currently has:
+  - 13m long ladder_close_50_618: tiny_live
+  - 44m long ladder_close_50_618: tiny_live
+  - 8m long ladder_close_50_618: paper
+  - 4m long ladder_close_50_618: paper
+- signals show recent BTCUSDT 4m short/long and 13m long signals.
+- Current strategy discussion: if market direction is short, opposite golden pocket should be treated as resistance, but live short strategy is NOT authorized in this phase.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any new lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change the existing 13m/44m tiny_live modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/candidate_source_freshness_audit.py
+- src/app/hammer_radar/operator/post_tiny_live_mode_fresh_proof_watch.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_fresh_signal_router.py
+- tests/hammer_radar/test_candidate_source_freshness_audit.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- docs/hammer_radar/live_readiness/R151_CANDIDATE_SOURCE_FRESHNESS_AND_PROOF_STARVATION_AUDIT.md
+
+REUSE / EXTEND:
+Reuse existing lane_controls.json schema.
+Reuse R145 entry-mode derivation.
+Reuse R150 bounded watcher.
+Reuse R151 audit classification logic where useful.
+Do not create a separate competing lane config system.
+Do not duplicate strategy scoring logic.
+
+SCANNED TIMEFRAMES:
+Discover from recent signals and existing config, but at minimum support BTCUSDT:
+- 4m
+- 8m
+- 13m
+- 44m
+
+If recent logs show more BTCUSDT timeframes clearly scanned, include them in the audit/report and optionally in generated paper-only recommendations, but do not blindly add exotic timeframes unless they are present in recent signals/scans or existing code constants.
+
+DEFAULT EXPANSION LANES:
+Paper-only BTCUSDT lanes for:
+- 4m long ladder_close_50_618
+- 4m short ladder_close_50_618
+- 8m long ladder_close_50_618
+- 8m short ladder_close_50_618
+- 13m long ladder_close_50_618 existing tiny_live, preserve
+- 13m short ladder_close_50_618 paper
+- 44m long ladder_close_50_618 existing tiny_live, preserve
+- 44m short ladder_close_50_618 paper
+
+Existing long paper lanes must be preserved unless target tiny_live lanes already intentionally changed.
+Existing risk limits should be conservative. For new paper lanes use:
+- mode=paper
+- max_daily_trades=1
+- max_daily_loss_pct=0.10 for 4m
+- max_daily_loss_pct=0.15 for 8m
+- max_daily_loss_pct=0.20 for 13m
+- max_daily_loss_pct=0.20 for 44m
+- freshness_seconds:
+  - 4m: 30
+  - 8m: 60
+  - 13m: 120
+  - 44m: 300
+- cooldown_after_loss_minutes:
+  - 4m/8m/13m: 120
+  - 44m: 180
+- require_protective_orders=true
+
+IMPORTANT:
+Because these are paper lanes, risk fields are metadata and guardrails only. They do not authorize live orders.
+
+IMPLEMENTATION OPTION:
+Prefer generating a preview/runbook and patching config only with a confirmed operator phrase. If existing lane-control-command is only for set-mode and not add-lane, implement a new explicit paper expansion command.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/paper_opportunity_expansion.py
+
+Expose:
+- build_default_paper_expansion_lanes
+- build_recent_btcusdt_timeframe_direction_distribution
+- build_paper_opportunity_expansion_preview
+- validate_paper_expansion_plan
+- apply_paper_opportunity_expansion_plan
+- append_paper_opportunity_expansion_record
+- load_paper_opportunity_expansion_records
+- summarize_paper_opportunity_expansions
+
+STATUS ENUM:
+- PAPER_OPPORTUNITY_EXPANSION_PREVIEW
+- PAPER_OPPORTUNITY_EXPANSION_READY
+- PAPER_OPPORTUNITY_EXPANSION_REJECTED
+- PAPER_OPPORTUNITY_EXPANSION_APPLIED
+- PAPER_OPPORTUNITY_EXPANSION_BLOCKED
+- PAPER_OPPORTUNITY_EXPANSION_ERROR
+
+EXPANSION MODE:
+- preview by default
+- apply only with exact confirmation phrase
+- apply mutates only configs/hammer_radar/lane_controls.json
+- apply may add missing paper lanes and preserve existing lane modes
+- apply must never change tiny_live lanes to anything else
+- apply must never set new lanes to tiny_live
+
+CONFIRMATION PHRASE:
+I CONFIRM PAPER OPPORTUNITY EXPANSION ONLY; NO LIVE LANES; NO ORDER; NO BINANCE CALL.
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "apply_requested": false,
+  "confirmation_valid": false,
+  "config_written": false,
+  "expansion_recorded": false,
+  "expansion_id": null,
+  "existing_lanes": {...},
+  "proposed_lanes": [...],
+  "lanes_to_add": [...],
+  "lanes_to_preserve": [...],
+  "lanes_not_modified": [...],
+  "forbidden_changes_blocked": [...],
+  "recent_distribution": {
+    "latest_signals_checked": ...,
+    "by_timeframe_direction": {...},
+    "target_tiny_live_lanes": [...],
+    "short_signal_count": ...,
+    "long_signal_count": ...
+  },
+  "paper_watch_scope": {
+    "paper_lanes_count": ...,
+    "tiny_live_lanes_count": ...,
+    "directions_covered": ["long", "short"],
+    "timeframes_covered": [...]
+  },
+  "expected_after_apply": {
+    "new_lanes_are_paper_only": true,
+    "existing_tiny_live_lanes_preserved": true,
+    "live_execution_enabled": false,
+    "orders_allowed": false
+  },
+  "recommended_next_operator_move": "APPLY_PAPER_OPPORTUNITY_EXPANSION|RUN_EXPANDED_PAPER_WATCH|RUN_R153_OPPORTUNITY_DISTRIBUTION_RECHECK",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- global_live_flags_changed=false
+- config_written=false unless apply is valid
+
+LEDGER:
+logs/hammer_radar_forward/paper_opportunity_expansions.ndjson
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+paper-opportunity-expansion
+
+Args:
+- --latest-signals <int>, default 1000
+- --latest-scans <int>, default 2000
+- --include-default-expansion
+- --apply
+- --confirm-paper-expansion <phrase>
+- --record-expansion
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  paper-opportunity-expansion \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --include-default-expansion
+
+Rejected apply:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  paper-opportunity-expansion \
+  --include-default-expansion \
+  --apply \
+  --confirm-paper-expansion "wrong"
+
+Confirmed apply, human-run after tests:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  paper-opportunity-expansion \
+  --include-default-expansion \
+  --apply \
+  --record-expansion \
+  --confirm-paper-expansion "I CONFIRM PAPER OPPORTUNITY EXPANSION ONLY; NO LIVE LANES; NO ORDER; NO BINANCE CALL."
+
+DO NOT run confirmed apply inside Codex against the real config unless explicitly instructed by the human operator after tests.
+Codex may run preview and rejected apply.
+
+AFTER APPLY EXPECTED CONFIG:
+- 13m long remains tiny_live
+- 44m long remains tiny_live
+- all new shorts are paper
+- all non-target longs are paper
+- no new tiny_live lanes
+
+REQUIRED WATCH/AUDIT SUPPORT:
+Patch candidate source freshness audit or add an expansion audit so it can report:
+- paper-only expanded lane coverage
+- whether short signals are appearing
+- whether 4m/8m/13m/44m opportunities are appearing
+- candidate distribution by direction/timeframe
+- no live permission implied
+
+REQUIRED DOC:
+Create:
+docs/hammer_radar/live_readiness/R152_AGGRESSIVE_PAPER_ONLY_OPPORTUNITY_EXPANSION.md
+
+Explain:
+- why R152 follows R151
+- why waiting on two target lanes is too narrow
+- why expansion is paper-only
+- why shorts are paper-only and not live
+- how existing tiny_live lanes are preserved
+- preview/apply commands
+- post-apply checks
+- no live execution
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R152.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R153_EXPANDED_PAPER_WATCH_AND_OPPORTUNITY_RECHECK.md
+
+R153 should:
+- run bounded watcher/audit over expanded paper scope
+- collect proof/candidate distribution across long/short and timeframes
+- identify best next live candidate family
+- no live execution
+- no new tiny_live modes without future operator approval
+
+TESTS:
+Create:
+tests/hammer_radar/test_paper_opportunity_expansion.py
+
+Update related tests if needed:
+- tests/hammer_radar/test_lane_control.py
+- tests/hammer_radar/test_candidate_source_freshness_audit.py
+- tests/hammer_radar/test_fresh_signal_router.py
+
+Test:
+- preview writes no config
+- wrong confirmation rejects apply
+- exact confirmation applies only paper lanes in temp config path
+- existing 13m/44m long tiny_live lanes are preserved
+- no short lane is tiny_live
+- no new lane is tiny_live
+- all new expansion lanes are paper
+- default expansion covers 4m/8m/13m/44m long/short as specified
+- risk limits are conservative
+- forbidden changes are blocked
+- distribution counts long/short and timeframe signals
+- safety flags clean
+- no Binance/order/payload/network/env/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/paper_opportunity_expansion.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_paper_opportunity_expansion.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_candidate_source_freshness_audit.py \
+  tests/hammer_radar/test_fresh_signal_router.py \
+  tests/hammer_radar/test_lane_control.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  paper-opportunity-expansion \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --include-default-expansion \
+  | jq '.status, .existing_lanes, .lanes_to_add, .lanes_to_preserve, .recent_distribution, .paper_watch_scope, .expected_after_apply, .recommended_next_operator_move, .safety'
+
+Rejected apply:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  paper-opportunity-expansion \
+  --include-default-expansion \
+  --apply \
+  --confirm-paper-expansion "wrong" \
+  | jq '.status, .confirmation_valid, .config_written, .safety'
+
+Config verification after preview/rejected only:
+git diff -- configs/hammer_radar/lane_controls.json
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Paper expansion added:
+Lanes proposed:
+Tiny-live lanes preserved:
+Short lanes mode:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended operator action after merge:
+
+Aggressive mode:
+Complete in one pass.
+Do not run confirmed real config apply inside Codex.
+Do not perform live trading actions.
