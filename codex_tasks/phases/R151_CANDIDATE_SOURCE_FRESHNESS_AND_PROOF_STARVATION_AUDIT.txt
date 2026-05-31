@@ -1,0 +1,359 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R151 Candidate Source Freshness and Proof Starvation Audit
+
+BRANCH:
+r151-candidate-source-freshness-proof-starvation-audit
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+GOAL:
+Explain why the post-R150 12h fresh proof watcher completed 720 iterations without capturing paper proof.
+
+Verified state:
+- BTCUSDT 13m long ladder_close_50_618 lane is tiny_live.
+- BTCUSDT 44m long ladder_close_50_618 lane is tiny_live.
+- Binance read-only connector is configured safely.
+- R145 entry-mode derivation bridge works.
+- R149 lane status is fast.
+- R150 watcher heartbeat and bounded scan work.
+- 12h watcher completed:
+  - status: FRESH_CANDIDATE_WATCH_TIMEOUT
+  - max_iterations: 720
+  - iterations_completed: 720
+  - paper_proof_captured: false
+  - captured_lane_key: null
+  - next_operator_move: WAIT_FOR_FRESH_CANDIDATE
+
+R151 must determine whether the miss was caused by:
+1. no fresh market/scanner input,
+2. scanner/service stopped,
+3. no BTCUSDT 13m/44m long candidates during window,
+4. candidates existed but were stale,
+5. candidates existed but were short direction,
+6. candidates existed but were wrong timeframe,
+7. candidates existed but entry mode / lane normalization mismatch,
+8. proof watcher scan window missed relevant candidates,
+9. proof capture path blocked for another reason.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not widen lanes as an implementation change.
+- Do not add shorts as an implementation change.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/watch_heartbeat.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/post_tiny_live_mode_fresh_proof_watch.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/*.ndjson usage patterns
+- tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py
+- tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py
+- docs/hammer_radar/live_readiness/R150_FAST_FRESH_PROOF_WATCH_HEARTBEAT_BOUNDED_SCAN.md
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/candidate_source_freshness_audit.py
+
+Expose:
+- build_candidate_source_freshness_audit
+- load_recent_watch_heartbeats
+- load_recent_signal_source_summary
+- load_recent_scan_source_summary
+- analyze_watch_window_starvation
+- classify_proof_starvation_reason
+- build_candidate_source_next_action
+- append_candidate_source_freshness_audit_record
+- load_candidate_source_freshness_audit_records
+- summarize_candidate_source_freshness_audits
+
+STATUS ENUM:
+- CANDIDATE_SOURCE_AUDIT_READY
+- CANDIDATE_SOURCE_AUDIT_REJECTED
+- CANDIDATE_SOURCE_AUDIT_RECORDED
+- CANDIDATE_SOURCE_AUDIT_BLOCKED
+- CANDIDATE_SOURCE_AUDIT_ERROR
+
+STARVATION CLASSIFICATION ENUM:
+- SOURCE_FEED_STALE_OR_STOPPED
+- NO_TARGET_LANE_SIGNALS_DURING_WINDOW
+- TARGET_LANE_SIGNALS_ALL_STALE
+- TARGET_TIMEFRAME_PRESENT_BUT_WRONG_DIRECTION
+- TARGET_DIRECTION_PRESENT_BUT_WRONG_TIMEFRAME
+- ENTRY_MODE_OR_LANE_KEY_MISMATCH
+- WATCH_SCAN_WINDOW_TOO_NARROW
+- PAPER_CAPTURE_BLOCKED_AFTER_ELIGIBLE_SIGNAL
+- WATCHER_HEALTHY_MARKET_QUIET
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+INPUTS / SOURCES:
+Use:
+- logs/hammer_radar_forward/fresh_candidate_paper_proof_watch_heartbeats.ndjson
+- logs/hammer_radar_forward/fresh_candidate_paper_proof_capture_loop.ndjson
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson
+- logs/hammer_radar_forward/paper_refresh_runs.ndjson
+- logs/hammer_radar_forward/market_intelligence_snapshots.ndjson
+- configs/hammer_radar/lane_controls.json
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "audit_recorded": false,
+  "audit_id": null,
+  "watch_window": {
+    "watch_id": "...",
+    "max_iterations": 720,
+    "iterations_completed": 720,
+    "started_at": "...",
+    "ended_at": "...",
+    "paper_proof_captured": false
+  },
+  "target_lanes": [...],
+  "source_freshness": {
+    "signals_latest_timestamp": "...",
+    "signals_mtime": "...",
+    "paper_scans_latest_timestamp": "...",
+    "paper_scans_mtime": "...",
+    "paper_refresh_latest_timestamp": "...",
+    "market_intelligence_latest_timestamp": "...",
+    "source_appears_live": true/false
+  },
+  "watcher_health": {
+    "heartbeat_count": ...,
+    "last_heartbeat_status": "WATCH_EXITED",
+    "avg_iteration_elapsed_seconds": ...,
+    "max_iteration_elapsed_seconds": ...,
+    "performance_guard_triggered": false
+  },
+  "candidate_distribution": {
+    "latest_signals_checked": ...,
+    "target_lane_exact_or_normalized_count": ...,
+    "target_lane_fresh_count": ...,
+    "target_lane_stale_count": ...,
+    "target_timeframe_wrong_direction_count": ...,
+    "short_candidate_count": ...,
+    "wrong_timeframe_count": ...
+  },
+  "top_blockers": [...],
+  "starvation_classification": "...",
+  "why_no_proof": "...",
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable"
+  ],
+  "record_audit_requested": false,
+  "confirmation_valid": false,
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+RECOMMENDED NEXT MOVES:
+If source feed stale/stopped:
+- recommend checking/restarting paper refresh/radar services manually, but do not restart in Codex.
+
+If target lane signals all stale:
+- recommend continuing watcher or scheduling bounded watcher service.
+
+If wrong direction dominates:
+- recommend a future R152 short-lane paper-only betrayal/short candidate audit, not live short.
+
+If no target lane signals but source is live:
+- recommend R152 Candidate Opportunity Expansion Audit:
+  - compare 4m/8m/13m/44m/88m long/short paper stats
+  - do not change live lanes yet.
+
+If scan window too narrow:
+- recommend increasing latest-signals in watcher safely.
+
+If eligible signal existed but proof capture blocked:
+- recommend fixing proof capture blocker.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+candidate-source-freshness-audit
+
+Args:
+- --latest-signals <int>, default 1000
+- --latest-scans <int>, default 2000
+- --watch-id optional
+- --record-audit
+- --confirm-audit <phrase>
+
+Confirmation phrase:
+I CONFIRM CANDIDATE SOURCE AUDIT RECORDING ONLY; NO ORDER; NO BINANCE CALL.
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  candidate-source-freshness-audit \
+  --latest-signals 1000 \
+  --latest-scans 2000
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  candidate-source-freshness-audit \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --record-audit \
+  --confirm-audit "I CONFIRM CANDIDATE SOURCE AUDIT RECORDING ONLY; NO ORDER; NO BINANCE CALL."
+
+LEDGER:
+logs/hammer_radar_forward/candidate_source_freshness_audits.ndjson
+
+TESTS:
+Create:
+tests/hammer_radar/test_candidate_source_freshness_audit.py
+
+Test:
+- preview writes no audit
+- wrong confirmation rejects record
+- exact confirmation records audit only
+- source stale classification
+- all target signals stale classification
+- no target lane signals classification
+- wrong direction dominates classification
+- watcher healthy market quiet classification
+- scan window too narrow classification if detectable
+- safety flags all false
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/candidate_source_freshness_audit.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_candidate_source_freshness_audit.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py \
+  tests/hammer_radar/test_fresh_candidate_paper_proof_capture_loop.py \
+  tests/hammer_radar/test_post_tiny_live_mode_fresh_proof_watch.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  candidate-source-freshness-audit \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  | jq '.status, .watch_window, .source_freshness, .watcher_health, .candidate_distribution, .starvation_classification, .why_no_proof, .recommended_next_operator_move, .recommended_next_engineering_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  candidate-source-freshness-audit \
+  --record-audit \
+  --confirm-audit "wrong" \
+  | jq '.status, .confirmation_valid, .audit_recorded, .safety'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R151_CANDIDATE_SOURCE_FRESHNESS_AND_PROOF_STARVATION_AUDIT.md
+
+Explain:
+- why R151 follows a healthy 720 watcher timeout
+- how to distinguish market quiet vs source stale vs routing/proof capture bug
+- classifications
+- safe commands
+- no live execution
+- next possible phase
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R151.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R152_CANDIDATE_OPPORTUNITY_EXPANSION_AUDIT.md
+
+R152 should:
+- compare long/short and timeframe opportunity distribution
+- identify whether current live target lanes are too narrow
+- recommend paper-only expansion candidates
+- no live execution
+- no lane widening without future operator approval
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Audit added:
+Classifications added:
+CLI added:
+Tests run:
+Validation results:
+Smoke output summary:
+Starvation classification:
+Recommended next operator move:
+Recommended next engineering move:
+Safety result:
+
+Aggressive mode:
+Complete in one pass.
+Do not restart services.
+Do not start watcher automatically.
+Do not perform live trading actions.
