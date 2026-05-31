@@ -1,0 +1,545 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R155 Full-Spectrum Betrayal + Short Strategy Review + Tiny-Live Candidate Door Finder
+
+BRANCH:
+r155-full-spectrum-betrayal-short-strategy-review
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: EXTENSION OF EXISTING CAPABILITY, WIRING / INTEGRATION, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R154 showed that expanded paper evidence is pointing away from the original narrow tiny-live doorway.
+
+Key R154 findings:
+- Top paper candidates included:
+  - BTCUSDT|4m|long|ladder_close_50_618 score 64, NOT_ENOUGH_EVIDENCE
+  - BTCUSDT|8m|short|ladder_close_50_618 score 64, NOT_ENOUGH_EVIDENCE
+  - BTCUSDT|4m|short|ladder_close_50_618 score 63, NOT_ENOUGH_EVIDENCE
+  - BTCUSDT|13m|short|ladder_close_50_618 score 63, NOT_ENOUGH_EVIDENCE
+- Existing 13m long tiny_live reference looked bad:
+  - win_rate around 32%
+  - avg_pnl negative
+  - readiness DO_NOT_PROMOTE
+- Existing 44m long tiny_live reference had low sample:
+  - win_rate around 50%
+  - avg_pnl slightly positive
+  - readiness NOT_ENOUGH_EVIDENCE
+- R154 short review:
+  - best_short_family: BTCUSDT|8m|short|ladder_close_50_618
+  - shorts_seen: true
+  - shorts_remain_paper_only: true
+  - future short tiny_live requires separate strategy review
+
+The operator hypothesis:
+- Betrayal/inverse framework may show 8m short or other short lanes with stronger effectiveness.
+- We need full-spectrum tracking across long/short and timeframes to find the right tiny-live door.
+- If current market direction is short, opposite golden pocket should be treated as resistance for short strategy review.
+- But live short is NOT authorized in this phase.
+
+PURPOSE:
+Build a full-spectrum evidence audit that combines:
+1. current lane family performance,
+2. expanded paper candidates,
+3. betrayal/inverse performance,
+4. direction/timeframe opportunity distribution,
+5. short-specific strategy review notes,
+6. candidate recommendation for the next future tiny-live review packet.
+
+This phase must be aggressive in evidence coverage but conservative in execution permissions.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is an audit/review only.
+It does NOT promote lanes.
+It does NOT set short lanes to tiny_live.
+It does NOT change lane config.
+It does NOT call Binance.
+It does NOT place orders.
+It does NOT create executable order payloads.
+
+CURRENT EXPECTED CONFIG:
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|4m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|long|ladder_close_50_618 mode=paper
+- BTCUSDT|4m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|44m|short|ladder_close_50_618 mode=paper
+
+FULL-SPECTRUM TIMEFRAME SCOPE:
+At minimum:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 4h
+- 444m
+- 666m
+- 888m
+
+If the repo/logs use 4H instead of 4h, normalize display but preserve raw keys.
+
+FULL-SPECTRUM DIRECTION SCOPE:
+- long
+- short
+
+ENTRY MODE FOCUS:
+Primary:
+- ladder_close_50_618
+
+Also inspect if available:
+- fib_618
+- fib_650
+- market_close
+- ladder_22_44_22
+- ladder_382_50_618
+
+But the ranking should center on ladder_close_50_618 because current lane controls use it.
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/candidate_source_freshness_audit.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py
+- src/app/hammer_radar/operator/betrayal_shadow_outcomes.py if present
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- tests/hammer_radar/test_promotion_candidate_audit.py
+- tests/hammer_radar/test_expanded_paper_watch.py
+- docs/hammer_radar/live_readiness/R154_PROMOTION_CANDIDATE_AUDIT_FROM_EXPANDED_PAPER.md
+
+REUSE / EXTEND:
+Reuse R154 promotion candidate audit logic.
+Reuse existing betrayal/inverse modules if available.
+Reuse expanded paper watch records.
+Reuse strategy performance parsers.
+Do not duplicate full outcome parsing if a module already provides summary.
+Do not create another config system.
+Do not build execution logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+
+Expose:
+- build_full_spectrum_betrayal_short_review
+- build_full_spectrum_lane_family_scope
+- load_recent_strategy_outcomes
+- load_recent_betrayal_shadow_outcomes
+- build_direction_timeframe_matrix
+- build_entry_mode_matrix
+- build_betrayal_inverse_matrix
+- build_short_strategy_review
+- score_full_spectrum_candidate_family
+- classify_full_spectrum_readiness
+- build_next_tiny_live_candidate_door_recommendation
+- append_full_spectrum_betrayal_review_record
+- load_full_spectrum_betrayal_review_records
+- summarize_full_spectrum_betrayal_reviews
+
+STATUS ENUM:
+- FULL_SPECTRUM_BETRAYAL_REVIEW_READY
+- FULL_SPECTRUM_BETRAYAL_REVIEW_REJECTED
+- FULL_SPECTRUM_BETRAYAL_REVIEW_RECORDED
+- FULL_SPECTRUM_BETRAYAL_REVIEW_BLOCKED
+- FULL_SPECTRUM_BETRAYAL_REVIEW_ERROR
+
+READINESS ENUM:
+- NOT_ENOUGH_EVIDENCE
+- PAPER_ONLY_CONTINUE_COLLECTING
+- SHORT_STRATEGY_REVIEW_REQUIRED
+- WATCHLIST_FOR_FUTURE_TINY_LIVE
+- STRONG_PAPER_CANDIDATE_REQUIRES_REVIEW
+- INCUMBENT_TINY_LIVE_SHOULD_BE_REVIEWED
+- DO_NOT_PROMOTE
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+STRATEGY INTERPRETATION REQUIREMENTS:
+For shorts:
+- Treat short golden pocket as resistance conceptually.
+- Define short-side review language:
+  "For short candidates, the golden pocket acts as resistance/retrace zone, not support."
+- Do not change calculation formulas unless existing code already supports short-side inverse/reversal semantics.
+- Do not claim short strategy is live-ready without evidence.
+- Short tiny-live requires future explicit review and operator approval.
+
+For betrayal/inverse:
+- If betrayal/inverse records exist, compute:
+  - original direction outcome stats
+  - inverse direction hypothetical stats
+  - inverse win rate
+  - inverse avg pnl if available
+  - sample count
+  - confidence label
+- If betrayal data is missing or incomplete, report null/unknown honestly.
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "audit_recorded": false,
+  "audit_id": null,
+  "record_audit_requested": false,
+  "confirmation_valid": false,
+  "scope": {
+    "symbol": "BTCUSDT",
+    "timeframes": [...],
+    "directions": ["long", "short"],
+    "entry_modes": [...]
+  },
+  "direction_timeframe_matrix": {
+    "4m|long": {...},
+    "4m|short": {...},
+    "8m|long": {...},
+    "8m|short": {...}
+  },
+  "entry_mode_matrix": {
+    "ladder_close_50_618": {...}
+  },
+  "betrayal_inverse_matrix": {
+    "8m|short": {
+      "sample_count": ...,
+      "original_win_rate_pct": ...,
+      "inverse_win_rate_pct": ...,
+      "inverse_advantage_pct": ...,
+      "confidence": "LOW|MEDIUM|HIGH|UNKNOWN"
+    }
+  },
+  "short_strategy_review": {
+    "shorts_seen": true/false,
+    "best_short_family": "...",
+    "short_golden_pocket_interpretation": "resistance/retrace zone",
+    "requires_future_short_strategy_review": true,
+    "shorts_remain_paper_only": true,
+    "notes": [...]
+  },
+  "candidate_rankings": [
+    {
+      "lane_family": "BTCUSDT|8m|short|ladder_close_50_618",
+      "mode": "paper",
+      "direction": "short",
+      "timeframe": "8m",
+      "score": ...,
+      "readiness": "...",
+      "why": "...",
+      "risks": [...],
+      "recommended_next_action": "..."
+    }
+  ],
+  "incumbent_tiny_live_review": {
+    "BTCUSDT|13m|long|ladder_close_50_618": {...},
+    "BTCUSDT|44m|long|ladder_close_50_618": {...}
+  },
+  "next_tiny_live_candidate_door": {
+    "recommended_family": "...",
+    "recommendation_type": "PAPER_CONTINUE|PROMOTION_PACKET_REVIEW|SHORT_STRATEGY_REVIEW|INCUMBENT_REVIEW",
+    "operator_summary": "...",
+    "requires_future_operator_approval": true,
+    "config_change_allowed_now": false
+  },
+  "recommended_next_operator_move": "RUN_EXPANDED_PAPER_WATCH|RUN_R156_SHORT_STRATEGY_PACKET|RUN_R156_TOP_LANE_PROMOTION_PACKET|KEEP_COLLECTING_EVIDENCE|REVIEW_INCUMBENT_TINY_LIVE_LANES",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+SCORING GUIDANCE:
+Score should consider:
+- signal activity
+- fresh candidate activity
+- paper outcome count
+- win rate
+- avg pnl
+- stop dominance
+- betrayal/inverse advantage
+- direction pressure
+- sample quality
+
+Suggested score bands:
+- 0-39: weak / do not promote
+- 40-59: paper continue
+- 60-74: watchlist / needs evidence
+- 75-84: strong paper candidate requires review
+- 85+: exceptional, still requires review
+
+Do not let a lane score high on signal count alone.
+Do not let betrayal/inverse advantage dominate with low sample.
+Require sample quality labels.
+
+LEDGER:
+logs/hammer_radar_forward/full_spectrum_betrayal_short_reviews.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FULL SPECTRUM BETRAYAL REVIEW RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+full-spectrum-betrayal-short-review
+
+Args:
+- --latest-outcomes <int>, default 10000
+- --latest-signals <int>, default 3000
+- --latest-betrayal <int>, default 5000
+- --latest-watch-records <int>, default 500
+- --include-paper-lanes
+- --include-tiny-live-incumbents
+- --include-betrayal-inverse
+- --record-review
+- --confirm-full-spectrum-review <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-betrayal-short-review \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents \
+  --include-betrayal-inverse
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-betrayal-short-review \
+  --record-review \
+  --confirm-full-spectrum-review "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-betrayal-short-review \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents \
+  --include-betrayal-inverse \
+  --record-review \
+  --confirm-full-spectrum-review "I CONFIRM FULL SPECTRUM BETRAYAL REVIEW RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- expanded-paper-watch preview command
+- expanded-paper-watch record command
+- promotion-candidate-audit command
+- full-spectrum-betrayal-short-review record command
+- candidate-source-freshness-audit command
+- no live commands
+- no lane mode apply commands
+
+REQUIRED TESTS:
+Create:
+tests/hammer_radar/test_full_spectrum_betrayal_short_review.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects record
+- exact confirmation records review only
+- full spectrum includes long/short and timeframes
+- short strategy review marks golden pocket as resistance/retrace zone
+- short lanes remain paper-only
+- no lane mode apply commands emitted
+- no live commands emitted
+- betrayal inverse matrix handles available mocked records
+- betrayal inverse matrix handles missing records honestly
+- candidate ranking does not score high on signal count alone
+- low sample betrayal advantage does not auto-promote
+- incumbent tiny_live lanes reviewed but not changed
+- config_written false
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_full_spectrum_betrayal_short_review.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_promotion_candidate_audit.py \
+  tests/hammer_radar/test_expanded_paper_watch.py \
+  tests/hammer_radar/test_paper_opportunity_expansion.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-betrayal-short-review \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500 \
+  --include-paper-lanes \
+  --include-tiny-live-incumbents \
+  --include-betrayal-inverse \
+  | jq '.status, .candidate_rankings[0:10], .betrayal_inverse_matrix, .short_strategy_review, .next_tiny_live_candidate_door, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-betrayal-short-review \
+  --record-review \
+  --confirm-full-spectrum-review "wrong" \
+  | jq '.status, .confirmation_valid, .audit_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R155_FULL_SPECTRUM_BETRAYAL_SHORT_STRATEGY_REVIEW.md
+
+Explain:
+- why R155 follows R154
+- why numbers pushed us beyond the narrow long-only doorway
+- betrayal/inverse framework
+- short golden pocket as resistance/retrace zone
+- full-spectrum ranking
+- why no lane is promoted here
+- no live execution
+- next possible phase
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R155.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R156_SHORT_STRATEGY_PACKET_OR_TOP_LANE_PROMOTION_REVIEW.md
+
+R156 should:
+- branch based on R155 result
+- if best door is short, build short strategy packet:
+  - opposite golden pocket as resistance
+  - short-specific stop/TP
+  - paper evidence thresholds
+  - no live execution
+- if best door is long, build top lane promotion packet:
+  - evidence summary
+  - risk contract review
+  - no lane mode change without explicit future operator approval
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Full-spectrum audit added:
+Betrayal inverse matrix:
+Short strategy review:
+Candidate door recommendation:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.

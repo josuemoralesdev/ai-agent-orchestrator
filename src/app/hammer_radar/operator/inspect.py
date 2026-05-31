@@ -1717,6 +1717,28 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "full-spectrum-betrayal-short-review":
+        from src.app.hammer_radar.operator.full_spectrum_betrayal_short_review import (
+            build_full_spectrum_betrayal_short_review,
+            format_full_spectrum_betrayal_review_json,
+        )
+
+        print(
+            format_full_spectrum_betrayal_review_json(
+                build_full_spectrum_betrayal_short_review(
+                    log_dir=args.log_dir,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    latest_betrayal=args.latest_betrayal,
+                    latest_watch_records=args.latest_watch_records,
+                    include_paper_lanes=args.include_paper_lanes,
+                    include_tiny_live_incumbents=args.include_tiny_live_incumbents,
+                    include_betrayal_inverse=args.include_betrayal_inverse,
+                    record_review=args.record_review,
+                    confirm_full_spectrum_review=args.confirm_full_spectrum_review,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2672,6 +2694,20 @@ def _build_parser() -> argparse.ArgumentParser:
     promotion_candidate_audit_parser.add_argument("--include-tiny-live-incumbents", action="store_true")
     promotion_candidate_audit_parser.add_argument("--record-audit", action="store_true")
     promotion_candidate_audit_parser.add_argument("--confirm-promotion-audit", default=None)
+
+    full_spectrum_review_parser = subparsers.add_parser(
+        "full-spectrum-betrayal-short-review",
+        parents=[parent],
+    )
+    full_spectrum_review_parser.add_argument("--latest-outcomes", type=int, default=10000)
+    full_spectrum_review_parser.add_argument("--latest-signals", type=int, default=3000)
+    full_spectrum_review_parser.add_argument("--latest-betrayal", type=int, default=5000)
+    full_spectrum_review_parser.add_argument("--latest-watch-records", type=int, default=500)
+    full_spectrum_review_parser.add_argument("--include-paper-lanes", action="store_true")
+    full_spectrum_review_parser.add_argument("--include-tiny-live-incumbents", action="store_true")
+    full_spectrum_review_parser.add_argument("--include-betrayal-inverse", action="store_true")
+    full_spectrum_review_parser.add_argument("--record-review", action="store_true")
+    full_spectrum_review_parser.add_argument("--confirm-full-spectrum-review", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
