@@ -1841,6 +1841,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "short-risk-contract-draft-preview":
+        from src.app.hammer_radar.operator.short_risk_contract_draft_preview import (
+            build_short_risk_contract_draft_preview,
+            format_short_risk_contract_draft_preview_json,
+        )
+
+        print(
+            format_short_risk_contract_draft_preview_json(
+                build_short_risk_contract_draft_preview(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_draft=args.record_draft,
+                    confirm_short_risk_contract_draft=args.confirm_short_risk_contract_draft,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2871,6 +2887,14 @@ def _build_parser() -> argparse.ArgumentParser:
     fundless_short_dry_run_packet_parser.add_argument("--latest-signals", type=int, default=3000)
     fundless_short_dry_run_packet_parser.add_argument("--record-packet", action="store_true")
     fundless_short_dry_run_packet_parser.add_argument("--confirm-fundless-short-dry-run", default=None)
+
+    short_risk_contract_draft_preview_parser = subparsers.add_parser(
+        "short-risk-contract-draft-preview",
+        parents=[parent],
+    )
+    short_risk_contract_draft_preview_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    short_risk_contract_draft_preview_parser.add_argument("--record-draft", action="store_true")
+    short_risk_contract_draft_preview_parser.add_argument("--confirm-short-risk-contract-draft", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
