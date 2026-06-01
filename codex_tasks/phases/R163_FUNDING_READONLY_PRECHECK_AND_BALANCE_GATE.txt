@@ -1,0 +1,432 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R163 Funding Readonly Precheck and Balance Gate
+
+BRANCH:
+r163-funding-readonly-precheck-balance-gate
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R159/R160/R162 all identify funding as a blocker for the future BTCUSDT 8m short tiny-live review path.
+
+Current target:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Known state:
+- lane mode remains paper
+- fresh captures are below threshold, around 2 / 10
+- funding is UNKNOWN_NOT_CHECKED
+- risk contract is draft/review only
+- no tiny-live authorization exists for this short lane
+- account is believed by operator to be unfunded
+- Binance connector has previously been configured in read-only mode
+- live execution must remain disabled
+
+R163 must create a safe read-only funding/balance gate that can classify funding readiness without enabling trading.
+
+PURPOSE:
+Build a funding precheck surface that answers:
+1. Is Binance connector locally configured for read-only use?
+2. Are required env vars present, without printing secrets?
+3. Is live trading disabled?
+4. Is read-only account/balance check locally available?
+5. If balance can be checked safely, is USDT funding sufficient for future tiny-live review?
+6. If balance cannot be checked safely, why?
+7. What remains blocked before any future live discussion?
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is read-only diagnostic only.
+It does NOT place orders.
+It does NOT create order payloads.
+It does NOT call order/test-order/protective endpoints.
+It does NOT enable live execution.
+It does NOT mutate env/config/global flags.
+It does NOT print secrets.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not send signed trading/order requests.
+- Do not create signed order request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not mutate risk contract config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+READ-ONLY NETWORK BOUNDARY:
+- Preview/default command must NOT require network.
+- Tests must NOT use real network.
+- If an existing connector safely supports read-only signed account/balance check, expose it behind an explicit flag:
+  --allow-readonly-network-check
+- Even with --allow-readonly-network-check:
+  - no order endpoints
+  - no test-order endpoints
+  - no transfers
+  - no withdrawals
+  - no live enable
+  - no secrets printed
+- If no safe existing read-only balance function exists, report BALANCE_CHECK_NOT_AVAILABLE and do not implement ad hoc network signing from scratch.
+- Do not create new generic Binance signed request infrastructure in this phase.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/binance_readonly_status.py if present
+- src/app/hammer_radar/operator/fundless_short_dry_run_packet.py
+- src/app/hammer_radar/operator/fundless_short_tiny_live_readiness_rehearsal.py
+- src/app/hammer_radar/operator/short_risk_contract_apply_review.py
+- src/app/hammer_radar/operator/short_risk_contract_draft_preview.py
+- src/app/hammer_radar/operator/short_evidence_recheck_packet.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- tests/hammer_radar/test_fundless_short_dry_run_packet.py
+- tests/hammer_radar/test_short_risk_contract_apply_review.py
+- docs/hammer_radar/live_readiness/R162_8M_SHORT_RISK_CONTRACT_APPLY_REVIEW_IF_READY.md
+
+REUSE / EXTEND:
+Reuse existing binance-readonly-status surface if present.
+Reuse existing fundless readiness / dry-run gate outputs where useful.
+Reuse existing safety object style.
+Do not duplicate connector code if an existing read-only module exists.
+Do not build trading execution.
+Do not build order submit.
+Do not create signed order request logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/funding_readonly_precheck.py
+
+Expose:
+- build_funding_readonly_precheck
+- build_local_env_readiness_summary
+- build_live_flag_readiness_summary
+- build_readonly_connector_summary
+- build_balance_gate_summary
+- build_target_lane_funding_context
+- classify_funding_readiness
+- append_funding_readonly_precheck_record
+- load_funding_readonly_precheck_records
+- summarize_funding_readonly_prechecks
+
+STATUS ENUM:
+- FUNDING_READONLY_PRECHECK_READY
+- FUNDING_READONLY_PRECHECK_REJECTED
+- FUNDING_READONLY_PRECHECK_RECORDED
+- FUNDING_READONLY_PRECHECK_BLOCKED
+- FUNDING_READONLY_PRECHECK_ERROR
+
+FUNDING READINESS ENUM:
+- FUNDING_NOT_CHECKED
+- READONLY_CONNECTOR_MISSING_ENV
+- READONLY_CONNECTOR_READY_BALANCE_NOT_CHECKED
+- READONLY_BALANCE_CHECK_NOT_AVAILABLE
+- READONLY_BALANCE_CHECK_BLOCKED
+- ACCOUNT_NOT_FUNDED
+- ACCOUNT_FUNDED_BELOW_MINIMUM
+- ACCOUNT_FUNDED_READY_FOR_REVIEW
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+DEFAULT MINIMUM:
+- minimum_balance_required_estimate_usdt: 44
+This is an estimate only and does not authorize execution.
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "precheck_recorded": false,
+  "precheck_id": null,
+  "record_precheck_requested": false,
+  "confirmation_valid": false,
+  "allow_readonly_network_check": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "local_env_readiness": {
+    "binance_connector_mode_present": true/false,
+    "binance_connector_mode": "read_only|n/a",
+    "api_key_present": true/false,
+    "api_secret_present": true/false,
+    "api_key_preview": "xxxx...yyyy|n/a",
+    "secrets_shown": false
+  },
+  "live_flag_readiness": {
+    "binance_live_trading_enabled": false/null,
+    "hammer_live_execution_enabled": false/null,
+    "hammer_allow_live_orders": false/null,
+    "global_kill_switch_status": "enabled|unknown",
+    "live_flags_safe": true/false
+  },
+  "readonly_connector": {
+    "connector_status": "READY_READ_ONLY|MISSING_ENV|BLOCKED|UNKNOWN",
+    "allowed_actions": ["read_exchange_info", "read_account_status"],
+    "forbidden_actions": ["place_order", "cancel_order", "transfer", "withdraw", "enable_live_trading"],
+    "network_check_available": true/false,
+    "network_check_attempted": false
+  },
+  "balance_gate": {
+    "balance_check_attempted": false,
+    "balance_check_available": true/false,
+    "asset": "USDT",
+    "available_balance_usdt": null,
+    "minimum_balance_required_estimate_usdt": 44,
+    "funding_ready": false,
+    "funding_status": "..."
+  },
+  "funding_readiness": "...",
+  "blockers": [...],
+  "recommended_next_operator_move": "FUND_ACCOUNT_LATER|KEEP_R157_RUNNING|RUN_R158_AFTER_MORE_CAPTURES|RUN_R164_READONLY_BALANCE_CHECK_IF_SAFE",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live",
+    "write risk contract config",
+    "funds-dependent execution",
+    "signed order request",
+    "protective order submit",
+    "withdraw",
+    "transfer"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false unless explicit read-only network flag used
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- global_live_flags_changed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+
+LEDGER:
+logs/hammer_radar_forward/funding_readonly_prechecks.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FUNDING READONLY PRECHECK RECORDING ONLY; NO ORDER; NO BINANCE TRADING CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+funding-readonly-precheck
+
+Args:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --minimum-balance-usdt <float>, default 44
+- --allow-readonly-network-check default false
+- --record-precheck
+- --confirm-funding-readonly-precheck <phrase>
+
+Preview, no network:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --minimum-balance-usdt 44
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --record-precheck \
+  --confirm-funding-readonly-precheck "wrong"
+
+Record, no network:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --minimum-balance-usdt 44 \
+  --record-precheck \
+  --confirm-funding-readonly-precheck "I CONFIRM FUNDING READONLY PRECHECK RECORDING ONLY; NO ORDER; NO BINANCE TRADING CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- funding-readonly-precheck preview command
+- funding-readonly-precheck record command
+- R157 12h short paper capture command
+- R158 short evidence recheck command
+- R162 apply review command
+- no live commands
+- no lane mode apply commands
+- no order commands
+- no transfer/withdraw commands
+
+TESTS:
+Create:
+tests/hammer_radar/test_funding_readonly_precheck.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects record
+- exact confirmation records precheck only
+- target lane default is BTCUSDT|8m|short|ladder_close_50_618
+- target lane remains paper
+- missing env classified as READONLY_CONNECTOR_MISSING_ENV
+- read-only env present classified as READONLY_CONNECTOR_READY_BALANCE_NOT_CHECKED when no network flag
+- default preview does not attempt network
+- no secrets shown
+- live flags must remain false/safe
+- minimum balance defaults to 44
+- do_not_run_yet blocks transfer and withdraw
+- no order commands emitted
+- no live commands emitted
+- config_written false
+- risk_contract_config_written false
+- safety flags clean
+- no Binance order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/funding_readonly_precheck.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_funding_readonly_precheck.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_short_risk_contract_apply_review.py \
+  tests/hammer_radar/test_short_risk_contract_draft_preview.py \
+  tests/hammer_radar/test_fundless_short_dry_run_packet.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview no network:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --minimum-balance-usdt 44 \
+  | jq '.status, .target_family, .local_env_readiness, .live_flag_readiness, .readonly_connector, .balance_gate, .funding_readiness, .blockers, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --record-precheck \
+  --confirm-funding-readonly-precheck "wrong" \
+  | jq '.status, .confirmation_valid, .precheck_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R163_FUNDING_READONLY_PRECHECK_AND_BALANCE_GATE.md
+
+Explain:
+- why R163 follows R162
+- funding gate purpose
+- read-only connector boundary
+- no-network default
+- balance gate
+- secret safety
+- forbidden actions
+- no live execution
+- no lane changes
+- next possible R164
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R163.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R164_READONLY_BALANCE_CHECK_IF_SAFE.md
+
+R164 should:
+- only run if existing connector safely supports read-only balance check
+- optionally allow explicit --allow-readonly-network-check
+- no orders
+- no transfers
+- no withdrawals
+- no live enable
+- no secrets printed
+- no signed trading/order request
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Funding readonly precheck added:
+Local env readiness:
+Live flag readiness:
+Readonly connector:
+Balance gate:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate config.
+Do not perform live trading actions.
