@@ -1783,6 +1783,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "short-evidence-recheck-packet":
+        from src.app.hammer_radar.operator.short_evidence_recheck_packet import (
+            build_short_evidence_recheck_packet,
+            format_short_evidence_recheck_packet_json,
+        )
+
+        print(
+            format_short_evidence_recheck_packet_json(
+                build_short_evidence_recheck_packet(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_captures=args.latest_captures,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    latest_betrayal=args.latest_betrayal,
+                    record_packet=args.record_packet,
+                    confirm_short_evidence_recheck=args.confirm_short_evidence_recheck,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2779,6 +2799,18 @@ def _build_parser() -> argparse.ArgumentParser:
     short_paper_capture_parser.add_argument("--run-capture-loop", action="store_true")
     short_paper_capture_parser.add_argument("--record-capture", action="store_true")
     short_paper_capture_parser.add_argument("--confirm-short-paper-capture", default=None)
+
+    short_evidence_recheck_parser = subparsers.add_parser(
+        "short-evidence-recheck-packet",
+        parents=[parent],
+    )
+    short_evidence_recheck_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    short_evidence_recheck_parser.add_argument("--latest-captures", type=int, default=200)
+    short_evidence_recheck_parser.add_argument("--latest-outcomes", type=int, default=10000)
+    short_evidence_recheck_parser.add_argument("--latest-signals", type=int, default=3000)
+    short_evidence_recheck_parser.add_argument("--latest-betrayal", type=int, default=5000)
+    short_evidence_recheck_parser.add_argument("--record-packet", action="store_true")
+    short_evidence_recheck_parser.add_argument("--confirm-short-evidence-recheck", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
