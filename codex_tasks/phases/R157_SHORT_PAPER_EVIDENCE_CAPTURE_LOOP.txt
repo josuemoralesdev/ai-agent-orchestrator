@@ -1,0 +1,477 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R157 Short Paper Evidence Capture Loop for BTCUSDT 8m Short
+
+BRANCH:
+r157-short-paper-evidence-capture-loop
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R156 built the short strategy packet for:
+BTCUSDT|8m|short|ladder_close_50_618
+
+R156 found strong historical paper outcome evidence:
+- mode: paper
+- win_rate_pct: 54.65
+- avg_pnl_pct: +0.0246
+- total_pnl_pct: +4.2378
+- paper_outcome_count: 172
+- fill_rate_pct: 97.18
+
+But R156 also blocked any future tiny-live discussion because:
+- fresh_candidate_count: 0
+- freshness_hit_rate_pct: 0
+- blocker: fresh short candidate sample below 10
+
+R157 must create a focused bounded capture loop for fresh BTCUSDT 8m short paper evidence.
+
+PURPOSE:
+Build a safe, observable, bounded paper-only watcher focused on:
+BTCUSDT|8m|short|ladder_close_50_618
+
+It must capture/record fresh paper evidence when fresh candidates appear.
+It must write heartbeat/progress records.
+It must not mutate config.
+It must not promote the lane.
+It must not call Binance.
+It must not place orders.
+
+CRITICAL SAFETY PRINCIPLE:
+This is paper evidence collection only.
+It does NOT promote 8m short.
+It does NOT set short tiny_live.
+It does NOT change any lane mode.
+It does NOT call Binance.
+It does NOT place orders.
+It does NOT create executable order payloads.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT EXPECTED CONFIG:
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- Other expanded BTCUSDT paper lanes remain paper
+
+SHORT STRATEGY CONTEXT:
+For short candidates:
+- golden pocket acts as resistance / retrace zone
+- invalidation belongs above relevant swing high / resistance zone
+- take-profit belongs below entry toward downside continuation / prior liquidity
+- paper evidence must prove fresh candidate capture before future tiny-live review
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/fresh_candidate_paper_proof_capture_loop.py
+- src/app/hammer_radar/operator/watch_heartbeat.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- tests/hammer_radar/test_short_strategy_packet.py
+- tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py
+- tests/hammer_radar/test_expanded_paper_watch.py
+- docs/hammer_radar/live_readiness/R156_SHORT_STRATEGY_PACKET_8M_SHORT.md
+
+REUSE / EXTEND:
+Reuse R150 heartbeat/bounded scan logic where possible.
+Reuse R153 expanded-paper-watch candidate evaluation where possible.
+Reuse R145 entry-mode normalization.
+Reuse lane_controls.json read-only.
+Do not duplicate strategy logic if existing modules expose reusable summaries.
+Do not add live gate logic.
+Do not create another lane config system.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py
+
+Expose:
+- build_short_paper_evidence_capture_preview
+- build_short_paper_target_lane
+- evaluate_short_paper_candidate_window
+- run_short_paper_evidence_capture_once
+- run_short_paper_evidence_capture_loop
+- build_short_paper_capture_heartbeat_record
+- append_short_paper_capture_heartbeat
+- append_short_paper_evidence_capture_record
+- load_short_paper_evidence_capture_records
+- summarize_short_paper_evidence_capture_records
+
+STATUS ENUM:
+- SHORT_PAPER_EVIDENCE_CAPTURE_PREVIEW
+- SHORT_PAPER_EVIDENCE_CAPTURE_READY
+- SHORT_PAPER_EVIDENCE_CAPTURE_REJECTED
+- SHORT_PAPER_EVIDENCE_CAPTURE_STARTED
+- SHORT_PAPER_EVIDENCE_CAPTURE_ITERATION_COMPLETED
+- SHORT_PAPER_EVIDENCE_CAPTURE_TIMEOUT
+- SHORT_PAPER_EVIDENCE_CAPTURED
+- SHORT_PAPER_EVIDENCE_BLOCKED
+- SHORT_PAPER_EVIDENCE_ERROR
+
+HEARTBEAT STATUSES:
+- SHORT_PAPER_CAPTURE_ITERATION_STARTED
+- SHORT_PAPER_CAPTURE_ITERATION_COMPLETED
+- SHORT_PAPER_CAPTURE_CANDIDATE_CAPTURED
+- SHORT_PAPER_CAPTURE_TIMEOUT
+- SHORT_PAPER_CAPTURE_EXITED
+- SHORT_PAPER_CAPTURE_PERFORMANCE_GUARD
+
+TARGET DEFAULTS:
+- lane_key: BTCUSDT|8m|short|ladder_close_50_618
+- latest_signals: 500
+- latest_scans: 1000
+- max_iterations: 60
+- sleep_seconds: 60
+- iteration_timeout_seconds: 30
+- heartbeat_every: 1
+
+CLI ARGS:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --latest-signals <int>, default 500
+- --latest-scans <int>, default 1000
+- --max-iterations <int>, default 60
+- --sleep-seconds <int>, default 60
+- --iteration-timeout-seconds <int>, default 30
+- --heartbeat-every <int>, default 1
+- --run-capture-loop
+- --record-capture
+- --confirm-short-paper-capture <phrase>
+
+CONFIRMATION PHRASE:
+I CONFIRM SHORT PAPER EVIDENCE CAPTURE ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+LEDGERS:
+logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "capture_id": "...",
+  "target_lane": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "mode": "paper",
+    "direction": "short",
+    "timeframe": "8m",
+    "entry_mode": "ladder_close_50_618"
+  },
+  "watch_started": false,
+  "watch_completed": false,
+  "record_capture_requested": false,
+  "confirmation_valid": false,
+  "paper_evidence_captured": false,
+  "captured_signal_id": null,
+  "captured_lane_key": null,
+  "iterations_completed": 0,
+  "max_iterations": ...,
+  "bounded_scan_limits": {...},
+  "performance_guard_enabled": true,
+  "latest_heartbeat": {...},
+  "candidate_window": {
+    "signals_checked": ...,
+    "matching_lane_count": ...,
+    "fresh_matching_count": ...,
+    "stale_matching_count": ...,
+    "tradable_matching_count": ...,
+    "top_blockers": [...]
+  },
+  "evidence_summary": {
+    "fresh_candidate_count_added": ...,
+    "short_lane_remains_paper": true,
+    "tiny_live_not_authorized": true
+  },
+  "recommended_next_operator_move": "WAIT_FOR_SHORT_FRESH_CANDIDATE|RUN_R158_SHORT_EVIDENCE_RECHECK|KEEP_COLLECTING_SHORT_PAPER|STOP_SAFETY_BLOCK",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+CAPTURE RULES:
+A capture is allowed only if:
+- symbol=BTCUSDT
+- timeframe=8m
+- direction=short
+- normalized entry_mode matches ladder_close_50_618 or can be mapped by R145 logic
+- lane mode is paper
+- candidate timestamp is within lane freshness_seconds or configured short capture freshness window
+- candidate is tradable or equivalent eligible signal if fields exist
+- not stale
+- no live permission implied
+
+If no fresh candidate:
+- record blockers honestly
+- do not invent proof
+- do not mutate anything
+
+PERFORMANCE:
+Must use bounded recent readers.
+Must not scan full huge NDJSON files every iteration.
+Must write heartbeat at iteration start and completion.
+Must print compact heartbeat lines when running loop:
+SHORT PAPER heartbeat iteration=1 status=completed fresh=0 stale=3 captured=false elapsed=0.12s
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+short-paper-evidence-capture-loop
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --latest-signals 500 \
+  --latest-scans 1000
+
+Short smoke loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --latest-signals 500 \
+  --latest-scans 1000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-capture-loop \
+  --record-capture \
+  --confirm-short-paper-capture "I CONFIRM SHORT PAPER EVIDENCE CAPTURE ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --record-capture \
+  --confirm-short-paper-capture "wrong"
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- short-paper-evidence-capture-loop smoke command
+- short-paper-evidence-capture-loop 60-min command
+- short-strategy-packet command
+- full-spectrum-betrayal-short-review command
+- no live commands
+- no lane mode apply commands
+
+TESTS:
+Create:
+tests/hammer_radar/test_short_paper_evidence_capture_loop.py
+
+Test:
+- preview writes no capture
+- wrong confirmation rejects capture loop
+- exact confirmation records capture heartbeat/summary
+- default target lane is BTCUSDT|8m|short|ladder_close_50_618
+- target lane mode must be paper
+- stale short candidate is not captured
+- fresh short candidate can be captured from mocked recent signals
+- long candidate is ignored
+- wrong timeframe candidate is ignored
+- heartbeat writes start/completion/exit
+- performance guard triggers timeout status when mocked evaluator is slow
+- no lane mode apply commands emitted
+- no live commands emitted
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_short_paper_evidence_capture_loop.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_short_strategy_packet.py \
+  tests/hammer_radar/test_full_spectrum_betrayal_short_review.py \
+  tests/hammer_radar/test_fresh_candidate_watch_heartbeat.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --latest-signals 500 \
+  --latest-scans 1000 \
+  | jq '.status, .target_lane, .candidate_window, .evidence_summary, .recommended_next_operator_move, .recommended_next_engineering_move, .safety'
+
+Short 2-iteration loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --latest-signals 500 \
+  --latest-scans 1000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-capture-loop \
+  --record-capture \
+  --confirm-short-paper-capture "I CONFIRM SHORT PAPER EVIDENCE CAPTURE ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL." \
+  | tail -80
+
+Heartbeat check:
+tail -n 5 logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson \
+  | jq '.status, .iteration, .max_iterations, .paper_evidence_captured, .captured_signal_id, .elapsed_seconds, .safety'
+
+Final ledger check:
+tail -n 1 logs/hammer_radar_forward/short_paper_evidence_capture.ndjson \
+  | jq '.status, .max_iterations, .iterations_completed, .paper_evidence_captured, .captured_signal_id, .recommended_next_operator_move, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-paper-evidence-capture-loop \
+  --record-capture \
+  --confirm-short-paper-capture "wrong" \
+  | jq '.status, .confirmation_valid, .paper_evidence_captured, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R157_SHORT_PAPER_EVIDENCE_CAPTURE_LOOP.md
+
+Explain:
+- why R157 follows R156
+- why historical 8m short evidence is promising
+- why fresh evidence is still missing
+- short paper capture loop
+- heartbeat/bounded scan
+- no live execution
+- no lane changes
+- next possible R158
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R157.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R158_SHORT_EVIDENCE_RECHECK_AND_PROMOTION_READINESS_PACKET.md
+
+R158 should:
+- run after short paper evidence capture records exist
+- re-run short strategy packet and full-spectrum review
+- determine whether 8m short meets fresh evidence threshold
+- if yes, build promotion readiness packet only
+- no lane mode change
+- no live execution
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Short paper capture loop added:
+Target lane:
+Capture rules:
+Heartbeat:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended operator action after merge:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.
