@@ -12,6 +12,7 @@ from src.app.hammer_radar.operator.readonly_balance_check import append_readonly
 from src.app.hammer_radar.operator.readonly_balance_failure_classifier import (
     CONFIRM_READONLY_BALANCE_FAILURE_RECHECK_RECORDING_PHRASE,
     ERROR_BODY_NOT_AVAILABLE,
+    FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE,
     HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE,
     HTTP_401_OR_403_KEY_PERMISSION_OR_IP_RESTRICTION,
     HTTP_404_OR_ENDPOINT_MISMATCH,
@@ -93,8 +94,41 @@ def test_http_400_classified_timestamp_recvwindow_or_signature() -> None:
     assert _classification(400) == HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE
 
 
+def test_http_400_with_binance_timestamp_code_surfaces_operator_checklist(tmp_path: Path) -> None:
+    _append_failed_balance_check(
+        tmp_path,
+        http_status=400,
+        binance_code=-1021,
+        binance_message="Timestamp for this request is outside of the recvWindow.",
+    )
+
+    payload = build_readonly_balance_failure_recheck(
+        log_dir=tmp_path / "logs",
+        config_path=_write_config(tmp_path / "lane_controls.json"),
+        now=NOW,
+    )
+
+    assert payload["failure_classification"] == HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE
+    assert "system clock / recvWindow check" in payload["operator_checklist"]
+    assert any("recvWindow" in action for action in payload["operator_actions"])
+    assert payload["last_balance_check_summary"]["sanitized_error_available"] is True
+
+
 def test_http_404_classified_endpoint_mismatch() -> None:
     assert _classification(404) == HTTP_404_OR_ENDPOINT_MISMATCH
+
+
+def test_http_404_recorded_failure_uses_endpoint_mismatch_classification(tmp_path: Path) -> None:
+    _append_failed_balance_check(tmp_path, http_status=404, binance_code=-1121, binance_message="endpoint not found")
+
+    payload = build_readonly_balance_failure_recheck(
+        log_dir=tmp_path / "logs",
+        config_path=_write_config(tmp_path / "lane_controls.json"),
+        now=NOW,
+    )
+
+    assert payload["failure_classification"] == HTTP_404_OR_ENDPOINT_MISMATCH
+    assert "endpoint family check" in payload["operator_checklist"]
 
 
 def test_missing_error_body_classified_error_body_not_available() -> None:
@@ -104,6 +138,21 @@ def test_missing_error_body_classified_error_body_not_available() -> None:
             "sanitized_http_status": None,
             "sanitized_binance_code": None,
             "sanitized_binance_message": None,
+        }
+    )
+
+    assert classification == ERROR_BODY_NOT_AVAILABLE
+
+
+def test_httperror_with_status_but_no_body_stays_error_body_not_available() -> None:
+    classification = classify_readonly_balance_failure(
+        last_balance_check_summary={
+            "error_type": "HTTPError",
+            "sanitized_http_status": 400,
+            "sanitized_binance_code": None,
+            "sanitized_binance_message": None,
+            "body_available": False,
+            "sanitized_error_available": True,
         }
     )
 
@@ -140,6 +189,20 @@ def test_secrets_and_signature_never_appear_in_sanitized_output() -> None:
     assert "raw-signature-secret" not in rendered
     assert "signature=<redacted>" in rendered
     assert "fapi.binance.com" not in rendered
+
+
+def test_futures_account_not_enabled_classification() -> None:
+    classification = classify_readonly_balance_failure(
+        last_balance_check_summary={
+            "error_type": "HTTPError",
+            "sanitized_http_status": 400,
+            "sanitized_binance_code": -2015,
+            "sanitized_binance_message": "Futures account is not enabled.",
+            "sanitized_error_available": True,
+        }
+    )
+
+    assert classification == FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE
 
 
 def test_no_order_live_transfer_or_withdraw_commands_emitted(tmp_path: Path) -> None:
@@ -211,6 +274,7 @@ def test_cli_exists_and_preview_returns_expected_shape(tmp_path: Path) -> None:
     assert payload["target_family"]["lane_key"] == LANE_8M_SHORT
     assert "last_balance_check_summary" in payload
     assert "failure_classification" in payload
+    assert "operator_checklist" in payload
     assert "readonly-balance-failure-recheck" in help_result.stdout
 
 
@@ -259,6 +323,10 @@ def _append_failed_balance_check(
                 "binance_code": binance_code,
                 "binance_message": binance_message,
                 "endpoint_family": "futures_account_readonly",
+                "retryable": http_status in {429, 500, 502, 503, 504},
+                "troubleshooting_hint": "test sanitized hint",
+                "sanitized_error_available": http_status is not None or binance_code is not None or bool(binance_message),
+                "body_available": bool(binance_message),
             },
             "balance_readiness": "READONLY_BALANCE_CHECK_FAILED",
             "safety": {"signed_trading_request_created": False},
