@@ -1803,6 +1803,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "fundless-short-tiny-live-readiness-rehearsal":
+        from src.app.hammer_radar.operator.fundless_short_tiny_live_readiness_rehearsal import (
+            build_fundless_short_tiny_live_readiness_rehearsal,
+            format_fundless_readiness_rehearsal_json,
+        )
+
+        print(
+            format_fundless_readiness_rehearsal_json(
+                build_fundless_short_tiny_live_readiness_rehearsal(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_captures=args.latest_captures,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    record_rehearsal=args.record_rehearsal,
+                    confirm_fundless_short_rehearsal=args.confirm_fundless_short_rehearsal,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2811,6 +2830,17 @@ def _build_parser() -> argparse.ArgumentParser:
     short_evidence_recheck_parser.add_argument("--latest-betrayal", type=int, default=5000)
     short_evidence_recheck_parser.add_argument("--record-packet", action="store_true")
     short_evidence_recheck_parser.add_argument("--confirm-short-evidence-recheck", default=None)
+
+    fundless_short_rehearsal_parser = subparsers.add_parser(
+        "fundless-short-tiny-live-readiness-rehearsal",
+        parents=[parent],
+    )
+    fundless_short_rehearsal_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    fundless_short_rehearsal_parser.add_argument("--latest-captures", type=int, default=200)
+    fundless_short_rehearsal_parser.add_argument("--latest-outcomes", type=int, default=10000)
+    fundless_short_rehearsal_parser.add_argument("--latest-signals", type=int, default=3000)
+    fundless_short_rehearsal_parser.add_argument("--record-rehearsal", action="store_true")
+    fundless_short_rehearsal_parser.add_argument("--confirm-fundless-short-rehearsal", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
