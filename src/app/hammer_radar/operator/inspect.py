@@ -1759,6 +1759,30 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "short-paper-evidence-capture-loop":
+        from src.app.hammer_radar.operator.short_paper_evidence_capture_loop import (
+            format_short_paper_evidence_capture_json,
+            run_short_paper_evidence_capture_loop,
+        )
+
+        print(
+            format_short_paper_evidence_capture_json(
+                run_short_paper_evidence_capture_loop(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    max_iterations=args.max_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    iteration_timeout_seconds=args.iteration_timeout_seconds,
+                    heartbeat_every=args.heartbeat_every,
+                    run_capture_loop=args.run_capture_loop,
+                    record_capture=args.record_capture,
+                    confirm_short_paper_capture=args.confirm_short_paper_capture,
+                    progress_fn=(lambda line: print(line, file=sys.stderr, flush=True)) if args.run_capture_loop else None,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2740,6 +2764,21 @@ def _build_parser() -> argparse.ArgumentParser:
     short_strategy_packet_parser.add_argument("--latest-watch-records", type=int, default=500)
     short_strategy_packet_parser.add_argument("--record-packet", action="store_true")
     short_strategy_packet_parser.add_argument("--confirm-short-strategy-packet", default=None)
+
+    short_paper_capture_parser = subparsers.add_parser(
+        "short-paper-evidence-capture-loop",
+        parents=[parent],
+    )
+    short_paper_capture_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    short_paper_capture_parser.add_argument("--latest-signals", type=int, default=500)
+    short_paper_capture_parser.add_argument("--latest-scans", type=int, default=1000)
+    short_paper_capture_parser.add_argument("--max-iterations", type=int, default=60)
+    short_paper_capture_parser.add_argument("--sleep-seconds", type=int, default=60)
+    short_paper_capture_parser.add_argument("--iteration-timeout-seconds", type=int, default=30)
+    short_paper_capture_parser.add_argument("--heartbeat-every", type=int, default=1)
+    short_paper_capture_parser.add_argument("--run-capture-loop", action="store_true")
+    short_paper_capture_parser.add_argument("--record-capture", action="store_true")
+    short_paper_capture_parser.add_argument("--confirm-short-paper-capture", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
