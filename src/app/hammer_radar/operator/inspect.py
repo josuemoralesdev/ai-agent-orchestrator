@@ -1739,6 +1739,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "short-strategy-packet":
+        from src.app.hammer_radar.operator.short_strategy_packet import (
+            build_short_strategy_packet,
+            format_short_strategy_packet_json,
+        )
+
+        print(
+            format_short_strategy_packet_json(
+                build_short_strategy_packet(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    latest_betrayal=args.latest_betrayal,
+                    latest_watch_records=args.latest_watch_records,
+                    record_packet=args.record_packet,
+                    confirm_short_strategy_packet=args.confirm_short_strategy_packet,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2708,6 +2728,18 @@ def _build_parser() -> argparse.ArgumentParser:
     full_spectrum_review_parser.add_argument("--include-betrayal-inverse", action="store_true")
     full_spectrum_review_parser.add_argument("--record-review", action="store_true")
     full_spectrum_review_parser.add_argument("--confirm-full-spectrum-review", default=None)
+
+    short_strategy_packet_parser = subparsers.add_parser(
+        "short-strategy-packet",
+        parents=[parent],
+    )
+    short_strategy_packet_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    short_strategy_packet_parser.add_argument("--latest-outcomes", type=int, default=10000)
+    short_strategy_packet_parser.add_argument("--latest-signals", type=int, default=3000)
+    short_strategy_packet_parser.add_argument("--latest-betrayal", type=int, default=5000)
+    short_strategy_packet_parser.add_argument("--latest-watch-records", type=int, default=500)
+    short_strategy_packet_parser.add_argument("--record-packet", action="store_true")
+    short_strategy_packet_parser.add_argument("--confirm-short-strategy-packet", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

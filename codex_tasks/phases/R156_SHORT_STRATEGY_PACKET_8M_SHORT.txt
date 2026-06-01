@@ -1,0 +1,425 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R156 Short Strategy Packet for BTCUSDT 8m Short
+
+BRANCH:
+r156-short-strategy-packet-8m-short
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: EXTENSION OF EXISTING CAPABILITY, WIRING / INTEGRATION, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R155 full-spectrum betrayal + short strategy review identified the next candidate door:
+- recommended_family: BTCUSDT|8m|short|ladder_close_50_618
+- recommendation_type: SHORT_STRATEGY_REVIEW
+- config_change_allowed_now: false
+- requires_future_operator_approval: true
+
+R155 also confirmed:
+- short-side evidence is notable
+- 8m short is the best short family
+- short golden pocket must be interpreted as resistance/retrace zone, not support
+- shorts remain paper-only
+- no short lane is authorized for tiny_live yet
+
+R156 must build a serious short strategy packet for BTCUSDT 8m short:
+- short-side golden pocket interpretation
+- stop/TP logic review
+- evidence thresholds
+- paper-only tracking plan
+- readiness checklist for future review
+- explicit blockers preventing tiny-live promotion now
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is a strategy packet only.
+It does NOT promote the 8m short lane.
+It does NOT set any lane to tiny_live.
+It does NOT change lane config.
+It does NOT call Binance.
+It does NOT place orders.
+It does NOT create executable order payloads.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT EXPECTED CONFIG:
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- Other expanded BTCUSDT paper lanes remain paper
+
+SHORT STRATEGY PRINCIPLE:
+For short candidates:
+- golden pocket is resistance / retrace zone
+- invalidation should be above the relevant swing/high/resistance zone
+- take profit should be below entry, toward projected downside continuation or prior liquidity
+- stop/TP must be short-specific and not copied blindly from long logic
+- paper evidence must prove the interpretation before any live discussion
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson usage patterns
+- tests/hammer_radar/test_full_spectrum_betrayal_short_review.py
+- docs/hammer_radar/live_readiness/R155_FULL_SPECTRUM_BETRAYAL_SHORT_STRATEGY_REVIEW.md
+
+REUSE / EXTEND:
+Reuse R155 full-spectrum review result where possible.
+Reuse R154 promotion candidate audit logic where useful.
+Reuse strategy/outcome parsers.
+Reuse lane_controls.json as read-only.
+Do not create new execution logic.
+Do not duplicate trading strategy code if existing modules already provide summaries.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/short_strategy_packet.py
+
+Expose:
+- build_short_strategy_packet
+- build_short_strategy_target_family
+- load_short_family_recent_evidence
+- build_short_golden_pocket_interpretation
+- build_short_stop_tp_review
+- build_short_evidence_thresholds
+- build_short_paper_tracking_plan
+- classify_short_strategy_readiness
+- build_short_strategy_next_action
+- append_short_strategy_packet_record
+- load_short_strategy_packet_records
+- summarize_short_strategy_packets
+
+STATUS ENUM:
+- SHORT_STRATEGY_PACKET_READY
+- SHORT_STRATEGY_PACKET_REJECTED
+- SHORT_STRATEGY_PACKET_RECORDED
+- SHORT_STRATEGY_PACKET_BLOCKED
+- SHORT_STRATEGY_PACKET_ERROR
+
+READINESS ENUM:
+- PAPER_ONLY_NOT_READY
+- PAPER_ONLY_COLLECT_MORE_EVIDENCE
+- SHORT_STRATEGY_REVIEW_READY
+- STRONG_SHORT_PAPER_CANDIDATE_REQUIRES_OPERATOR_REVIEW
+- DO_NOT_PROMOTE
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET:
+Default target:
+- BTCUSDT|8m|short|ladder_close_50_618
+
+Allow optional args:
+- --lane-key
+but default must be the R155 recommended family.
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "packet_recorded": false,
+  "packet_id": null,
+  "record_packet_requested": false,
+  "confirmation_valid": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "short_strategy_interpretation": {
+    "golden_pocket_role": "resistance/retrace zone",
+    "short_entry_concept": "...",
+    "invalidation_concept": "...",
+    "take_profit_concept": "...",
+    "notes": [...]
+  },
+  "evidence_summary": {
+    "signal_count": ...,
+    "paper_outcome_count": ...,
+    "fresh_candidate_count": ...,
+    "stale_candidate_count": ...,
+    "win_rate_pct": ...,
+    "avg_pnl_pct": ...,
+    "total_pnl_pct": ...,
+    "stop_count": ...,
+    "betrayal_inverse_summary": {...},
+    "sample_quality": "..."
+  },
+  "thresholds_for_future_review": {
+    "min_paper_outcomes": 30,
+    "min_fresh_candidates": 10,
+    "preferred_win_rate_pct": 52,
+    "avg_pnl_must_be_positive": true,
+    "stop_dominance_must_be_controlled": true,
+    "requires_operator_approval": true
+  },
+  "readiness": "...",
+  "why": "...",
+  "blockers_to_tiny_live": [...],
+  "paper_tracking_plan": {
+    "continue_mode": "paper",
+    "watch_commands": [...],
+    "audit_commands": [...],
+    "what_to_collect": [...]
+  },
+  "recommended_next_operator_move": "RUN_EXPANDED_PAPER_WATCH|RECORD_SHORT_STRATEGY_PACKET|WAIT_FOR_MORE_SHORT_EVIDENCE|RUN_R157_SHORT_PAPER_EVIDENCE_CAPTURE_LOOP",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live"
+  ],
+  "safe_commands": [...],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/short_strategy_packets.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM SHORT STRATEGY PACKET RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+short-strategy-packet
+
+Args:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --latest-outcomes <int>, default 10000
+- --latest-signals <int>, default 3000
+- --latest-betrayal <int>, default 5000
+- --latest-watch-records <int>, default 500
+- --record-packet
+- --confirm-short-strategy-packet <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-strategy-packet \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-strategy-packet \
+  --record-packet \
+  --confirm-short-strategy-packet "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-strategy-packet \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500 \
+  --record-packet \
+  --confirm-short-strategy-packet "I CONFIRM SHORT STRATEGY PACKET RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- short-strategy-packet record command
+- full-spectrum-betrayal-short-review command
+- promotion-candidate-audit command
+- expanded-paper-watch record command
+- no live commands
+- no lane mode apply commands
+
+TESTS:
+Create:
+tests/hammer_radar/test_short_strategy_packet.py
+
+Test:
+- preview writes no packet
+- wrong confirmation rejects record
+- exact confirmation records packet only
+- default target is BTCUSDT|8m|short|ladder_close_50_618
+- target mode must be paper
+- golden pocket interpretation is resistance/retrace zone
+- thresholds included
+- readiness blocks tiny_live when evidence insufficient
+- no lane mode apply commands emitted
+- no live commands emitted
+- do_not_run_yet includes short tiny_live / new tiny_live blockers
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/short_strategy_packet.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_short_strategy_packet.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_full_spectrum_betrayal_short_review.py \
+  tests/hammer_radar/test_promotion_candidate_audit.py \
+  tests/hammer_radar/test_expanded_paper_watch.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-strategy-packet \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --latest-watch-records 500 \
+  | jq '.status, .target_family, .short_strategy_interpretation, .evidence_summary, .thresholds_for_future_review, .readiness, .blockers_to_tiny_live, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-strategy-packet \
+  --record-packet \
+  --confirm-short-strategy-packet "wrong" \
+  | jq '.status, .confirmation_valid, .packet_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R156_SHORT_STRATEGY_PACKET_8M_SHORT.md
+
+Explain:
+- why R156 follows R155
+- why 8m short became the next door
+- short golden pocket as resistance/retrace zone
+- evidence thresholds
+- why this is still paper-only
+- what blocks tiny_live now
+- next possible R157
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R156.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R157_SHORT_PAPER_EVIDENCE_CAPTURE_LOOP.md
+
+R157 should:
+- collect bounded evidence specifically for BTCUSDT 8m short paper lane
+- use heartbeat/bounded scan
+- track fresh/stale/paper outcomes
+- no lane mode change
+- no live execution
+- no Binance
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Short strategy packet added:
+Target family:
+Evidence summary:
+Thresholds:
+Readiness:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.
