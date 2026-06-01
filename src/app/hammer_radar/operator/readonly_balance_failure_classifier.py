@@ -9,7 +9,6 @@ live execution.
 from __future__ import annotations
 
 import json
-import urllib.error
 from collections import Counter
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -20,6 +19,7 @@ from uuid import uuid4
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
+from src.app.hammer_radar.operator.readonly_balance_error_sanitizer import sanitize_http_error
 from src.app.hammer_radar.operator.short_strategy_packet import DEFAULT_TARGET_LANE_KEY, build_short_strategy_target_family
 
 READONLY_BALANCE_FAILURE_RECHECK_READY = "READONLY_BALANCE_FAILURE_RECHECK_READY"
@@ -57,6 +57,8 @@ SAFETY = {
     "transfer_endpoint_called": False,
     "withdraw_endpoint_called": False,
     "secrets_shown": False,
+    "signature_shown": False,
+    "signed_url_shown": False,
     "env_mutated": False,
     "config_written": False,
     "global_live_flags_changed": False,
@@ -72,33 +74,7 @@ SOURCE_SURFACES_USED = [
 
 def sanitize_readonly_balance_error(error: BaseException | Mapping[str, Any], *, endpoint_family: str = "unknown") -> dict[str, Any]:
     """Return only safe failure metadata from a read-only balance exception."""
-    if isinstance(error, Mapping):
-        status = _int_or_none(error.get("http_status") or error.get("sanitized_http_status"))
-        code = _int_or_none(error.get("binance_code") or error.get("sanitized_binance_code"))
-        message = _clean_message(error.get("binance_message") or error.get("sanitized_binance_message"))
-        error_type = str(error.get("error_type") or error.get("error") or "UNKNOWN")
-    else:
-        status = _int_or_none(getattr(error, "code", None) or getattr(error, "status", None))
-        code = None
-        message = None
-        error_type = error.__class__.__name__
-        if isinstance(error, urllib.error.HTTPError):
-            body = _read_http_error_body(error)
-            parsed = _parse_json_object(body)
-            if parsed:
-                code = _int_or_none(parsed.get("code"))
-                message = _clean_message(parsed.get("msg") or parsed.get("message"))
-            elif body:
-                message = _clean_message(body)
-
-    payload = {
-        "error_type": error_type,
-        "http_status": status,
-        "binance_code": code,
-        "binance_message": message,
-        "endpoint_family": endpoint_family,
-    }
-    return _sanitize(payload)
+    return sanitize_http_error(error, endpoint_family=endpoint_family)
 
 
 def classify_readonly_balance_failure(
@@ -129,7 +105,17 @@ def classify_readonly_balance_failure(
     ).lower()
     error_type = str(summary.get("error_type") or detail.get("error_type") or detail.get("error") or "")
     balance_readiness = str(summary.get("balance_readiness") or detail.get("funding_status") or "")
+    sanitized_error_available = summary.get("sanitized_error_available")
+    if sanitized_error_available is None:
+        sanitized_error_available = detail.get("sanitized_error_available")
+    body_available = summary.get("body_available")
+    if body_available is None:
+        body_available = detail.get("body_available")
 
+    if sanitized_error_available is False and "httperror" in error_type.lower():
+        return ERROR_BODY_NOT_AVAILABLE
+    if body_available is False and "httperror" in error_type.lower() and code is None and not message:
+        return ERROR_BODY_NOT_AVAILABLE
     if "futures account" in message and ("not" in message or "enable" in message):
         return FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE
     if "account type" in message or "not enabled" in message:
@@ -205,7 +191,8 @@ def build_readonly_balance_failure_recheck(
             "last_balance_check_summary": last_summary,
             "failure_classification": failure_classification,
             "likely_causes": _likely_causes(failure_classification),
-            "operator_actions": _operator_actions(),
+            "operator_actions": _operator_actions(failure_classification),
+            "operator_checklist": _operator_checklist(failure_classification),
             "safe_recheck_commands": _safe_recheck_commands(latest_balance_checks),
             "do_not_run_yet": _do_not_run_yet(),
             "safety": dict(SAFETY),
@@ -230,7 +217,8 @@ def build_readonly_balance_failure_recheck(
                 "last_balance_check_summary": _empty_last_balance_check_summary(),
                 "failure_classification": UNKNOWN_HTTP_ERROR,
                 "likely_causes": _likely_causes(UNKNOWN_HTTP_ERROR),
-                "operator_actions": _operator_actions(),
+                "operator_actions": _operator_actions(UNKNOWN_HTTP_ERROR),
+                "operator_checklist": _operator_checklist(UNKNOWN_HTTP_ERROR),
                 "safe_recheck_commands": _safe_recheck_commands(latest_balance_checks),
                 "do_not_run_yet": _do_not_run_yet(),
                 "error": exc.__class__.__name__,
@@ -244,7 +232,8 @@ def build_readonly_balance_failure_next_actions(failure_classification: str) -> 
     return {
         "failure_classification": failure_classification,
         "likely_causes": _likely_causes(failure_classification),
-        "operator_actions": _operator_actions(),
+        "operator_actions": _operator_actions(failure_classification),
+        "operator_checklist": _operator_checklist(failure_classification),
         "safe_recheck_commands": _safe_recheck_commands(50),
         "do_not_run_yet": _do_not_run_yet(),
         "safety": dict(SAFETY),
@@ -272,6 +261,7 @@ def append_readonly_balance_failure_recheck_record(
             "failure_classification": record.get("failure_classification"),
             "likely_causes": list(record.get("likely_causes") or []),
             "operator_actions": list(record.get("operator_actions") or []),
+            "operator_checklist": list(record.get("operator_checklist") or []),
             "safe_recheck_commands": list(record.get("safe_recheck_commands") or []),
             "do_not_run_yet": list(record.get("do_not_run_yet") or []),
             "safety": dict(record.get("safety") or SAFETY),
@@ -345,6 +335,10 @@ def _last_balance_check_summary(record: Mapping[str, Any]) -> dict[str, Any]:
         "sanitized_binance_code": _int_or_none(balance.get("binance_code") or balance.get("sanitized_binance_code")),
         "sanitized_binance_message": _clean_message(balance.get("binance_message") or balance.get("sanitized_binance_message")),
         "endpoint_family": balance.get("endpoint_family") or "unknown",
+        "retryable": balance.get("retryable"),
+        "troubleshooting_hint": balance.get("troubleshooting_hint"),
+        "sanitized_error_available": balance.get("sanitized_error_available"),
+        "body_available": balance.get("body_available"),
     }
 
 
@@ -361,6 +355,10 @@ def _empty_last_balance_check_summary() -> dict[str, Any]:
         "sanitized_binance_code": None,
         "sanitized_binance_message": None,
         "endpoint_family": "unknown",
+        "retryable": None,
+        "troubleshooting_hint": "No sanitized error metadata is available yet; rerun R164 after R166.",
+        "sanitized_error_available": False,
+        "body_available": False,
     }
 
 
@@ -404,14 +402,69 @@ def _likely_causes(failure_classification: str) -> list[str]:
     return list(causes.get(failure_classification, causes[UNKNOWN_HTTP_ERROR]))
 
 
-def _operator_actions() -> list[str]:
-    return [
-        "check API key permissions",
-        "check IP restriction",
-        "check Futures account enabled",
-        "check system clock / recvWindow",
-        "verify endpoint type used by connector",
+def _operator_actions(failure_classification: str) -> list[str]:
+    actions = {
+        HTTP_401_OR_403_KEY_PERMISSION_OR_IP_RESTRICTION: [
+            "check API key permissions include read-only account/futures status",
+            "check IP restriction includes this operator host",
+            "rerun readonly-balance-check only after key/IP settings are confirmed",
+        ],
+        HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE: [
+            "check system clock synchronization",
+            "check recvWindow tolerance",
+            "rerun readonly-balance-check only after clock/signature path is reviewed",
+        ],
+        HTTP_404_OR_ENDPOINT_MISMATCH: [
+            "verify endpoint family is futures_account_readonly for the BTCUSDT 8m short funding path",
+            "check whether this key/account should use spot_account_readonly instead",
+            "do not add order, test-order, protective, transfer, or withdraw endpoints",
+        ],
+        FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE: [
+            "check Futures account enabled status in Binance UI",
+            "check whether the API key belongs to the expected account type",
+            "keep funding gate blocked until account type is confirmed",
+        ],
+        READONLY_BALANCE_ENDPOINT_UNAVAILABLE: [
+            "wait and retry the explicit read-only balance check later",
+            "check Binance status or regional product availability",
+            "keep the no-network failure recheck as the default diagnostic command",
+        ],
+        NETWORK_OR_BINANCE_TEMPORARY_FAILURE: [
+            "wait and retry the explicit read-only balance check later",
+            "check rate-limit, regional block, or temporary Binance issue",
+            "do not broaden the network scope beyond read-only account/balance",
+        ],
+        ERROR_BODY_NOT_AVAILABLE: [
+            "rerun R164 after R166 so sanitized HTTP status/code/message can be captured",
+            "do not inspect raw signed URLs, query strings, headers, or secrets",
+            "keep funding and live execution blocked until sanitized metadata is available",
+        ],
+        UNKNOWN_HTTP_ERROR: [
+            "review sanitized http_status, binance_code, binance_message, and endpoint_family",
+            "check API key/IP, Futures enablement, system clock, recvWindow, and endpoint family",
+            "keep the next recheck read-only and non-executing",
+        ],
+    }
+    return list(actions.get(failure_classification, actions[UNKNOWN_HTTP_ERROR]))
+
+
+def _operator_checklist(failure_classification: str) -> list[str]:
+    checklist = [
+        "key permission check",
+        "IP restriction check",
+        "Futures account enabled check",
+        "system clock / recvWindow check",
+        "endpoint family check",
     ]
+    if failure_classification == HTTP_401_OR_403_KEY_PERMISSION_OR_IP_RESTRICTION:
+        return checklist[:2] + checklist[4:]
+    if failure_classification == HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE:
+        return [checklist[3], checklist[4]]
+    if failure_classification == HTTP_404_OR_ENDPOINT_MISMATCH:
+        return [checklist[4], checklist[2]]
+    if failure_classification == FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE:
+        return [checklist[2], checklist[4], checklist[0]]
+    return checklist
 
 
 def _safe_recheck_commands(latest_balance_checks: int) -> list[str]:

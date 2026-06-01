@@ -228,9 +228,75 @@ def test_httperror_sanitized_metadata_is_recorded_without_signature_or_secret(tm
     assert payload["balance_check"]["binance_code"] == -2015
     assert payload["balance_check"]["binance_message"] == "Invalid API-key, IP, or permissions."
     assert payload["balance_check"]["endpoint_family"] == "futures_account_readonly"
+    assert payload["balance_check"]["retryable"] is False
+    assert payload["balance_check"]["sanitized_error_available"] is True
+    assert "API key" in payload["balance_check"]["troubleshooting_hint"]
     assert "raw-signature-secret" not in rendered
     assert "secret-not-rendered" not in rendered
     assert "abcd1234wxyz5678" not in rendered
+
+
+def test_httperror_timestamp_recvwindow_metadata_is_recorded(tmp_path: Path) -> None:
+    error = urllib.error.HTTPError(
+        "https://fapi.binance.com/fapi/v2/account?timestamp=1&signature=raw-signature-secret",
+        400,
+        "Bad Request",
+        {},
+        BytesIO(b'{"code":-1021,"msg":"Timestamp for this request is outside of the recvWindow."}'),
+    )
+    with patch(
+        "src.app.hammer_radar.operator.readonly_balance_check._request_binance_futures_account_snapshot",
+        side_effect=error,
+    ):
+        payload = build_readonly_balance_check(
+            log_dir=tmp_path / "logs",
+            config_path=_write_config(tmp_path / "lane_controls.json"),
+            env=READ_ONLY_ENV,
+            allow_readonly_network_check=True,
+            now=NOW,
+        )
+
+    assert payload["balance_readiness"] == "READONLY_BALANCE_CHECK_FAILED"
+    assert payload["balance_check"]["error_type"] == "HTTPError"
+    assert payload["balance_check"]["http_status"] == 400
+    assert payload["balance_check"]["binance_code"] == -1021
+    assert payload["balance_check"]["endpoint_family"] == "futures_account_readonly"
+    assert payload["balance_check"]["retryable"] is True
+    assert payload["balance_check"]["sanitized_error_available"] is True
+
+
+def test_explicit_readonly_network_failure_record_persists_sanitized_fields(tmp_path: Path) -> None:
+    error = urllib.error.HTTPError(
+        "https://fapi.binance.com/fapi/v2/account?timestamp=1&signature=raw-signature-secret",
+        404,
+        "Not Found",
+        {},
+        BytesIO(b'{"code":-1121,"msg":"endpoint not found"}'),
+    )
+    with patch(
+        "src.app.hammer_radar.operator.readonly_balance_check._request_binance_futures_account_snapshot",
+        side_effect=error,
+    ):
+        payload = build_readonly_balance_check(
+            log_dir=tmp_path / "logs",
+            config_path=_write_config(tmp_path / "lane_controls.json"),
+            env=READ_ONLY_ENV,
+            allow_readonly_network_check=True,
+            record_balance_check=True,
+            confirm_readonly_balance_check=CONFIRM_READONLY_BALANCE_CHECK_RECORDING_PHRASE,
+            now=NOW,
+        )
+
+    records = load_readonly_balance_check_records(log_dir=tmp_path / "logs", limit=0)
+    record_balance = records[0]["balance_check"]
+    assert payload["balance_check"]["http_status"] == 404
+    assert record_balance["http_status"] == 404
+    assert record_balance["binance_code"] == -1121
+    assert record_balance["endpoint_family"] == "futures_account_readonly"
+    assert record_balance["sanitized_error_available"] is True
+    rendered = json.dumps(records, sort_keys=True)
+    assert "raw-signature-secret" not in rendered
+    assert "timestamp=1" not in rendered
 
 
 def test_account_0_usdt_classified_account_not_funded(tmp_path: Path) -> None:

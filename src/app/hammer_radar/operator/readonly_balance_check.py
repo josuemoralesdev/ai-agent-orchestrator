@@ -45,12 +45,8 @@ from src.app.hammer_radar.operator.short_paper_evidence_capture_loop import CONF
 from src.app.hammer_radar.operator.short_risk_contract_apply_review import (
     CONFIRM_SHORT_RISK_CONTRACT_APPLY_REVIEW_RECORDING_PHRASE,
 )
+from src.app.hammer_radar.operator.readonly_balance_error_sanitizer import sanitize_http_error
 from src.app.hammer_radar.operator.short_strategy_packet import DEFAULT_TARGET_LANE_KEY, build_short_strategy_target_family
-
-try:
-    from src.app.hammer_radar.operator.readonly_balance_failure_classifier import sanitize_readonly_balance_error
-except ImportError:  # pragma: no cover - defensive during partial imports
-    sanitize_readonly_balance_error = None
 
 READONLY_BALANCE_CHECK_READY = "READONLY_BALANCE_CHECK_READY"
 READONLY_BALANCE_CHECK_REJECTED = "READONLY_BALANCE_CHECK_REJECTED"
@@ -98,6 +94,8 @@ SAFETY = {
     "transfer_endpoint_called": False,
     "withdraw_endpoint_called": False,
     "secrets_shown": False,
+    "signature_shown": False,
+    "signed_url_shown": False,
     "paper_live_separation_intact": True,
     "env_mutated": False,
     "config_written": False,
@@ -317,11 +315,7 @@ def perform_readonly_balance_check_if_allowed(
             network_check_requested=True,
             funding_status=READONLY_BALANCE_CHECK_FAILED,
         )
-        sanitized_error = (
-            sanitize_readonly_balance_error(exc, endpoint_family="futures_account_readonly")
-            if sanitize_readonly_balance_error is not None
-            else {"error_type": exc.__class__.__name__, "endpoint_family": "futures_account_readonly"}
-        )
+        sanitized_error = sanitize_http_error(exc, endpoint_family="futures_account_readonly")
         result.update(
             {
                 "network_check_attempted": True,
