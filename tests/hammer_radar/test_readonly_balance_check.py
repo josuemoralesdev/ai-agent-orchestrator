@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import urllib.error
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -195,6 +197,38 @@ def test_no_secrets_shown(tmp_path: Path) -> None:
     assert payload["readonly_preflight"]["api_key_preview"] == "abcd...5678"
     assert payload["readonly_preflight"]["secrets_shown"] is False
     assert payload["safety"]["secrets_shown"] is False
+    assert "secret-not-rendered" not in rendered
+    assert "abcd1234wxyz5678" not in rendered
+
+
+def test_httperror_sanitized_metadata_is_recorded_without_signature_or_secret(tmp_path: Path) -> None:
+    error = urllib.error.HTTPError(
+        "https://fapi.binance.com/fapi/v2/account?timestamp=1&signature=raw-signature-secret",
+        403,
+        "Forbidden",
+        {},
+        BytesIO(b'{"code":-2015,"msg":"Invalid API-key, IP, or permissions."}'),
+    )
+    with patch(
+        "src.app.hammer_radar.operator.readonly_balance_check._request_binance_futures_account_snapshot",
+        side_effect=error,
+    ):
+        payload = build_readonly_balance_check(
+            log_dir=tmp_path / "logs",
+            config_path=_write_config(tmp_path / "lane_controls.json"),
+            env=READ_ONLY_ENV,
+            allow_readonly_network_check=True,
+            now=NOW,
+        )
+
+    rendered = json.dumps(payload, sort_keys=True)
+    assert payload["balance_readiness"] == "READONLY_BALANCE_CHECK_FAILED"
+    assert payload["balance_check"]["error_type"] == "HTTPError"
+    assert payload["balance_check"]["http_status"] == 403
+    assert payload["balance_check"]["binance_code"] == -2015
+    assert payload["balance_check"]["binance_message"] == "Invalid API-key, IP, or permissions."
+    assert payload["balance_check"]["endpoint_family"] == "futures_account_readonly"
+    assert "raw-signature-secret" not in rendered
     assert "secret-not-rendered" not in rendered
     assert "abcd1234wxyz5678" not in rendered
 

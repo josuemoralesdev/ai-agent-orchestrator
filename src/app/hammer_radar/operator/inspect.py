@@ -1911,6 +1911,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "readonly-balance-failure-recheck":
+        from src.app.hammer_radar.operator.readonly_balance_failure_classifier import (
+            build_readonly_balance_failure_recheck,
+            format_readonly_balance_failure_recheck_json,
+        )
+
+        print(
+            format_readonly_balance_failure_recheck_json(
+                build_readonly_balance_failure_recheck(
+                    log_dir=args.log_dir,
+                    latest_balance_checks=args.latest_balance_checks,
+                    record_recheck=args.record_recheck,
+                    confirm_readonly_balance_failure_recheck=args.confirm_readonly_balance_failure_recheck,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2979,6 +2995,14 @@ def _build_parser() -> argparse.ArgumentParser:
     readonly_balance_check_parser.add_argument("--allow-readonly-network-check", action="store_true")
     readonly_balance_check_parser.add_argument("--record-balance-check", action="store_true")
     readonly_balance_check_parser.add_argument("--confirm-readonly-balance-check", default=None)
+
+    readonly_balance_failure_recheck_parser = subparsers.add_parser(
+        "readonly-balance-failure-recheck",
+        parents=[parent],
+    )
+    readonly_balance_failure_recheck_parser.add_argument("--latest-balance-checks", type=int, default=50)
+    readonly_balance_failure_recheck_parser.add_argument("--record-recheck", action="store_true")
+    readonly_balance_failure_recheck_parser.add_argument("--confirm-readonly-balance-failure-recheck", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

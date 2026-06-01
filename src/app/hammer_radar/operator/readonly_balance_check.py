@@ -47,6 +47,11 @@ from src.app.hammer_radar.operator.short_risk_contract_apply_review import (
 )
 from src.app.hammer_radar.operator.short_strategy_packet import DEFAULT_TARGET_LANE_KEY, build_short_strategy_target_family
 
+try:
+    from src.app.hammer_radar.operator.readonly_balance_failure_classifier import sanitize_readonly_balance_error
+except ImportError:  # pragma: no cover - defensive during partial imports
+    sanitize_readonly_balance_error = None
+
 READONLY_BALANCE_CHECK_READY = "READONLY_BALANCE_CHECK_READY"
 READONLY_BALANCE_CHECK_REJECTED = "READONLY_BALANCE_CHECK_REJECTED"
 READONLY_BALANCE_CHECK_RECORDED = "READONLY_BALANCE_CHECK_RECORDED"
@@ -312,12 +317,18 @@ def perform_readonly_balance_check_if_allowed(
             network_check_requested=True,
             funding_status=READONLY_BALANCE_CHECK_FAILED,
         )
+        sanitized_error = (
+            sanitize_readonly_balance_error(exc, endpoint_family="futures_account_readonly")
+            if sanitize_readonly_balance_error is not None
+            else {"error_type": exc.__class__.__name__, "endpoint_family": "futures_account_readonly"}
+        )
         result.update(
             {
                 "network_check_attempted": True,
                 "balance_check_attempted": True,
                 "signed_readonly_request_created": True,
                 "error": exc.__class__.__name__,
+                **sanitized_error,
             }
         )
         return result

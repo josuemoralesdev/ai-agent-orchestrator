@@ -1,0 +1,388 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R165 Readonly Balance Failure Classifier and Funding Gate Recheck
+
+BRANCH:
+r165-readonly-balance-failure-classifier-funding-gate-recheck
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R164 added a safe explicit read-only balance check gate.
+
+After R164 was committed, the operator loaded .env and ran:
+
+readonly-balance-check --minimum-balance-usdt 44 --allow-readonly-network-check
+
+Observed result:
+- connector_status: READY_READ_ONLY
+- connector_mode: read_only
+- API key present: true
+- API secret present: true
+- live flags safe: true
+- network_check_attempted: true
+- balance_check_attempted: true
+- signed_readonly_request_created: true
+- signed_request_created_scope: readonly_account_status_only
+- signed_trading_request_created: false
+- order_payload_created: false
+- order_placed: false
+- transfer_endpoint_called: false
+- withdraw_endpoint_called: false
+- safety clean
+- result: READONLY_BALANCE_CHECK_FAILED
+- error: HTTPError
+
+R165 must classify the read-only balance failure safely and produce a useful funding gate recheck.
+
+Possible causes:
+- wrong Binance endpoint
+- futures vs spot endpoint mismatch
+- API key lacks futures/account permission
+- API key IP restriction
+- timestamp / recvWindow / clock skew
+- account type not enabled
+- Binance regional restriction
+- insufficient error body captured
+- connector intentionally hiding error details too aggressively
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is diagnostic only.
+It may improve read-only error classification.
+It must NOT call order endpoints.
+It must NOT call test-order endpoints.
+It must NOT transfer or withdraw.
+It must NOT enable live trading.
+It must NOT print secrets.
+It must NOT mutate env/config/global flags.
+It must NOT create executable payloads.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call transfer endpoints.
+- Do not call withdraw endpoints.
+- Do not enable live trading.
+- Do not send signed trading/order requests.
+- Do not create signed order request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not mutate risk contract config.
+- Do not set any lane to tiny_live.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+READ-ONLY NETWORK BOUNDARY:
+- Default preview must not attempt network.
+- Explicit --allow-readonly-network-check may attempt read-only balance/account status only.
+- If a network error occurs, capture sanitized HTTP status / Binance error code / message if available.
+- Never capture full headers containing signatures or secrets.
+- Never log query string with signature.
+- Never print API key or secret.
+- Any signed material must remain scoped to readonly_account_status_only.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/binance_readonly*.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- tests/hammer_radar/test_funding_readonly_precheck.py
+- docs/hammer_radar/live_readiness/R164_READONLY_BALANCE_CHECK_IF_SAFE.md
+
+REUSE / EXTEND:
+Reuse R164 readonly balance check.
+Do not create trading execution logic.
+Do not create generic signed order helpers.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/readonly_balance_failure_classifier.py
+
+Expose:
+- classify_readonly_balance_failure
+- sanitize_readonly_balance_error
+- build_readonly_balance_failure_recheck
+- build_readonly_balance_failure_next_actions
+- append_readonly_balance_failure_recheck_record
+- load_readonly_balance_failure_recheck_records
+- summarize_readonly_balance_failure_rechecks
+
+STATUS ENUM:
+- READONLY_BALANCE_FAILURE_RECHECK_READY
+- READONLY_BALANCE_FAILURE_RECHECK_REJECTED
+- READONLY_BALANCE_FAILURE_RECHECK_RECORDED
+- READONLY_BALANCE_FAILURE_RECHECK_BLOCKED
+- READONLY_BALANCE_FAILURE_RECHECK_ERROR
+
+FAILURE CLASSIFICATION ENUM:
+- HTTP_401_OR_403_KEY_PERMISSION_OR_IP_RESTRICTION
+- HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE
+- HTTP_404_OR_ENDPOINT_MISMATCH
+- FUTURES_ACCOUNT_NOT_ENABLED_OR_WRONG_ACCOUNT_TYPE
+- READONLY_BALANCE_ENDPOINT_UNAVAILABLE
+- NETWORK_OR_BINANCE_TEMPORARY_FAILURE
+- ERROR_BODY_NOT_AVAILABLE
+- UNKNOWN_HTTP_ERROR
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "target_family": {...},
+  "last_balance_check_summary": {
+    "status": "READONLY_BALANCE_CHECK_BLOCKED",
+    "balance_readiness": "READONLY_BALANCE_CHECK_FAILED",
+    "network_check_attempted": true,
+    "balance_check_attempted": true,
+    "signed_readonly_request_created": true,
+    "signed_trading_request_created": false,
+    "error_type": "HTTPError",
+    "sanitized_http_status": null,
+    "sanitized_binance_code": null,
+    "sanitized_binance_message": null
+  },
+  "failure_classification": "...",
+  "likely_causes": [...],
+  "operator_actions": [
+    "check API key permissions",
+    "check IP restriction",
+    "check Futures account enabled",
+    "check system clock / recvWindow",
+    "verify endpoint type used by connector"
+  ],
+  "safe_recheck_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live",
+    "write risk contract config",
+    "funds-dependent execution",
+    "signed order request",
+    "protective order submit",
+    "withdraw",
+    "transfer"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_trading_request_created=false
+- signed_order_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/readonly_balance_failure_rechecks.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM READONLY BALANCE FAILURE RECHECK RECORDING ONLY; NO ORDER; NO BINANCE TRADING CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+readonly-balance-failure-recheck
+
+Args:
+- --latest-balance-checks <int>, default 50
+- --record-recheck
+- --confirm-readonly-balance-failure-recheck <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --latest-balance-checks 50
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --record-recheck \
+  --confirm-readonly-balance-failure-recheck "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --latest-balance-checks 50 \
+  --record-recheck \
+  --confirm-readonly-balance-failure-recheck "I CONFIRM READONLY BALANCE FAILURE RECHECK RECORDING ONLY; NO ORDER; NO BINANCE TRADING CALL."
+
+PATCH R164 IF NEEDED:
+If R164 does not currently persist enough sanitized error metadata to classify failures, patch readonly_balance_check.py to include sanitized fields:
+- error_type
+- http_status if available
+- binance_code if available
+- binance_message if available
+- endpoint_family, e.g. futures_account_readonly or unknown
+- never include full URL query string
+- never include signature
+- never include API key/secret
+
+TESTS:
+Create:
+tests/hammer_radar/test_readonly_balance_failure_classifier.py
+
+Update:
+tests/hammer_radar/test_readonly_balance_check.py if R164 error sanitization changes.
+
+Test:
+- preview writes no record
+- wrong confirmation rejects record
+- exact confirmation records recheck only
+- HTTP 401/403 classified permission/IP restriction
+- HTTP 400 classified timestamp/recvWindow/signature
+- HTTP 404 classified endpoint mismatch
+- missing error body classified ERROR_BODY_NOT_AVAILABLE
+- unknown HTTPError classified UNKNOWN_HTTP_ERROR
+- secrets/signature never appear in sanitized output
+- no order/live/transfer/withdraw commands emitted
+- safety flags clean
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/readonly_balance_failure_classifier.py \
+  src/app/hammer_radar/operator/readonly_balance_check.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_readonly_balance_failure_classifier.py \
+  tests/hammer_radar/test_readonly_balance_check.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_funding_readonly_precheck.py \
+  tests/hammer_radar/test_short_risk_contract_apply_review.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --latest-balance-checks 50 \
+  | jq '.status, .last_balance_check_summary, .failure_classification, .likely_causes, .operator_actions, .safe_recheck_commands, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --record-recheck \
+  --confirm-readonly-balance-failure-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .recheck_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R165_READONLY_BALANCE_FAILURE_CLASSIFIER_AND_FUNDING_GATE_RECHECK.md
+
+Explain:
+- why R165 follows R164 HTTPError
+- sanitized failure classification
+- possible causes
+- no secret leakage
+- no live execution
+- no order endpoints
+- next possible R166
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R165.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R166_READONLY_BALANCE_ENDPOINT_FIX_OR_OPERATOR_KEY_CHECK.md
+
+R166 should:
+- branch based on R165 classification
+- if endpoint mismatch, fix read-only endpoint
+- if permission/IP/timestamp, produce operator checklist
+- no live execution
+- no orders
+- no secrets printed
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Failure classifier added:
+R164 sanitized metadata patch:
+Failure classification:
+Operator actions:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate config.
+Do not perform live trading actions.
+Do not run explicit network smoke inside Codex.
