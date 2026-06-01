@@ -1822,6 +1822,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "fundless-short-dry-run-packet":
+        from src.app.hammer_radar.operator.fundless_short_dry_run_packet import (
+            build_fundless_short_dry_run_packet,
+            format_fundless_short_dry_run_packet_json,
+        )
+
+        print(
+            format_fundless_short_dry_run_packet_json(
+                build_fundless_short_dry_run_packet(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_captures=args.latest_captures,
+                    latest_outcomes=args.latest_outcomes,
+                    latest_signals=args.latest_signals,
+                    record_packet=args.record_packet,
+                    confirm_fundless_short_dry_run=args.confirm_fundless_short_dry_run,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2841,6 +2860,17 @@ def _build_parser() -> argparse.ArgumentParser:
     fundless_short_rehearsal_parser.add_argument("--latest-signals", type=int, default=3000)
     fundless_short_rehearsal_parser.add_argument("--record-rehearsal", action="store_true")
     fundless_short_rehearsal_parser.add_argument("--confirm-fundless-short-rehearsal", default=None)
+
+    fundless_short_dry_run_packet_parser = subparsers.add_parser(
+        "fundless-short-dry-run-packet",
+        parents=[parent],
+    )
+    fundless_short_dry_run_packet_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    fundless_short_dry_run_packet_parser.add_argument("--latest-captures", type=int, default=200)
+    fundless_short_dry_run_packet_parser.add_argument("--latest-outcomes", type=int, default=10000)
+    fundless_short_dry_run_packet_parser.add_argument("--latest-signals", type=int, default=3000)
+    fundless_short_dry_run_packet_parser.add_argument("--record-packet", action="store_true")
+    fundless_short_dry_run_packet_parser.add_argument("--confirm-fundless-short-dry-run", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
