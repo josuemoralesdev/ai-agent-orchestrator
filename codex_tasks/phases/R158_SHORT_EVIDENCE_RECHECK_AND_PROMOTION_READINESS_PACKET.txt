@@ -1,0 +1,416 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R158 Short Evidence Recheck and Promotion Readiness Packet
+
+BRANCH:
+r158-short-evidence-recheck-promotion-readiness-packet
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: EXTENSION OF EXISTING CAPABILITY, WIRING / INTEGRATION, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R156 built the short strategy packet for:
+BTCUSDT|8m|short|ladder_close_50_618
+
+R156 evidence:
+- mode: paper
+- win_rate_pct: 54.65
+- avg_pnl_pct: +0.0246
+- total_pnl_pct: +4.2378
+- paper_outcome_count: 172
+- fill_rate_pct: 97.18
+- blocker: fresh_candidate_count = 0
+
+R157 created a focused bounded short paper evidence capture loop.
+
+The 12h R157 watcher captured fresh paper evidence:
+- status: SHORT_PAPER_EVIDENCE_CAPTURED
+- max_iterations: 720
+- iterations_completed: 348
+- paper_evidence_captured: true
+- captured_signal_id: BTCUSDT|8m|short|2026-06-01T10:55:59.999000+00:00
+- recommended_next_operator_move: RUN_R158_SHORT_EVIDENCE_RECHECK
+- safety clean:
+  - no Binance order
+  - no network
+  - no payload
+  - no config mutation
+  - no env mutation
+  - no global live flag change
+
+R158 must recheck the 8m short lane after fresh evidence exists and build a promotion-readiness packet if justified.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is audit/packet only.
+It does NOT promote 8m short.
+It does NOT set short tiny_live.
+It does NOT change lane config.
+It does NOT call Binance.
+It does NOT place orders.
+It does NOT create executable order payloads.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance account/order/private endpoint.
+- Do not send signed requests.
+- Do not create signed request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson usage patterns
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson usage patterns
+- tests/hammer_radar/test_short_paper_evidence_capture_loop.py
+- tests/hammer_radar/test_short_strategy_packet.py
+- docs/hammer_radar/live_readiness/R157_SHORT_PAPER_EVIDENCE_CAPTURE_LOOP.md
+
+REUSE / EXTEND:
+Reuse R157 capture records.
+Reuse R156 short strategy packet.
+Reuse R155 full-spectrum review.
+Reuse R154 promotion candidate audit where useful.
+Reuse lane_controls.json read-only.
+Do not create execution logic.
+Do not mutate config.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/short_evidence_recheck_packet.py
+
+Expose:
+- build_short_evidence_recheck_packet
+- load_recent_short_capture_records
+- summarize_short_fresh_evidence
+- rerun_short_strategy_evidence_summary
+- build_short_promotion_readiness_assessment
+- classify_short_promotion_readiness
+- build_short_readiness_blockers
+- build_short_next_operator_move
+- append_short_evidence_recheck_record
+- load_short_evidence_recheck_records
+- summarize_short_evidence_recheck_records
+
+STATUS ENUM:
+- SHORT_EVIDENCE_RECHECK_READY
+- SHORT_EVIDENCE_RECHECK_REJECTED
+- SHORT_EVIDENCE_RECHECK_RECORDED
+- SHORT_EVIDENCE_RECHECK_BLOCKED
+- SHORT_EVIDENCE_RECHECK_ERROR
+
+READINESS ENUM:
+- KEEP_PAPER_ONLY_COLLECT_MORE
+- PROMOTION_PACKET_NOT_READY
+- PROMOTION_PACKET_READY_FOR_OPERATOR_REVIEW
+- SHORT_STRATEGY_REVIEW_REQUIRED
+- DO_NOT_PROMOTE
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "packet_recorded": false,
+  "packet_id": null,
+  "record_packet_requested": false,
+  "confirmation_valid": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "fresh_evidence": {
+    "fresh_capture_records_count": ...,
+    "latest_captured_signal_id": "...",
+    "latest_capture_status": "SHORT_PAPER_EVIDENCE_CAPTURED",
+    "fresh_candidate_count": ...,
+    "freshness_threshold_required": 10,
+    "freshness_threshold_met": true/false
+  },
+  "historical_evidence": {
+    "paper_outcome_count": ...,
+    "win_rate_pct": ...,
+    "avg_pnl_pct": ...,
+    "total_pnl_pct": ...,
+    "fill_rate_pct": ...,
+    "stop_count": ...,
+    "sample_quality": "..."
+  },
+  "short_strategy_interpretation": {
+    "golden_pocket_role": "resistance/retrace zone",
+    "invalidation_concept": "...",
+    "take_profit_concept": "..."
+  },
+  "promotion_readiness": {
+    "readiness": "...",
+    "ready_for_operator_review": false,
+    "config_change_allowed_now": false,
+    "operator_approval_required": true,
+    "why": "...",
+    "blockers": [...]
+  },
+  "thresholds": {
+    "min_paper_outcomes": 30,
+    "min_fresh_candidates": 10,
+    "preferred_win_rate_pct": 52,
+    "avg_pnl_must_be_positive": true,
+    "stop_dominance_must_be_controlled": true
+  },
+  "recommended_next_operator_move": "KEEP_R157_RUNNING|RUN_SHORT_STRATEGY_RECHECK|BUILD_FUTURE_TINY_LIVE_REVIEW_PACKET|WAIT_FOR_MORE_SHORT_EVIDENCE",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/short_evidence_recheck_packets.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM SHORT EVIDENCE RECHECK RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+short-evidence-recheck-packet
+
+Args:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --latest-captures <int>, default 200
+- --latest-outcomes <int>, default 10000
+- --latest-signals <int>, default 3000
+- --latest-betrayal <int>, default 5000
+- --record-packet
+- --confirm-short-evidence-recheck <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-evidence-recheck-packet \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-evidence-recheck-packet \
+  --record-packet \
+  --confirm-short-evidence-recheck "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-evidence-recheck-packet \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  --record-packet \
+  --confirm-short-evidence-recheck "I CONFIRM SHORT EVIDENCE RECHECK RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- short-evidence-recheck-packet record command
+- short-paper-evidence-capture-loop 12h command
+- short-strategy-packet command
+- full-spectrum-betrayal-short-review command
+- no live commands
+- no lane mode apply commands
+
+TESTS:
+Create:
+tests/hammer_radar/test_short_evidence_recheck_packet.py
+
+Test:
+- preview writes no packet
+- wrong confirmation rejects record
+- exact confirmation records packet only
+- target lane default is BTCUSDT|8m|short|ladder_close_50_618
+- target lane remains paper
+- fresh capture record is detected
+- latest captured signal id is surfaced
+- freshness threshold below 10 keeps readiness not ready
+- if mocked fresh captures >=10 and historical evidence good, readiness can become PROMOTION_PACKET_READY_FOR_OPERATOR_REVIEW
+- no lane mode apply commands emitted
+- no live commands emitted
+- do_not_run_yet blocks short tiny_live
+- config_written false
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/short_evidence_recheck_packet.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_short_evidence_recheck_packet.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_short_paper_evidence_capture_loop.py \
+  tests/hammer_radar/test_short_strategy_packet.py \
+  tests/hammer_radar/test_full_spectrum_betrayal_short_review.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-evidence-recheck-packet \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --latest-betrayal 5000 \
+  | jq '.status, .target_family, .fresh_evidence, .historical_evidence, .promotion_readiness, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  short-evidence-recheck-packet \
+  --record-packet \
+  --confirm-short-evidence-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .packet_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R158_SHORT_EVIDENCE_RECHECK_AND_PROMOTION_READINESS_PACKET.md
+
+Explain:
+- why R158 follows captured R157 evidence
+- what fresh evidence was captured
+- why 8m short remains paper
+- what thresholds are still missing
+- when future operator review packet becomes justified
+- no live execution
+- no lane changes
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R158.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R159_SHORT_TINY_LIVE_REVIEW_PACKET_OR_CONTINUED_CAPTURE.md
+
+R159 should:
+- branch based on R158 readiness
+- if fresh threshold still low, continue bounded capture
+- if threshold met, build short tiny-live review packet only
+- no lane mode change
+- no live execution without explicit future operator approval
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Fresh evidence detected:
+Historical evidence:
+Promotion readiness:
+Remaining blockers:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.
