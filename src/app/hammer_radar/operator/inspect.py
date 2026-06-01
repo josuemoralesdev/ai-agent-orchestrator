@@ -1893,6 +1893,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "readonly-balance-check":
+        from src.app.hammer_radar.operator.readonly_balance_check import (
+            build_readonly_balance_check,
+            format_readonly_balance_check_json,
+        )
+
+        print(
+            format_readonly_balance_check_json(
+                build_readonly_balance_check(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    minimum_balance_usdt=args.minimum_balance_usdt,
+                    allow_readonly_network_check=args.allow_readonly_network_check,
+                    record_balance_check=args.record_balance_check,
+                    confirm_readonly_balance_check=args.confirm_readonly_balance_check,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2951,6 +2969,16 @@ def _build_parser() -> argparse.ArgumentParser:
     funding_readonly_precheck_parser.add_argument("--allow-readonly-network-check", action="store_true")
     funding_readonly_precheck_parser.add_argument("--record-precheck", action="store_true")
     funding_readonly_precheck_parser.add_argument("--confirm-funding-readonly-precheck", default=None)
+
+    readonly_balance_check_parser = subparsers.add_parser(
+        "readonly-balance-check",
+        parents=[parent],
+    )
+    readonly_balance_check_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    readonly_balance_check_parser.add_argument("--minimum-balance-usdt", type=float, default=44.0)
+    readonly_balance_check_parser.add_argument("--allow-readonly-network-check", action="store_true")
+    readonly_balance_check_parser.add_argument("--record-balance-check", action="store_true")
+    readonly_balance_check_parser.add_argument("--confirm-readonly-balance-check", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
