@@ -1,0 +1,475 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R159 Fundless 8m Short Tiny-Live Readiness Rehearsal
+
+BRANCH:
+r159-fundless-8m-short-tiny-live-readiness-rehearsal
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R155 identified the next candidate door:
+- BTCUSDT|8m|short|ladder_close_50_618
+- recommendation_type: SHORT_STRATEGY_REVIEW
+
+R156 built the short strategy packet:
+- 8m short is paper mode
+- historical paper outcome evidence was promising:
+  - paper_outcome_count around 174
+  - win_rate around 53.45%
+  - avg_pnl positive
+  - total_pnl positive
+- but fresh candidate evidence was below threshold
+
+R157 built a focused short paper evidence capture loop.
+
+R157 captured one fresh 8m short paper signal:
+- captured_signal_id: BTCUSDT|8m|short|2026-06-01T10:55:59.999000+00:00
+- safety clean
+- no Binance
+- no order
+- no config mutation
+
+R158 rechecked readiness:
+- fresh capture count: 1
+- required fresh threshold: 10
+- readiness: PROMOTION_PACKET_NOT_READY
+- next operator move: KEEP_R157_RUNNING
+
+Current operator state:
+- R157 12h focused watcher is running in tmux to collect more fresh 8m short evidence.
+- Account is not funded.
+- We do not want to wait idly.
+- We want to build the fundless readiness shell now so the system is operationally prepared when evidence/funding arrive.
+
+PURPOSE:
+Build a fundless tiny-live readiness rehearsal for BTCUSDT 8m short.
+
+It must answer:
+1. What is already ready?
+2. What is blocked because account is not funded?
+3. What is blocked because fresh evidence is below threshold?
+4. What exact future conditions are required before any tiny-live discussion?
+5. What non-executable dry-run path would be used later?
+6. What operator checklist must be satisfied?
+7. What commands are safe now?
+8. What commands are explicitly forbidden?
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is a rehearsal/audit only.
+It does NOT promote the 8m short lane.
+It does NOT set short tiny_live.
+It does NOT change lane config.
+It does NOT call Binance order endpoints.
+It does NOT place orders.
+It does NOT create executable order payloads.
+It does NOT enable live execution.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT EXPECTED CONFIG:
+- BTCUSDT|8m|short|ladder_close_50_618 mode=paper
+- BTCUSDT|13m|long|ladder_close_50_618 mode=tiny_live
+- BTCUSDT|44m|long|ladder_close_50_618 mode=tiny_live
+- Other expanded BTCUSDT paper lanes remain paper
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call any Binance order/private trading endpoint.
+- Do not send signed trading requests.
+- Do not create signed order request material.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not disable global kill switch.
+- Do not enable live orders globally.
+- Do not bypass R106/global gates.
+- Do not mark global gate ready.
+- Do not bypass protective policy.
+- Do not bypass freshness.
+- Do not create fake paper proof.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not change existing tiny_live lane modes.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+READ-ONLY CONNECTOR BOUNDARY:
+- Do not call network inside tests.
+- Do not require Binance network access for preview.
+- If existing read-only Binance status surfaces exist, summarize their configured status from safe local checks only.
+- It is acceptable to report funding status as UNKNOWN_NOT_CHECKED unless a local read-only status surface already exists.
+- Do not create signed order requests.
+- Do not create executable payloads.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json if present
+- src/app/hammer_radar/operator/short_evidence_recheck_packet.py
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/binance_readonly_status.py if present
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/first_live_activation_gate.py
+- src/app/hammer_radar/operator/tiny_live_lane_unlock_contract.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- logs/hammer_radar_forward/short_evidence_recheck_packets.ndjson usage patterns
+- tests/hammer_radar/test_short_evidence_recheck_packet.py
+- tests/hammer_radar/test_short_paper_evidence_capture_loop.py
+- docs/hammer_radar/live_readiness/R158_SHORT_EVIDENCE_RECHECK_AND_PROMOTION_READINESS_PACKET.md
+
+REUSE / EXTEND:
+Reuse R158 evidence recheck.
+Reuse R156 short strategy packet.
+Reuse R157 capture records.
+Reuse lane_controls.json read-only.
+Reuse existing live readiness and tiny-live gate concepts only as references.
+Do not duplicate live execution logic.
+Do not create trading execution logic.
+Do not create order submit logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/fundless_short_tiny_live_readiness_rehearsal.py
+
+Expose:
+- build_fundless_short_tiny_live_readiness_rehearsal
+- build_target_short_lane_state
+- build_fresh_evidence_gate_summary
+- build_funding_gate_summary
+- build_short_risk_contract_preview
+- build_non_executable_dry_run_intent_preview
+- build_operator_arming_checklist_preview
+- build_fundless_readiness_blockers
+- classify_fundless_readiness
+- append_fundless_readiness_rehearsal_record
+- load_fundless_readiness_rehearsal_records
+- summarize_fundless_readiness_rehearsals
+
+STATUS ENUM:
+- FUNDLESS_SHORT_READINESS_REHEARSAL_READY
+- FUNDLESS_SHORT_READINESS_REHEARSAL_REJECTED
+- FUNDLESS_SHORT_READINESS_REHEARSAL_RECORDED
+- FUNDLESS_SHORT_READINESS_REHEARSAL_BLOCKED
+- FUNDLESS_SHORT_READINESS_REHEARSAL_ERROR
+
+READINESS ENUM:
+- NOT_READY_FUNDING_AND_EVIDENCE_BLOCKED
+- NOT_READY_EVIDENCE_BLOCKED
+- NOT_READY_FUNDING_BLOCKED
+- FUNDLESS_REHEARSAL_READY
+- READY_FOR_FUTURE_OPERATOR_REVIEW_ONLY
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "rehearsal_recorded": false,
+  "rehearsal_id": null,
+  "record_rehearsal_requested": false,
+  "confirmation_valid": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "evidence_gate": {
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "fresh_evidence_threshold_met": false,
+    "latest_captured_signal_id": "...",
+    "historical_win_rate_pct": ...,
+    "historical_avg_pnl_pct": ...,
+    "historical_total_pnl_pct": ...,
+    "evidence_ready_for_promotion_review": false
+  },
+  "funding_gate": {
+    "account_funded": false/unknown,
+    "funding_status": "UNKNOWN_NOT_CHECKED|READ_ONLY_AVAILABLE_NOT_FUNDED|READ_ONLY_AVAILABLE_FUNDED|MISSING_ENV|BLOCKED",
+    "minimum_balance_required_estimate_usdt": null,
+    "balance_source": "not_checked|local_readonly_summary|operator_supplied",
+    "funding_ready": false
+  },
+  "short_strategy_gate": {
+    "golden_pocket_role": "resistance/retrace zone",
+    "short_specific_stop_tp_required": true,
+    "short_strategy_packet_exists": true/false,
+    "short_strategy_ready_for_review": true/false
+  },
+  "risk_contract_preview": {
+    "risk_contract_exists": true/false,
+    "target_lane_has_contract": true/false,
+    "suggested_tiny_live_notional_usdt": null,
+    "max_daily_trades": 1,
+    "max_daily_loss_pct": 0.15,
+    "requires_protective_orders": true,
+    "non_executable_preview_only": true
+  },
+  "non_executable_dry_run_intent_preview": {
+    "would_build_order_payload": false,
+    "would_submit_order": false,
+    "would_call_binance": false,
+    "intent_type": "SHORT_TINY_LIVE_REHEARSAL_ONLY",
+    "side": "SELL",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "entry_mode": "ladder_close_50_618",
+    "notional_usdt": null,
+    "stop_tp_model": "short_specific_required_before_live",
+    "executable": false
+  },
+  "operator_arming_checklist": {
+    "required_before_future_live_discussion": [
+      "fresh captures >= 10",
+      "account funding verified",
+      "short risk contract reviewed",
+      "protective policy reviewed",
+      "global kill switch reviewed",
+      "operator explicit approval",
+      "live flags intentionally armed in later phase"
+    ],
+    "currently_satisfied": [...],
+    "currently_blocked": [...]
+  },
+  "readiness": "...",
+  "blockers": [...],
+  "recommended_next_operator_move": "KEEP_R157_RUNNING|FUND_ACCOUNT_LATER|RUN_R160_FUNDLESS_DRY_RUN_PACKET|WAIT_FOR_MORE_SHORT_EVIDENCE",
+  "recommended_next_engineering_move": "...",
+  "safe_commands": [...],
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "set new lane tiny_live",
+    "funds-dependent execution"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- protective_payload_created=false
+- signed_request_created=false
+- network_allowed=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- protective_order_endpoint_called=false
+- secrets_shown=false
+- paper_live_separation_intact=true
+- env_mutated=false
+- config_written=false
+- global_live_flags_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/fundless_short_tiny_live_readiness_rehearsals.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FUNDLESS SHORT READINESS REHEARSAL RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL.
+
+REQUIRED CLI:
+Wire into:
+src/app/hammer_radar/operator/inspect.py
+
+Add mode:
+fundless-short-tiny-live-readiness-rehearsal
+
+Args:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --latest-captures <int>, default 200
+- --latest-outcomes <int>, default 10000
+- --latest-signals <int>, default 3000
+- --record-rehearsal
+- --confirm-fundless-short-rehearsal <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fundless-short-tiny-live-readiness-rehearsal \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fundless-short-tiny-live-readiness-rehearsal \
+  --record-rehearsal \
+  --confirm-fundless-short-rehearsal "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fundless-short-tiny-live-readiness-rehearsal \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  --record-rehearsal \
+  --confirm-fundless-short-rehearsal "I CONFIRM FUNDLESS SHORT READINESS REHEARSAL RECORDING ONLY; NO LANE CHANGES; NO ORDER; NO BINANCE CALL."
+
+REQUIRED SAFE COMMANDS:
+Output should include:
+- R157 12h short paper capture command
+- R158 short evidence recheck command
+- R156 short strategy packet command
+- fundless readiness rehearsal record command
+- no live commands
+- no lane mode apply commands
+- no order commands
+
+TESTS:
+Create:
+tests/hammer_radar/test_fundless_short_tiny_live_readiness_rehearsal.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects record
+- exact confirmation records rehearsal only
+- target lane default is BTCUSDT|8m|short|ladder_close_50_618
+- target lane remains paper
+- fresh evidence count below 10 blocks readiness
+- funding unknown/not funded blocks readiness
+- non_executable_dry_run_intent_preview is not executable
+- no order payload is created
+- no lane mode apply commands emitted
+- no live commands emitted
+- do_not_run_yet blocks short tiny_live and funds-dependent execution
+- config_written false
+- safety flags clean
+- no Binance/order/payload/network/env/config/global mutation
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/fundless_short_tiny_live_readiness_rehearsal.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_fundless_short_tiny_live_readiness_rehearsal.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_short_evidence_recheck_packet.py \
+  tests/hammer_radar/test_short_paper_evidence_capture_loop.py \
+  tests/hammer_radar/test_short_strategy_packet.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fundless-short-tiny-live-readiness-rehearsal \
+  --latest-captures 200 \
+  --latest-outcomes 10000 \
+  --latest-signals 3000 \
+  | jq '.status, .target_family, .evidence_gate, .funding_gate, .short_strategy_gate, .risk_contract_preview, .non_executable_dry_run_intent_preview, .readiness, .blockers, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fundless-short-tiny-live-readiness-rehearsal \
+  --record-rehearsal \
+  --confirm-fundless-short-rehearsal "wrong" \
+  | jq '.status, .confirmation_valid, .rehearsal_recorded, .safety'
+
+Config unchanged:
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R159_FUNDLESS_8M_SHORT_TINY_LIVE_READINESS_REHEARSAL.md
+
+Explain:
+- why R159 follows R158
+- why this is progress while waiting for evidence/funding
+- fundless readiness gates
+- funding blocker
+- evidence blocker
+- short strategy blocker
+- non-executable dry-run intent
+- no live execution
+- no lane changes
+- next possible R160
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R159.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R160_FUNDLESS_SHORT_DRY_RUN_PACKET_AND_OPERATOR_ARMING_CHECKLIST.md
+
+R160 should:
+- build a more detailed non-executable dry-run packet
+- define exact operator arming checklist
+- define funding verification steps
+- define future lane promotion review steps
+- no lane mode change
+- no live execution
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Fundless readiness rehearsal added:
+Evidence gate:
+Funding gate:
+Short strategy gate:
+Risk contract preview:
+Dry-run intent preview:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next phase:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate lane config.
+Do not perform live trading actions.
