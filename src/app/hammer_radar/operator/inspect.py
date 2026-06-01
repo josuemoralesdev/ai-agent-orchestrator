@@ -1857,6 +1857,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "short-risk-contract-apply-review":
+        from src.app.hammer_radar.operator.short_risk_contract_apply_review import (
+            build_short_risk_contract_apply_review,
+            format_short_risk_contract_apply_review_json,
+        )
+
+        print(
+            format_short_risk_contract_apply_review_json(
+                build_short_risk_contract_apply_review(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    latest_captures=args.latest_captures,
+                    latest_drafts=args.latest_drafts,
+                    record_review=args.record_review,
+                    confirm_short_risk_contract_apply_review=args.confirm_short_risk_contract_apply_review,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -2895,6 +2913,16 @@ def _build_parser() -> argparse.ArgumentParser:
     short_risk_contract_draft_preview_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     short_risk_contract_draft_preview_parser.add_argument("--record-draft", action="store_true")
     short_risk_contract_draft_preview_parser.add_argument("--confirm-short-risk-contract-draft", default=None)
+
+    short_risk_contract_apply_review_parser = subparsers.add_parser(
+        "short-risk-contract-apply-review",
+        parents=[parent],
+    )
+    short_risk_contract_apply_review_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    short_risk_contract_apply_review_parser.add_argument("--latest-captures", type=int, default=200)
+    short_risk_contract_apply_review_parser.add_argument("--latest-drafts", type=int, default=50)
+    short_risk_contract_apply_review_parser.add_argument("--record-review", action="store_true")
+    short_risk_contract_apply_review_parser.add_argument("--confirm-short-risk-contract-apply-review", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
