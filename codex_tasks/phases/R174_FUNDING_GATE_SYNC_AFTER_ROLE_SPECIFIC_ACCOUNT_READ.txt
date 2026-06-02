@@ -1,0 +1,350 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R174 Funding Gate Sync After Role-Specific Account Read
+
+BRANCH:
+r174-funding-gate-sync-after-role-specific-account-read
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R173 verified the account-read env migration ritual worked:
+- account_read selected_pair_source=role_specific
+- role_specific_pair_present=true
+- legacy_fallback_used=false
+- runtime safety passed:
+  - BINANCE_CONNECTOR_MODE=read_only
+  - BINANCE_LIVE_TRADING_ENABLED=false
+  - HAMMER_LIVE_EXECUTION_ENABLED=false
+  - HAMMER_ALLOW_LIVE_ORDERS=false
+  - HAMMER_GLOBAL_KILL_SWITCH=true
+- future_live_disabled=true
+- no env writes
+- no config writes
+- no Binance call by default
+- latest funding context: ACCOUNT_NOT_FUNDED
+
+Earlier role-specific account-read balance check proved:
+- available_balance_usdt=0.0
+- wallet_balance_usdt=0.0
+- balance_readiness=ACCOUNT_NOT_FUNDED
+- safety clean:
+  - no order
+  - no signed trading request
+  - no transfer
+  - no withdraw
+  - no live execution
+
+R174 must sync the funding gate using the verified role-specific account-read state.
+
+PURPOSE:
+Create a funding gate sync surface that:
+1. Confirms account-read role-specific env is selected.
+2. Reads latest recorded readonly balance result.
+3. Syncs funding readiness to ACCOUNT_NOT_FUNDED.
+4. States tiny-live remains blocked by funding and evidence.
+5. Produces the exact next blockers before any future tiny-live review.
+6. Does not call Binance by default.
+7. Does not write env/config.
+8. Does not change lane modes.
+9. Does not place orders.
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT EXPECTED STATE:
+- account-read env role is role_specific in current shell if ritual was performed.
+- latest recorded account balance is 0.0 USDT.
+- funding gate should be ACCOUNT_NOT_FUNDED.
+- target lane remains paper.
+- fresh captures are below threshold unless new captures happened.
+- risk contract is draft/review only.
+- short tiny-live is not authorized.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is sync/audit only.
+It must NOT call Binance by default.
+It must NOT write env.
+It must NOT mutate config.
+It must NOT promote the lane.
+It must NOT set short tiny-live.
+It must NOT create executable payloads.
+It must NOT place orders.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance by default.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys/secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/account_read_env_migration_verify.py
+- src/app/hammer_radar/operator/account_read_env_migration_packet.py
+- src/app/hammer_radar/operator/env_role_adapter.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/funding_gate_key_role_sync.py
+- src/app/hammer_radar/operator/short_evidence_recheck_packet.py
+- src/app/hammer_radar/operator/short_risk_contract_apply_review.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/readonly_balance_checks.ndjson usage patterns
+- logs/hammer_radar_forward/account_read_env_migration_verifications.ndjson usage patterns
+- tests/hammer_radar/test_account_read_env_migration_verify.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- docs/hammer_radar/live_readiness/R173_AFTER_ACCOUNT_READ_ENV_MIGRATION_VERIFY.md
+
+REUSE / EXTEND:
+Reuse R173 verification.
+Reuse R164/R167 readonly balance check records.
+Reuse R158 evidence recheck if useful.
+Reuse R162 contract apply review if useful.
+Do not create network logic.
+Do not call Binance.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/funding_gate_role_specific_sync.py
+
+Expose:
+- build_funding_gate_role_specific_sync
+- load_latest_account_read_migration_verify
+- load_latest_readonly_balance_record
+- build_account_read_role_state
+- build_funding_gate_state
+- build_tiny_live_blocker_summary
+- build_next_readiness_actions
+- append_funding_gate_role_specific_sync_record
+- load_funding_gate_role_specific_sync_records
+- summarize_funding_gate_role_specific_syncs
+
+STATUS ENUM:
+- FUNDING_GATE_ROLE_SPECIFIC_SYNC_READY
+- FUNDING_GATE_ROLE_SPECIFIC_SYNC_REJECTED
+- FUNDING_GATE_ROLE_SPECIFIC_SYNC_RECORDED
+- FUNDING_GATE_ROLE_SPECIFIC_SYNC_BLOCKED
+- FUNDING_GATE_ROLE_SPECIFIC_SYNC_ERROR
+
+FUNDING SYNC ENUM:
+- FUNDING_SYNC_ACCOUNT_NOT_FUNDED
+- FUNDING_SYNC_BELOW_MINIMUM
+- FUNDING_SYNC_READY_FOR_REVIEW
+- FUNDING_SYNC_NO_BALANCE_RECORD
+- FUNDING_SYNC_ACCOUNT_READ_ROLE_NOT_VERIFIED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "sync_recorded": false,
+  "sync_id": null,
+  "record_sync_requested": false,
+  "confirmation_valid": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "account_read_role_state": {
+    "selected_pair_source": "role_specific|legacy_fallback|missing",
+    "role_specific_pair_present": true/false,
+    "legacy_fallback_used": true/false,
+    "runtime_safety_passed": true/false,
+    "future_live_disabled": true/false,
+    "secrets_shown": false
+  },
+  "latest_balance_state": {
+    "record_found": true/false,
+    "balance_readiness": "ACCOUNT_NOT_FUNDED|ACCOUNT_FUNDED_BELOW_MINIMUM|ACCOUNT_FUNDED_READY_FOR_REVIEW|UNKNOWN",
+    "available_balance_usdt": 0.0/null,
+    "wallet_balance_usdt": 0.0/null,
+    "minimum_balance_required_estimate_usdt": 44,
+    "funding_ready": false,
+    "source_ledger": "readonly_balance_checks.ndjson"
+  },
+  "funding_gate": {
+    "funding_sync_status": "...",
+    "funding_ready": false,
+    "funding_blocker": "account_not_funded|below_minimum|missing_balance_record|role_not_verified",
+    "safe_to_arm_live": false
+  },
+  "tiny_live_blocker_summary": {
+    "funding_blocked": true,
+    "fresh_evidence_blocked": true/false,
+    "risk_contract_blocked": true,
+    "lane_mode_blocked": true,
+    "operator_approval_blocked": true,
+    "global_live_flags_blocked": true
+  },
+  "recommended_next_operator_move": "FUND_ACCOUNT_LATER|KEEP_R157_RUNNING|RUN_R158_AFTER_MORE_CAPTURES|RUN_R175_TINY_LIVE_BLOCKER_BURN_DOWN",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "write env files",
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/funding_gate_role_specific_sync.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FUNDING GATE ROLE-SPECIFIC SYNC RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+funding-gate-role-specific-sync
+
+Args:
+- --record-sync
+- --confirm-funding-role-specific-sync <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-role-specific-sync
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-role-specific-sync \
+  --record-sync \
+  --confirm-funding-role-specific-sync "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-role-specific-sync \
+  --record-sync \
+  --confirm-funding-role-specific-sync "I CONFIRM FUNDING GATE ROLE-SPECIFIC SYNC RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_funding_gate_role_specific_sync.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- role_specific account-read + ACCOUNT_NOT_FUNDED produces FUNDING_SYNC_ACCOUNT_NOT_FUNDED
+- missing role verification blocks
+- missing balance record blocks
+- funded below minimum produces below minimum
+- funded >= minimum produces ready for review but not live ready
+- no secrets shown
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related account-read verify / readonly balance / funding precheck tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-role-specific-sync \
+  | jq '.status, .account_read_role_state, .latest_balance_state, .funding_gate, .tiny_live_blocker_summary, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-role-specific-sync \
+  --record-sync \
+  --confirm-funding-role-specific-sync "wrong" \
+  | jq '.status, .confirmation_valid, .sync_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R174_FUNDING_GATE_SYNC_AFTER_ROLE_SPECIFIC_ACCOUNT_READ.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R174.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R175_TINY_LIVE_BLOCKER_BURN_DOWN_8M_SHORT.md
+
+R175 should:
+- produce a compact blocker burn-down for BTCUSDT 8m short tiny-live path
+- include funding, fresh captures, risk contract, lane mode, protective policy, operator approval, live flags
+- no env writes
+- no config writes
+- no live execution
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.

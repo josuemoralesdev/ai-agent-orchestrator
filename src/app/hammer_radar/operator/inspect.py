@@ -1943,6 +1943,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "funding-gate-role-specific-sync":
+        from src.app.hammer_radar.operator.funding_gate_role_specific_sync import (
+            build_funding_gate_role_specific_sync,
+            format_funding_gate_role_specific_sync_json,
+        )
+
+        print(
+            format_funding_gate_role_specific_sync_json(
+                build_funding_gate_role_specific_sync(
+                    log_dir=args.log_dir,
+                    record_sync=args.record_sync,
+                    confirm_funding_role_specific_sync=args.confirm_funding_role_specific_sync,
+                )
+            )
+        )
     elif args.command == "env-role-split-proposal":
         from src.app.hammer_radar.operator.env_role_split_proposal import (
             build_env_role_split_proposal,
@@ -3087,6 +3102,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     funding_gate_key_role_sync_parser.add_argument("--record-sync", action="store_true")
     funding_gate_key_role_sync_parser.add_argument("--confirm-funding-key-role-sync", default=None)
+
+    funding_gate_role_specific_sync_parser = subparsers.add_parser(
+        "funding-gate-role-specific-sync",
+        parents=[parent],
+    )
+    funding_gate_role_specific_sync_parser.add_argument("--record-sync", action="store_true")
+    funding_gate_role_specific_sync_parser.add_argument("--confirm-funding-role-specific-sync", default=None)
 
     env_role_split_proposal_parser = subparsers.add_parser(
         "env-role-split-proposal",
