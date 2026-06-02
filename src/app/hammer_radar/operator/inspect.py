@@ -1958,6 +1958,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-blocker-burn-down":
+        from src.app.hammer_radar.operator.tiny_live_blocker_burn_down import (
+            build_tiny_live_blocker_burn_down,
+            format_tiny_live_blocker_burn_down_json,
+        )
+
+        print(
+            format_tiny_live_blocker_burn_down_json(
+                build_tiny_live_blocker_burn_down(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_burn_down=args.record_burn_down,
+                    confirm_tiny_live_burn_down=args.confirm_tiny_live_burn_down,
+                )
+            )
+        )
     elif args.command == "env-role-split-proposal":
         from src.app.hammer_radar.operator.env_role_split_proposal import (
             build_env_role_split_proposal,
@@ -3109,6 +3125,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     funding_gate_role_specific_sync_parser.add_argument("--record-sync", action="store_true")
     funding_gate_role_specific_sync_parser.add_argument("--confirm-funding-role-specific-sync", default=None)
+
+    tiny_live_blocker_burn_down_parser = subparsers.add_parser(
+        "tiny-live-blocker-burn-down",
+        parents=[parent],
+    )
+    tiny_live_blocker_burn_down_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    tiny_live_blocker_burn_down_parser.add_argument("--record-burn-down", action="store_true")
+    tiny_live_blocker_burn_down_parser.add_argument("--confirm-tiny-live-burn-down", default=None)
 
     env_role_split_proposal_parser = subparsers.add_parser(
         "env-role-split-proposal",
