@@ -30,6 +30,11 @@ READ_ONLY_ENV = {
     "HAMMER_ALLOW_LIVE_ORDERS": "false",
     "HAMMER_GLOBAL_KILL_SWITCH": "true",
 }
+ACCOUNT_READ_ROLE_ENV = {
+    **{key: value for key, value in READ_ONLY_ENV.items() if key not in {"BINANCE_API_KEY", "BINANCE_API_SECRET"}},
+    "HAMMER_ACCOUNT_READ_BINANCE_API_KEY": "rolekey1234wxyz5678",
+    "HAMMER_ACCOUNT_READ_BINANCE_API_SECRET": "role-secret-not-rendered",
+}
 
 
 def test_preview_writes_no_record(tmp_path: Path) -> None:
@@ -130,6 +135,40 @@ def test_readonly_env_present_balance_not_checked_without_network_flag(tmp_path:
     assert payload["readonly_connector"]["network_check_attempted"] is False
     assert payload["balance_gate"]["balance_check_attempted"] is False
     assert payload["balance_gate"]["funding_ready"] is False
+
+
+def test_funding_precheck_uses_account_read_role_adapter(tmp_path: Path) -> None:
+    payload = build_funding_readonly_precheck(
+        log_dir=tmp_path / "logs",
+        config_path=_write_config(tmp_path / "lane_controls.json"),
+        env=ACCOUNT_READ_ROLE_ENV,
+        now=NOW,
+    )
+    rendered = json.dumps(payload, sort_keys=True)
+
+    assert payload["funding_readiness"] == READONLY_CONNECTOR_READY_BALANCE_NOT_CHECKED
+    assert payload["env_role_resolution"]["role"] == "account_read"
+    assert payload["env_role_resolution"]["selected_pair_source"] == "role_specific"
+    assert payload["env_role_resolution"]["legacy_fallback_used"] is False
+    assert payload["local_env_readiness"]["api_key_present"] is True
+    assert payload["local_env_readiness"]["api_secret_present"] is True
+    assert payload["readonly_connector"]["connector_status"] == "READY_READ_ONLY"
+    assert payload["readonly_connector"]["network_check_attempted"] is False
+    assert "rolekey1234wxyz5678" not in rendered
+    assert "role-secret-not-rendered" not in rendered
+
+
+def test_funding_precheck_marks_account_read_legacy_fallback(tmp_path: Path) -> None:
+    payload = build_funding_readonly_precheck(
+        log_dir=tmp_path / "logs",
+        config_path=_write_config(tmp_path / "lane_controls.json"),
+        env=READ_ONLY_ENV,
+        now=NOW,
+    )
+
+    assert payload["env_role_resolution"]["selected_pair_source"] == "legacy_fallback"
+    assert payload["env_role_resolution"]["legacy_fallback_used"] is True
+    assert "account_read uses legacy fallback; role-specific HAMMER_ACCOUNT_READ_* variables are preferred." in payload["readonly_connector"]["warnings"]
 
 
 def test_default_preview_does_not_attempt_network_and_secrets_are_hidden(tmp_path: Path) -> None:

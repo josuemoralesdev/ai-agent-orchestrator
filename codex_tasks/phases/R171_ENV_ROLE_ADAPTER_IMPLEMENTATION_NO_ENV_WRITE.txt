@@ -1,0 +1,291 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R171 Env Role Adapter Implementation No Env Write
+
+BRANCH:
+r171-env-role-adapter-implementation-no-env-write
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R168 recorded funding/key-role truth:
+- repo `.env` had/may still have mismatched legacy BINANCE_API_KEY / BINANCE_API_SECRET evidence
+- binance-live.env worked for read-only Futures account balance when runtime forced read-only mode
+- account balance was 0.0 USDT
+- funding gate = ACCOUNT_NOT_FUNDED
+
+R169 proposed clean env roles:
+- HAMMER_MARKET_BINANCE_API_KEY / HAMMER_MARKET_BINANCE_API_SECRET
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY / HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+- HAMMER_LIVE_BINANCE_API_KEY / HAMMER_LIVE_BINANCE_API_SECRET
+
+R170 added preview logic:
+- role-specific vars preferred
+- legacy fallback marked ambiguous
+- future_live never falls back to legacy
+- no env writes
+
+R171 must implement code-level adapter behavior for account-read / funding surfaces without writing env files.
+
+PURPOSE:
+Make read-only balance/funding code prefer the account-read role variables when present:
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY
+- HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+
+Fallback to legacy:
+- BINANCE_API_KEY
+- BINANCE_API_SECRET
+
+But:
+- fallback must be flagged as legacy/ambiguous
+- future live must not fallback to legacy
+- no env files are written
+- no Binance network calls in tests
+- no live execution
+
+CRITICAL SAFETY PRINCIPLE:
+This phase changes env resolution logic only.
+It does NOT write env files.
+It does NOT call Binance by default.
+It does NOT place orders.
+It does NOT enable live execution.
+It does NOT change lane config.
+It does NOT set short tiny-live.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance in Codex/tests.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys/secrets.
+- Do not mutate .env.
+- Do not mutate /home/josue/.config/hammer-radar/*.env.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set short lane tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/env_role_adapter_preview.py
+- src/app/hammer_radar/operator/env_role_split_proposal.py
+- src/app/hammer_radar/operator/funding_gate_key_role_sync.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_env_role_adapter_preview.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- tests/hammer_radar/test_funding_readonly_precheck.py
+- docs/hammer_radar/live_readiness/R170_ENV_ROLE_ADAPTER_PREVIEW_NO_WRITE.md
+
+REUSE / EXTEND:
+Reuse R170 preview rules.
+Do not create a second role naming scheme.
+Do not create new Binance network logic.
+Do not create trading execution logic.
+Do not write env files.
+
+REQUIRED MODULE:
+Create or extend:
+src/app/hammer_radar/operator/env_role_adapter.py
+
+Expose:
+- resolve_binance_env_role
+- resolve_account_read_env_pair
+- resolve_market_data_env_pair
+- resolve_future_live_env_pair
+- build_env_role_resolution_summary
+- validate_account_read_runtime_safety
+- build_env_role_adapter_safety
+
+Rules:
+1. account_read:
+   - prefer HAMMER_ACCOUNT_READ_BINANCE_API_KEY / HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+   - fallback to BINANCE_API_KEY / BINANCE_API_SECRET only when role-specific pair absent
+   - mark selected_pair_source as role_specific or legacy_fallback
+   - mark legacy_fallback_used true when using legacy
+   - require runtime:
+     BINANCE_CONNECTOR_MODE=read_only
+     BINANCE_LIVE_TRADING_ENABLED=false
+     HAMMER_LIVE_EXECUTION_ENABLED=false
+     HAMMER_ALLOW_LIVE_ORDERS=false
+     HAMMER_GLOBAL_KILL_SWITCH=true
+2. market_data:
+   - prefer HAMMER_MARKET_BINANCE_API_KEY / HAMMER_MARKET_BINANCE_API_SECRET
+   - fallback to legacy only when role-specific absent
+   - mark ambiguity
+3. future_live:
+   - prefer HAMMER_LIVE_BINANCE_API_KEY / HAMMER_LIVE_BINANCE_API_SECRET
+   - do NOT fallback to legacy
+   - always disabled unless future phase explicitly enables
+4. Never return/print raw secrets in summaries.
+
+PATCH:
+- readonly_balance_check.py should use resolve_account_read_env_pair for explicit read-only balance checks.
+- funding_readonly_precheck.py should use the adapter summary for env readiness if safe and low impact.
+- env_role_adapter_preview.py may reuse the adapter summary if cleaner.
+
+IMPORTANT:
+Do not break existing behavior when only legacy BINANCE_API_KEY/BINANCE_API_SECRET exist.
+But surface a warning:
+"account_read uses legacy fallback; role-specific HAMMER_ACCOUNT_READ_* variables are preferred."
+
+OUTPUT REQUIREMENTS FOR readonly-balance-check:
+The existing output should now include:
+"env_role_resolution": {
+  "role": "account_read",
+  "selected_pair_source": "role_specific|legacy_fallback|missing",
+  "api_key_present": true/false,
+  "api_secret_present": true/false,
+  "api_key_hash_preview": "...",
+  "api_secret_hash_preview": "...",
+  "legacy_fallback_used": true/false,
+  "role_specific_pair_present": true/false,
+  "runtime_safety_ok": true/false,
+  "secrets_shown": false
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+CLI:
+No new CLI required unless helpful.
+Existing commands must still work:
+- readonly-balance-check
+- funding-readonly-precheck
+- env-role-adapter-preview
+
+TESTS:
+Create:
+tests/hammer_radar/test_env_role_adapter.py
+
+Update:
+- tests/hammer_radar/test_readonly_balance_check.py
+- tests/hammer_radar/test_funding_readonly_precheck.py
+- tests/hammer_radar/test_env_role_adapter_preview.py if needed
+
+Test:
+- account_read prefers HAMMER_ACCOUNT_READ_* when present
+- account_read falls back to legacy BINANCE_* only when role-specific pair absent
+- account_read fallback is marked legacy_fallback_used
+- account_read runtime safety requires read_only and live flags false and kill switch true
+- market_data prefers HAMMER_MARKET_*
+- future_live prefers HAMMER_LIVE_* but never falls back to legacy
+- future_live remains disabled
+- partial pairs are detected
+- no full keys/secrets shown
+- readonly-balance-check uses account_read adapter in mocked env
+- default no-network readonly-balance-check still does not call network
+- no env/config mutation
+- no order/live/transfer/withdraw actions
+- CLI still works
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/env_role_adapter.py \
+  src/app/hammer_radar/operator/env_role_adapter_preview.py \
+  src/app/hammer_radar/operator/readonly_balance_check.py \
+  src/app/hammer_radar/operator/funding_readonly_precheck.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_env_role_adapter.py \
+  tests/hammer_radar/test_env_role_adapter_preview.py \
+  tests/hammer_radar/test_readonly_balance_check.py \
+  tests/hammer_radar/test_funding_readonly_precheck.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_funding_gate_key_role_sync.py \
+  tests/hammer_radar/test_readonly_balance_failure_classifier.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+No-network balance check:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-check \
+  --minimum-balance-usdt 44 \
+  | jq '.status, .readonly_preflight, .env_role_resolution, .balance_check, .balance_readiness, .safety'
+
+Funding precheck:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-readonly-precheck \
+  --minimum-balance-usdt 44 \
+  | jq '.status, .local_env_readiness, .readonly_connector, .funding_readiness, .safety'
+
+Adapter preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview \
+  | jq '.status, .role_resolution_matrix, .legacy_fallback_risks, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R171_ENV_ROLE_ADAPTER_IMPLEMENTATION_NO_ENV_WRITE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R171.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R172_ACCOUNT_READ_ENV_MANUAL_MIGRATION_PACKET_NO_WRITE.md
+
+R172 should:
+- produce exact manual migration instructions to create HAMMER_ACCOUNT_READ_* variables from the account-capable pair
+- no env writes by Codex
+- no Binance calls
+- no live execution
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
