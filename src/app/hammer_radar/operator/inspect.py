@@ -1988,6 +1988,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "account-read-env-migration-verify":
+        from src.app.hammer_radar.operator.account_read_env_migration_verify import (
+            build_account_read_env_migration_verify,
+            format_account_read_env_migration_verify_json,
+        )
+
+        print(
+            format_account_read_env_migration_verify_json(
+                build_account_read_env_migration_verify(
+                    log_dir=args.log_dir,
+                    record_verify=args.record_verify,
+                    confirm_account_read_env_migration_verify=args.confirm_account_read_env_migration_verify,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -3093,6 +3108,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     account_read_env_migration_packet_parser.add_argument("--record-packet", action="store_true")
     account_read_env_migration_packet_parser.add_argument("--confirm-account-read-env-migration", default=None)
+
+    account_read_env_migration_verify_parser = subparsers.add_parser(
+        "account-read-env-migration-verify",
+        parents=[parent],
+    )
+    account_read_env_migration_verify_parser.add_argument("--record-verify", action="store_true")
+    account_read_env_migration_verify_parser.add_argument("--confirm-account-read-env-migration-verify", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
