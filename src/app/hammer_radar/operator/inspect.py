@@ -1928,6 +1928,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "funding-gate-key-role-sync":
+        from src.app.hammer_radar.operator.funding_gate_key_role_sync import (
+            build_funding_gate_key_role_sync,
+            format_funding_gate_key_role_sync_json,
+        )
+
+        print(
+            format_funding_gate_key_role_sync_json(
+                build_funding_gate_key_role_sync(
+                    log_dir=args.log_dir,
+                    record_sync=args.record_sync,
+                    confirm_funding_key_role_sync=args.confirm_funding_key_role_sync,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -3005,6 +3020,13 @@ def _build_parser() -> argparse.ArgumentParser:
     readonly_balance_failure_recheck_parser.add_argument("--latest-balance-checks", type=int, default=50)
     readonly_balance_failure_recheck_parser.add_argument("--record-recheck", action="store_true")
     readonly_balance_failure_recheck_parser.add_argument("--confirm-readonly-balance-failure-recheck", default=None)
+
+    funding_gate_key_role_sync_parser = subparsers.add_parser(
+        "funding-gate-key-role-sync",
+        parents=[parent],
+    )
+    funding_gate_key_role_sync_parser.add_argument("--record-sync", action="store_true")
+    funding_gate_key_role_sync_parser.add_argument("--confirm-funding-key-role-sync", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")

@@ -1,0 +1,205 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow all repo rules:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R168 Funding Gate Recheck and Key Role Sync
+
+BRANCH:
+r168-funding-gate-recheck-key-role-sync
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R164/R166/R167 fixed the read-only balance path.
+Operator tested two key roles.
+
+Observed:
+- Current repo `.env` had mismatched Binance key/secret pair.
+- `/home/josue/.config/hammer-radar/binance-readonly.env` appears to be market/read-only but not account-balance capable.
+- `/home/josue/.config/hammer-radar/binance-live.env` works for read-only Futures account balance when the app forces:
+  - BINANCE_CONNECTOR_MODE=read_only
+  - BINANCE_LIVE_TRADING_ENABLED=false
+  - HAMMER_LIVE_EXECUTION_ENABLED=false
+  - HAMMER_ALLOW_LIVE_ORDERS=false
+  - HAMMER_GLOBAL_KILL_SWITCH=true
+
+Latest successful balance check using account-capable key:
+- available_balance_usdt: 0.0
+- wallet_balance_usdt: 0.0
+- funding_status: ACCOUNT_NOT_FUNDED
+- balance_readiness: ACCOUNT_NOT_FUNDED
+- safety clean:
+  - no order
+  - no signed trading request
+  - no transfer
+  - no withdraw
+  - no config mutation
+
+PURPOSE:
+Create an audit/sync surface that:
+1. Records the funding truth as ACCOUNT_NOT_FUNDED.
+2. Documents Binance key roles safely.
+3. Detects mismatched key/secret pairs by comparing safe hashes/lengths only.
+4. Prevents future confusion between market key and account-read key.
+5. Keeps live execution blocked.
+6. Emits safe operator instructions for future env loading.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys.
+- Do not mutate `.env`.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/funding_gate_key_role_sync.py
+
+Expose:
+- build_funding_gate_key_role_sync
+- build_key_role_hash_summary
+- detect_key_secret_pair_mismatch
+- load_latest_readonly_balance_result
+- build_funding_gate_sync_summary
+- build_operator_env_role_guidance
+- append_funding_gate_key_role_sync_record
+- load_funding_gate_key_role_sync_records
+
+STATUS ENUM:
+- FUNDING_GATE_KEY_ROLE_SYNC_READY
+- FUNDING_GATE_KEY_ROLE_SYNC_REJECTED
+- FUNDING_GATE_KEY_ROLE_SYNC_RECORDED
+- FUNDING_GATE_KEY_ROLE_SYNC_BLOCKED
+- FUNDING_GATE_KEY_ROLE_SYNC_ERROR
+
+OUTPUT MUST INCLUDE:
+- target family: BTCUSDT|8m|short|ladder_close_50_618
+- latest balance result:
+  - ACCOUNT_NOT_FUNDED
+  - available_balance_usdt 0.0 if latest record has it
+- key role summary:
+  - repo .env key hash preview / secret hash preview
+  - binance-readonly.env hash previews
+  - binance-live.env hash previews
+  - mismatched_pair_detected true/false
+  - secrets_shown false
+- funding gate:
+  - funding_ready false
+  - funding_status ACCOUNT_NOT_FUNDED
+- guidance:
+  - use account-capable key only for balance checks
+  - force read-only runtime flags
+  - keep live flags false
+  - do not edit env automatically
+- do_not_run_yet:
+  - live-connector-submit
+  - any order endpoint
+  - global live flag arming
+  - kill switch disable
+  - set short lane tiny_live
+  - write risk contract config
+  - transfer
+  - withdraw
+- safety object with all execution/order/transfer/withdraw false
+
+LEDGER:
+logs/hammer_radar_forward/funding_gate_key_role_sync.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FUNDING GATE KEY ROLE SYNC RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE TRADING CALL.
+
+CLI:
+Wire into inspect.py as:
+funding-gate-key-role-sync
+
+Args:
+- --record-sync
+- --confirm-funding-key-role-sync <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-key-role-sync
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-key-role-sync \
+  --record-sync \
+  --confirm-funding-key-role-sync "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  funding-gate-key-role-sync \
+  --record-sync \
+  --confirm-funding-key-role-sync "I CONFIRM FUNDING GATE KEY ROLE SYNC RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE TRADING CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_funding_gate_key_role_sync.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- detects mismatched repo `.env` pair from mocked hash summaries
+- latest ACCOUNT_NOT_FUNDED balance result is surfaced
+- no secrets shown
+- no env/config mutation
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related readonly balance tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview with jq:
+.status, .latest_balance_result, .key_role_summary, .funding_gate, .operator_env_role_guidance, .do_not_run_yet, .safety
+
+Rejected smoke.
+Config unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R168_FUNDING_GATE_RECHECK_AND_KEY_ROLE_SYNC.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R169_ENV_ROLE_SPLIT_PROPOSAL_NO_WRITE.md
+
+R169 should propose clean env naming for:
+- market data key
+- account read key
+- live trading key or future account key
+without writing env files by default.
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
