@@ -1,0 +1,281 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R173 After Account-Read Env Migration Verify
+
+BRANCH:
+r173-after-account-read-env-migration-verify
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R172 produced manual shell migration commands for account-read role variables:
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY
+- HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+
+The operator should have manually sourced:
+- /home/josue/.config/hammer-radar/binance-live.env
+then exported those values into HAMMER_ACCOUNT_READ_* variables in the current shell only, with forced read-only runtime flags.
+
+R173 must verify that the env role adapter now selects account_read role_specific variables instead of legacy fallback.
+
+PURPOSE:
+Build a verification surface that confirms:
+1. account_read selected_pair_source is role_specific
+2. legacy_fallback_used is false
+3. runtime safety flags are correct
+4. future_live remains disabled and does not fallback to legacy
+5. no env files were written
+6. no config files were written
+7. no Binance call is required by default
+8. funding remains ACCOUNT_NOT_FUNDED unless explicit read-only balance check is operator-run
+
+CRITICAL SAFETY:
+No env writes.
+No config writes.
+No Binance calls by default.
+No orders.
+No live execution.
+No lane changes.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance by default.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys/secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/env_role_adapter.py
+- src/app/hammer_radar/operator/env_role_adapter_preview.py
+- src/app/hammer_radar/operator/account_read_env_migration_packet.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_env_role_adapter.py
+- tests/hammer_radar/test_account_read_env_migration_packet.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- docs/hammer_radar/live_readiness/R172_ACCOUNT_READ_ENV_MANUAL_MIGRATION_PACKET_NO_WRITE.md
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/account_read_env_migration_verify.py
+
+Expose:
+- build_account_read_env_migration_verify
+- build_account_read_role_verification
+- build_runtime_safety_verification
+- build_future_live_isolation_verification
+- build_no_write_verification
+- append_account_read_env_migration_verify_record
+- load_account_read_env_migration_verify_records
+- summarize_account_read_env_migration_verifications
+
+STATUS ENUM:
+- ACCOUNT_READ_ENV_MIGRATION_VERIFY_READY
+- ACCOUNT_READ_ENV_MIGRATION_VERIFY_REJECTED
+- ACCOUNT_READ_ENV_MIGRATION_VERIFY_RECORDED
+- ACCOUNT_READ_ENV_MIGRATION_VERIFY_BLOCKED
+- ACCOUNT_READ_ENV_MIGRATION_VERIFY_ERROR
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "verify_recorded": false,
+  "verify_id": null,
+  "record_verify_requested": false,
+  "confirmation_valid": false,
+  "account_read_role_verification": {
+    "selected_pair_source": "role_specific|legacy_fallback|missing",
+    "role_specific_pair_present": true/false,
+    "legacy_fallback_used": true/false,
+    "api_key_hash_preview": "...",
+    "api_secret_hash_preview": "...",
+    "secrets_shown": false,
+    "passed": true/false
+  },
+  "runtime_safety_verification": {
+    "BINANCE_CONNECTOR_MODE": "read_only",
+    "BINANCE_LIVE_TRADING_ENABLED": "false",
+    "HAMMER_LIVE_EXECUTION_ENABLED": "false",
+    "HAMMER_ALLOW_LIVE_ORDERS": "false",
+    "HAMMER_GLOBAL_KILL_SWITCH": "true",
+    "passed": true/false
+  },
+  "future_live_isolation": {
+    "future_live_disabled": true,
+    "legacy_fallback_used_for_future_live": false,
+    "passed": true/false
+  },
+  "no_write_verification": {
+    "env_written": false,
+    "env_mutated": false,
+    "config_written": false
+  },
+  "funding_gate_context": {
+    "latest_funding_status": "ACCOUNT_NOT_FUNDED|UNKNOWN",
+    "funding_ready": false
+  },
+  "recommended_next_operator_move": "RUN_READONLY_BALANCE_CHECK_WITH_ROLE_SPECIFIC_ACCOUNT_READ|RUN_R174_FUNDING_EVIDENCE_SYNC|FIX_ACCOUNT_READ_ENV_ROLE",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "write env files",
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/account_read_env_migration_verifications.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ACCOUNT READ ENV MIGRATION VERIFY RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+account-read-env-migration-verify
+
+Args:
+- --record-verify
+- --confirm-account-read-env-migration-verify <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-verify
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-verify \
+  --record-verify \
+  --confirm-account-read-env-migration-verify "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-verify \
+  --record-verify \
+  --confirm-account-read-env-migration-verify "I CONFIRM ACCOUNT READ ENV MIGRATION VERIFY RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_account_read_env_migration_verify.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- role_specific account_read passes
+- legacy_fallback account_read fails or warns
+- missing role blocks
+- future_live does not fallback to legacy
+- runtime safety flags required
+- no secrets shown
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related env role adapter/account migration/readonly balance tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-verify \
+  | jq '.status, .account_read_role_verification, .runtime_safety_verification, .future_live_isolation, .funding_gate_context, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-verify \
+  --record-verify \
+  --confirm-account-read-env-migration-verify "wrong" \
+  | jq '.status, .confirmation_valid, .verify_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R173_AFTER_ACCOUNT_READ_ENV_MIGRATION_VERIFY.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R173.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R174_FUNDING_GATE_SYNC_AFTER_ROLE_SPECIFIC_ACCOUNT_READ.md
+
+R174 should:
+- run after R173 passes
+- use latest explicit read-only balance check result
+- sync funding status
+- no env writes
+- no live execution
+- no lane changes
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
