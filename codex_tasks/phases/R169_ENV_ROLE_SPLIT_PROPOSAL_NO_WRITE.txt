@@ -1,0 +1,290 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R169 Env Role Split Proposal No Write
+
+BRANCH:
+r169-env-role-split-proposal-no-write
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R168 proved the current repo `.env` contains a mismatched Binance key/secret pair.
+
+Observed safe hash roles:
+- repo .env:
+  - API key hash matches binance-live.env key
+  - API secret hash appears mismatched
+- /home/josue/.config/hammer-radar/binance-readonly.env:
+  - appears to be market/read-only key role
+- /home/josue/.config/hammer-radar/binance-live.env:
+  - works for Futures account balance when runtime flags force read-only mode
+  - latest account balance result: ACCOUNT_NOT_FUNDED, 0.0 USDT
+- R168 recorded funding gate and key role sync safely.
+- No env/config mutation was performed.
+
+Problem:
+The current variable names BINANCE_API_KEY / BINANCE_API_SECRET are too ambiguous.
+They can point to:
+- market data/read-only status key
+- account-read Futures key
+- future live/trading key
+This ambiguity caused a mixed key/secret pair and repeated -1022 signature errors.
+
+PURPOSE:
+Create a no-write env-role split proposal and migration plan.
+
+This phase must:
+1. Define clear future env variable names for each Binance key role.
+2. Detect and document current env role ambiguity.
+3. Propose safe migration steps.
+4. Provide a compatibility plan for existing commands.
+5. Keep live execution disabled.
+6. Avoid editing env files.
+7. Avoid printing secrets.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is proposal-only.
+It must NOT write `.env`.
+It must NOT write /home/josue/.config/hammer-radar/*.env.
+It must NOT mutate config.
+It must NOT call Binance.
+It must NOT place orders.
+It must NOT enable live execution.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+PROPOSED FUTURE ENV ROLES:
+Use proposal only, no writing.
+
+Suggested names:
+- HAMMER_MARKET_BINANCE_API_KEY
+- HAMMER_MARKET_BINANCE_API_SECRET
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY
+- HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+- HAMMER_LIVE_BINANCE_API_KEY
+- HAMMER_LIVE_BINANCE_API_SECRET
+
+Runtime safety flags remain:
+- BINANCE_CONNECTOR_MODE=read_only
+- BINANCE_LIVE_TRADING_ENABLED=false
+- HAMMER_BINANCE_LIVE_ENABLED=false
+- HAMMER_LIVE_EXECUTION_ENABLED=false
+- HAMMER_ALLOW_LIVE_ORDERS=false
+- HAMMER_GLOBAL_KILL_SWITCH=true
+
+Compatibility:
+- Existing BINANCE_API_KEY / BINANCE_API_SECRET may remain supported short-term.
+- For account balance checks, prefer account-read variables when present.
+- For market data, prefer market variables when present.
+- For live trading, live variables must not be used unless future live phase explicitly allows it.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/env_role_split_proposal.py
+
+Expose:
+- build_env_role_split_proposal
+- build_current_env_role_inventory
+- build_proposed_env_role_schema
+- build_backward_compatibility_plan
+- build_operator_migration_steps
+- build_env_role_blockers
+- append_env_role_split_proposal_record
+- load_env_role_split_proposal_records
+- summarize_env_role_split_proposals
+
+STATUS ENUM:
+- ENV_ROLE_SPLIT_PROPOSAL_READY
+- ENV_ROLE_SPLIT_PROPOSAL_REJECTED
+- ENV_ROLE_SPLIT_PROPOSAL_RECORDED
+- ENV_ROLE_SPLIT_PROPOSAL_BLOCKED
+- ENV_ROLE_SPLIT_PROPOSAL_ERROR
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "proposal_recorded": false,
+  "proposal_id": null,
+  "record_proposal_requested": false,
+  "confirmation_valid": false,
+  "current_env_inventory": {
+    "repo_env": {...},
+    "binance_readonly_env": {...},
+    "binance_live_env": {...},
+    "mismatched_pair_detected": true/false,
+    "secrets_shown": false
+  },
+  "proposed_env_role_schema": {
+    "market_data_role": {...},
+    "account_read_role": {...},
+    "future_live_role": {...},
+    "runtime_safety_flags": {...}
+  },
+  "backward_compatibility_plan": {...},
+  "operator_migration_steps": [...],
+  "blockers": [...],
+  "recommended_next_operator_move": "REVIEW_ENV_ROLE_SPLIT|KEEP_CURRENT_ENV_UNCHANGED|RUN_R170_ENV_ROLE_ADAPTER_PREVIEW",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "write env files",
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/env_role_split_proposals.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ENV ROLE SPLIT PROPOSAL RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+env-role-split-proposal
+
+Args:
+- --record-proposal
+- --confirm-env-role-split-proposal <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-split-proposal
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-split-proposal \
+  --record-proposal \
+  --confirm-env-role-split-proposal "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-split-proposal \
+  --record-proposal \
+  --confirm-env-role-split-proposal "I CONFIRM ENV ROLE SPLIT PROPOSAL RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_env_role_split_proposal.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- current inventory uses hashes/lengths only
+- mismatched repo env pair is detected from mocked data
+- proposed schema includes market/account/live roles
+- backward compatibility is included
+- migration steps included
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related funding/read-only/key-role tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-split-proposal \
+  | jq '.status, .current_env_inventory, .proposed_env_role_schema, .backward_compatibility_plan, .operator_migration_steps, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-split-proposal \
+  --record-proposal \
+  --confirm-env-role-split-proposal "wrong" \
+  | jq '.status, .confirmation_valid, .proposal_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R169_ENV_ROLE_SPLIT_PROPOSAL_NO_WRITE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R169.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R170_ENV_ROLE_ADAPTER_PREVIEW_NO_WRITE.md
+
+R170 should:
+- add code-level adapter preference order for proposed env role names
+- no env writes
+- no Binance calls
+- no live execution
+- preserve backward compatibility
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
