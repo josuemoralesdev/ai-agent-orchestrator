@@ -1,0 +1,338 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R172 Account-Read Env Manual Migration Packet No Write
+
+BRANCH:
+r172-account-read-env-manual-migration-packet-no-write
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R168 documented the funding gate and key-role mess:
+- binance-live.env works for Futures account-read balance when runtime flags force read-only.
+- account balance result: ACCOUNT_NOT_FUNDED, 0.0 USDT.
+- repo .env had ambiguous/mismatched legacy key-secret evidence.
+
+R169 proposed clean env roles:
+- HAMMER_MARKET_BINANCE_API_KEY / HAMMER_MARKET_BINANCE_API_SECRET
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY / HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+- HAMMER_LIVE_BINANCE_API_KEY / HAMMER_LIVE_BINANCE_API_SECRET
+
+R170 previewed adapter behavior.
+R171 implemented env-role adapter behavior without writing env files:
+- account_read prefers HAMMER_ACCOUNT_READ_* when present
+- legacy BINANCE_* fallback remains supported but ambiguous
+- future_live never falls back to legacy
+- no env write
+- no Binance call
+
+R172 must produce a manual migration packet for the operator to create account-read role variables safely.
+
+PURPOSE:
+Create a no-write operator packet that:
+1. Identifies the account-capable key source safely by hash only.
+2. Proposes exact manual steps to create/use HAMMER_ACCOUNT_READ_* variables.
+3. Keeps legacy env unchanged.
+4. Produces source commands the operator may run manually.
+5. Confirms what to verify after manual migration.
+6. Avoids printing secrets.
+7. Avoids writing env files.
+8. Avoids calling Binance.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is manual migration guidance only.
+It must NOT write `.env`.
+It must NOT write /home/josue/.config/hammer-radar/*.env.
+It must NOT call Binance.
+It must NOT place orders.
+It must NOT enable live.
+It must NOT mutate configs.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys.
+- Do not print full API secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+KNOWN SAFE OPERATOR CONTEXT:
+- Account-capable source file appears to be:
+  /home/josue/.config/hammer-radar/binance-live.env
+- It should be used for account-read checks ONLY when runtime flags force read-only.
+- Current account balance known from prior recorded check:
+  ACCOUNT_NOT_FUNDED, available_balance_usdt=0.0, wallet_balance_usdt=0.0
+- Do not expose actual key/secret values.
+
+PROPOSED ACCOUNT-READ ROLE:
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY
+- HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+
+Runtime flags that must remain forced:
+- BINANCE_CONNECTOR_MODE=read_only
+- BINANCE_LIVE_TRADING_ENABLED=false
+- HAMMER_BINANCE_LIVE_ENABLED=false
+- HAMMER_LIVE_EXECUTION_ENABLED=false
+- HAMMER_ALLOW_LIVE_ORDERS=false
+- HAMMER_GLOBAL_KILL_SWITCH=true
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/env_role_adapter.py
+- src/app/hammer_radar/operator/env_role_adapter_preview.py
+- src/app/hammer_radar/operator/env_role_split_proposal.py
+- src/app/hammer_radar/operator/funding_gate_key_role_sync.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_env_role_adapter.py
+- tests/hammer_radar/test_env_role_adapter_preview.py
+- docs/hammer_radar/live_readiness/R171_ENV_ROLE_ADAPTER_IMPLEMENTATION_NO_ENV_WRITE.md
+
+REUSE / EXTEND:
+Reuse R171 adapter summaries.
+Reuse R168 key-role inventory if possible.
+Do not create a second naming scheme.
+Do not write env.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/account_read_env_migration_packet.py
+
+Expose:
+- build_account_read_env_migration_packet
+- build_account_read_source_inventory
+- build_manual_migration_steps
+- build_manual_source_commands
+- build_post_migration_verification_commands
+- build_migration_blockers
+- append_account_read_env_migration_packet_record
+- load_account_read_env_migration_packet_records
+- summarize_account_read_env_migration_packets
+
+STATUS ENUM:
+- ACCOUNT_READ_ENV_MIGRATION_PACKET_READY
+- ACCOUNT_READ_ENV_MIGRATION_PACKET_REJECTED
+- ACCOUNT_READ_ENV_MIGRATION_PACKET_RECORDED
+- ACCOUNT_READ_ENV_MIGRATION_PACKET_BLOCKED
+- ACCOUNT_READ_ENV_MIGRATION_PACKET_ERROR
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "packet_recorded": false,
+  "packet_id": null,
+  "record_packet_requested": false,
+  "confirmation_valid": false,
+  "account_read_source_inventory": {
+    "account_capable_source_file": "/home/josue/.config/hammer-radar/binance-live.env",
+    "source_file_present": true/false,
+    "source_key_hash_preview": "...",
+    "source_secret_hash_preview": "...",
+    "source_key_length": 64,
+    "source_secret_length": 64,
+    "secrets_shown": false
+  },
+  "manual_migration_steps": [
+    ...
+  ],
+  "manual_source_commands": [
+    "safe commands that source account role vars into current shell without printing secrets"
+  ],
+  "post_migration_verification_commands": [
+    "env-role-adapter-preview",
+    "funding-readonly-precheck",
+    "readonly-balance-check no-network",
+    "readonly-balance-check explicit read-only network if operator approves"
+  ],
+  "runtime_safety_flags_required": {...},
+  "expected_after_manual_migration": {
+    "account_read_selected_pair_source": "role_specific",
+    "legacy_fallback_used": false,
+    "future_live_still_disabled": true,
+    "funding_status_expected_now": "ACCOUNT_NOT_FUNDED unless account is funded"
+  },
+  "blockers": [...],
+  "recommended_next_operator_move": "REVIEW_MANUAL_ACCOUNT_READ_ENV_MIGRATION|RUN_MANUAL_SOURCE_COMMANDS|RUN_R173_AFTER_MANUAL_MIGRATION_VERIFY",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "write env files automatically",
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+MANUAL SOURCE COMMANDS:
+Provide commands that the operator can run manually. These commands may read values from the source env file into shell variables but must not echo secrets.
+
+Example expected command style:
+set -a
+source /home/josue/.config/hammer-radar/binance-live.env
+export HAMMER_ACCOUNT_READ_BINANCE_API_KEY="$BINANCE_API_KEY"
+export HAMMER_ACCOUNT_READ_BINANCE_API_SECRET="$BINANCE_API_SECRET"
+export BINANCE_CONNECTOR_MODE=read_only
+export BINANCE_LIVE_TRADING_ENABLED=false
+export HAMMER_BINANCE_LIVE_ENABLED=false
+export HAMMER_LIVE_EXECUTION_ENABLED=false
+export HAMMER_ALLOW_LIVE_ORDERS=false
+export HAMMER_GLOBAL_KILL_SWITCH=true
+set +a
+
+But DO NOT execute this in Codex.
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/account_read_env_migration_packets.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ACCOUNT READ ENV MIGRATION PACKET RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+account-read-env-migration-packet
+
+Args:
+- --record-packet
+- --confirm-account-read-env-migration <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-packet
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-packet \
+  --record-packet \
+  --confirm-account-read-env-migration "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-packet \
+  --record-packet \
+  --confirm-account-read-env-migration "I CONFIRM ACCOUNT READ ENV MIGRATION PACKET RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_account_read_env_migration_packet.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- account-capable source inventory uses hash/length only
+- secrets are not shown
+- manual commands include HAMMER_ACCOUNT_READ_BINANCE_API_KEY and HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+- manual commands include forced read-only runtime flags
+- post-migration verification commands included
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related env role adapter/funding tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-packet \
+  | jq '.status, .account_read_source_inventory, .manual_migration_steps, .manual_source_commands, .post_migration_verification_commands, .expected_after_manual_migration, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  account-read-env-migration-packet \
+  --record-packet \
+  --confirm-account-read-env-migration "wrong" \
+  | jq '.status, .confirmation_valid, .packet_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R172_ACCOUNT_READ_ENV_MANUAL_MIGRATION_PACKET_NO_WRITE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R172.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R173_AFTER_ACCOUNT_READ_ENV_MIGRATION_VERIFY.md
+
+R173 should:
+- run after operator manually sources HAMMER_ACCOUNT_READ_* variables
+- verify adapter selects role_specific account_read
+- verify funding precheck and readonly balance no-network
+- optionally run explicit read-only balance check by operator
+- no env writes
+- no live execution
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
