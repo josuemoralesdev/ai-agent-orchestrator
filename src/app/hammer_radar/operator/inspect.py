@@ -1974,6 +1974,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "capture-count-sync-8m-short":
+        from src.app.hammer_radar.operator.capture_count_sync_8m_short import (
+            build_capture_count_sync_8m_short,
+            format_capture_count_sync_8m_short_json,
+        )
+
+        print(
+            format_capture_count_sync_8m_short_json(
+                build_capture_count_sync_8m_short(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_sync=args.record_sync,
+                    confirm_capture_count_sync=args.confirm_capture_count_sync,
+                )
+            )
+        )
     elif args.command == "env-role-split-proposal":
         from src.app.hammer_radar.operator.env_role_split_proposal import (
             build_env_role_split_proposal,
@@ -3133,6 +3149,14 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_blocker_burn_down_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     tiny_live_blocker_burn_down_parser.add_argument("--record-burn-down", action="store_true")
     tiny_live_blocker_burn_down_parser.add_argument("--confirm-tiny-live-burn-down", default=None)
+
+    capture_count_sync_parser = subparsers.add_parser(
+        "capture-count-sync-8m-short",
+        parents=[parent],
+    )
+    capture_count_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    capture_count_sync_parser.add_argument("--record-sync", action="store_true")
+    capture_count_sync_parser.add_argument("--confirm-capture-count-sync", default=None)
 
     env_role_split_proposal_parser = subparsers.add_parser(
         "env-role-split-proposal",
