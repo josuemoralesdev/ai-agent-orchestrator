@@ -1958,6 +1958,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "env-role-adapter-preview":
+        from src.app.hammer_radar.operator.env_role_adapter_preview import (
+            build_env_role_adapter_preview,
+            format_env_role_adapter_preview_json,
+        )
+
+        print(
+            format_env_role_adapter_preview_json(
+                build_env_role_adapter_preview(
+                    log_dir=args.log_dir,
+                    record_preview=args.record_preview,
+                    confirm_env_role_adapter_preview=args.confirm_env_role_adapter_preview,
+                )
+            )
+        )
     elif args.command == "betrayal-true-paper-scaffold":
         from src.app.hammer_radar.operator.betrayal_true_paper_tracking import (
             build_betrayal_true_paper_scaffold,
@@ -3049,6 +3064,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     env_role_split_proposal_parser.add_argument("--record-proposal", action="store_true")
     env_role_split_proposal_parser.add_argument("--confirm-env-role-split-proposal", default=None)
+
+    env_role_adapter_preview_parser = subparsers.add_parser(
+        "env-role-adapter-preview",
+        parents=[parent],
+    )
+    env_role_adapter_preview_parser.add_argument("--record-preview", action="store_true")
+    env_role_adapter_preview_parser.add_argument("--confirm-env-role-adapter-preview", default=None)
 
     betrayal_true_paper_scaffold_parser = subparsers.add_parser("betrayal-true-paper-scaffold", parents=[parent])
     betrayal_true_paper_scaffold_parser.add_argument("--symbol", default="BTCUSDT")
