@@ -1,0 +1,335 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R170 Env Role Adapter Preview No Write
+
+BRANCH:
+r170-env-role-adapter-preview-no-write
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R168 recorded funding gate/key-role sync.
+R169 proposed clean Binance env roles because current legacy `.env` is ambiguous and currently had/has mismatched key-secret evidence.
+
+R169 proposed:
+- HAMMER_MARKET_BINANCE_API_KEY
+- HAMMER_MARKET_BINANCE_API_SECRET
+- HAMMER_ACCOUNT_READ_BINANCE_API_KEY
+- HAMMER_ACCOUNT_READ_BINANCE_API_SECRET
+- HAMMER_LIVE_BINANCE_API_KEY
+- HAMMER_LIVE_BINANCE_API_SECRET
+
+Runtime safety flags remain:
+- BINANCE_CONNECTOR_MODE=read_only
+- BINANCE_LIVE_TRADING_ENABLED=false
+- HAMMER_BINANCE_LIVE_ENABLED=false
+- HAMMER_LIVE_EXECUTION_ENABLED=false
+- HAMMER_ALLOW_LIVE_ORDERS=false
+- HAMMER_GLOBAL_KILL_SWITCH=true
+
+R170 must add a code-level adapter preview that can resolve intended Binance key roles without writing env files.
+
+PURPOSE:
+Add a safe env-role adapter preview surface that:
+1. Shows which env vars would be used for each role.
+2. Prefers role-specific variables when present.
+3. Falls back to legacy BINANCE_API_KEY / BINANCE_API_SECRET only when role-specific pair is absent.
+4. Detects ambiguous/mismatched legacy usage.
+5. Emits guidance for operator migration.
+6. Does not write env.
+7. Does not call Binance.
+8. Does not mutate config.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is adapter preview only.
+It must NOT write `.env`.
+It must NOT write any env file.
+It must NOT call Binance.
+It must NOT create signed requests.
+It must NOT place orders.
+It must NOT enable live execution.
+It must NOT change lane modes.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys.
+- Do not print full API secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/env_role_split_proposal.py
+- src/app/hammer_radar/operator/funding_gate_key_role_sync.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_env_role_split_proposal.py
+- tests/hammer_radar/test_funding_gate_key_role_sync.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- docs/hammer_radar/live_readiness/R169_ENV_ROLE_SPLIT_PROPOSAL_NO_WRITE.md
+
+REUSE / EXTEND:
+Reuse R169 proposal concepts.
+Do not create a second role naming scheme.
+Do not alter current readonly balance behavior yet unless only adding preview helpers.
+Do not call network.
+Do not write env.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/env_role_adapter_preview.py
+
+Expose:
+- build_env_role_adapter_preview
+- build_role_specific_env_schema
+- resolve_env_role_preview
+- build_role_resolution_matrix
+- detect_legacy_fallback_risks
+- build_adapter_migration_plan
+- append_env_role_adapter_preview_record
+- load_env_role_adapter_preview_records
+- summarize_env_role_adapter_previews
+
+STATUS ENUM:
+- ENV_ROLE_ADAPTER_PREVIEW_READY
+- ENV_ROLE_ADAPTER_PREVIEW_REJECTED
+- ENV_ROLE_ADAPTER_PREVIEW_RECORDED
+- ENV_ROLE_ADAPTER_PREVIEW_BLOCKED
+- ENV_ROLE_ADAPTER_PREVIEW_ERROR
+
+ROLE ENUM:
+- market_data
+- account_read
+- future_live
+
+RESOLUTION RULES:
+For market_data:
+1. Prefer HAMMER_MARKET_BINANCE_API_KEY + HAMMER_MARKET_BINANCE_API_SECRET.
+2. Fallback to BINANCE_API_KEY + BINANCE_API_SECRET only if role-specific pair absent.
+3. Mark fallback as legacy_ambiguous.
+
+For account_read:
+1. Prefer HAMMER_ACCOUNT_READ_BINANCE_API_KEY + HAMMER_ACCOUNT_READ_BINANCE_API_SECRET.
+2. Fallback to BINANCE_API_KEY + BINANCE_API_SECRET only if role-specific pair absent.
+3. Mark fallback as legacy_ambiguous.
+4. Account-read role requires runtime connector mode read_only and live flags false.
+
+For future_live:
+1. Prefer HAMMER_LIVE_BINANCE_API_KEY + HAMMER_LIVE_BINANCE_API_SECRET.
+2. Do NOT fallback to legacy BINANCE_API_KEY for live.
+3. Always mark future_live as disabled unless future live phase explicitly allows it.
+
+OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "preview_recorded": false,
+  "preview_id": null,
+  "record_preview_requested": false,
+  "confirmation_valid": false,
+  "role_resolution_matrix": {
+    "market_data": {
+      "selected_pair_source": "role_specific|legacy_fallback|missing",
+      "api_key_present": true/false,
+      "api_secret_present": true/false,
+      "api_key_hash_preview": "...",
+      "api_secret_hash_preview": "...",
+      "legacy_fallback_used": true/false,
+      "secrets_shown": false
+    },
+    "account_read": {...},
+    "future_live": {
+      "selected_pair_source": "role_specific|missing",
+      "legacy_fallback_used": false,
+      "future_live_disabled": true
+    }
+  },
+  "runtime_safety_flags": {
+    "BINANCE_CONNECTOR_MODE": "...",
+    "BINANCE_LIVE_TRADING_ENABLED": "...",
+    "HAMMER_LIVE_EXECUTION_ENABLED": "...",
+    "HAMMER_ALLOW_LIVE_ORDERS": "...",
+    "HAMMER_GLOBAL_KILL_SWITCH": "..."
+  },
+  "legacy_fallback_risks": [...],
+  "adapter_migration_plan": [...],
+  "recommended_next_operator_move": "REVIEW_ADAPTER_PREVIEW|RUN_R171_ENV_ROLE_ADAPTER_IMPLEMENTATION_NO_WRITE|KEEP_ENV_UNCHANGED",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "write env files",
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/env_role_adapter_previews.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ENV ROLE ADAPTER PREVIEW RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+env-role-adapter-preview
+
+Args:
+- --record-preview
+- --confirm-env-role-adapter-preview <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview \
+  --record-preview \
+  --confirm-env-role-adapter-preview "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview \
+  --record-preview \
+  --confirm-env-role-adapter-preview "I CONFIRM ENV ROLE ADAPTER PREVIEW RECORDING ONLY; NO ENV WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_env_role_adapter_preview.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- market role prefers HAMMER_MARKET_* if present
+- account_read role prefers HAMMER_ACCOUNT_READ_* if present
+- future_live role prefers HAMMER_LIVE_* if present
+- future_live does not fallback to legacy BINANCE_* pair
+- account_read legacy fallback is marked ambiguous
+- market legacy fallback is marked ambiguous
+- no secrets shown, only hash previews/lengths
+- runtime safety flags reported
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/env_role_adapter_preview.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_env_role_adapter_preview.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_env_role_split_proposal.py \
+  tests/hammer_radar/test_funding_gate_key_role_sync.py \
+  tests/hammer_radar/test_readonly_balance_check.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview \
+  | jq '.status, .role_resolution_matrix, .runtime_safety_flags, .legacy_fallback_risks, .adapter_migration_plan, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  env-role-adapter-preview \
+  --record-preview \
+  --confirm-env-role-adapter-preview "wrong" \
+  | jq '.status, .confirmation_valid, .preview_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R170_ENV_ROLE_ADAPTER_PREVIEW_NO_WRITE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R170.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R171_ENV_ROLE_ADAPTER_IMPLEMENTATION_NO_ENV_WRITE.md
+
+R171 should:
+- implement code-level env role adapter for readonly balance and funding precheck
+- prefer HAMMER_ACCOUNT_READ_* for account-read checks
+- preserve legacy fallback with warnings
+- no env writes
+- no Binance calls in tests
+- no live execution
+
+REPORT:
+Files changed, tests, smoke, safety, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
