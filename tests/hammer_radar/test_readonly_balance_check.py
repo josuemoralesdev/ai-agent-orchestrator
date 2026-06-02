@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import urllib.error
+import urllib.parse
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -20,8 +21,11 @@ from src.app.hammer_radar.operator.readonly_balance_check import (
     READONLY_CONNECTOR_MISSING_ENV,
     READONLY_CONNECTOR_NOT_SAFE,
     READONLY_NETWORK_NOT_ALLOWED,
+    build_readonly_account_query,
     build_readonly_balance_check,
+    build_readonly_signed_account_url_safely,
     load_readonly_balance_check_records,
+    sign_readonly_account_query,
 )
 
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
@@ -35,6 +39,34 @@ READ_ONLY_ENV = {
     "HAMMER_ALLOW_LIVE_ORDERS": "false",
     "HAMMER_GLOBAL_KILL_SWITCH": "true",
 }
+
+
+def test_readonly_account_query_signs_exact_urlencoded_params_without_signature() -> None:
+    params = {"timestamp": "1770000000123", "recvWindow": "5000"}
+    before = dict(params)
+
+    query = build_readonly_account_query(params)
+    signature = sign_readonly_account_query(query, "readonly-secret")
+
+    assert params == before
+    assert query == urllib.parse.urlencode([("recvWindow", "5000"), ("timestamp", "1770000000123")])
+    assert "signature" not in query.lower()
+    assert signature == "377603b23b1ec249d14fb7662ba4466f156650eeb89d345044ee294dab9bffc8"
+
+
+def test_readonly_signed_account_url_uses_same_query_string_before_signature() -> None:
+    url = build_readonly_signed_account_url_safely(
+        endpoint_url="https://fapi.binance.com/fapi/v2/account",
+        secret="readonly-secret",
+        timestamp_ms=1770000000123,
+        recv_window_ms=5000,
+    )
+
+    parsed = urllib.parse.urlparse(url)
+    unsigned_query, signature_query = parsed.query.rsplit("&signature=", 1)
+
+    assert unsigned_query == "recvWindow=5000&timestamp=1770000000123"
+    assert signature_query == sign_readonly_account_query(unsigned_query, "readonly-secret")
 
 
 def test_preview_writes_no_record(tmp_path: Path) -> None:
@@ -145,10 +177,45 @@ def test_explicit_allow_flag_can_attempt_readonly_network_only_when_preflight_sa
     assert payload["balance_check"]["network_check_attempted"] is True
     assert payload["balance_check"]["balance_check_attempted"] is True
     assert payload["balance_check"]["funding_status"] == ACCOUNT_FUNDED_READY_FOR_REVIEW
+    assert payload["balance_check"]["endpoint_family"] == "futures_account_readonly"
+    assert payload["balance_check"]["signed_request_created_scope"] == "readonly_account_status_only"
+    assert payload["balance_check"]["timestamp_used"] is True
+    assert payload["balance_check"]["recv_window_ms"] == 5000
+    assert payload["balance_check"]["signed_query_param_keys"] == ["recvWindow", "timestamp"]
+    assert payload["balance_check"]["signature_shown"] is False
+    assert payload["balance_check"]["signed_url_shown"] is False
     assert payload["safety"]["network_allowed"] is True
     assert payload["safety"]["signed_readonly_request_created"] is True
     assert payload["safety"]["signed_trading_request_created"] is False
     assert payload["safety"]["signed_order_request_created"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert payload["safety"]["binance_test_order_endpoint_called"] is False
+    assert payload["safety"]["protective_order_endpoint_called"] is False
+    assert payload["safety"]["transfer_endpoint_called"] is False
+    assert payload["safety"]["withdraw_endpoint_called"] is False
+
+
+def test_explicit_allow_flag_supports_safe_recv_window_override(tmp_path: Path) -> None:
+    with patch(
+        "src.app.hammer_radar.operator.readonly_balance_check._request_binance_futures_account_snapshot",
+        return_value=_account(44),
+    ) as request:
+        payload = build_readonly_balance_check(
+            log_dir=tmp_path / "logs",
+            config_path=_write_config(tmp_path / "lane_controls.json"),
+            env=READ_ONLY_ENV,
+            allow_readonly_network_check=True,
+            recv_window_ms=10000,
+            now=NOW,
+        )
+
+    request.assert_called_once()
+    assert request.call_args.kwargs["recv_window_ms"] == 10000
+    assert payload["balance_check"]["recv_window_ms"] == 10000
+    assert payload["balance_check"]["signed_query_param_keys"] == ["recvWindow", "timestamp"]
+    rendered = json.dumps(payload, sort_keys=True)
+    assert "signature=" not in rendered
+    assert "https://fapi.binance.com" not in rendered
 
 
 def test_missing_env_blocks_before_network(tmp_path: Path) -> None:

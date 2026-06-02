@@ -1,0 +1,291 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- AGENTS.builder.md
+- AGENTS.index.md
+- AGENTS.qa.md
+- AGENTS.security.md
+- codex_tasks/CODEX_RULES.md
+- codex_tasks/agents/AGENT_WORKFLOW.md
+- codex_tasks/phases/PHASE_TASK_TEMPLATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/AGENT_TASK_WORKFLOW.md
+
+PHASE:
+R167 Readonly Balance Signature Path Fix
+
+BRANCH:
+r167-readonly-balance-signature-path-fix
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R164 added explicit read-only balance check.
+R165 added failure classification.
+R166 added sanitized error capture.
+
+Operator fixed the Binance API IP whitelist mismatch.
+The host public IP is:
+189.158.141.137
+
+Clock check:
+- system clock synchronized: yes
+- NTP active
+- Binance server time diff: about -278 ms
+So clock skew is not the cause.
+
+Current R164 explicit read-only network check result:
+- connector_status: READY_READ_ONLY
+- connector_mode: read_only
+- live flags safe: true
+- network_check_attempted: true
+- balance_check_attempted: true
+- signed_readonly_request_created: true
+- signed_trading_request_created: false
+- order endpoints: false
+- transfer/withdraw: false
+- safety clean
+- endpoint_family: futures_account_readonly
+- HTTP status: 400
+- Binance code: -1022
+- Binance message: Signature for this request is not valid.
+
+R167 must fix the read-only balance/account signing path.
+
+CRITICAL SAFETY PRINCIPLE:
+This phase may patch signed read-only account/balance signing only.
+It must NOT add or enable trading signing.
+It must NOT call order endpoints.
+It must NOT call test-order endpoints.
+It must NOT call transfer/withdraw endpoints.
+It must NOT place orders.
+It must NOT create executable order payloads.
+It must NOT print secrets/signatures/signed URLs.
+It must NOT mutate config/env/global flags.
+
+TARGET:
+readonly-balance-check for endpoint_family=futures_account_readonly
+
+NON-NEGOTIABLES:
+- Do not place real orders.
+- Do not create executable Binance order payloads.
+- Do not create executable protective order payloads.
+- Do not call Binance order endpoints.
+- Do not call Binance test-order endpoints.
+- Do not call protective order endpoints.
+- Do not call transfer endpoints.
+- Do not call withdraw endpoints.
+- Do not enable live trading.
+- Do not create signed trading/order request material.
+- Do not print secrets.
+- Do not print signatures.
+- Do not log full signed URLs.
+- Do not log query strings containing signature.
+- Do not mutate env files.
+- Do not mutate global live flags.
+- Do not mutate lane config.
+- Do not mutate risk contract config.
+- Do not set any lane to tiny_live.
+- Do not set any short lane to tiny_live.
+- Do not start/restart services.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/readonly_balance_error_sanitizer.py
+- src/app/hammer_radar/operator/readonly_balance_failure_classifier.py
+- src/app/hammer_radar/operator/funding_readonly_precheck.py
+- src/app/hammer_radar/operator/inspect.py
+- tests/hammer_radar/test_readonly_balance_check.py
+- tests/hammer_radar/test_readonly_balance_error_sanitizer.py
+- tests/hammer_radar/test_readonly_balance_failure_classifier.py
+- docs/hammer_radar/live_readiness/R164_READONLY_BALANCE_CHECK_IF_SAFE.md
+- docs/hammer_radar/live_readiness/R166_READONLY_BALANCE_ENDPOINT_FIX_OR_OPERATOR_KEY_CHECK.md
+
+REUSE / EXTEND:
+Reuse R164 readonly balance check.
+Reuse R166 sanitizer.
+Do not create trading execution logic.
+Do not create generic order-signing helpers.
+Keep all signing helpers scoped/named as readonly/account-only.
+
+REQUIRED IMPLEMENTATION:
+1. Fix Binance Futures read-only account signature generation.
+
+For Binance signed REST endpoints, the HMAC SHA256 signature must be computed over the exact query string before appending signature.
+
+Expected pattern:
+- params include timestamp
+- params include recvWindow
+- query_string = urlencode(params) in stable order
+- signature = hmac_sha256(secret, query_string)
+- final request = endpoint + "?" + query_string + "&signature=" + signature
+
+Use urllib.parse.urlencode with deterministic ordering.
+Do not mutate params after signing.
+Do not sign a different encoded representation than the one sent.
+Do not include signature in the signed payload.
+
+2. Add/ensure recvWindow.
+Default recvWindow should be 5000 or 10000.
+Prefer 5000 unless tests show otherwise.
+Expose optional CLI arg if easy:
+--recv-window-ms <int>, default 5000
+
+3. Add debug-safe signature diagnostics.
+Output may include:
+- endpoint_family
+- signed_readonly_request_created=true
+- signed_request_created_scope=readonly_account_status_only
+- timestamp_used=true
+- recv_window_ms=5000
+- signed_query_param_keys=["recvWindow","timestamp"]
+- signature_shown=false
+- signed_url_shown=false
+
+Do NOT output:
+- secret
+- signature
+- full signed URL
+- raw signed query string
+- API key except existing preview mask
+
+4. Make R164 explicit network check use fixed signing path.
+
+5. Make R165 classifier continue to classify sanitized failures.
+If -1022 remains after patch, likely causes should still mention signature path, but now operator can suspect key/secret mismatch.
+
+6. Keep default no-network preview unchanged.
+
+OPTIONAL:
+Add a local deterministic signing unit helper:
+- build_readonly_account_query(params)
+- sign_readonly_account_query(query_string, secret)
+- build_readonly_signed_account_url_safely(...)
+But keep it read-only scoped.
+
+TESTS:
+Update/create tests in:
+- tests/hammer_radar/test_readonly_balance_check.py
+- tests/hammer_radar/test_readonly_balance_error_sanitizer.py if needed
+- tests/hammer_radar/test_readonly_balance_failure_classifier.py if needed
+
+Test:
+- signing helper signs exactly urlencode(params_without_signature)
+- signature is not part of signed payload
+- params are not mutated after signing
+- recvWindow is included
+- timestamp is included
+- signed_query_param_keys are safe
+- signature is never shown
+- signed URL is never shown
+- explicit network path marks signed_readonly_request_created=true in mocked request
+- explicit network path never marks signed_trading_request_created
+- no order endpoint/test-order/transfer/withdraw endpoint flags
+- default preview still does not attempt network
+- -1022 sanitized classification still works
+- no secrets printed
+
+VALIDATION:
+Run:
+PYTHONPATH=. .venv/bin/python -m py_compile \
+  src/app/hammer_radar/operator/readonly_balance_check.py \
+  src/app/hammer_radar/operator/readonly_balance_error_sanitizer.py \
+  src/app/hammer_radar/operator/readonly_balance_failure_classifier.py \
+  src/app/hammer_radar/operator/inspect.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_readonly_balance_check.py \
+  tests/hammer_radar/test_readonly_balance_error_sanitizer.py \
+  tests/hammer_radar/test_readonly_balance_failure_classifier.py
+
+Run related:
+PYTHONPATH=. .venv/bin/python -m pytest -q \
+  tests/hammer_radar/test_funding_readonly_precheck.py \
+  tests/hammer_radar/test_short_risk_contract_apply_review.py
+
+Run:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview no network:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-check \
+  --minimum-balance-usdt 44 \
+  | jq '.status, .balance_check, .balance_readiness, .safety'
+
+Failure recheck preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  readonly-balance-failure-recheck \
+  --latest-balance-checks 50 \
+  | jq '.status, .last_balance_check_summary, .failure_classification, .likely_causes, .operator_actions, .safety'
+
+Do NOT run explicit network smoke inside Codex.
+
+Config unchanged:
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R167_READONLY_BALANCE_SIGNATURE_PATH_FIX.md
+
+Explain:
+- why R167 follows -1022 signature failure
+- Binance read-only signing requirements
+- timestamp/recvWindow
+- sanitized diagnostics
+- no secrets/signatures/logged signed URLs
+- no live execution
+- no order endpoints
+- next possible R168
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R167.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R168_OPERATOR_READONLY_BALANCE_RETRY_AND_FUNDING_SYNC.md
+
+R168 should:
+- operator manually reruns explicit readonly-balance-check after R167
+- classify result
+- sync funding gate
+- if funded, update readiness only
+- no live execution
+- no lane changes
+- no config writes
+
+REPORT:
+Branch:
+Files created:
+Files modified:
+Capability reuse report:
+Duplicate risk report:
+Signature path fixed:
+RecvWindow:
+Safe diagnostics:
+Tests run:
+Validation results:
+Smoke output summary:
+Safety result:
+Recommended next operator action:
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate config.
+Do not perform live trading actions.
+Do not run explicit network smoke inside Codex.

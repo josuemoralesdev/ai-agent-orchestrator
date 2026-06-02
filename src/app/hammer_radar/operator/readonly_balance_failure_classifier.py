@@ -373,6 +373,7 @@ def _likely_causes(failure_classification: str) -> list[str]:
             "system clock may be skewed",
             "recvWindow may be too narrow",
             "read-only signature may not match Binance expectations",
+            "after R167 fixed signing, key/secret mismatch may remain possible",
         ],
         HTTP_404_OR_ENDPOINT_MISMATCH: [
             "wrong Binance endpoint may be in use",
@@ -412,7 +413,8 @@ def _operator_actions(failure_classification: str) -> list[str]:
         HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE: [
             "check system clock synchronization",
             "check recvWindow tolerance",
-            "rerun readonly-balance-check only after clock/signature path is reviewed",
+            "if -1022 persists after R167, verify the API key and secret belong together",
+            "rerun readonly-balance-check only after clock/signature/key-secret path is reviewed",
         ],
         HTTP_404_OR_ENDPOINT_MISMATCH: [
             "verify endpoint family is futures_account_readonly for the BTCUSDT 8m short funding path",

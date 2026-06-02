@@ -114,6 +114,25 @@ def test_http_400_with_binance_timestamp_code_surfaces_operator_checklist(tmp_pa
     assert payload["last_balance_check_summary"]["sanitized_error_available"] is True
 
 
+def test_http_400_with_signature_code_keeps_r167_key_secret_guidance(tmp_path: Path) -> None:
+    _append_failed_balance_check(
+        tmp_path,
+        http_status=400,
+        binance_code=-1022,
+        binance_message="Signature for this request is not valid.",
+    )
+
+    payload = build_readonly_balance_failure_recheck(
+        log_dir=tmp_path / "logs",
+        config_path=_write_config(tmp_path / "lane_controls.json"),
+        now=NOW,
+    )
+
+    assert payload["failure_classification"] == HTTP_400_TIMESTAMP_RECVWINDOW_OR_SIGNATURE
+    assert any("key/secret mismatch" in cause for cause in payload["likely_causes"])
+    assert any("API key and secret belong together" in action for action in payload["operator_actions"])
+
+
 def test_http_404_classified_endpoint_mismatch() -> None:
     assert _classification(404) == HTTP_404_OR_ENDPOINT_MISMATCH
 
