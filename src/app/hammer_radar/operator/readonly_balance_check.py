@@ -40,6 +40,10 @@ from src.app.hammer_radar.operator.funding_readonly_precheck import (
     DEFAULT_MINIMUM_BALANCE_REQUIRED_ESTIMATE_USDT,
     build_live_flag_readiness_summary,
 )
+from src.app.hammer_radar.operator.env_role_adapter import (
+    account_read_env_for_legacy_connector,
+    resolve_account_read_env_pair,
+)
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
 from src.app.hammer_radar.operator.short_paper_evidence_capture_loop import CONFIRM_SHORT_PAPER_CAPTURE_PHRASE
 from src.app.hammer_radar.operator.short_risk_contract_apply_review import (
@@ -95,9 +99,12 @@ SAFETY = {
     "transfer_endpoint_called": False,
     "withdraw_endpoint_called": False,
     "secrets_shown": False,
+    "full_api_key_shown": False,
+    "full_api_secret_shown": False,
     "signature_shown": False,
     "signed_url_shown": False,
     "paper_live_separation_intact": True,
+    "env_written": False,
     "env_mutated": False,
     "config_written": False,
     "risk_contract_config_written": False,
@@ -172,6 +179,7 @@ def build_readonly_balance_check(
             "allow_readonly_network_check": bool(allow_readonly_network_check),
             "target_family": preflight["target_family"],
             "readonly_preflight": preflight["readonly_preflight"],
+            "env_role_resolution": preflight["env_role_resolution"],
             "balance_check": balance_check,
             "balance_readiness": balance_readiness,
             "blockers": blockers,
@@ -204,6 +212,7 @@ def build_readonly_balance_check(
                 "allow_readonly_network_check": bool(allow_readonly_network_check),
                 "target_family": target,
                 "readonly_preflight": _empty_readonly_preflight(),
+                "env_role_resolution": resolve_account_read_env_pair(env=source),
                 "balance_check": _empty_balance_check(
                     minimum_balance_usdt=minimum,
                     network_check_requested=allow_readonly_network_check,
@@ -233,28 +242,34 @@ def build_readonly_balance_preflight(
 ) -> dict[str, Any]:
     source = os.environ if env is None else env
     target = build_short_strategy_target_family(lane_key=lane_key, config_path=config_path)
-    connector = build_binance_readonly_status(env=source)
+    env_role_resolution = resolve_account_read_env_pair(env=source)
+    adapted_env = account_read_env_for_legacy_connector(env=source)
+    connector = build_binance_readonly_status(env=adapted_env)
     live_flags = build_live_flag_readiness_summary(env=source)
     allowed = list(connector.get("allowed_actions") or [])
     if "read_account_status" not in allowed and connector.get("api_key_present") and connector.get("api_secret_present"):
         allowed.append("read_account_status")
+    warnings = list(connector.get("warnings") or [])
+    warnings.extend(str(item) for item in env_role_resolution.get("warnings") or [] if item)
     readonly_preflight = {
         "connector_status": connector.get("connector_status") or "UNKNOWN",
         "connector_mode": connector.get("connector_mode") or "n/a",
-        "api_key_present": bool(connector.get("api_key_present")),
-        "api_secret_present": bool(connector.get("api_secret_present")),
+        "api_key_present": bool(env_role_resolution.get("api_key_present")),
+        "api_secret_present": bool(env_role_resolution.get("api_secret_present")),
         "api_key_preview": connector.get("api_key_preview") or "n/a",
         "live_flags_safe": bool(live_flags.get("live_flags_safe")),
+        "account_read_runtime_safety_ok": bool(env_role_resolution.get("runtime_safety_ok")),
         "secrets_shown": False,
         "allowed_actions": allowed,
         "forbidden_actions": list(FORBIDDEN_ACTIONS),
         "live_flag_readiness": live_flags,
         "blockers": list(connector.get("blockers") or []),
-        "warnings": list(connector.get("warnings") or []),
+        "warnings": _dedupe(warnings),
     }
     return {
         "target_family": target,
         "readonly_preflight": readonly_preflight,
+        "env_role_resolution": _readonly_env_role_resolution(env_role_resolution),
     }
 
 
@@ -275,9 +290,9 @@ def build_balance_check_blockers(
     if readonly_preflight.get("connector_mode") != REQUIRED_CONNECTOR_MODE:
         blockers.append("BINANCE_CONNECTOR_MODE is not read_only")
     if not readonly_preflight.get("api_key_present"):
-        blockers.append("BINANCE_API_KEY missing")
+        blockers.append("account_read API key missing")
     if not readonly_preflight.get("api_secret_present"):
-        blockers.append("BINANCE_API_SECRET missing")
+        blockers.append("account_read API secret missing")
     if readonly_preflight.get("live_flags_safe") is not True:
         blockers.append("live flags are not safe for read-only balance check")
     blockers.extend(str(item) for item in readonly_preflight.get("blockers") or [] if item)
@@ -312,7 +327,10 @@ def perform_readonly_balance_check_if_allowed(
         )
 
     try:
-        account = _request_binance_futures_account_snapshot(env=source, recv_window_ms=recv_window_ms)
+        account = _request_binance_futures_account_snapshot(
+            env=account_read_env_for_legacy_connector(env=source),
+            recv_window_ms=recv_window_ms,
+        )
     except Exception as exc:
         result = _empty_balance_check(
             minimum_balance_usdt=minimum_balance_usdt,
@@ -402,6 +420,7 @@ def append_readonly_balance_check_record(
             "allow_readonly_network_check": bool(record.get("allow_readonly_network_check")),
             "target_family": dict(record.get("target_family") or {}),
             "readonly_preflight": dict(record.get("readonly_preflight") or {}),
+            "env_role_resolution": dict(record.get("env_role_resolution") or {}),
             "balance_check": dict(record.get("balance_check") or {}),
             "balance_readiness": record.get("balance_readiness"),
             "blockers": list(record.get("blockers") or []),
@@ -570,6 +589,21 @@ def _empty_readonly_preflight() -> dict[str, Any]:
         "live_flag_readiness": {},
         "blockers": [],
         "warnings": [],
+    }
+
+
+def _readonly_env_role_resolution(resolution: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "role": resolution.get("role") or "account_read",
+        "selected_pair_source": resolution.get("selected_pair_source") or "missing",
+        "api_key_present": bool(resolution.get("api_key_present")),
+        "api_secret_present": bool(resolution.get("api_secret_present")),
+        "api_key_hash_preview": resolution.get("api_key_hash_preview"),
+        "api_secret_hash_preview": resolution.get("api_secret_hash_preview"),
+        "legacy_fallback_used": bool(resolution.get("legacy_fallback_used")),
+        "role_specific_pair_present": bool(resolution.get("role_specific_pair_present")),
+        "runtime_safety_ok": bool(resolution.get("runtime_safety_ok")),
+        "secrets_shown": False,
     }
 
 

@@ -35,6 +35,10 @@ from src.app.hammer_radar.operator.binance_live_status import (
     ENV_GLOBAL_KILL_SWITCH,
     ENV_LIVE_EXECUTION_ENABLED,
 )
+from src.app.hammer_radar.operator.env_role_adapter import (
+    account_read_env_for_legacy_connector,
+    resolve_account_read_env_pair,
+)
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
 from src.app.hammer_radar.operator.short_paper_evidence_capture_loop import CONFIRM_SHORT_PAPER_CAPTURE_PHRASE
@@ -78,11 +82,16 @@ SAFETY = {
     "executable_payload_created": False,
     "protective_payload_created": False,
     "signed_request_created": False,
+    "signed_order_request_created": False,
+    "signed_trading_request_created": False,
     "binance_order_endpoint_called": False,
     "binance_test_order_endpoint_called": False,
     "protective_order_endpoint_called": False,
     "secrets_shown": False,
+    "full_api_key_shown": False,
+    "full_api_secret_shown": False,
     "paper_live_separation_intact": True,
+    "env_written": False,
     "env_mutated": False,
     "config_written": False,
     "risk_contract_config_written": False,
@@ -163,6 +172,7 @@ def build_funding_readonly_precheck(
             "allow_readonly_network_check": bool(allow_readonly_network_check),
             "target_family": target,
             "local_env_readiness": local_env,
+            "env_role_resolution": local_env["env_role_resolution"],
             "live_flag_readiness": live_flags,
             "readonly_connector": readonly_connector,
             "balance_gate": balance_gate,
@@ -194,6 +204,7 @@ def build_funding_readonly_precheck(
                 "allow_readonly_network_check": bool(allow_readonly_network_check),
                 "target_family": target,
                 "local_env_readiness": build_local_env_readiness_summary(env=source),
+                "env_role_resolution": build_local_env_readiness_summary(env=source)["env_role_resolution"],
                 "live_flag_readiness": build_live_flag_readiness_summary(env=source),
                 "readonly_connector": build_readonly_connector_summary(
                     env=source,
@@ -216,14 +227,17 @@ def build_funding_readonly_precheck(
 def build_local_env_readiness_summary(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     source = os.environ if env is None else env
     mode = _env_value(source, ENV_CONNECTOR_MODE)
-    api_key = _env_value(source, ENV_API_KEY)
-    api_secret = _env_value(source, ENV_API_SECRET)
+    env_role_resolution = resolve_account_read_env_pair(env=source)
+    adapted_env = account_read_env_for_legacy_connector(env=source)
+    api_key = _env_value(adapted_env, ENV_API_KEY)
     return {
         "binance_connector_mode_present": bool(mode),
         "binance_connector_mode": mode or "n/a",
-        "api_key_present": bool(api_key),
-        "api_secret_present": bool(api_secret),
+        "api_key_present": bool(env_role_resolution.get("api_key_present")),
+        "api_secret_present": bool(env_role_resolution.get("api_secret_present")),
         "api_key_preview": _preview_api_key(api_key) or "n/a",
+        "env_role_resolution": _funding_env_role_resolution(env_role_resolution),
+        "warnings": list(env_role_resolution.get("warnings") or []),
         "secrets_shown": False,
     }
 
@@ -250,7 +264,9 @@ def build_readonly_connector_summary(
     env: Mapping[str, str] | None = None,
     allow_readonly_network_check: bool = False,
 ) -> dict[str, Any]:
-    status = build_binance_readonly_status(env=env)
+    source = os.environ if env is None else env
+    env_role_resolution = resolve_account_read_env_pair(env=source)
+    status = build_binance_readonly_status(env=account_read_env_for_legacy_connector(env=source))
     allowed = list(status.get("allowed_actions") or ["read_exchange_info"])
     if "read_exchange_info" not in allowed:
         allowed.insert(0, "read_exchange_info")
@@ -266,7 +282,8 @@ def build_readonly_connector_summary(
         "source_connector_name": status.get("connector_name"),
         "read_only": bool(status.get("read_only")),
         "blockers": list(status.get("blockers") or []),
-        "warnings": list(status.get("warnings") or []),
+        "warnings": _dedupe(list(status.get("warnings") or []) + list(env_role_resolution.get("warnings") or [])),
+        "env_role_resolution": _funding_env_role_resolution(env_role_resolution),
     }
 
 
@@ -370,6 +387,7 @@ def append_funding_readonly_precheck_record(
             "allow_readonly_network_check": bool(record.get("allow_readonly_network_check")),
             "target_family": dict(record.get("target_family") or {}),
             "local_env_readiness": dict(record.get("local_env_readiness") or {}),
+            "env_role_resolution": dict(record.get("env_role_resolution") or {}),
             "live_flag_readiness": dict(record.get("live_flag_readiness") or {}),
             "readonly_connector": dict(record.get("readonly_connector") or {}),
             "balance_gate": dict(record.get("balance_gate") or {}),
@@ -500,9 +518,9 @@ def _blockers(
     if local_env_readiness.get("binance_connector_mode") != REQUIRED_CONNECTOR_MODE:
         blockers.append("BINANCE_CONNECTOR_MODE is not read_only")
     if not local_env_readiness.get("api_key_present"):
-        blockers.append("BINANCE_API_KEY missing")
+        blockers.append("account_read API key missing")
     if not local_env_readiness.get("api_secret_present"):
-        blockers.append("BINANCE_API_SECRET missing")
+        blockers.append("account_read API secret missing")
     if live_flag_readiness.get("live_flags_safe") is not True:
         blockers.append("live flags are not safe for read-only precheck")
     blockers.extend(str(item) for item in readonly_connector.get("blockers") or [] if item)
@@ -561,6 +579,21 @@ def _target_from_key(lane_key: str, *, mode: str) -> dict[str, Any]:
         "direction": parts[2] if len(parts) > 2 else "unknown",
         "entry_mode": parts[3] if len(parts) > 3 else "unknown",
         "current_mode": mode,
+    }
+
+
+def _funding_env_role_resolution(resolution: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "role": resolution.get("role") or "account_read",
+        "selected_pair_source": resolution.get("selected_pair_source") or "missing",
+        "api_key_present": bool(resolution.get("api_key_present")),
+        "api_secret_present": bool(resolution.get("api_secret_present")),
+        "api_key_hash_preview": resolution.get("api_key_hash_preview"),
+        "api_secret_hash_preview": resolution.get("api_secret_hash_preview"),
+        "legacy_fallback_used": bool(resolution.get("legacy_fallback_used")),
+        "role_specific_pair_present": bool(resolution.get("role_specific_pair_present")),
+        "runtime_safety_ok": bool(resolution.get("runtime_safety_ok")),
+        "secrets_shown": False,
     }
 
 
