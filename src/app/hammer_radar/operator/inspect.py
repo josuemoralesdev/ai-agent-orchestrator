@@ -1906,6 +1906,7 @@ def main() -> int:
                     lane_key=args.lane_key,
                     minimum_balance_usdt=args.minimum_balance_usdt,
                     allow_readonly_network_check=args.allow_readonly_network_check,
+                    recv_window_ms=args.recv_window_ms,
                     record_balance_check=args.record_balance_check,
                     confirm_readonly_balance_check=args.confirm_readonly_balance_check,
                 )
@@ -2993,6 +2994,7 @@ def _build_parser() -> argparse.ArgumentParser:
     readonly_balance_check_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     readonly_balance_check_parser.add_argument("--minimum-balance-usdt", type=float, default=44.0)
     readonly_balance_check_parser.add_argument("--allow-readonly-network-check", action="store_true")
+    readonly_balance_check_parser.add_argument("--recv-window-ms", type=int, default=5000)
     readonly_balance_check_parser.add_argument("--record-balance-check", action="store_true")
     readonly_balance_check_parser.add_argument("--confirm-readonly-balance-check", default=None)
 

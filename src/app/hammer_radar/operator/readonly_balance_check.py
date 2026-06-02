@@ -76,6 +76,7 @@ CONFIRM_READONLY_BALANCE_CHECK_RECORDING_PHRASE = (
     "I CONFIRM READONLY BALANCE CHECK RECORDING ONLY; NO ORDER; NO BINANCE TRADING CALL."
 )
 BINANCE_FUTURES_ACCOUNT_URL = "https://fapi.binance.com/fapi/v2/account"
+DEFAULT_RECV_WINDOW_MS = 5000
 
 SAFETY = {
     **SAFETY_FALSE,
@@ -119,6 +120,7 @@ def build_readonly_balance_check(
     lane_key: str = DEFAULT_TARGET_LANE_KEY,
     minimum_balance_usdt: float = DEFAULT_MINIMUM_BALANCE_REQUIRED_ESTIMATE_USDT,
     allow_readonly_network_check: bool = False,
+    recv_window_ms: int = DEFAULT_RECV_WINDOW_MS,
     record_balance_check: bool = False,
     confirm_readonly_balance_check: str | None = None,
     config_path: str | Path | None = None,
@@ -140,6 +142,7 @@ def build_readonly_balance_check(
             readonly_preflight=preflight,
             minimum_balance_usdt=minimum,
             allow_readonly_network_check=allow_readonly_network_check,
+            recv_window_ms=recv_window_ms,
             env=source,
         )
         balance_readiness = classify_balance_readiness(
@@ -288,6 +291,7 @@ def perform_readonly_balance_check_if_allowed(
     readonly_preflight: Mapping[str, Any],
     minimum_balance_usdt: float = DEFAULT_MINIMUM_BALANCE_REQUIRED_ESTIMATE_USDT,
     allow_readonly_network_check: bool = False,
+    recv_window_ms: int = DEFAULT_RECV_WINDOW_MS,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     preflight = dict(readonly_preflight.get("readonly_preflight") or readonly_preflight)
@@ -308,7 +312,7 @@ def perform_readonly_balance_check_if_allowed(
         )
 
     try:
-        account = _request_binance_futures_account_snapshot(env=source)
+        account = _request_binance_futures_account_snapshot(env=source, recv_window_ms=recv_window_ms)
     except Exception as exc:
         result = _empty_balance_check(
             minimum_balance_usdt=minimum_balance_usdt,
@@ -322,6 +326,7 @@ def perform_readonly_balance_check_if_allowed(
                 "balance_check_attempted": True,
                 "signed_readonly_request_created": True,
                 "error": exc.__class__.__name__,
+                **readonly_account_signature_diagnostics(recv_window_ms=recv_window_ms),
                 **sanitized_error,
             }
         )
@@ -340,6 +345,7 @@ def perform_readonly_balance_check_if_allowed(
         "funding_ready": funding_status == ACCOUNT_FUNDED_READY_FOR_REVIEW,
         "funding_status": funding_status,
         "signed_readonly_request_created": True,
+        **readonly_account_signature_diagnostics(recv_window_ms=recv_window_ms),
     }
 
 
@@ -452,18 +458,60 @@ def format_readonly_balance_check_json(payload: Mapping[str, Any]) -> str:
     return json.dumps(_sanitize(payload), sort_keys=True, separators=(",", ":"))
 
 
-def _request_binance_futures_account_snapshot(*, env: Mapping[str, str], timeout_seconds: float = 10.0) -> dict[str, Any]:
+def build_readonly_account_query(params: Mapping[str, Any]) -> str:
+    """Build the exact deterministic query string used for read-only account signing."""
+    return urllib.parse.urlencode([(key, params[key]) for key in sorted(params)])
+
+
+def sign_readonly_account_query(query_string: str, secret: str) -> str:
+    """Sign a read-only account query string without including signature in the payload."""
+    return hmac.new(str(secret).encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def build_readonly_signed_account_url_safely(
+    *,
+    endpoint_url: str,
+    secret: str,
+    timestamp_ms: int,
+    recv_window_ms: int = DEFAULT_RECV_WINDOW_MS,
+) -> str:
+    params = {
+        "timestamp": str(int(timestamp_ms)),
+        "recvWindow": str(int(recv_window_ms)),
+    }
+    query = build_readonly_account_query(params)
+    signature = sign_readonly_account_query(query, secret)
+    return f"{endpoint_url}?{query}&signature={signature}"
+
+
+def readonly_account_signature_diagnostics(*, recv_window_ms: int = DEFAULT_RECV_WINDOW_MS) -> dict[str, Any]:
+    return {
+        "endpoint_family": "futures_account_readonly",
+        "signed_request_created_scope": "readonly_account_status_only",
+        "timestamp_used": True,
+        "recv_window_ms": int(recv_window_ms),
+        "signed_query_param_keys": ["recvWindow", "timestamp"],
+        "signature_shown": False,
+        "signed_url_shown": False,
+    }
+
+
+def _request_binance_futures_account_snapshot(
+    *,
+    env: Mapping[str, str],
+    recv_window_ms: int = DEFAULT_RECV_WINDOW_MS,
+    timeout_seconds: float = 10.0,
+) -> dict[str, Any]:
     api_key = str(env.get(ENV_API_KEY) or "").strip()
     api_secret = str(env.get(ENV_API_SECRET) or "").strip()
     if not api_key or not api_secret:
         raise RuntimeError("missing_readonly_credentials")
-    params = {
-        "timestamp": str(int(time.time() * 1000)),
-        "recvWindow": "5000",
-    }
-    query = urllib.parse.urlencode(params)
-    signature = hmac.new(api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256).hexdigest()
-    url = f"{BINANCE_FUTURES_ACCOUNT_URL}?{query}&signature={signature}"
+    url = build_readonly_signed_account_url_safely(
+        endpoint_url=BINANCE_FUTURES_ACCOUNT_URL,
+        secret=api_secret,
+        timestamp_ms=int(time.time() * 1000),
+        recv_window_ms=recv_window_ms,
+    )
     request = urllib.request.Request(url, headers={"X-MBX-APIKEY": api_key}, method="GET")
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
         raw = response.read()
