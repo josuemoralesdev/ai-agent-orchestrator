@@ -1,0 +1,386 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R175 Tiny-Live Blocker Burn-Down for BTCUSDT 8m Short
+
+BRANCH:
+r175-tiny-live-blocker-burn-down-8m-short
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+We have built a robust path for the candidate lane:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Important prior milestones:
+- R155 identified 8m short as the next candidate door.
+- R156 built short strategy packet.
+- R157 built focused short paper evidence capture loop.
+- R157 captured fresh short paper evidence.
+- R158 rechecked short evidence and showed fresh captures below threshold.
+- R159 built fundless readiness rehearsal.
+- R160 built fundless dry-run packet and operator checklist.
+- R161 drafted 8m short risk contract preview.
+- R162 built risk contract apply review and correctly blocked apply.
+- R163/R164/R165/R166/R167 built read-only funding/balance diagnostics.
+- R168/R169/R170/R171/R172/R173 cleaned up env role handling.
+- R174 synced role-specific account-read funding gate.
+- Latest known funding: ACCOUNT_NOT_FUNDED, 0.0 USDT.
+- Account-read role can be verified as role_specific after the manual migration ritual.
+- Target lane remains paper.
+- No live authorization exists.
+- No risk contract has been applied.
+- No config write should occur.
+
+R175 must produce a compact blocker burn-down for the 8m short tiny-live path.
+
+PURPOSE:
+Create a single audit surface that answers:
+1. Are we structurally close to tiny-live?
+2. Which blockers remain?
+3. Which blockers are already solved?
+4. Which blockers are operator/action blockers vs engineering blockers?
+5. What is the shortest safe next path?
+6. What must NOT be done yet?
+
+CRITICAL SAFETY PRINCIPLE:
+This phase is audit-only.
+It must NOT:
+- promote the lane
+- set short tiny-live
+- write risk contract config
+- write env files
+- call Binance
+- place orders
+- create executable payloads
+- enable live execution
+
+TARGET FAMILY:
+BTCUSDT|8m|short|ladder_close_50_618
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not print full API keys/secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set short tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- src/app/hammer_radar/operator/funding_gate_role_specific_sync.py
+- src/app/hammer_radar/operator/account_read_env_migration_verify.py
+- src/app/hammer_radar/operator/account_read_env_migration_packet.py
+- src/app/hammer_radar/operator/env_role_adapter.py
+- src/app/hammer_radar/operator/readonly_balance_check.py
+- src/app/hammer_radar/operator/short_evidence_recheck_packet.py
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/fundless_short_dry_run_packet.py
+- src/app/hammer_radar/operator/short_risk_contract_draft_preview.py
+- src/app/hammer_radar/operator/short_risk_contract_apply_review.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- logs/hammer_radar_forward/readonly_balance_checks.ndjson usage patterns
+- logs/hammer_radar_forward/account_read_env_migration_verifications.ndjson usage patterns
+- logs/hammer_radar_forward/funding_gate_role_specific_sync.ndjson usage patterns
+- tests/hammer_radar/test_funding_gate_role_specific_sync.py
+- tests/hammer_radar/test_short_evidence_recheck_packet.py
+- tests/hammer_radar/test_short_risk_contract_apply_review.py
+- docs/hammer_radar/live_readiness/R174_FUNDING_GATE_SYNC_AFTER_ROLE_SPECIFIC_ACCOUNT_READ.md
+
+REUSE / EXTEND:
+Reuse existing ledgers and module summaries.
+Do not create new execution logic.
+Do not create order payload logic.
+Do not mutate config.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+
+Expose:
+- build_tiny_live_blocker_burn_down
+- build_target_lane_status_summary
+- build_evidence_blocker_summary
+- build_funding_blocker_summary
+- build_risk_contract_blocker_summary
+- build_lane_mode_blocker_summary
+- build_protective_policy_blocker_summary
+- build_operator_approval_blocker_summary
+- build_live_flag_blocker_summary
+- build_shortest_safe_path_summary
+- classify_tiny_live_distance
+- append_tiny_live_blocker_burn_down_record
+- load_tiny_live_blocker_burn_down_records
+- summarize_tiny_live_blocker_burn_downs
+
+STATUS ENUM:
+- TINY_LIVE_BLOCKER_BURN_DOWN_READY
+- TINY_LIVE_BLOCKER_BURN_DOWN_REJECTED
+- TINY_LIVE_BLOCKER_BURN_DOWN_RECORDED
+- TINY_LIVE_BLOCKER_BURN_DOWN_BLOCKED
+- TINY_LIVE_BLOCKER_BURN_DOWN_ERROR
+
+DISTANCE ENUM:
+- NOT_CLOSE_MULTIPLE_HARD_BLOCKERS
+- STRUCTURALLY_CLOSE_BUT_NEEDS_FUNDING_AND_EVIDENCE
+- CLOSE_AFTER_FUNDING_AND_EVIDENCE
+- READY_FOR_OPERATOR_REVIEW_PACKET
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "burn_down_recorded": false,
+  "burn_down_id": null,
+  "record_burn_down_requested": false,
+  "confirmation_valid": false,
+  "target_family": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "current_mode": "paper"
+  },
+  "blockers": {
+    "funding": {
+      "status": "blocked|clear|unknown",
+      "current": "ACCOUNT_NOT_FUNDED / 0.0 USDT",
+      "required": ">= 44 USDT estimate or future risk contract amount",
+      "blocker_type": "operator/funding"
+    },
+    "fresh_evidence": {
+      "status": "blocked|clear|unknown",
+      "current": "N / 10 fresh captures",
+      "required": ">= 10 fresh captures",
+      "blocker_type": "market/evidence"
+    },
+    "risk_contract": {
+      "status": "blocked|clear|unknown",
+      "current": "draft preview only / not applied",
+      "required": "target risk contract applied in future safe phase",
+      "blocker_type": "engineering/operator approval"
+    },
+    "lane_mode": {
+      "status": "blocked|clear|unknown",
+      "current": "paper",
+      "required": "future tiny_live mode only after approval",
+      "blocker_type": "operator approval/config"
+    },
+    "protective_policy": {
+      "status": "blocked|clear|unknown",
+      "current": "short-specific policy reviewed but not live-applied",
+      "required": "short stop/TP protective policy final review",
+      "blocker_type": "engineering/risk"
+    },
+    "operator_approval": {
+      "status": "blocked",
+      "current": "not provided",
+      "required": "explicit future approval phrase",
+      "blocker_type": "operator"
+    },
+    "live_flags": {
+      "status": "blocked",
+      "current": "disabled/kill-switch-on",
+      "required": "future authorized arming phase",
+      "blocker_type": "operator/safety"
+    }
+  },
+  "cleared_items": [
+    "candidate door identified",
+    "short strategy packet exists",
+    "fresh capture loop exists",
+    "account-read role-specific env verified",
+    "read-only balance path works",
+    "funding truth known"
+  ],
+  "tiny_live_distance": "...",
+  "shortest_safe_path": [
+    "continue R157 until fresh captures >= 10",
+    "fund account later",
+    "rerun R158/R174 sync",
+    "apply risk contract in future safe config phase",
+    "build tiny-live review packet",
+    "operator approval",
+    "arming phase"
+  ],
+  "estimated_phase_distance": {
+    "if_funding_and_captures_ready": "2-4 phases",
+    "if_captures_missing": "depends on market, keep watcher running",
+    "if_funding_missing": "blocked until funded"
+  },
+  "recommended_next_operator_move": "KEEP_R157_RUNNING|FUND_ACCOUNT_LATER|RUN_R176_CAPTURE_COUNT_SYNC|WAIT_FOR_MORE_EVIDENCE",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set short lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...},
+  "source_surfaces_used": [...]
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- full_api_key_shown=false
+- full_api_secret_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_blocker_burn_downs.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE BLOCKER BURN DOWN RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+tiny-live-blocker-burn-down
+
+Args:
+- --lane-key optional, default BTCUSDT|8m|short|ladder_close_50_618
+- --record-burn-down
+- --confirm-tiny-live-burn-down <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-blocker-burn-down
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-blocker-burn-down \
+  --record-burn-down \
+  --confirm-tiny-live-burn-down "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-blocker-burn-down \
+  --record-burn-down \
+  --confirm-tiny-live-burn-down "I CONFIRM TINY LIVE BLOCKER BURN DOWN RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_blocker_burn_down.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- target lane defaults to BTCUSDT 8m short
+- funding blocker detects ACCOUNT_NOT_FUNDED
+- fresh evidence blocker detects below threshold
+- risk contract blocker detects draft/not applied
+- lane mode blocker detects paper
+- operator approval blocked
+- live flags blocked
+- cleared items include discovered door/account-read readiness
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related funding/evidence/risk contract tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-blocker-burn-down \
+  | jq '.status, .target_family, .blockers, .cleared_items, .tiny_live_distance, .shortest_safe_path, .estimated_phase_distance, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-blocker-burn-down \
+  --record-burn-down \
+  --confirm-tiny-live-burn-down "wrong" \
+  | jq '.status, .confirmation_valid, .burn_down_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R175_TINY_LIVE_BLOCKER_BURN_DOWN_8M_SHORT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R175.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R176_CAPTURE_COUNT_SYNC_8M_SHORT.md
+
+R176 should:
+- sync exact fresh capture count from R157 records
+- determine whether threshold 10 is met
+- no config writes
+- no live execution
+- no Binance calls
+
+REPORT:
+Files changed, tests, smoke, safety, tiny-live distance, shortest path, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
