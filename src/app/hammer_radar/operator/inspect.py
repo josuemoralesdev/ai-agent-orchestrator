@@ -2006,6 +2006,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "risk-contract-apply-packet-8m-short":
+        from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
+            build_risk_contract_apply_packet_8m_short,
+            format_risk_contract_apply_packet_8m_short_json,
+        )
+
+        print(
+            format_risk_contract_apply_packet_8m_short_json(
+                build_risk_contract_apply_packet_8m_short(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_packet=args.record_packet,
+                    confirm_risk_contract_apply_packet=args.confirm_risk_contract_apply_packet,
+                )
+            )
+        )
     elif args.command == "env-role-split-proposal":
         from src.app.hammer_radar.operator.env_role_split_proposal import (
             build_env_role_split_proposal,
@@ -3181,6 +3197,14 @@ def _build_parser() -> argparse.ArgumentParser:
     evidence_threshold_recheck_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     evidence_threshold_recheck_parser.add_argument("--record-recheck", action="store_true")
     evidence_threshold_recheck_parser.add_argument("--confirm-evidence-threshold-recheck", default=None)
+
+    risk_contract_apply_packet_parser = subparsers.add_parser(
+        "risk-contract-apply-packet-8m-short",
+        parents=[parent],
+    )
+    risk_contract_apply_packet_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    risk_contract_apply_packet_parser.add_argument("--record-packet", action="store_true")
+    risk_contract_apply_packet_parser.add_argument("--confirm-risk-contract-apply-packet", default=None)
 
     env_role_split_proposal_parser = subparsers.add_parser(
         "env-role-split-proposal",
