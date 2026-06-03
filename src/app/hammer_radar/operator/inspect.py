@@ -1990,6 +1990,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "evidence-threshold-recheck-8m-short":
+        from src.app.hammer_radar.operator.evidence_threshold_recheck_8m_short import (
+            build_evidence_threshold_recheck_8m_short,
+            format_evidence_threshold_recheck_8m_short_json,
+        )
+
+        print(
+            format_evidence_threshold_recheck_8m_short_json(
+                build_evidence_threshold_recheck_8m_short(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_recheck=args.record_recheck,
+                    confirm_evidence_threshold_recheck=args.confirm_evidence_threshold_recheck,
+                )
+            )
+        )
     elif args.command == "env-role-split-proposal":
         from src.app.hammer_radar.operator.env_role_split_proposal import (
             build_env_role_split_proposal,
@@ -3157,6 +3173,14 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_count_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     capture_count_sync_parser.add_argument("--record-sync", action="store_true")
     capture_count_sync_parser.add_argument("--confirm-capture-count-sync", default=None)
+
+    evidence_threshold_recheck_parser = subparsers.add_parser(
+        "evidence-threshold-recheck-8m-short",
+        parents=[parent],
+    )
+    evidence_threshold_recheck_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    evidence_threshold_recheck_parser.add_argument("--record-recheck", action="store_true")
+    evidence_threshold_recheck_parser.add_argument("--confirm-evidence-threshold-recheck", default=None)
 
     env_role_split_proposal_parser = subparsers.add_parser(
         "env-role-split-proposal",
