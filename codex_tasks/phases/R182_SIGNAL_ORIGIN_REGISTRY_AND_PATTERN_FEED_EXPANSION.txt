@@ -1,0 +1,434 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R182 Signal Origin Registry and Pattern Feed Expansion
+
+BRANCH:
+r182-signal-origin-registry-pattern-feed-expansion
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R180 opened the paper net across multiple BTCUSDT lanes.
+R181 ranked the lanes and confirmed:
+
+- selected_lane: BTCUSDT|8m|short|ladder_close_50_618
+- selection_type: KEEP_8M_SHORT
+- confidence: MEDIUM
+- fresh_capture_count: 3 / 10
+- stale activity alone is not readiness evidence
+- no other paper lane overtook 8m short yet
+
+The next layer is signal origin.
+
+Current system mostly works around:
+- hammer / wick reversal
+- golden pocket / ladder_close_50_618
+- direction
+- timeframe
+- lane
+
+But the operator wants to expand signal origin:
+- hammer
+- three black crows
+- three white soldiers
+- engulfing
+- RSI divergence
+- golden pocket rejection
+- breakdown retest
+- exhaustion wick
+- future Keter signal-quality scoring
+
+Important architectural idea:
+- Lane = where the trade may happen.
+- Signal origin = why the trade may exist.
+- Entry feed = how the setup is recognized.
+- Trading timeframes can remain stable.
+- Signal origin can expand.
+
+R182 must create a signal-origin registry and paper-only pattern feed expansion.
+
+PURPOSE:
+Create a paper-only signal origin registry that:
+1. Defines supported signal origin families.
+2. Maps known existing signals to origins when possible.
+3. Tags existing paper signals with signal_origin metadata.
+4. Adds registry entries for pattern families, including Three Black Crows.
+5. Produces a paper-only feed summary by signal origin.
+6. Does not trade any signal origin.
+7. Does not promote any signal origin.
+8. Does not alter lane modes.
+9. Does not call Binance.
+10. Does not write config.
+
+CRITICAL SAFETY:
+This phase is registry/tagging/audit only.
+It must NOT:
+- place orders
+- call Binance
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson usage patterns
+- tests/hammer_radar/test_multi_lane_evidence_ranking.py
+- tests/hammer_radar/test_multi_lane_paper_capture_harvester.py
+- docs/hammer_radar/live_readiness/R181_MULTI_LANE_EVIDENCE_RANKING_AND_NEXT_DOOR_SELECTION.md
+
+REUSE / EXTEND:
+Reuse existing signal parsing.
+Reuse lane keys and normalized entry modes.
+Do not create trading execution.
+Do not create order logic.
+Do not mutate configs.
+Do not call Binance.
+
+SIGNAL ORIGIN REGISTRY:
+Create a registry with these initial origins:
+
+1. hammer_wick_reversal
+- aliases: hammer, wick_reversal, long_wick_rejection
+- type: reversal / rejection
+- current system support: existing hammer radar / wick logic if present
+- direction support: long and short depending on rejection context
+
+2. golden_pocket_rejection
+- aliases: golden_pocket, gp_rejection, ladder_close_50_618
+- type: retrace/rejection
+- direction support: long support zone, short resistance/retrace zone
+
+3. three_black_crows
+- aliases: 3_black_crows, three_bearish_candles
+- type: bearish reversal / bearish continuation
+- direction support: short
+- initially registry-only unless candle pattern detector already exists
+
+4. three_white_soldiers
+- aliases: 3_white_soldiers, three_bullish_candles
+- type: bullish reversal / bullish continuation
+- direction support: long
+- initially registry-only unless detector exists
+
+5. bearish_engulfing
+- aliases: engulfing_bearish
+- type: bearish reversal
+- direction support: short
+
+6. bullish_engulfing
+- aliases: engulfing_bullish
+- type: bullish reversal
+- direction support: long
+
+7. rsi_divergence_bearish
+- aliases: bearish_divergence, rsi_bear_div
+- type: momentum divergence
+- direction support: short
+
+8. rsi_divergence_bullish
+- aliases: bullish_divergence, rsi_bull_div
+- type: momentum divergence
+- direction support: long
+
+9. breakdown_retest
+- aliases: breakdown_retest_short, support_break_retest
+- type: continuation / confirmation
+- direction support: short
+
+10. breakout_retest
+- aliases: breakout_retest_long, resistance_break_retest
+- type: continuation / confirmation
+- direction support: long
+
+11. exhaustion_wick
+- aliases: exhaustion, terminal_wick
+- type: exhaustion/reversal
+- direction support: long/short depending wick location
+
+12. unknown_or_unclassified
+- fallback origin
+
+IMPORTANT:
+- Do not claim pattern detection exists if it does not.
+- Registry entries can be "available_for_tagging": true/false.
+- Pattern families may be registry-only at R182.
+- Actual pattern detection can come in later phases.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/signal_origin_registry.py
+
+Expose:
+- build_signal_origin_registry
+- normalize_signal_origin
+- infer_signal_origin_from_record
+- build_signal_origin_feed_summary
+- tag_signal_records_with_origin
+- build_signal_origin_registry_preview
+- append_signal_origin_registry_record
+- load_signal_origin_registry_records
+- summarize_signal_origin_registry_records
+
+STATUS ENUM:
+- SIGNAL_ORIGIN_REGISTRY_READY
+- SIGNAL_ORIGIN_REGISTRY_REJECTED
+- SIGNAL_ORIGIN_REGISTRY_RECORDED
+- SIGNAL_ORIGIN_REGISTRY_BLOCKED
+- SIGNAL_ORIGIN_REGISTRY_ERROR
+
+ORIGIN AVAILABILITY ENUM:
+- DETECTOR_AVAILABLE
+- REGISTRY_ONLY
+- INFERRED_FROM_EXISTING_FIELDS
+- UNKNOWN
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "registry_recorded": false,
+  "registry_id": null,
+  "record_registry_requested": false,
+  "confirmation_valid": false,
+  "registry": [
+    {
+      "signal_origin": "hammer_wick_reversal",
+      "aliases": [...],
+      "origin_type": "reversal/rejection",
+      "direction_support": ["long", "short"],
+      "availability": "DETECTOR_AVAILABLE|REGISTRY_ONLY|INFERRED_FROM_EXISTING_FIELDS|UNKNOWN",
+      "description": "...",
+      "live_authorized": false,
+      "paper_only": true
+    }
+  ],
+  "feed_summary": {
+    "records_checked": ...,
+    "records_tagged": ...,
+    "by_origin": {
+      "hammer_wick_reversal": ...,
+      "golden_pocket_rejection": ...,
+      "unknown_or_unclassified": ...
+    },
+    "by_lane_and_origin": {
+      "BTCUSDT|8m|short|ladder_close_50_618": {
+        "hammer_wick_reversal": ...,
+        "golden_pocket_rejection": ...
+      }
+    }
+  },
+  "origin_gaps": [
+    "three_black_crows is registry-only until detector is added",
+    "engulfing patterns are registry-only until detector is added"
+  ],
+  "recommended_next_operator_move": "RUN_R183_KETER_SIGNAL_ORIGIN_SCORING|KEEP_MULTI_LANE_HARVESTER_RUNNING|RUN_PATTERN_DETECTOR_PHASE",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/signal_origin_registry.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM SIGNAL ORIGIN REGISTRY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+signal-origin-registry
+
+Args:
+- --latest-signals <int>, default 1000
+- --latest-harvest-records <int>, default 500
+- --record-registry
+- --confirm-signal-origin-registry <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-registry \
+  --latest-signals 1000 \
+  --latest-harvest-records 500
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-registry \
+  --record-registry \
+  --confirm-signal-origin-registry "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-registry \
+  --latest-signals 1000 \
+  --latest-harvest-records 500 \
+  --record-registry \
+  --confirm-signal-origin-registry "I CONFIRM SIGNAL ORIGIN REGISTRY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_signal_origin_registry.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- registry includes hammer_wick_reversal
+- registry includes golden_pocket_rejection
+- registry includes three_black_crows
+- registry includes three_white_soldiers
+- registry includes bearish/bullish engulfing
+- registry includes RSI divergence origins
+- unknown fallback works
+- normalize aliases works
+- infer existing hammer/golden pocket fields when available
+- registry-only origins do not claim detector availability
+- live_authorized false for all origins
+- paper_only true for all origins
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related multi-lane ranking / harvester tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-registry \
+  --latest-signals 1000 \
+  --latest-harvest-records 500 \
+  | jq '.status, .registry[0:12], .feed_summary, .origin_gaps, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-registry \
+  --record-registry \
+  --confirm-signal-origin-registry "wrong" \
+  | jq '.status, .confirmation_valid, .registry_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R182_SIGNAL_ORIGIN_REGISTRY_AND_PATTERN_FEED_EXPANSION.md
+
+Explain:
+- why R182 follows R181
+- lane vs signal origin
+- registry origins
+- Three Black Crows as registry-only initial origin
+- Keter scoring future layer
+- no live execution
+- no config writes
+- no signal origin promotion
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R182.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R183_KETER_SIGNAL_ORIGIN_SCORING_LAYER.md
+
+R183 should:
+- score signal origins by reversal strength, confirmation density, timeframe alignment, historical paper outcome, freshness, conflict with higher TF, continuation/reversal type
+- no live execution
+- no config writes
+
+REPORT:
+Files changed, tests, smoke, safety, registry origins, feed summary, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
