@@ -1825,6 +1825,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "local-candle-feed-preview":
+        from src.app.hammer_radar.operator.local_candle_feed_capture_preview import (
+            build_local_candle_feed_capture_preview,
+            format_local_candle_feed_capture_preview_json,
+        )
+
+        print(
+            format_local_candle_feed_capture_preview_json(
+                build_local_candle_feed_capture_preview(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    latest_candles=args.latest_candles,
+                    record_preview=args.record_preview,
+                    confirm_local_candle_feed_preview=args.confirm_local_candle_feed_preview,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3246,6 +3264,16 @@ def _build_parser() -> argparse.ArgumentParser:
     three_black_crows_feed_integration_parser.add_argument("--latest-candles", type=int, default=500)
     three_black_crows_feed_integration_parser.add_argument("--record-integration", action="store_true")
     three_black_crows_feed_integration_parser.add_argument("--confirm-three-black-crows-feed-integration", default=None)
+
+    local_candle_feed_preview_parser = subparsers.add_parser(
+        "local-candle-feed-preview",
+        parents=[parent],
+    )
+    local_candle_feed_preview_parser.add_argument("--symbol", default="BTCUSDT")
+    local_candle_feed_preview_parser.add_argument("--timeframe", default="8m")
+    local_candle_feed_preview_parser.add_argument("--latest-candles", type=int, default=500)
+    local_candle_feed_preview_parser.add_argument("--record-preview", action="store_true")
+    local_candle_feed_preview_parser.add_argument("--confirm-local-candle-feed-preview", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
