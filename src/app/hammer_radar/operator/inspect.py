@@ -1863,6 +1863,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "three-black-crows-local-detection":
+        from src.app.hammer_radar.operator.three_black_crows_local_feed_detection import (
+            build_three_black_crows_local_feed_detection,
+            format_three_black_crows_local_feed_detection_json,
+        )
+
+        print(
+            format_three_black_crows_local_feed_detection_json(
+                build_three_black_crows_local_feed_detection(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    latest_candles=args.latest_candles,
+                    mode=args.mode,
+                    record_detection=args.record_detection,
+                    confirm_three_black_crows_local_detection=args.confirm_three_black_crows_local_detection,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3306,6 +3325,24 @@ def _build_parser() -> argparse.ArgumentParser:
     local_candle_feed_adapter_parser.add_argument("--confirm-local-candle-feed-adapter", default=None)
     local_candle_feed_adapter_parser.add_argument("--write-normalized-feed", action="store_true")
     local_candle_feed_adapter_parser.add_argument("--confirm-normalized-candle-feed-write", default=None)
+
+    three_black_crows_local_detection_parser = subparsers.add_parser(
+        "three-black-crows-local-detection",
+        parents=[parent],
+    )
+    three_black_crows_local_detection_parser.add_argument("--symbol", default="BTCUSDT")
+    three_black_crows_local_detection_parser.add_argument("--timeframe", default="8m")
+    three_black_crows_local_detection_parser.add_argument("--latest-candles", type=int, default=500)
+    three_black_crows_local_detection_parser.add_argument(
+        "--mode",
+        choices=["strict", "loose_preview", "both"],
+        default="both",
+    )
+    three_black_crows_local_detection_parser.add_argument("--record-detection", action="store_true")
+    three_black_crows_local_detection_parser.add_argument(
+        "--confirm-three-black-crows-local-detection",
+        default=None,
+    )
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
