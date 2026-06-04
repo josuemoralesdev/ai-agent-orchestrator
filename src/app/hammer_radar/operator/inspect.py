@@ -1787,6 +1787,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "three-black-crows-detector":
+        from src.app.hammer_radar.operator.three_black_crows_detector import (
+            build_three_black_crows_detector_preview,
+            format_three_black_crows_detector_json,
+        )
+
+        print(
+            format_three_black_crows_detector_json(
+                build_three_black_crows_detector_preview(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    mode=args.mode,
+                    latest_candles=args.latest_candles,
+                    record_detector=args.record_detector,
+                    confirm_three_black_crows_detector=args.confirm_three_black_crows_detector,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3186,6 +3205,17 @@ def _build_parser() -> argparse.ArgumentParser:
     signal_origin_lane_matrix_parser.add_argument("--latest-scoring-records", type=int, default=100)
     signal_origin_lane_matrix_parser.add_argument("--record-matrix", action="store_true")
     signal_origin_lane_matrix_parser.add_argument("--confirm-signal-origin-lane-matrix", default=None)
+
+    three_black_crows_detector_parser = subparsers.add_parser(
+        "three-black-crows-detector",
+        parents=[parent],
+    )
+    three_black_crows_detector_parser.add_argument("--symbol", default="BTCUSDT")
+    three_black_crows_detector_parser.add_argument("--timeframe", default="8m")
+    three_black_crows_detector_parser.add_argument("--mode", choices=["strict", "loose_preview"], default="strict")
+    three_black_crows_detector_parser.add_argument("--latest-candles", type=int, default=500)
+    three_black_crows_detector_parser.add_argument("--record-detector", action="store_true")
+    three_black_crows_detector_parser.add_argument("--confirm-three-black-crows-detector", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
