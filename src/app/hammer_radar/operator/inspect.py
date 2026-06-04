@@ -1770,6 +1770,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "signal-origin-lane-matrix":
+        from src.app.hammer_radar.operator.signal_origin_lane_matrix import (
+            build_signal_origin_lane_matrix,
+            format_signal_origin_lane_matrix_json,
+        )
+
+        print(
+            format_signal_origin_lane_matrix_json(
+                build_signal_origin_lane_matrix(
+                    log_dir=args.log_dir,
+                    latest_ranking_records=args.latest_ranking_records,
+                    latest_scoring_records=args.latest_scoring_records,
+                    record_matrix=args.record_matrix,
+                    confirm_signal_origin_lane_matrix=args.confirm_signal_origin_lane_matrix,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3160,6 +3177,15 @@ def _build_parser() -> argparse.ArgumentParser:
     keter_signal_origin_scoring_parser.add_argument("--latest-ranking-records", type=int, default=100)
     keter_signal_origin_scoring_parser.add_argument("--record-scoring", action="store_true")
     keter_signal_origin_scoring_parser.add_argument("--confirm-keter-origin-scoring", default=None)
+
+    signal_origin_lane_matrix_parser = subparsers.add_parser(
+        "signal-origin-lane-matrix",
+        parents=[parent],
+    )
+    signal_origin_lane_matrix_parser.add_argument("--latest-ranking-records", type=int, default=100)
+    signal_origin_lane_matrix_parser.add_argument("--latest-scoring-records", type=int, default=100)
+    signal_origin_lane_matrix_parser.add_argument("--record-matrix", action="store_true")
+    signal_origin_lane_matrix_parser.add_argument("--confirm-signal-origin-lane-matrix", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",

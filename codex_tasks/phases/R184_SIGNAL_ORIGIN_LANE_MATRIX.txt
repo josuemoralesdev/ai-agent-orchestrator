@@ -1,0 +1,402 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R184 Signal-Origin × Lane Matrix
+
+BRANCH:
+r184-signal-origin-lane-matrix
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R180 opened multi-lane paper harvesting.
+R181 ranked multi-lane evidence and confirmed:
+- selected lane remains BTCUSDT|8m|short|ladder_close_50_618
+- selection type KEEP_8M_SHORT
+- confidence MEDIUM
+- fresh captures still below threshold
+
+R182 created signal-origin registry:
+- hammer_wick_reversal
+- golden_pocket_rejection
+- three_black_crows
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- rsi_divergence_bearish
+- rsi_divergence_bullish
+- breakdown_retest
+- breakout_retest
+- exhaustion_wick
+- unknown_or_unclassified
+
+R183 added Keter signal-origin scoring:
+- current best origin: hammer_wick_reversal
+- hammer_wick_reversal Keter score around 82
+- hammer_wick_reversal readiness: ORIGIN_READY_FOR_PAPER_TRACKING
+- three_black_crows is HIGH detector priority but registry-only, not trade-ready
+- all origins remain paper-only and not live-authorized
+
+R184 must combine lane ranking with signal-origin scoring to create a lane × origin matrix.
+
+ARCHITECTURAL PRINCIPLE:
+- Lane = where the trade may happen.
+- Signal origin = why the trade may exist.
+- Matrix = which signal origin inside which lane deserves paper tracking or next detector work.
+
+PURPOSE:
+Create a signal-origin × lane matrix that:
+1. Combines R181 lane scores with R183 signal-origin scores.
+2. Scores lane/origin pairs.
+3. Identifies strongest current paper-tracking pairs.
+4. Identifies registry-only detector priorities by lane.
+5. Keeps 8m short + hammer as current lead if evidence supports it.
+6. Flags 8m short + three_black_crows as detector-priority, not trade-ready.
+7. Produces next recommended engineering phase.
+8. Does not promote lanes.
+9. Does not authorize live.
+10. Does not mutate config.
+11. Does not call Binance.
+12. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is matrix/scoring/audit only.
+It must NOT:
+- place orders
+- call Binance
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote any signal origin
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/evidence_threshold_recheck_8m_short.py
+- src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson usage patterns
+- logs/hammer_radar_forward/keter_signal_origin_scoring.ndjson usage patterns
+- logs/hammer_radar_forward/signal_origin_registry.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson usage patterns
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- tests/hammer_radar/test_multi_lane_evidence_ranking.py
+- tests/hammer_radar/test_keter_signal_origin_scoring.py
+- tests/hammer_radar/test_signal_origin_registry.py
+- docs/hammer_radar/live_readiness/R181_MULTI_LANE_EVIDENCE_RANKING_AND_NEXT_DOOR_SELECTION.md
+- docs/hammer_radar/live_readiness/R183_KETER_SIGNAL_ORIGIN_SCORING_LAYER.md
+
+REUSE / EXTEND:
+Reuse R181 lane scores.
+Reuse R183 Keter origin scores.
+Reuse R182 origin registry.
+Do not duplicate scoring logic if helper outputs are available.
+Do not mutate configs.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+
+Expose:
+- build_signal_origin_lane_matrix
+- load_latest_multi_lane_evidence_ranking
+- load_latest_keter_signal_origin_scoring
+- build_lane_origin_pairs
+- score_lane_origin_pair
+- classify_lane_origin_pair_readiness
+- build_current_best_lane_origin_pair
+- build_detector_priority_lane_origin_pairs
+- build_matrix_next_actions
+- append_signal_origin_lane_matrix_record
+- load_signal_origin_lane_matrix_records
+- summarize_signal_origin_lane_matrix_records
+
+STATUS ENUM:
+- SIGNAL_ORIGIN_LANE_MATRIX_READY
+- SIGNAL_ORIGIN_LANE_MATRIX_REJECTED
+- SIGNAL_ORIGIN_LANE_MATRIX_RECORDED
+- SIGNAL_ORIGIN_LANE_MATRIX_BLOCKED
+- SIGNAL_ORIGIN_LANE_MATRIX_ERROR
+
+PAIR READINESS ENUM:
+- PAIR_READY_FOR_PAPER_TRACKING
+- PAIR_NEEDS_MORE_FRESH_CAPTURES
+- PAIR_NEEDS_DETECTOR
+- PAIR_NEEDS_MORE_TAGGED_DATA
+- PAIR_REFERENCE_ONLY
+- PAIR_NOT_LIVE_AUTHORIZED
+- PAIR_UNKNOWN
+
+MATRIX SCORING:
+For each lane/origin pair, score 0-100 using:
+- lane_score from R181
+- lane fresh capture count
+- lane threshold progress
+- origin Keter score from R183
+- origin detector availability
+- origin tagged record count in that lane
+- registry-only penalty
+- reference-only lane penalty
+- paper-only safety status
+
+Suggested pair score:
+- 40% lane score
+- 35% origin Keter score
+- 15% lane/origin tagged record density
+- 10% threshold progress
+Then apply penalties:
+- registry-only origin: strong penalty
+- unknown origin: strong penalty
+- tiny-live reference-only lane: cannot be selected as new paper door
+- no fresh captures: cannot become tiny-live-ready
+- live authorization false always
+
+IMPORTANT:
+- Do not let Three Black Crows score as ready until detector exists.
+- Do not let stale-only activity become readiness.
+- Do not let tiny-live incumbents become new paper candidate doors automatically.
+- Do not promote any lane/origin pair.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "matrix_recorded": false,
+  "matrix_id": null,
+  "record_matrix_requested": false,
+  "confirmation_valid": false,
+  "lane_origin_matrix": [
+    {
+      "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+      "signal_origin": "hammer_wick_reversal",
+      "lane_score": 59,
+      "origin_keter_score": 82,
+      "pair_score": ...,
+      "pair_readiness": "...",
+      "fresh_capture_count": 3,
+      "required_fresh_capture_count": 10,
+      "threshold_met": false,
+      "origin_availability": "DETECTOR_AVAILABLE",
+      "tagged_record_count_for_lane": 114,
+      "paper_only": true,
+      "live_authorized": false,
+      "why": "...",
+      "blockers": [...]
+    }
+  ],
+  "current_best_pair": {
+    "lane_key": "...",
+    "signal_origin": "...",
+    "pair_score": ...,
+    "why": "..."
+  },
+  "detector_priority_pairs": [
+    {
+      "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+      "signal_origin": "three_black_crows",
+      "priority": "HIGH",
+      "why": "operator-prioritized bearish origin for current lead lane, but detector missing"
+    }
+  ],
+  "matrix_summary": {
+    "pairs_scored": ...,
+    "paper_tracking_pairs": ...,
+    "detector_needed_pairs": ...,
+    "reference_only_pairs": ...,
+    "top_lane": "...",
+    "top_origin": "..."
+  },
+  "recommended_next_operator_move": "KEEP_MULTI_LANE_HARVESTER_RUNNING|KEEP_8M_SHORT_WATCHER_RUNNING|RUN_R185_THREE_BLACK_CROWS_DETECTOR_PREVIEW",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/signal_origin_lane_matrix.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM SIGNAL ORIGIN LANE MATRIX RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+signal-origin-lane-matrix
+
+Args:
+- --latest-ranking-records <int>, default 100
+- --latest-scoring-records <int>, default 100
+- --record-matrix
+- --confirm-signal-origin-lane-matrix <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-lane-matrix
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-lane-matrix \
+  --record-matrix \
+  --confirm-signal-origin-lane-matrix "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-lane-matrix \
+  --record-matrix \
+  --confirm-signal-origin-lane-matrix "I CONFIRM SIGNAL ORIGIN LANE MATRIX RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_signal_origin_lane_matrix.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- 8m short + hammer can become current best pair when lane/origin scores lead
+- three_black_crows for 8m short appears as detector priority, not ready pair
+- registry-only origins are penalized
+- reference-only tiny-live lanes cannot become new paper candidate door
+- pair score includes lane and origin inputs
+- no pair is live-authorized
+- no lane promoted
+- no signal origin promoted
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related Keter scoring / signal origin registry / multi-lane ranking tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-lane-matrix \
+  | jq '.status, .lane_origin_matrix[0:12], .current_best_pair, .detector_priority_pairs, .matrix_summary, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-lane-matrix \
+  --record-matrix \
+  --confirm-signal-origin-lane-matrix "wrong" \
+  | jq '.status, .confirmation_valid, .matrix_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R184_SIGNAL_ORIGIN_LANE_MATRIX.md
+
+Explain:
+- why R184 follows R183
+- lane × origin matrix
+- current best pair
+- why Three Black Crows is detector-priority, not ready
+- no live execution
+- no config writes
+- next possible R185
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R184.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R185_THREE_BLACK_CROWS_DETECTOR_PREVIEW.md
+
+R185 should:
+- build Three Black Crows detector preview
+- paper-only
+- no live execution
+- no config writes
+- no Binance calls
+- no orders
+
+REPORT:
+Files changed, tests, smoke, safety, current best pair, detector priority pairs, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
