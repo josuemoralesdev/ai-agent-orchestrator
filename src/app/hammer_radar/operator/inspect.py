@@ -2006,6 +2006,28 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "capture-watcher-supervisor-8m-short":
+        from src.app.hammer_radar.operator.capture_watcher_supervisor_8m_short import (
+            build_capture_watcher_supervisor_once,
+            format_capture_watcher_supervisor_8m_short_json,
+            run_capture_watcher_supervisor_loop,
+        )
+
+        builder = run_capture_watcher_supervisor_loop if args.run_supervisor_loop else build_capture_watcher_supervisor_once
+        print(
+            format_capture_watcher_supervisor_8m_short_json(
+                builder(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    record_supervisor=args.record_supervisor,
+                    confirm_capture_watcher_supervisor=args.confirm_capture_watcher_supervisor,
+                    max_supervisor_iterations=args.max_supervisor_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    allow_paper_watcher_restart=args.allow_paper_watcher_restart,
+                    **({"sleep_fn": (lambda _seconds: None)} if args.run_supervisor_loop and args.sleep_seconds == 0 else {}),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -3197,6 +3219,18 @@ def _build_parser() -> argparse.ArgumentParser:
     evidence_threshold_recheck_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     evidence_threshold_recheck_parser.add_argument("--record-recheck", action="store_true")
     evidence_threshold_recheck_parser.add_argument("--confirm-evidence-threshold-recheck", default=None)
+
+    capture_watcher_supervisor_parser = subparsers.add_parser(
+        "capture-watcher-supervisor-8m-short",
+        parents=[parent],
+    )
+    capture_watcher_supervisor_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    capture_watcher_supervisor_parser.add_argument("--record-supervisor", action="store_true")
+    capture_watcher_supervisor_parser.add_argument("--confirm-capture-watcher-supervisor", default=None)
+    capture_watcher_supervisor_parser.add_argument("--run-supervisor-loop", action="store_true")
+    capture_watcher_supervisor_parser.add_argument("--max-supervisor-iterations", type=int, default=60)
+    capture_watcher_supervisor_parser.add_argument("--sleep-seconds", type=int, default=60)
+    capture_watcher_supervisor_parser.add_argument("--allow-paper-watcher-restart", action="store_true")
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
