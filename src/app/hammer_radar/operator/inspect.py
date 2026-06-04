@@ -1929,6 +1929,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "crow-outcome-mapping-preview":
+        from src.app.hammer_radar.operator.crow_outcome_mapping_preview import (
+            build_crow_outcome_mapping_preview,
+            format_crow_outcome_mapping_preview_json,
+        )
+
+        print(
+            format_crow_outcome_mapping_preview_json(
+                build_crow_outcome_mapping_preview(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    lane_key=args.lane_key,
+                    success_threshold_pct=args.success_threshold_pct,
+                    adverse_threshold_pct=args.adverse_threshold_pct,
+                    record_mapping=args.record_mapping,
+                    confirm_crow_outcome_mapping=args.confirm_crow_outcome_mapping,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3413,6 +3433,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lane_matrix_after_crow_rescoring_parser.add_argument("--record-matrix", action="store_true")
     lane_matrix_after_crow_rescoring_parser.add_argument("--confirm-lane-matrix-after-crow-rescore", default=None)
+
+    crow_outcome_mapping_parser = subparsers.add_parser(
+        "crow-outcome-mapping-preview",
+        parents=[parent],
+    )
+    crow_outcome_mapping_parser.add_argument("--symbol", default="BTCUSDT")
+    crow_outcome_mapping_parser.add_argument("--timeframe", default="8m")
+    crow_outcome_mapping_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    crow_outcome_mapping_parser.add_argument("--success-threshold-pct", type=float, default=0.10)
+    crow_outcome_mapping_parser.add_argument("--adverse-threshold-pct", type=float, default=0.10)
+    crow_outcome_mapping_parser.add_argument("--record-mapping", action="store_true")
+    crow_outcome_mapping_parser.add_argument("--confirm-crow-outcome-mapping", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
