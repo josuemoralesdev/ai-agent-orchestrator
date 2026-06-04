@@ -1736,6 +1736,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "signal-origin-registry":
+        from src.app.hammer_radar.operator.signal_origin_registry import (
+            build_signal_origin_registry_preview,
+            format_signal_origin_registry_json,
+        )
+
+        print(
+            format_signal_origin_registry_json(
+                build_signal_origin_registry_preview(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_harvest_records=args.latest_harvest_records,
+                    record_registry=args.record_registry,
+                    confirm_signal_origin_registry=args.confirm_signal_origin_registry,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3108,6 +3125,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     multi_lane_evidence_ranking_parser.add_argument("--record-ranking", action="store_true")
     multi_lane_evidence_ranking_parser.add_argument("--confirm-multi-lane-ranking", default=None)
+
+    signal_origin_registry_parser = subparsers.add_parser(
+        "signal-origin-registry",
+        parents=[parent],
+    )
+    signal_origin_registry_parser.add_argument("--latest-signals", type=int, default=1000)
+    signal_origin_registry_parser.add_argument("--latest-harvest-records", type=int, default=500)
+    signal_origin_registry_parser.add_argument("--record-registry", action="store_true")
+    signal_origin_registry_parser.add_argument("--confirm-signal-origin-registry", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
