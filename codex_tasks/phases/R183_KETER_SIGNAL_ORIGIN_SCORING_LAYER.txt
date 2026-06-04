@@ -1,0 +1,427 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R183 Keter Signal Origin Scoring Layer
+
+BRANCH:
+r183-keter-signal-origin-scoring-layer
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R182 created the signal origin registry and pattern feed expansion.
+
+R182 introduced signal origins:
+- hammer_wick_reversal
+- golden_pocket_rejection
+- three_black_crows
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- rsi_divergence_bearish
+- rsi_divergence_bullish
+- breakdown_retest
+- breakout_retest
+- exhaustion_wick
+- unknown_or_unclassified
+
+R182 correctly marked Three Black Crows and several candle-pattern origins as REGISTRY_ONLY until detectors are added.
+
+R182 feed summary currently shows:
+- hammer_wick_reversal has existing data/tagging support
+- golden_pocket_rejection can be inferred from entry mode but may require better separation
+- registry-only origins exist but should not be scored as if detectors are active
+- no signal origin is live-authorized
+- all origins are paper-only
+
+R183 must add a Keter signal-origin scoring layer:
+- Keter here means highest-level signal-quality scoring, not live authority.
+- It ranks signal origins by quality and readiness.
+- It does not promote any signal to live.
+- It does not change lane modes.
+- It does not call Binance.
+- It does not write config.
+
+ARCHITECTURAL PRINCIPLE:
+- Lane = where the trade may happen.
+- Signal origin = why the trade may exist.
+- Entry feed = how the setup is recognized.
+- Keter score = quality/rank of the signal origin before any future lane × origin matrix.
+
+PURPOSE:
+Create a signal-origin scoring surface that:
+1. Reads the R182 signal origin registry.
+2. Reads tagged signal-origin feed summaries.
+3. Scores each origin by quality dimensions.
+4. Separates detector-ready origins from registry-only origins.
+5. Prevents registry-only origins from ranking as trade-ready.
+6. Scores origin quality per lane where possible.
+7. Identifies which origins deserve detector work next.
+8. Identifies which origins deserve paper evidence tracking next.
+9. Produces no live authorization.
+10. Does not write config or call Binance.
+
+CRITICAL SAFETY:
+This phase is scoring/audit only.
+It must NOT:
+- place orders
+- call Binance
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote any signal origin
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/signal_origin_registry.ndjson usage patterns
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson usage patterns
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/paper_executions.ndjson usage patterns
+- tests/hammer_radar/test_signal_origin_registry.py
+- tests/hammer_radar/test_multi_lane_evidence_ranking.py
+- docs/hammer_radar/live_readiness/R182_SIGNAL_ORIGIN_REGISTRY_AND_PATTERN_FEED_EXPANSION.md
+
+REUSE / EXTEND:
+Reuse R182 registry and feed summary.
+Reuse R181 lane evidence ranking where useful.
+Reuse performance/outcome helpers if available.
+Do not duplicate signal parsing unnecessarily.
+Do not mutate configs.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+
+Expose:
+- build_keter_signal_origin_scoring
+- load_latest_signal_origin_registry_record
+- build_origin_quality_dimensions
+- score_signal_origin
+- score_signal_origin_by_lane
+- build_origin_readiness_classification
+- build_detector_priority_recommendations
+- build_origin_tracking_recommendations
+- build_keter_origin_ranking
+- append_keter_signal_origin_scoring_record
+- load_keter_signal_origin_scoring_records
+- summarize_keter_signal_origin_scoring_records
+
+STATUS ENUM:
+- KETER_SIGNAL_ORIGIN_SCORING_READY
+- KETER_SIGNAL_ORIGIN_SCORING_REJECTED
+- KETER_SIGNAL_ORIGIN_SCORING_RECORDED
+- KETER_SIGNAL_ORIGIN_SCORING_BLOCKED
+- KETER_SIGNAL_ORIGIN_SCORING_ERROR
+
+ORIGIN READINESS ENUM:
+- ORIGIN_READY_FOR_PAPER_TRACKING
+- ORIGIN_NEEDS_DETECTOR
+- ORIGIN_NEEDS_MORE_TAGGED_DATA
+- ORIGIN_REFERENCE_ONLY
+- ORIGIN_UNKNOWN
+- ORIGIN_NOT_LIVE_AUTHORIZED
+
+KETER SCORE DIMENSIONS:
+Each origin should be scored 0-100 using these dimensions when data exists:
+
+1. detector_availability_score
+- DETECTOR_AVAILABLE: high
+- INFERRED_FROM_EXISTING_FIELDS: medium/high
+- REGISTRY_ONLY: low until detector exists
+- UNKNOWN: low
+
+2. tagged_data_score
+- more tagged records means stronger evidence base
+- no tagged records = weak
+
+3. lane_coverage_score
+- origin appears across multiple relevant lanes
+- or appears strongly on current lead lane
+
+4. freshness_score
+- recent tagged examples / fresh flow if available
+- stale-only should not dominate
+
+5. historical_outcome_score
+- paper outcome count, win rate, avg PnL, total PnL if mappable
+- null data should not be hallucinated
+
+6. reversal_context_score
+- reversal/rejection origins are relevant for current strategy
+- continuation origins are useful but must be separated
+
+7. conflict_penalty
+- registry-only origins should be penalized
+- unknown/unclassified should be penalized
+- detector gaps should be explicit
+
+Suggested score bands:
+- 0-24: registry / unknown / not actionable
+- 25-49: needs detector or more data
+- 50-69: paper tracking candidate
+- 70-84: strong paper origin candidate
+- 85-100: high-priority origin for next matrix work
+
+IMPORTANT:
+- Do not treat Three Black Crows as detected yet.
+- Do not give registry-only origins high score just because the operator likes them.
+- Three Black Crows can receive high detector-priority, not high trading-readiness.
+- Hammer/wick and golden-pocket origins can score higher because existing fields support them.
+- No origin can become live-authorized in R183.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "scoring_recorded": false,
+  "scoring_id": null,
+  "record_scoring_requested": false,
+  "confirmation_valid": false,
+  "keter_origin_rankings": [
+    {
+      "signal_origin": "hammer_wick_reversal",
+      "availability": "DETECTOR_AVAILABLE",
+      "keter_score": 0-100,
+      "score_band": "...",
+      "readiness": "...",
+      "dimension_scores": {
+        "detector_availability_score": ...,
+        "tagged_data_score": ...,
+        "lane_coverage_score": ...,
+        "freshness_score": ...,
+        "historical_outcome_score": ...,
+        "reversal_context_score": ...,
+        "conflict_penalty": ...
+      },
+      "tagged_record_count": ...,
+      "top_lanes": [...],
+      "why": "...",
+      "blockers": [...],
+      "live_authorized": false,
+      "paper_only": true
+    }
+  ],
+  "by_lane_origin_scores": {
+    "BTCUSDT|8m|short|ladder_close_50_618": [
+      {
+        "signal_origin": "hammer_wick_reversal",
+        "keter_score": ...,
+        "tagged_record_count": ...
+      }
+    ]
+  },
+  "detector_priority_recommendations": [
+    {
+      "signal_origin": "three_black_crows",
+      "priority": "HIGH|MEDIUM|LOW",
+      "reason": "operator-prioritized bearish reversal pattern but registry-only until detector exists"
+    }
+  ],
+  "origin_tracking_recommendations": [
+    ...
+  ],
+  "current_best_origin": {
+    "signal_origin": "...",
+    "reason": "...",
+    "keter_score": ...
+  },
+  "recommended_next_operator_move": "RUN_R184_SIGNAL_ORIGIN_LANE_MATRIX|RUN_THREE_BLACK_CROWS_DETECTOR_PHASE|KEEP_MULTI_LANE_HARVESTER_RUNNING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/keter_signal_origin_scoring.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM KETER SIGNAL ORIGIN SCORING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+keter-signal-origin-scoring
+
+Args:
+- --latest-registry-records <int>, default 100
+- --latest-ranking-records <int>, default 100
+- --record-scoring
+- --confirm-keter-origin-scoring <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  keter-signal-origin-scoring
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  keter-signal-origin-scoring \
+  --record-scoring \
+  --confirm-keter-origin-scoring "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  keter-signal-origin-scoring \
+  --record-scoring \
+  --confirm-keter-origin-scoring "I CONFIRM KETER SIGNAL ORIGIN SCORING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_keter_signal_origin_scoring.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- detector available origin scores above registry-only when data exists
+- registry-only three_black_crows does not get trading-ready score
+- three_black_crows appears in detector priority recommendations
+- hammer_wick_reversal can rank highest with tagged data
+- unknown_or_unclassified is penalized
+- live_authorized false for all origins
+- paper_only true for all origins
+- no signal origin promoted
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related signal origin registry / multi-lane ranking tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  keter-signal-origin-scoring \
+  | jq '.status, .keter_origin_rankings[0:12], .by_lane_origin_scores, .detector_priority_recommendations, .origin_tracking_recommendations, .current_best_origin, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  keter-signal-origin-scoring \
+  --record-scoring \
+  --confirm-keter-origin-scoring "wrong" \
+  | jq '.status, .confirmation_valid, .scoring_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R183_KETER_SIGNAL_ORIGIN_SCORING_LAYER.md
+
+Explain:
+- why R183 follows R182
+- Keter as signal-quality scoring layer
+- scoring dimensions
+- why registry-only origins are not trade-ready
+- why Three Black Crows becomes detector priority, not live signal
+- no live execution
+- no config writes
+- next possible R184
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R183.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R184_SIGNAL_ORIGIN_LANE_MATRIX.md
+
+R184 should:
+- combine lane ranking with signal-origin scores
+- build lane × origin matrix
+- identify best lane/origin pairs for paper tracking
+- no live execution
+- no config writes
+
+REPORT:
+Files changed, tests, smoke, safety, scoring results, current best origin, detector priorities, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.

@@ -1753,6 +1753,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "keter-signal-origin-scoring":
+        from src.app.hammer_radar.operator.keter_signal_origin_scoring import (
+            build_keter_signal_origin_scoring,
+            format_keter_signal_origin_scoring_json,
+        )
+
+        print(
+            format_keter_signal_origin_scoring_json(
+                build_keter_signal_origin_scoring(
+                    log_dir=args.log_dir,
+                    latest_registry_records=args.latest_registry_records,
+                    latest_ranking_records=args.latest_ranking_records,
+                    record_scoring=args.record_scoring,
+                    confirm_keter_origin_scoring=args.confirm_keter_origin_scoring,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3134,6 +3151,15 @@ def _build_parser() -> argparse.ArgumentParser:
     signal_origin_registry_parser.add_argument("--latest-harvest-records", type=int, default=500)
     signal_origin_registry_parser.add_argument("--record-registry", action="store_true")
     signal_origin_registry_parser.add_argument("--confirm-signal-origin-registry", default=None)
+
+    keter_signal_origin_scoring_parser = subparsers.add_parser(
+        "keter-signal-origin-scoring",
+        parents=[parent],
+    )
+    keter_signal_origin_scoring_parser.add_argument("--latest-registry-records", type=int, default=100)
+    keter_signal_origin_scoring_parser.add_argument("--latest-ranking-records", type=int, default=100)
+    keter_signal_origin_scoring_parser.add_argument("--record-scoring", action="store_true")
+    keter_signal_origin_scoring_parser.add_argument("--confirm-keter-origin-scoring", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
