@@ -1,0 +1,401 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R188 Local Candle Feed Adapter No Network
+
+BRANCH:
+r188-local-candle-feed-adapter-no-network
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R187 local candle feed preview found a valid local OHLC feed:
+
+- valid_ohlc_files:
+  logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson
+
+- valid_candles_found: 500
+- latest_candle_time: 2026-06-04T16:31:59.999000+00:00
+- feed_readiness: VALID_LOCAL_OHLC_FEED_AVAILABLE
+- three_black_crows_ready_to_detect: true
+- no Binance/network calls
+- no feed write
+- no config write
+- no live execution
+
+R188 must create a local-only candle feed adapter that consumes this valid OHLC feed and exposes it safely to the Three Black Crows detector.
+
+PURPOSE:
+Create a no-network local candle feed adapter that:
+1. Reads valid local OHLC from candle_archive.
+2. Normalizes candle records for detector consumers.
+3. Exposes a reusable local candle adapter surface.
+4. Runs Three Black Crows detector against the normalized local feed.
+5. Optionally writes a normalized local feed only with explicit confirmation, but default must not write.
+6. Produces a detector-ready summary.
+7. Does not call Binance.
+8. Does not mutate config.
+9. Does not place orders.
+10. Does not enable live execution.
+
+CRITICAL SAFETY:
+This phase is local data adapter only.
+It must NOT:
+- call Binance
+- call any network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote signal origins
+- fake OHLC candles
+
+TARGET:
+Primary:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Signal origin:
+three_black_crows
+
+Local source:
+logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson
+
+Candidate normalized output path, write only with explicit confirmation:
+logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not write normalized candle feed unless explicit confirmation is valid.
+- Do not fake OHLC from signal summaries.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/local_candle_feed_capture_preview.py
+- src/app/hammer_radar/operator/three_black_crows_feed_integration.py
+- src/app/hammer_radar/operator/three_black_crows_detector.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson usage patterns
+- tests/hammer_radar/test_local_candle_feed_capture_preview.py
+- tests/hammer_radar/test_three_black_crows_feed_integration.py
+- tests/hammer_radar/test_three_black_crows_detector.py
+- docs/hammer_radar/live_readiness/R187_LOCAL_CANDLE_FEED_CAPTURE_PREVIEW_NO_BINANCE.md
+
+REUSE / EXTEND:
+Reuse R187 normalization and validation rules.
+Reuse R185 detector.
+Reuse R186 feed integration if possible.
+Do not create Binance/network logic.
+Do not mutate configs.
+Do not fake OHLC.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/local_candle_feed_adapter.py
+
+Expose:
+- build_local_candle_feed_adapter_preview
+- resolve_local_candle_feed_path
+- load_local_candle_feed
+- normalize_local_candle_feed
+- validate_normalized_candle_feed
+- build_detector_ready_candle_feed
+- run_three_black_crows_on_local_feed
+- write_normalized_candle_feed_if_confirmed
+- build_local_candle_feed_adapter_summary
+- append_local_candle_feed_adapter_record
+- load_local_candle_feed_adapter_records
+- summarize_local_candle_feed_adapters
+
+STATUS ENUM:
+- LOCAL_CANDLE_FEED_ADAPTER_READY
+- LOCAL_CANDLE_FEED_ADAPTER_REJECTED
+- LOCAL_CANDLE_FEED_ADAPTER_RECORDED
+- LOCAL_CANDLE_FEED_ADAPTER_WRITTEN
+- LOCAL_CANDLE_FEED_ADAPTER_BLOCKED
+- LOCAL_CANDLE_FEED_ADAPTER_ERROR
+
+ADAPTER READINESS ENUM:
+- DETECTOR_READY_LOCAL_OHLC_AVAILABLE
+- LOCAL_OHLC_MISSING
+- LOCAL_OHLC_INVALID
+- NORMALIZED_FEED_READY
+- NORMALIZED_FEED_WRITE_BLOCKED_BY_DEFAULT
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+VALID CANDLE SHAPE:
+A valid normalized candle must include:
+- symbol
+- timeframe
+- open_time or timestamp
+- open
+- high
+- low
+- close
+- source
+
+Optional:
+- close_time
+- volume
+- generated_at
+
+Rules:
+- open/high/low/close must be numeric.
+- high >= max(open, close)
+- low <= min(open, close)
+- timeframe must match requested timeframe.
+- symbol must match requested symbol.
+- signal price-only summaries are not valid OHLC.
+- synthetic signal contexts must not be promoted to OHLC.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "adapter_recorded": false,
+  "adapter_id": null,
+  "record_adapter_requested": false,
+  "confirmation_valid": false,
+  "write_normalized_feed_requested": false,
+  "normalized_feed_written": false,
+  "target_context": {
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "consumer": "three_black_crows_detector"
+  },
+  "source_feed": {
+    "path": "logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson",
+    "source_found": true/false,
+    "records_loaded": ...,
+    "valid_records": ...,
+    "invalid_records": ...
+  },
+  "normalized_feed": {
+    "normalized_records": ...,
+    "latest_candle_time": "...",
+    "sample_candle": {...},
+    "output_path": "logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson",
+    "would_write_by_default": false,
+    "written": false
+  },
+  "detector_ready_feed": {
+    "ready": true/false,
+    "adapter_readiness": "...",
+    "blockers": [...]
+  },
+  "three_black_crows_detector_result": {
+    "detector_status": "...",
+    "strict_detections_found": ...,
+    "loose_detections_found": ...,
+    "latest_detection_at": null,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "recommended_next_operator_move": "RUN_R189_THREE_BLACK_CROWS_DETECTION_ON_LOCAL_FEED|KEEP_MULTI_LANE_HARVESTER_RUNNING|RUN_R186_AFTER_NORMALIZED_FEED",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- candle_feed_written=false unless explicit valid confirmation requested
+- fake_ohlc_created=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/local_candle_feed_adapter.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM LOCAL CANDLE FEED ADAPTER RECORDING ONLY; NO FEED WRITE; NO ORDER; NO BINANCE CALL.
+
+OPTIONAL WRITE CONFIRMATION PHRASE:
+I CONFIRM NORMALIZED LOCAL CANDLE FEED WRITE ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+local-candle-feed-adapter
+
+Args:
+- --symbol default BTCUSDT
+- --timeframe default 8m
+- --latest-candles <int>, default 500
+- --record-adapter
+- --confirm-local-candle-feed-adapter <phrase>
+- --write-normalized-feed
+- --confirm-normalized-candle-feed-write <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --latest-candles 500
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --record-adapter \
+  --confirm-local-candle-feed-adapter "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --latest-candles 500 \
+  --record-adapter \
+  --confirm-local-candle-feed-adapter "I CONFIRM LOCAL CANDLE FEED ADAPTER RECORDING ONLY; NO FEED WRITE; NO ORDER; NO BINANCE CALL."
+
+Write normalized feed, only if explicitly run by operator:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --latest-candles 500 \
+  --write-normalized-feed \
+  --confirm-normalized-candle-feed-write "I CONFIRM NORMALIZED LOCAL CANDLE FEED WRITE ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_local_candle_feed_adapter.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records adapter only
+- valid local source is normalized
+- invalid candles are rejected
+- default does not write normalized feed
+- write normalized feed requires exact write confirmation
+- wrong write confirmation does not write
+- detector ready when valid local OHLC exists
+- strict/loose detector result included
+- fake_ohlc_created false
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module, R187 module, detector module, and inspect.py.
+Run focused test.
+Run related R187/R186/R185 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --latest-candles 500 \
+  | jq '.status, .target_context, .source_feed, .normalized_feed, .detector_ready_feed, .three_black_crows_detector_result, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  local-candle-feed-adapter \
+  --record-adapter \
+  --confirm-local-candle-feed-adapter "wrong" \
+  | jq '.status, .confirmation_valid, .adapter_recorded, .normalized_feed.normalized_feed_written, .safety'
+
+Config/env/feed unchanged by default:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R188_LOCAL_CANDLE_FEED_ADAPTER_NO_NETWORK.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R188.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R189_THREE_BLACK_CROWS_DETECTION_ON_LOCAL_FEED.md
+
+R189 should:
+- run Three Black Crows detector against the local adapter feed
+- produce paper-only detections/tags if any
+- no live execution
+- no config writes
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, adapter readiness, detector result, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
