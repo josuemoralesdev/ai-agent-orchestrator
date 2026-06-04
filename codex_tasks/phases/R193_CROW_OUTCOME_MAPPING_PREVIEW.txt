@@ -1,0 +1,448 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R193 Crow Outcome Mapping Preview
+
+BRANCH:
+r193-crow-outcome-mapping-preview
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R189 produced Three Black Crows local feed detections:
+- signal_origin=three_black_crows
+- lane=BTCUSDT|8m|short|ladder_close_50_618
+- strict detections=5
+- loose detections=18
+- paper tags recorded=23
+- latest detection=2026-06-04T07:19:59.999000+00:00
+- no live authorization
+- no config writes
+- no Binance/network calls
+
+R191 rescored Three Black Crows:
+- previous Keter score=0
+- new Keter score=56
+- readiness=CROWS_READY_FOR_PAPER_TRACKING_REVIEW
+- paper_track_three_black_crows=true
+- needs paper outcome mapping=true
+- hammer remains best origin
+
+R192 reran lane matrix:
+- hammer_wick_reversal pair_score=72
+- three_black_crows pair_score=51
+- three_black_crows pair readiness=PAIR_NEEDS_PAPER_OUTCOME_MAPPING
+- post-crow matrix status=HAMMER_REMAINS_CURRENT_BEST_PAIR
+- recommended next phase=R193_CROW_OUTCOME_MAPPING_PREVIEW
+
+R193 must map Three Black Crows detections to post-detection paper outcome windows.
+
+PURPOSE:
+Create a paper-only outcome mapping preview that:
+1. Reads Three Black Crows detections/tags from R189.
+2. Reads local BTCUSDT 8m OHLC candles from R188/R187 source:
+   logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson
+3. For each detection, calculates post-detection movement windows.
+4. Estimates whether the short bias was supported after detection.
+5. Produces outcome metrics:
+   - MFE downside after detection
+   - MAE upside against detection
+   - close-after-N-candles return
+   - simple success flags for 1R-like preview thresholds
+6. Keeps everything paper-only.
+7. Does not create orders.
+8. Does not call Binance/network.
+9. Does not write config.
+10. Does not promote Three Black Crows.
+
+CRITICAL SAFETY:
+This phase is outcome mapping/audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote signal origins
+- promote lanes
+
+TARGET:
+Primary lane:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Signal origin:
+three_black_crows
+
+Local candle source:
+logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not fake OHLC.
+- Do not infer outcomes without future candles.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/three_black_crows_detector.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_rescoring.py
+- src/app/hammer_radar/operator/keter_rescoring_after_three_black_crows.py
+- src/app/hammer_radar/operator/signal_origin_feedback_sync.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/three_black_crows_local_detections.ndjson usage patterns
+- logs/hammer_radar_forward/three_black_crows_paper_tags.ndjson usage patterns
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson usage patterns
+- tests/hammer_radar/test_three_black_crows_local_feed_detection.py
+- tests/hammer_radar/test_local_candle_feed_adapter.py
+- tests/hammer_radar/test_lane_matrix_after_crow_rescoring.py
+- docs/hammer_radar/live_readiness/R192_LANE_MATRIX_AFTER_CROW_RESCORING.md
+
+REUSE / EXTEND:
+Reuse R189 detections.
+Reuse R188 local candle adapter.
+Reuse existing candle normalization.
+Do not create network logic.
+Do not mutate configs.
+Do not fake outcomes.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/crow_outcome_mapping_preview.py
+
+Expose:
+- build_crow_outcome_mapping_preview
+- load_three_black_crows_detections
+- load_three_black_crows_paper_tags
+- load_local_8m_candles_for_outcome_mapping
+- map_detection_to_future_candles
+- compute_short_outcome_window
+- build_crow_outcome_summary
+- classify_crow_outcome_mapping_status
+- append_crow_outcome_mapping_preview_record
+- load_crow_outcome_mapping_preview_records
+- summarize_crow_outcome_mapping_previews
+
+STATUS ENUM:
+- CROW_OUTCOME_MAPPING_PREVIEW_READY
+- CROW_OUTCOME_MAPPING_PREVIEW_REJECTED
+- CROW_OUTCOME_MAPPING_PREVIEW_RECORDED
+- CROW_OUTCOME_MAPPING_PREVIEW_BLOCKED
+- CROW_OUTCOME_MAPPING_PREVIEW_ERROR
+
+OUTCOME STATUS ENUM:
+- OUTCOME_MAPPING_AVAILABLE
+- OUTCOME_MAPPING_PARTIAL_FUTURE_CANDLES_MISSING
+- OUTCOME_MAPPING_NO_DETECTIONS
+- OUTCOME_MAPPING_NO_LOCAL_CANDLES
+- OUTCOME_MAPPING_INSUFFICIENT_FUTURE_WINDOW
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTCOME WINDOWS:
+For each detection, compute post-detection outcome over:
+- 1 candle
+- 3 candles
+- 5 candles
+- 10 candles
+
+For short context:
+- entry_reference = close of detection candle or next candle open if available
+- mfe_downside_pct = best downside move after detection
+- mae_upside_pct = worst upside move against detection
+- close_return_pct = (future_close - entry_reference) / entry_reference * 100
+  For short, negative close_return_pct is favorable.
+- favorable_close = close_return_pct < 0
+- adverse_close = close_return_pct > 0
+- simple_success = mfe_downside_pct >= configurable threshold, default 0.10%
+- simple_failure = mae_upside_pct >= configurable adverse threshold, default 0.10%
+
+Important:
+This is a preview only, not trade PnL.
+No leverage.
+No position sizing.
+No fees.
+No slippage.
+No live readiness.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "mapping_recorded": false,
+  "mapping_id": null,
+  "record_mapping_requested": false,
+  "confirmation_valid": false,
+  "target_context": {
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "signal_origin": "three_black_crows"
+  },
+  "input_summary": {
+    "detections_loaded": ...,
+    "paper_tags_loaded": ...,
+    "candles_loaded": ...,
+    "valid_detections_mapped": ...,
+    "detections_skipped": ...
+  },
+  "outcome_windows": {
+    "windows_candles": [1, 3, 5, 10],
+    "entry_reference": "detection_close_or_next_open",
+    "success_threshold_pct": 0.10,
+    "adverse_threshold_pct": 0.10
+  },
+  "mapped_outcomes": [
+    {
+      "detection_id": "...",
+      "detected_at": "...",
+      "mode": "strict|loose_preview",
+      "confidence": "LOW|MEDIUM|HIGH",
+      "entry_reference_price": ...,
+      "windows": {
+        "1": {
+          "future_close_time": "...",
+          "close_return_pct": ...,
+          "mfe_downside_pct": ...,
+          "mae_upside_pct": ...,
+          "favorable_close": true/false,
+          "simple_success": true/false,
+          "simple_failure": true/false
+        }
+      },
+      "paper_only": true,
+      "live_authorized": false
+    }
+  ],
+  "aggregate_summary": {
+    "mapped_count": ...,
+    "strict_mapped_count": ...,
+    "loose_mapped_count": ...,
+    "window_stats": {
+      "1": {
+        "favorable_close_rate_pct": ...,
+        "simple_success_rate_pct": ...,
+        "simple_failure_rate_pct": ...,
+        "avg_close_return_pct": ...,
+        "avg_mfe_downside_pct": ...,
+        "avg_mae_upside_pct": ...
+      }
+    },
+    "best_window": "1|3|5|10|unknown",
+    "worst_window": "1|3|5|10|unknown"
+  },
+  "outcome_mapping_status": "...",
+  "interpretation": {
+    "supports_short_bias": true/false/null,
+    "needs_more_samples": true/false,
+    "paper_tracking_recommended": true/false,
+    "live_ready": false,
+    "why": "..."
+  },
+  "recommended_next_operator_move": "KEEP_MULTI_LANE_HARVESTER_RUNNING|KEEP_8M_SHORT_WATCHER_RUNNING|RUN_R194_CROW_OUTCOME_KETER_FEEDBACK|COLLECT_MORE_CROW_DETECTIONS",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/crow_outcome_mapping_preview.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM CROW OUTCOME MAPPING PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+crow-outcome-mapping-preview
+
+Args:
+- --symbol default BTCUSDT
+- --timeframe default 8m
+- --lane-key default BTCUSDT|8m|short|ladder_close_50_618
+- --success-threshold-pct float default 0.10
+- --adverse-threshold-pct float default 0.10
+- --record-mapping
+- --confirm-crow-outcome-mapping <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618"
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --record-mapping \
+  --confirm-crow-outcome-mapping "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --record-mapping \
+  --confirm-crow-outcome-mapping "I CONFIRM CROW OUTCOME MAPPING PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_crow_outcome_mapping_preview.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records mapping only
+- missing detections blocks
+- missing candles blocks
+- maps detection to future candle windows
+- computes short favorable close correctly
+- computes MFE downside and MAE upside correctly
+- handles insufficient future candles
+- aggregate summary computes rates
+- supports_short_bias true when outcome rates are favorable
+- live_ready false always
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R189/R188 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  | jq '.status, .target_context, .input_summary, .outcome_windows, .mapped_outcomes[0:5], .aggregate_summary, .outcome_mapping_status, .interpretation, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --record-mapping \
+  --confirm-crow-outcome-mapping "I CONFIRM CROW OUTCOME MAPPING PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .mapping_recorded, .input_summary, .aggregate_summary, .interpretation, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  crow-outcome-mapping-preview \
+  --record-mapping \
+  --confirm-crow-outcome-mapping "wrong" \
+  | jq '.status, .confirmation_valid, .mapping_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R193_CROW_OUTCOME_MAPPING_PREVIEW.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R193.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R194_CROW_OUTCOME_KETER_FEEDBACK.md
+
+R194 should:
+- feed R193 outcome mapping back into Keter/crow scoring
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, aggregate outcome summary, interpretation, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
