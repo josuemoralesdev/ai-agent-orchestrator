@@ -1964,6 +1964,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-matrix-after-crow-outcome-feedback":
+        from src.app.hammer_radar.operator.lane_matrix_after_crow_outcome_feedback import (
+            build_lane_matrix_after_crow_outcome_feedback,
+            format_lane_matrix_after_crow_outcome_feedback_json,
+        )
+
+        print(
+            format_lane_matrix_after_crow_outcome_feedback_json(
+                build_lane_matrix_after_crow_outcome_feedback(
+                    log_dir=args.log_dir,
+                    record_matrix=args.record_matrix,
+                    confirm_lane_matrix_after_crow_outcome=args.confirm_lane_matrix_after_crow_outcome,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3467,6 +3482,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     crow_outcome_keter_feedback_parser.add_argument("--record-feedback", action="store_true")
     crow_outcome_keter_feedback_parser.add_argument("--confirm-crow-outcome-keter-feedback", default=None)
+
+    lane_matrix_after_crow_outcome_feedback_parser = subparsers.add_parser(
+        "lane-matrix-after-crow-outcome-feedback",
+        parents=[parent],
+    )
+    lane_matrix_after_crow_outcome_feedback_parser.add_argument("--record-matrix", action="store_true")
+    lane_matrix_after_crow_outcome_feedback_parser.add_argument(
+        "--confirm-lane-matrix-after-crow-outcome",
+        default=None,
+    )
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
