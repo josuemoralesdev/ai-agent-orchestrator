@@ -1,0 +1,372 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R186 Three Black Crows Feed Integration and Paper Tagging
+
+BRANCH:
+r186-three-black-crows-feed-integration-paper-tagging
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: NEW CAPABILITY, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R185 created the Three Black Crows detector preview.
+
+R185 result:
+- detector exists
+- signal_origin=three_black_crows
+- paper_only=true
+- live_authorized=false
+- detector_status=MISSING_OHLC_FEED
+- no fake detections
+- no Binance calls
+- no config writes
+- no live execution
+
+R186 must connect the detector to any existing local candle/OHLC surfaces or create a local paper-only candle feed adapter from existing signal/scan logs if real OHLC is unavailable.
+
+The purpose is not to trade.
+The purpose is to let Three Black Crows begin producing paper-only tags when local candle data exists.
+
+CRITICAL SAFETY:
+This phase is feed integration and paper tagging only.
+It must NOT:
+- call Binance
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote Three Black Crows to trade-ready
+
+TARGET:
+Primary:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Signal origin:
+three_black_crows
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/three_black_crows_detector.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/candles.ndjson if present
+- logs/hammer_radar_forward/ohlc.ndjson if present
+- logs/hammer_radar_forward/klines.ndjson if present
+- logs/hammer_radar_forward/*candles*.ndjson if present
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson usage patterns
+- tests/hammer_radar/test_three_black_crows_detector.py
+- tests/hammer_radar/test_signal_origin_registry.py
+- tests/hammer_radar/test_signal_origin_lane_matrix.py
+- docs/hammer_radar/live_readiness/R185_THREE_BLACK_CROWS_DETECTOR_PREVIEW.md
+
+REUSE / EXTEND:
+Reuse R185 detector.
+Reuse existing local logs only.
+Do not build Binance client.
+Do not call network.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/three_black_crows_feed_integration.py
+
+Expose:
+- build_three_black_crows_feed_integration
+- discover_local_candle_feeds
+- load_local_candle_records
+- normalize_local_candle_record
+- build_synthetic_candle_candidates_from_signal_logs_if_safe
+- run_three_black_crows_detector_on_feed
+- tag_three_black_crows_paper_candidates
+- build_three_black_crows_paper_tag_summary
+- append_three_black_crows_feed_integration_record
+- load_three_black_crows_feed_integration_records
+- summarize_three_black_crows_feed_integrations
+
+STATUS ENUM:
+- THREE_BLACK_CROWS_FEED_INTEGRATION_READY
+- THREE_BLACK_CROWS_FEED_INTEGRATION_REJECTED
+- THREE_BLACK_CROWS_FEED_INTEGRATION_RECORDED
+- THREE_BLACK_CROWS_FEED_INTEGRATION_BLOCKED
+- THREE_BLACK_CROWS_FEED_INTEGRATION_ERROR
+
+FEED STATUS ENUM:
+- LOCAL_OHLC_FEED_FOUND
+- LOCAL_OHLC_FEED_MISSING
+- SYNTHETIC_SIGNAL_FEED_AVAILABLE
+- INSUFFICIENT_CANDLE_DATA
+- DETECTIONS_TAGGED
+- NO_DETECTIONS_FOUND
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+IMPORTANT ABOUT SYNTHETIC CANDLES:
+If real OHLC candle data is not available:
+- Do NOT fake OHLC values.
+- A synthetic signal feed may only produce "candidate context" records, not valid candle detections.
+- three_black_crows detector must remain blocked for true detection unless real open/high/low/close exists.
+- Any synthetic context must be clearly marked:
+  "not_valid_for_three_black_crows_detection": true
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "integration_recorded": false,
+  "integration_id": null,
+  "record_integration_requested": false,
+  "confirmation_valid": false,
+  "target_context": {
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "signal_origin": "three_black_crows"
+  },
+  "feed_discovery": {
+    "local_ohlc_feed_found": true/false,
+    "source_files_checked": [...],
+    "source_files_used": [...],
+    "records_loaded": ...
+  },
+  "detector_result": {
+    "detector_status": "...",
+    "detections_found": ...,
+    "latest_detection_at": null,
+    "mode": "strict|loose_preview",
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "paper_tags": {
+    "tags_created": ...,
+    "tags": [
+      {
+        "signal_origin": "three_black_crows",
+        "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+        "paper_only": true,
+        "live_authorized": false
+      }
+    ]
+  },
+  "feed_status": "...",
+  "blockers": [...],
+  "recommended_next_operator_move": "KEEP_MULTI_LANE_HARVESTER_RUNNING|RUN_R187_LOCAL_CANDLE_FEED_CAPTURE_PREVIEW|RUN_R184_AFTER_CROW_TAGS",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/three_black_crows_feed_integration.ndjson
+logs/hammer_radar_forward/three_black_crows_paper_tags.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM THREE BLACK CROWS FEED INTEGRATION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+three-black-crows-feed-integration
+
+Args:
+- --symbol default BTCUSDT
+- --timeframe default 8m
+- --mode strict|loose_preview, default strict
+- --latest-candles <int>, default 500
+- --record-integration
+- --confirm-three-black-crows-feed-integration <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --mode strict \
+  --latest-candles 500
+
+Loose preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --mode loose_preview \
+  --latest-candles 500
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --record-integration \
+  --confirm-three-black-crows-feed-integration "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --mode strict \
+  --latest-candles 500 \
+  --record-integration \
+  --confirm-three-black-crows-feed-integration "I CONFIRM THREE BLACK CROWS FEED INTEGRATION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_three_black_crows_feed_integration.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records integration only
+- discovers local OHLC feed when mocked file exists
+- blocks when no OHLC feed exists
+- does not fake OHLC from signal logs
+- detector runs on real mocked OHLC feed
+- tags three_black_crows paper candidates when detections exist
+- paper tags are paper_only and live_authorized false
+- no signal origin promoted
+- no lane promoted
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module, detector module, and inspect.py.
+Run focused test.
+Run related detector / registry / Keter / matrix tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Strict preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --mode strict \
+  --latest-candles 500 \
+  | jq '.status, .target_context, .feed_discovery, .detector_result, .paper_tags, .feed_status, .blockers, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Loose preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --symbol BTCUSDT \
+  --timeframe 8m \
+  --mode loose_preview \
+  --latest-candles 500 \
+  | jq '.status, .feed_status, .feed_discovery, .detector_result, .paper_tags, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  three-black-crows-feed-integration \
+  --record-integration \
+  --confirm-three-black-crows-feed-integration "wrong" \
+  | jq '.status, .confirmation_valid, .integration_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R186_THREE_BLACK_CROWS_FEED_INTEGRATION_AND_PAPER_TAGGING.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R186.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R187_LOCAL_CANDLE_FEED_CAPTURE_PREVIEW_NO_BINANCE.md
+
+R187 should:
+- determine how to create/consume local OHLC candle feed without Binance calls
+- possibly derive from existing market data logs if valid OHLC exists
+- no live execution
+- no config writes
+- no Binance calls
+
+REPORT:
+Files changed, tests, smoke, safety, feed status, tags created, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.
