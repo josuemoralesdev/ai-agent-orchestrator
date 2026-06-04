@@ -1843,6 +1843,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "local-candle-feed-adapter":
+        from src.app.hammer_radar.operator.local_candle_feed_adapter import (
+            build_local_candle_feed_adapter_preview,
+            format_local_candle_feed_adapter_json,
+        )
+
+        print(
+            format_local_candle_feed_adapter_json(
+                build_local_candle_feed_adapter_preview(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    latest_candles=args.latest_candles,
+                    record_adapter=args.record_adapter,
+                    confirm_local_candle_feed_adapter=args.confirm_local_candle_feed_adapter,
+                    write_normalized_feed=args.write_normalized_feed,
+                    confirm_normalized_candle_feed_write=args.confirm_normalized_candle_feed_write,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3274,6 +3294,18 @@ def _build_parser() -> argparse.ArgumentParser:
     local_candle_feed_preview_parser.add_argument("--latest-candles", type=int, default=500)
     local_candle_feed_preview_parser.add_argument("--record-preview", action="store_true")
     local_candle_feed_preview_parser.add_argument("--confirm-local-candle-feed-preview", default=None)
+
+    local_candle_feed_adapter_parser = subparsers.add_parser(
+        "local-candle-feed-adapter",
+        parents=[parent],
+    )
+    local_candle_feed_adapter_parser.add_argument("--symbol", default="BTCUSDT")
+    local_candle_feed_adapter_parser.add_argument("--timeframe", default="8m")
+    local_candle_feed_adapter_parser.add_argument("--latest-candles", type=int, default=500)
+    local_candle_feed_adapter_parser.add_argument("--record-adapter", action="store_true")
+    local_candle_feed_adapter_parser.add_argument("--confirm-local-candle-feed-adapter", default=None)
+    local_candle_feed_adapter_parser.add_argument("--write-normalized-feed", action="store_true")
+    local_candle_feed_adapter_parser.add_argument("--confirm-normalized-candle-feed-write", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
