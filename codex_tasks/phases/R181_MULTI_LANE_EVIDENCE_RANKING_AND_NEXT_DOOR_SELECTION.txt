@@ -1,0 +1,372 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R181 Multi-Lane Evidence Ranking and Next Door Selection
+
+BRANCH:
+r181-multi-lane-evidence-ranking-next-door-selection
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R180 created a multi-lane paper capture harvester.
+
+R180 expanded paper evidence collection beyond only:
+BTCUSDT|8m|short|ladder_close_50_618
+
+R180 scope includes paper lanes:
+- BTCUSDT|4m|long|ladder_close_50_618
+- BTCUSDT|4m|short|ladder_close_50_618
+- BTCUSDT|8m|long|ladder_close_50_618
+- BTCUSDT|8m|short|ladder_close_50_618
+- BTCUSDT|13m|short|ladder_close_50_618
+- BTCUSDT|44m|short|ladder_close_50_618
+
+And observed tiny-live reference lanes:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+R180 preview showed:
+- 8m short currently remains lead by fresh capture count
+- 8m short has 3 / 10 fresh captures
+- other expanded lanes have 0 fresh captures so far, but many stale records
+- broader paper harvesting is now possible
+- no live execution
+- no Binance calls
+- no config mutation
+
+R181 must rank the multi-lane evidence and select the next candidate door.
+
+PURPOSE:
+Create a multi-lane evidence ranking surface that:
+1. Reads multi-lane harvester records.
+2. Reads single-lane 8m short capture records.
+3. Reads expanded paper watch records.
+4. Reads historical paper outcome/performance records where available.
+5. Ranks paper lanes by fresh flow, capture count, historical edge, and readiness.
+6. Compares 8m short against all other expanded paper lanes.
+7. Selects the next best tiny-live candidate door.
+8. Produces a clear recommendation:
+   - keep 8m short as lead
+   - switch lead to another paper lane
+   - keep harvesting because evidence is insufficient
+9. Does not call Binance.
+10. Does not write config.
+11. Does not change lane mode.
+12. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is ranking/audit only.
+It must NOT:
+- set any lane tiny_live
+- write lane config
+- write risk contract config
+- call Binance
+- place orders
+- create executable payloads
+- enable live execution
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/evidence_threshold_recheck_8m_short.py
+- src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/short_strategy_packet.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson usage patterns
+- logs/hammer_radar_forward/multi_lane_paper_harvester_heartbeats.ndjson usage patterns
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- logs/hammer_radar_forward/outcomes.ndjson usage patterns
+- logs/hammer_radar_forward/paper_executions.ndjson usage patterns
+- tests/hammer_radar/test_multi_lane_paper_capture_harvester.py
+- tests/hammer_radar/test_capture_count_sync_8m_short.py
+- tests/hammer_radar/test_promotion_candidate_audit.py
+- docs/hammer_radar/live_readiness/R180_MULTI_LANE_PAPER_CAPTURE_HARVESTER.md
+
+REUSE / EXTEND:
+Reuse R180 lane scope and capture records.
+Reuse R154 promotion candidate audit where useful.
+Reuse R155 full-spectrum review where useful.
+Reuse R176 8m short capture counts.
+Do not duplicate signal parsing if helpers exist.
+Do not mutate config.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+
+Expose:
+- build_multi_lane_evidence_ranking
+- load_multi_lane_harvest_records
+- load_single_lane_capture_records
+- build_lane_evidence_summary
+- build_lane_historical_performance_summary
+- score_lane_candidate
+- classify_lane_readiness
+- build_next_door_selection
+- build_ranking_blockers
+- append_multi_lane_evidence_ranking_record
+- load_multi_lane_evidence_ranking_records
+- summarize_multi_lane_evidence_rankings
+
+STATUS ENUM:
+- MULTI_LANE_EVIDENCE_RANKING_READY
+- MULTI_LANE_EVIDENCE_RANKING_REJECTED
+- MULTI_LANE_EVIDENCE_RANKING_RECORDED
+- MULTI_LANE_EVIDENCE_RANKING_BLOCKED
+- MULTI_LANE_EVIDENCE_RANKING_ERROR
+
+READINESS ENUM:
+- KEEP_HARVESTING_INSUFFICIENT_EVIDENCE
+- EIGHT_M_SHORT_REMAINS_LEAD
+- NEW_LANE_CANDIDATE_EMERGED
+- ONE_OR_MORE_LANES_READY_FOR_EVIDENCE_RECHECK
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+LANE SCORING:
+Score should consider:
+- fresh_capture_count
+- fresh_capture_threshold progress
+- fresh_by_lane from multi-lane harvester
+- stale_by_lane, as activity but not readiness
+- historical paper outcome count
+- win_rate_pct
+- avg_pnl_pct
+- total_pnl_pct
+- direction pressure
+- whether lane is paper or observed tiny-live reference
+- whether lane already has short strategy/risk scaffolding
+
+Suggested score bands:
+- 0-39: weak
+- 40-59: keep harvesting
+- 60-74: watchlist
+- 75-84: candidate for evidence recheck
+- 85+: strong next-door candidate, still paper-only
+
+Important:
+Do not let stale count alone make a lane “ready.”
+Do not let tiny-live reference lanes become new candidate doors automatically.
+Do not promote any lane.
+Do not write config.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "ranking_recorded": false,
+  "ranking_id": null,
+  "record_ranking_requested": false,
+  "confirmation_valid": false,
+  "ranked_lanes": [
+    {
+      "lane_key": "...",
+      "mode": "paper|tiny_live_observed_reference",
+      "fresh_capture_count": ...,
+      "fresh_threshold_required": 10,
+      "fresh_threshold_met": false,
+      "historical_win_rate_pct": null,
+      "avg_pnl_pct": null,
+      "paper_outcome_count": null,
+      "score": ...,
+      "readiness": "...",
+      "why": "...",
+      "blockers": [...]
+    }
+  ],
+  "current_lead": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "reason": "...",
+    "fresh_capture_count": 3
+  },
+  "next_door_selection": {
+    "selected_lane": "...",
+    "selection_type": "KEEP_8M_SHORT|NEW_LANE_CANDIDATE|KEEP_HARVESTING",
+    "confidence": "LOW|MEDIUM|HIGH",
+    "why": "...",
+    "next_required_phase": "R177|R182|R183|R184"
+  },
+  "harvest_summary": {
+    "multi_lane_records_found": ...,
+    "latest_harvest_status": "...",
+    "lanes_with_fresh_flow": [...],
+    "lanes_with_only_stale_activity": [...]
+  },
+  "blockers": [...],
+  "recommended_next_operator_move": "KEEP_MULTI_LANE_HARVESTER_RUNNING|KEEP_8M_SHORT_WATCHER_RUNNING|RUN_R182_SIGNAL_ORIGIN_REGISTRY|RUN_R177_IF_8M_SHORT_REACHES_10",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+
+LEDGER:
+logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM MULTI LANE EVIDENCE RANKING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+multi-lane-evidence-ranking
+
+Args:
+- --record-ranking
+- --confirm-multi-lane-ranking <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-evidence-ranking
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-evidence-ranking \
+  --record-ranking \
+  --confirm-multi-lane-ranking "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-evidence-ranking \
+  --record-ranking \
+  --confirm-multi-lane-ranking "I CONFIRM MULTI LANE EVIDENCE RANKING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_multi_lane_evidence_ranking.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- 8m short remains lead when it has highest fresh capture count
+- new lane candidate emerges when mocked fresh captures exceed 8m short
+- stale count alone does not make lane ready
+- tiny-live observed reference does not auto-promote
+- ranking includes score and readiness
+- next door selection works
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related multi-lane harvester / capture count / promotion audit tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-evidence-ranking \
+  | jq '.status, .ranked_lanes[0:8], .current_lead, .next_door_selection, .harvest_summary, .blockers, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-evidence-ranking \
+  --record-ranking \
+  --confirm-multi-lane-ranking "wrong" \
+  | jq '.status, .confirmation_valid, .ranking_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R181_MULTI_LANE_EVIDENCE_RANKING_AND_NEXT_DOOR_SELECTION.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R181.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R182_SIGNAL_ORIGIN_REGISTRY_AND_PATTERN_FEED_EXPANSION.md
+
+R182 should:
+- create signal origin registry
+- include hammer, three black crows, engulfing, RSI divergence, golden pocket rejection
+- paper-only tagging/scoring
+- no live execution
+- no config writes
+
+REPORT:
+Files changed, tests, smoke, safety, ranked lanes, next door, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.

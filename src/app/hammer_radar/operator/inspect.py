@@ -1721,6 +1721,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "multi-lane-evidence-ranking":
+        from src.app.hammer_radar.operator.multi_lane_evidence_ranking import (
+            build_multi_lane_evidence_ranking,
+            format_multi_lane_evidence_ranking_json,
+        )
+
+        print(
+            format_multi_lane_evidence_ranking_json(
+                build_multi_lane_evidence_ranking(
+                    log_dir=args.log_dir,
+                    record_ranking=args.record_ranking,
+                    confirm_multi_lane_ranking=args.confirm_multi_lane_ranking,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3086,6 +3101,13 @@ def _build_parser() -> argparse.ArgumentParser:
     multi_lane_harvester_parser.add_argument("--run-harvester-loop", action="store_true")
     multi_lane_harvester_parser.add_argument("--record-harvest", action="store_true")
     multi_lane_harvester_parser.add_argument("--confirm-multi-lane-harvest", default=None)
+
+    multi_lane_evidence_ranking_parser = subparsers.add_parser(
+        "multi-lane-evidence-ranking",
+        parents=[parent],
+    )
+    multi_lane_evidence_ranking_parser.add_argument("--record-ranking", action="store_true")
+    multi_lane_evidence_ranking_parser.add_argument("--confirm-multi-lane-ranking", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
