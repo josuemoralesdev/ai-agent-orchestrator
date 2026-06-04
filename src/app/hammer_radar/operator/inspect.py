@@ -1882,6 +1882,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "signal-origin-feedback-sync":
+        from src.app.hammer_radar.operator.signal_origin_feedback_sync import (
+            build_signal_origin_feedback_sync_after_three_black_crows,
+            format_signal_origin_feedback_sync_json,
+        )
+
+        print(
+            format_signal_origin_feedback_sync_json(
+                build_signal_origin_feedback_sync_after_three_black_crows(
+                    log_dir=args.log_dir,
+                    signal_origin=args.signal_origin,
+                    lane_key=args.lane_key,
+                    record_feedback=args.record_feedback,
+                    confirm_signal_origin_feedback_sync=args.confirm_signal_origin_feedback_sync,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3343,6 +3360,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--confirm-three-black-crows-local-detection",
         default=None,
     )
+
+    signal_origin_feedback_sync_parser = subparsers.add_parser(
+        "signal-origin-feedback-sync",
+        parents=[parent],
+    )
+    signal_origin_feedback_sync_parser.add_argument("--signal-origin", default="three_black_crows")
+    signal_origin_feedback_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
+    signal_origin_feedback_sync_parser.add_argument("--record-feedback", action="store_true")
+    signal_origin_feedback_sync_parser.add_argument("--confirm-signal-origin-feedback-sync", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",

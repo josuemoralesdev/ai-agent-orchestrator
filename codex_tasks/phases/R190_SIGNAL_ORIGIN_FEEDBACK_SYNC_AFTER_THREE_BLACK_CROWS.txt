@@ -1,0 +1,386 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R190 Signal Origin Feedback Sync After Three Black Crows
+
+BRANCH:
+r190-signal-origin-feedback-sync-after-three-black-crows
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R189 turned Three Black Crows from registry-only concept into paper-detected local evidence.
+
+R189 result:
+- signal_origin: three_black_crows
+- lane: BTCUSDT|8m|short|ladder_close_50_618
+- local feed: logs/hammer_radar_forward/candle_archive/BTCUSDT_8m.ndjson
+- strict detections: 5
+- loose detections: 18
+- paper tags recorded: 23
+- latest detection: 2026-06-04T07:19:59.999000+00:00
+- live_authorized=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- no Binance/network calls
+- no orders
+- no config writes
+
+Before R189:
+- R182 registry marked three_black_crows as REGISTRY_ONLY.
+- R183 Keter scoring marked three_black_crows as HIGH detector priority, but not trade-ready.
+- R184 matrix marked BTCUSDT|8m|short + three_black_crows as detector-priority, not ready.
+
+R190 must sync the R189 local detection evidence back into the signal-origin feedback stack:
+- registry feedback
+- Keter scoring feedback
+- lane matrix feedback
+
+But R190 must NOT promote it to live or mutate config.
+
+PURPOSE:
+Create a signal-origin feedback sync surface that:
+1. Reads R189 Three Black Crows local detection records.
+2. Reads R189 paper tags.
+3. Summarizes detector evidence for three_black_crows.
+4. Produces a feedback recommendation:
+   - previous availability: REGISTRY_ONLY
+   - new evidence: local detector evidence exists
+   - recommended future status: DETECTOR_AVAILABLE_AFTER_REVIEW
+5. Updates scoring/matrix context through append-only feedback records only.
+6. Recommends whether to rerun R183/R184 after feedback.
+7. Does not edit registry source config.
+8. Does not promote signal origin.
+9. Does not promote lane.
+10. Does not call Binance.
+11. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is append-only feedback/audit only.
+It must NOT:
+- call Binance
+- call any network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate registry config
+- promote signal origins
+- promote lanes
+
+TARGET:
+Signal origin:
+three_black_crows
+
+Primary lane:
+BTCUSDT|8m|short|ladder_close_50_618
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote three_black_crows to live.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/three_black_crows_detector.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/three_black_crows_local_detections.ndjson usage patterns
+- logs/hammer_radar_forward/three_black_crows_paper_tags.ndjson usage patterns
+- logs/hammer_radar_forward/signal_origin_registry.ndjson usage patterns
+- logs/hammer_radar_forward/keter_signal_origin_scoring.ndjson usage patterns
+- logs/hammer_radar_forward/signal_origin_lane_matrix.ndjson usage patterns
+- tests/hammer_radar/test_three_black_crows_local_feed_detection.py
+- tests/hammer_radar/test_signal_origin_registry.py
+- tests/hammer_radar/test_keter_signal_origin_scoring.py
+- tests/hammer_radar/test_signal_origin_lane_matrix.py
+- docs/hammer_radar/live_readiness/R189_THREE_BLACK_CROWS_DETECTION_ON_LOCAL_FEED.md
+
+REUSE / EXTEND:
+Reuse R189 detection/tag ledgers.
+Reuse R182/R183/R184 concepts.
+Do not rewrite detector logic.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/signal_origin_feedback_sync.py
+
+Expose:
+- build_signal_origin_feedback_sync_after_three_black_crows
+- load_three_black_crows_detection_records
+- load_three_black_crows_paper_tags
+- build_three_black_crows_feedback_summary
+- build_registry_feedback_recommendation
+- build_keter_feedback_recommendation
+- build_lane_matrix_feedback_recommendation
+- classify_signal_origin_feedback_status
+- append_signal_origin_feedback_sync_record
+- load_signal_origin_feedback_sync_records
+- summarize_signal_origin_feedback_sync_records
+
+STATUS ENUM:
+- SIGNAL_ORIGIN_FEEDBACK_SYNC_READY
+- SIGNAL_ORIGIN_FEEDBACK_SYNC_REJECTED
+- SIGNAL_ORIGIN_FEEDBACK_SYNC_RECORDED
+- SIGNAL_ORIGIN_FEEDBACK_SYNC_BLOCKED
+- SIGNAL_ORIGIN_FEEDBACK_SYNC_ERROR
+
+FEEDBACK STATUS ENUM:
+- DETECTOR_EVIDENCE_AVAILABLE_REVIEW_REQUIRED
+- NO_DETECTION_RECORDS_FOUND
+- PAPER_TAGS_FOUND
+- PAPER_TAGS_MISSING
+- READY_TO_RERUN_KETER_AND_MATRIX
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "feedback_recorded": false,
+  "feedback_id": null,
+  "record_feedback_requested": false,
+  "confirmation_valid": false,
+  "target_context": {
+    "signal_origin": "three_black_crows",
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short"
+  },
+  "three_black_crows_feedback_summary": {
+    "detection_records_found": ...,
+    "paper_tags_found": ...,
+    "strict_detections_found": ...,
+    "loose_detections_found": ...,
+    "latest_detection_at": "...",
+    "latest_tag_at": "...",
+    "local_detector_available": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "registry_feedback": {
+    "previous_availability": "REGISTRY_ONLY",
+    "recommended_future_availability": "DETECTOR_AVAILABLE_AFTER_REVIEW",
+    "write_registry_now": false,
+    "requires_review": true,
+    "signal_origin_promoted": false
+  },
+  "keter_feedback": {
+    "rerun_keter_scoring_recommended": true,
+    "expected_effect": "three_black_crows should move from detector priority only toward paper-tracking candidate after review",
+    "write_scoring_now": false
+  },
+  "lane_matrix_feedback": {
+    "rerun_lane_matrix_recommended": true,
+    "target_pair": "BTCUSDT|8m|short|ladder_close_50_618 + three_black_crows",
+    "expected_effect": "pair may become paper-tracking candidate after Keter review, still not live",
+    "write_matrix_now": false
+  },
+  "feedback_status": "...",
+  "blockers": [...],
+  "recommended_next_operator_move": "RUN_R191_KETER_RESCORING_AFTER_THREE_BLACK_CROWS|KEEP_MULTI_LANE_HARVESTER_RUNNING|KEEP_8M_SHORT_WATCHER_RUNNING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/signal_origin_feedback_sync.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM SIGNAL ORIGIN FEEDBACK SYNC RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+signal-origin-feedback-sync
+
+Args:
+- --signal-origin default three_black_crows
+- --lane-key default BTCUSDT|8m|short|ladder_close_50_618
+- --record-feedback
+- --confirm-signal-origin-feedback-sync <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --signal-origin three_black_crows \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618"
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --record-feedback \
+  --confirm-signal-origin-feedback-sync "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --signal-origin three_black_crows \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --record-feedback \
+  --confirm-signal-origin-feedback-sync "I CONFIRM SIGNAL ORIGIN FEEDBACK SYNC RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_signal_origin_feedback_sync.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records feedback only
+- detection records found produces detector evidence available
+- paper tags found are counted
+- missing detections blocks
+- registry feedback does not write config
+- signal_origin_promoted false
+- lane_promoted false
+- recommends rerun Keter/matrix
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R189/R183/R184/R182 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --signal-origin three_black_crows \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  | jq '.status, .target_context, .three_black_crows_feedback_summary, .registry_feedback, .keter_feedback, .lane_matrix_feedback, .feedback_status, .blockers, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --signal-origin three_black_crows \
+  --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+  --record-feedback \
+  --confirm-signal-origin-feedback-sync "I CONFIRM SIGNAL ORIGIN FEEDBACK SYNC RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .feedback_recorded, .three_black_crows_feedback_summary, .feedback_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  signal-origin-feedback-sync \
+  --record-feedback \
+  --confirm-signal-origin-feedback-sync "wrong" \
+  | jq '.status, .confirmation_valid, .feedback_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R190_SIGNAL_ORIGIN_FEEDBACK_SYNC_AFTER_THREE_BLACK_CROWS.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R190.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R191_KETER_RESCORING_AFTER_THREE_BLACK_CROWS.md
+
+R191 should:
+- rescore Keter after Three Black Crows detector evidence
+- no config writes
+- no live execution
+- no Binance/network calls
+- still paper-only
+
+REPORT:
+Files changed, tests, smoke, safety, feedback summary, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
