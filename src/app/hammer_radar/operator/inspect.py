@@ -1899,6 +1899,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "keter-rescore-after-three-black-crows":
+        from src.app.hammer_radar.operator.keter_rescoring_after_three_black_crows import (
+            build_keter_rescoring_after_three_black_crows,
+            format_keter_rescore_after_three_black_crows_json,
+        )
+
+        print(
+            format_keter_rescore_after_three_black_crows_json(
+                build_keter_rescoring_after_three_black_crows(
+                    log_dir=args.log_dir,
+                    record_rescore=args.record_rescore,
+                    confirm_keter_rescore_after_crows=args.confirm_keter_rescore_after_crows,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3369,6 +3384,13 @@ def _build_parser() -> argparse.ArgumentParser:
     signal_origin_feedback_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     signal_origin_feedback_sync_parser.add_argument("--record-feedback", action="store_true")
     signal_origin_feedback_sync_parser.add_argument("--confirm-signal-origin-feedback-sync", default=None)
+
+    keter_rescore_after_three_black_crows_parser = subparsers.add_parser(
+        "keter-rescore-after-three-black-crows",
+        parents=[parent],
+    )
+    keter_rescore_after_three_black_crows_parser.add_argument("--record-rescore", action="store_true")
+    keter_rescore_after_three_black_crows_parser.add_argument("--confirm-keter-rescore-after-crows", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
