@@ -1,0 +1,429 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R180 Multi-Lane Paper Capture Harvester
+
+BRANCH:
+r180-multi-lane-paper-capture-harvester
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R175/R176/R177/R178/R179 built a strong path around:
+BTCUSDT|8m|short|ladder_close_50_618
+
+Current known state:
+- 8m short fresh captures: 3 / 10
+- 8m short watcher is running and supervised
+- 8m short remains paper
+- tiny-live remains blocked by evidence/funding/risk contract/lane mode/operator approval/live flags
+
+But the operator correctly identified a flow problem:
+- Telegram/signals are active across many lanes.
+- A narrow watcher only captures BTCUSDT 8m short.
+- If the market is producing fresh candidates elsewhere, we are ignoring useful paper evidence.
+- Waiting only on 8m short could slow tiny-live unnecessarily.
+- We need to harvest the whole paper spectrum and let evidence decide which door is actually alive.
+
+R180 must build a multi-lane paper-only capture harvester.
+
+PURPOSE:
+Create a paper-only harvester that watches expanded BTCUSDT paper lanes across direction/timeframe and captures fresh paper evidence for each lane.
+
+It must answer:
+1. Which expanded paper lanes are producing fresh candidates?
+2. Which direction/timeframe is most active?
+3. Is 8m short still the lead candidate?
+4. Did another lane overtake it in fresh evidence flow?
+5. How many captures exist per lane?
+6. Which lanes should continue paper collection?
+7. Which lane deserves the next evidence-readiness review?
+8. No live execution.
+
+CRITICAL SAFETY:
+This phase is paper evidence harvesting only.
+It must NOT:
+- call Binance
+- place orders
+- create order payloads
+- enable live
+- write config
+- change lane modes
+- set any lane tiny_live
+- transfer or withdraw
+
+TARGET SCOPE:
+BTCUSDT expanded paper lanes from lane_controls.json and/or expanded paper config.
+
+At minimum include:
+- BTCUSDT|4m|long|ladder_close_50_618
+- BTCUSDT|4m|short|ladder_close_50_618
+- BTCUSDT|8m|long|ladder_close_50_618
+- BTCUSDT|8m|short|ladder_close_50_618
+- BTCUSDT|13m|short|ladder_close_50_618
+- BTCUSDT|44m|short|ladder_close_50_618
+
+Also observe current tiny-live incumbents as references only:
+- BTCUSDT|13m|long|ladder_close_50_618
+- BTCUSDT|44m|long|ladder_close_50_618
+
+IMPORTANT:
+- Paper-only harvest lanes may include both long and short.
+- Tiny-live incumbent lanes may be observed but not modified.
+- No lane promotion in this phase.
+- No live authorization in this phase.
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/capture_watcher_supervisor_8m_short.py
+- src/app/hammer_radar/operator/evidence_threshold_recheck_8m_short.py
+- src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+- src/app/hammer_radar/operator/entry_mode_derivation_bridge.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/signals.ndjson usage patterns
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson usage patterns
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson usage patterns
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson usage patterns
+- tests/hammer_radar/test_expanded_paper_watch.py
+- tests/hammer_radar/test_capture_count_sync_8m_short.py
+- tests/hammer_radar/test_short_paper_evidence_capture_loop.py
+- docs/hammer_radar/live_readiness/R176_CAPTURE_COUNT_SYNC_8M_SHORT.md
+- docs/hammer_radar/live_readiness/R179_CAPTURE_WATCHER_SUPERVISOR_8M_SHORT.md
+
+REUSE / EXTEND:
+Reuse R153 expanded paper watch logic.
+Reuse R145 entry-mode normalization.
+Reuse R176 capture count concepts.
+Reuse R157 capture ledger style.
+Do not duplicate signal parsing if existing helpers exist.
+Do not mutate configs.
+Do not call Binance.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+
+Expose:
+- build_multi_lane_paper_capture_harvester_preview
+- build_multi_lane_harvest_scope
+- evaluate_multi_lane_paper_candidates
+- capture_multi_lane_paper_evidence_once
+- run_multi_lane_paper_harvester_loop
+- build_multi_lane_capture_summary
+- build_lane_capture_counts
+- build_harvester_heartbeat_record
+- append_multi_lane_harvester_record
+- append_multi_lane_harvester_heartbeat
+- load_multi_lane_harvester_records
+- summarize_multi_lane_harvester_records
+- classify_multi_lane_harvest_status
+- build_next_lane_candidate_recommendation
+
+STATUS ENUM:
+- MULTI_LANE_PAPER_HARVESTER_PREVIEW
+- MULTI_LANE_PAPER_HARVESTER_READY
+- MULTI_LANE_PAPER_HARVESTER_REJECTED
+- MULTI_LANE_PAPER_HARVESTER_RECORDED
+- MULTI_LANE_PAPER_HARVESTER_TIMEOUT
+- MULTI_LANE_PAPER_HARVESTER_CAPTURED
+- MULTI_LANE_PAPER_HARVESTER_BLOCKED
+- MULTI_LANE_PAPER_HARVESTER_ERROR
+
+HARVEST STATUS ENUM:
+- NO_FRESH_CANDIDATES
+- CAPTURED_ONE_OR_MORE_LANES
+- EIGHT_M_SHORT_STILL_LEAD
+- NEW_LANE_CANDIDATE_EMERGED
+- THRESHOLD_MET_FOR_ONE_OR_MORE_LANES
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+HEARTBEAT STATUSES:
+- MULTI_LANE_HARVEST_ITERATION_STARTED
+- MULTI_LANE_HARVEST_ITERATION_COMPLETED
+- MULTI_LANE_HARVEST_CAPTURED
+- MULTI_LANE_HARVEST_TIMEOUT
+- MULTI_LANE_HARVEST_EXITED
+
+DEFAULTS:
+- latest_signals: 1000
+- latest_scans: 2000
+- max_iterations: 60
+- sleep_seconds: 60
+- iteration_timeout_seconds: 30
+- heartbeat_every: 1
+- capture_threshold_per_lane: 10
+- max_captures_per_iteration: 10
+
+CAPTURE RULES:
+A capture is allowed only if:
+- symbol=BTCUSDT
+- lane exists in lane_controls.json or expanded scope
+- lane mode is paper OR lane is an incumbent tiny_live observed-only reference
+- for capture ledger, only paper lanes count toward paper evidence threshold unless explicitly observed-only
+- candidate timestamp is within lane freshness window
+- candidate matches normalized entry_mode ladder_close_50_618
+- candidate is not stale
+- no live permission implied
+
+For tiny-live incumbent observed-only lanes:
+- may count observations separately
+- must not produce live approval
+- must not mutate anything
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "harvest_id": "...",
+  "record_harvest_requested": false,
+  "confirmation_valid": false,
+  "harvest_recorded": false,
+  "watch_started": false,
+  "watch_completed": false,
+  "scope": {
+    "paper_lanes": [...],
+    "observed_tiny_live_lanes": [...],
+    "timeframes": [...],
+    "directions": ["long","short"]
+  },
+  "capture_summary": {
+    "total_fresh_candidates": ...,
+    "total_captured": ...,
+    "captured_lanes": [...],
+    "fresh_by_lane": {...},
+    "stale_by_lane": {...},
+    "blocked_by_lane": {...}
+  },
+  "lane_capture_counts": {
+    "BTCUSDT|8m|short|ladder_close_50_618": {
+      "fresh_capture_count": 3,
+      "required_fresh_capture_count": 10,
+      "threshold_met": false,
+      "latest_captured_signal_id": "..."
+    }
+  },
+  "next_lane_candidate_recommendation": {
+    "lead_lane": "...",
+    "reason": "...",
+    "eight_m_short_still_lead": true/false,
+    "new_lane_candidate_emerged": true/false
+  },
+  "harvest_status": "...",
+  "recommended_next_operator_move": "KEEP_MULTI_LANE_HARVESTER_RUNNING|START_MULTI_LANE_HARVESTER|RUN_R181_MULTI_LANE_EVIDENCE_RANKING|RUN_R177_IF_8M_SHORT_REACHES_10",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+
+LEDGERS:
+logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+logs/hammer_radar_forward/multi_lane_paper_harvester_heartbeats.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM MULTI LANE PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+multi-lane-paper-harvester
+
+Args:
+- --latest-signals <int>, default 1000
+- --latest-scans <int>, default 2000
+- --max-iterations <int>, default 60
+- --sleep-seconds <int>, default 60
+- --iteration-timeout-seconds <int>, default 30
+- --heartbeat-every <int>, default 1
+- --max-captures-per-iteration <int>, default 10
+- --run-harvester-loop
+- --record-harvest
+- --confirm-multi-lane-harvest <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --latest-signals 1000 \
+  --latest-scans 2000
+
+Short 2-iteration smoke loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-harvester-loop \
+  --record-harvest \
+  --confirm-multi-lane-harvest "I CONFIRM MULTI LANE PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --record-harvest \
+  --confirm-multi-lane-harvest "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_multi_lane_paper_capture_harvester.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records only
+- scope includes expanded paper long/short lanes
+- observed tiny_live lanes are separated from paper lanes
+- fresh candidates across multiple paper lanes can be captured
+- stale candidates are not captured
+- wrong symbol ignored
+- wrong entry_mode ignored or normalized when allowed
+- max captures per iteration respected
+- lane capture counts include 8m short and other lanes
+- lead lane recommendation works
+- no env/config mutation
+- no Binance calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related expanded paper / capture count / capture loop tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  | jq '.status, .scope, .capture_summary, .lane_capture_counts, .next_lane_candidate_recommendation, .harvest_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Short loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --latest-signals 1000 \
+  --latest-scans 2000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-harvester-loop \
+  --record-harvest \
+  --confirm-multi-lane-harvest "I CONFIRM MULTI LANE PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | tail -80
+
+Heartbeat check:
+tail -n 5 logs/hammer_radar_forward/multi_lane_paper_harvester_heartbeats.ndjson \
+  | jq '.status, .iteration, .max_iterations, .total_captured, .captured_lanes, .elapsed_seconds, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  multi-lane-paper-harvester \
+  --record-harvest \
+  --confirm-multi-lane-harvest "wrong" \
+  | jq '.status, .confirmation_valid, .harvest_recorded, .safety'
+
+Config/env unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R180_MULTI_LANE_PAPER_CAPTURE_HARVESTER.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R180.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R181_MULTI_LANE_EVIDENCE_RANKING_AND_NEXT_DOOR_SELECTION.md
+
+R181 should:
+- rank lanes using multi-lane harvester records
+- compare 8m short vs all other active paper lanes
+- select next best tiny-live candidate door
+- no live execution
+- no config writes
+
+REPORT:
+Files changed, tests, smoke, safety, lanes harvested, recommendation, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance calls.
+Do not perform live trading actions.

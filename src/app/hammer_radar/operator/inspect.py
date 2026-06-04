@@ -1697,6 +1697,30 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "multi-lane-paper-harvester":
+        from src.app.hammer_radar.operator.multi_lane_paper_capture_harvester import (
+            format_multi_lane_paper_harvester_json,
+            run_multi_lane_paper_harvester_loop,
+        )
+
+        print(
+            format_multi_lane_paper_harvester_json(
+                run_multi_lane_paper_harvester_loop(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    max_iterations=args.max_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    iteration_timeout_seconds=args.iteration_timeout_seconds,
+                    heartbeat_every=args.heartbeat_every,
+                    max_captures_per_iteration=args.max_captures_per_iteration,
+                    run_harvester_loop=args.run_harvester_loop,
+                    record_harvest=args.record_harvest,
+                    confirm_multi_lane_harvest=args.confirm_multi_lane_harvest,
+                    progress_fn=(lambda line: print(line, file=sys.stderr, flush=True)) if args.run_harvester_loop else None,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3047,6 +3071,21 @@ def _build_parser() -> argparse.ArgumentParser:
     expanded_paper_watch_parser.add_argument("--include-tiny-live-targets-as-observed", action="store_true")
     expanded_paper_watch_parser.add_argument("--record-watch", action="store_true")
     expanded_paper_watch_parser.add_argument("--confirm-expanded-paper-watch", default=None)
+
+    multi_lane_harvester_parser = subparsers.add_parser(
+        "multi-lane-paper-harvester",
+        parents=[parent],
+    )
+    multi_lane_harvester_parser.add_argument("--latest-signals", type=int, default=1000)
+    multi_lane_harvester_parser.add_argument("--latest-scans", type=int, default=2000)
+    multi_lane_harvester_parser.add_argument("--max-iterations", type=int, default=60)
+    multi_lane_harvester_parser.add_argument("--sleep-seconds", type=int, default=60)
+    multi_lane_harvester_parser.add_argument("--iteration-timeout-seconds", type=int, default=30)
+    multi_lane_harvester_parser.add_argument("--heartbeat-every", type=int, default=1)
+    multi_lane_harvester_parser.add_argument("--max-captures-per-iteration", type=int, default=10)
+    multi_lane_harvester_parser.add_argument("--run-harvester-loop", action="store_true")
+    multi_lane_harvester_parser.add_argument("--record-harvest", action="store_true")
+    multi_lane_harvester_parser.add_argument("--confirm-multi-lane-harvest", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
