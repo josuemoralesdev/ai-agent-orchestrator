@@ -1914,6 +1914,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-matrix-after-crow-rescoring":
+        from src.app.hammer_radar.operator.lane_matrix_after_crow_rescoring import (
+            build_lane_matrix_after_crow_rescoring,
+            format_lane_matrix_after_crow_rescoring_json,
+        )
+
+        print(
+            format_lane_matrix_after_crow_rescoring_json(
+                build_lane_matrix_after_crow_rescoring(
+                    log_dir=args.log_dir,
+                    record_matrix=args.record_matrix,
+                    confirm_lane_matrix_after_crow_rescore=args.confirm_lane_matrix_after_crow_rescore,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3391,6 +3406,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     keter_rescore_after_three_black_crows_parser.add_argument("--record-rescore", action="store_true")
     keter_rescore_after_three_black_crows_parser.add_argument("--confirm-keter-rescore-after-crows", default=None)
+
+    lane_matrix_after_crow_rescoring_parser = subparsers.add_parser(
+        "lane-matrix-after-crow-rescoring",
+        parents=[parent],
+    )
+    lane_matrix_after_crow_rescoring_parser.add_argument("--record-matrix", action="store_true")
+    lane_matrix_after_crow_rescoring_parser.add_argument("--confirm-lane-matrix-after-crow-rescore", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
