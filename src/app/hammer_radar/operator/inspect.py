@@ -1949,6 +1949,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "crow-outcome-keter-feedback":
+        from src.app.hammer_radar.operator.crow_outcome_keter_feedback import (
+            build_crow_outcome_keter_feedback,
+            format_crow_outcome_keter_feedback_json,
+        )
+
+        print(
+            format_crow_outcome_keter_feedback_json(
+                build_crow_outcome_keter_feedback(
+                    log_dir=args.log_dir,
+                    record_feedback=args.record_feedback,
+                    confirm_crow_outcome_keter_feedback=args.confirm_crow_outcome_keter_feedback,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3445,6 +3460,13 @@ def _build_parser() -> argparse.ArgumentParser:
     crow_outcome_mapping_parser.add_argument("--adverse-threshold-pct", type=float, default=0.10)
     crow_outcome_mapping_parser.add_argument("--record-mapping", action="store_true")
     crow_outcome_mapping_parser.add_argument("--confirm-crow-outcome-mapping", default=None)
+
+    crow_outcome_keter_feedback_parser = subparsers.add_parser(
+        "crow-outcome-keter-feedback",
+        parents=[parent],
+    )
+    crow_outcome_keter_feedback_parser.add_argument("--record-feedback", action="store_true")
+    crow_outcome_keter_feedback_parser.add_argument("--confirm-crow-outcome-keter-feedback", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
