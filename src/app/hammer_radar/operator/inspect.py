@@ -1806,6 +1806,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "three-black-crows-feed-integration":
+        from src.app.hammer_radar.operator.three_black_crows_feed_integration import (
+            build_three_black_crows_feed_integration,
+            format_three_black_crows_feed_integration_json,
+        )
+
+        print(
+            format_three_black_crows_feed_integration_json(
+                build_three_black_crows_feed_integration(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframe=args.timeframe,
+                    mode=args.mode,
+                    latest_candles=args.latest_candles,
+                    record_integration=args.record_integration,
+                    confirm_three_black_crows_feed_integration=args.confirm_three_black_crows_feed_integration,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3216,6 +3235,17 @@ def _build_parser() -> argparse.ArgumentParser:
     three_black_crows_detector_parser.add_argument("--latest-candles", type=int, default=500)
     three_black_crows_detector_parser.add_argument("--record-detector", action="store_true")
     three_black_crows_detector_parser.add_argument("--confirm-three-black-crows-detector", default=None)
+
+    three_black_crows_feed_integration_parser = subparsers.add_parser(
+        "three-black-crows-feed-integration",
+        parents=[parent],
+    )
+    three_black_crows_feed_integration_parser.add_argument("--symbol", default="BTCUSDT")
+    three_black_crows_feed_integration_parser.add_argument("--timeframe", default="8m")
+    three_black_crows_feed_integration_parser.add_argument("--mode", choices=["strict", "loose_preview"], default="strict")
+    three_black_crows_feed_integration_parser.add_argument("--latest-candles", type=int, default=500)
+    three_black_crows_feed_integration_parser.add_argument("--record-integration", action="store_true")
+    three_black_crows_feed_integration_parser.add_argument("--confirm-three-black-crows-feed-integration", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
