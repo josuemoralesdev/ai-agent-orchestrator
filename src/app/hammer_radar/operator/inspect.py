@@ -2044,6 +2044,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "pattern-outcome-mapping-family":
+        from src.app.hammer_radar.operator.pattern_outcome_mapping_family import (
+            build_pattern_outcome_mapping_family,
+            format_pattern_outcome_mapping_family_json,
+        )
+
+        print(
+            format_pattern_outcome_mapping_family_json(
+                build_pattern_outcome_mapping_family(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    success_threshold_pct=args.success_threshold_pct,
+                    adverse_threshold_pct=args.adverse_threshold_pct,
+                    record_mapping=args.record_mapping,
+                    confirm_pattern_outcome_family=args.confirm_pattern_outcome_family,
+                )
+            )
+        )
     elif args.command == "crow-outcome-keter-feedback":
         from src.app.hammer_radar.operator.crow_outcome_keter_feedback import (
             build_crow_outcome_keter_feedback,
@@ -3646,6 +3664,16 @@ def _build_parser() -> argparse.ArgumentParser:
     crow_outcome_mapping_parser.add_argument("--adverse-threshold-pct", type=float, default=0.10)
     crow_outcome_mapping_parser.add_argument("--record-mapping", action="store_true")
     crow_outcome_mapping_parser.add_argument("--confirm-crow-outcome-mapping", default=None)
+
+    pattern_outcome_mapping_family_parser = subparsers.add_parser(
+        "pattern-outcome-mapping-family",
+        parents=[parent],
+    )
+    pattern_outcome_mapping_family_parser.add_argument("--symbol", default="BTCUSDT")
+    pattern_outcome_mapping_family_parser.add_argument("--success-threshold-pct", type=float, default=0.10)
+    pattern_outcome_mapping_family_parser.add_argument("--adverse-threshold-pct", type=float, default=0.10)
+    pattern_outcome_mapping_family_parser.add_argument("--record-mapping", action="store_true")
+    pattern_outcome_mapping_family_parser.add_argument("--confirm-pattern-outcome-family", default=None)
 
     crow_outcome_keter_feedback_parser = subparsers.add_parser(
         "crow-outcome-keter-feedback",
