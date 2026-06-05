@@ -1721,6 +1721,30 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "full-spectrum-harvester-expansion":
+        from src.app.hammer_radar.operator.full_spectrum_harvester_expansion import (
+            format_full_spectrum_harvester_expansion_json,
+            run_full_spectrum_harvester_loop,
+        )
+
+        print(
+            format_full_spectrum_harvester_expansion_json(
+                run_full_spectrum_harvester_loop(
+                    log_dir=args.log_dir,
+                    latest_signals=args.latest_signals,
+                    latest_scans=args.latest_scans,
+                    max_iterations=args.max_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    iteration_timeout_seconds=args.iteration_timeout_seconds,
+                    heartbeat_every=args.heartbeat_every,
+                    max_captures_per_iteration=args.max_captures_per_iteration,
+                    run_harvester_loop=args.run_harvester_loop,
+                    record_harvest=args.record_harvest,
+                    confirm_full_spectrum_harvest=args.confirm_full_spectrum_harvest,
+                    progress_fn=(lambda line: print(line, file=sys.stderr, flush=True)) if args.run_harvester_loop else None,
+                )
+            )
+        )
     elif args.command == "multi-lane-evidence-ranking":
         from src.app.hammer_radar.operator.multi_lane_evidence_ranking import (
             build_multi_lane_evidence_ranking,
@@ -3359,6 +3383,21 @@ def _build_parser() -> argparse.ArgumentParser:
     multi_lane_harvester_parser.add_argument("--run-harvester-loop", action="store_true")
     multi_lane_harvester_parser.add_argument("--record-harvest", action="store_true")
     multi_lane_harvester_parser.add_argument("--confirm-multi-lane-harvest", default=None)
+
+    full_spectrum_harvester_parser = subparsers.add_parser(
+        "full-spectrum-harvester-expansion",
+        parents=[parent],
+    )
+    full_spectrum_harvester_parser.add_argument("--latest-signals", type=int, default=3000)
+    full_spectrum_harvester_parser.add_argument("--latest-scans", type=int, default=5000)
+    full_spectrum_harvester_parser.add_argument("--max-iterations", type=int, default=60)
+    full_spectrum_harvester_parser.add_argument("--sleep-seconds", type=int, default=60)
+    full_spectrum_harvester_parser.add_argument("--iteration-timeout-seconds", type=int, default=30)
+    full_spectrum_harvester_parser.add_argument("--heartbeat-every", type=int, default=1)
+    full_spectrum_harvester_parser.add_argument("--max-captures-per-iteration", type=int, default=50)
+    full_spectrum_harvester_parser.add_argument("--run-harvester-loop", action="store_true")
+    full_spectrum_harvester_parser.add_argument("--record-harvest", action="store_true")
+    full_spectrum_harvester_parser.add_argument("--confirm-full-spectrum-harvest", default=None)
 
     multi_lane_evidence_ranking_parser = subparsers.add_parser(
         "multi-lane-evidence-ranking",
