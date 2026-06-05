@@ -1906,6 +1906,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "pattern-detector-family-expansion":
+        from src.app.hammer_radar.operator.pattern_detector_family_expansion import (
+            build_pattern_detector_family_expansion,
+            format_pattern_detector_family_expansion_json,
+        )
+
+        print(
+            format_pattern_detector_family_expansion_json(
+                build_pattern_detector_family_expansion(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframes=args.timeframes,
+                    mode=args.mode,
+                    latest_candles=args.latest_candles,
+                    record_expansion=args.record_expansion,
+                    confirm_pattern_family_expansion=args.confirm_pattern_family_expansion,
+                )
+            )
+        )
     elif args.command == "signal-origin-feedback-sync":
         from src.app.hammer_radar.operator.signal_origin_feedback_sync import (
             build_signal_origin_feedback_sync_after_three_black_crows,
@@ -3494,6 +3513,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "--confirm-three-black-crows-local-detection",
         default=None,
     )
+
+    pattern_detector_family_expansion_parser = subparsers.add_parser(
+        "pattern-detector-family-expansion",
+        parents=[parent],
+    )
+    pattern_detector_family_expansion_parser.add_argument("--symbol", default="BTCUSDT")
+    pattern_detector_family_expansion_parser.add_argument(
+        "--timeframes",
+        default="4m,8m,13m,22m,44m,55m,88m,222m,444m,666m,888m,4H,13H,13D",
+    )
+    pattern_detector_family_expansion_parser.add_argument(
+        "--mode",
+        choices=["strict", "loose_preview", "both"],
+        default="both",
+    )
+    pattern_detector_family_expansion_parser.add_argument("--latest-candles", type=int, default=500)
+    pattern_detector_family_expansion_parser.add_argument("--record-expansion", action="store_true")
+    pattern_detector_family_expansion_parser.add_argument("--confirm-pattern-family-expansion", default=None)
 
     signal_origin_feedback_sync_parser = subparsers.add_parser(
         "signal-origin-feedback-sync",
