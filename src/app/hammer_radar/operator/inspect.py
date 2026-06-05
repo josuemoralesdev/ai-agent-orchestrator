@@ -2460,6 +2460,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "capture-threshold-recovery-8m-short":
+        from src.app.hammer_radar.operator.capture_threshold_recovery_8m_short import (
+            build_capture_threshold_recovery_8m_short,
+            format_capture_threshold_recovery_8m_short_json,
+        )
+
+        print(
+            format_capture_threshold_recovery_8m_short_json(
+                build_capture_threshold_recovery_8m_short(
+                    log_dir=args.log_dir,
+                    record_recovery=args.record_recovery,
+                    confirm_capture_threshold_recovery=args.confirm_capture_threshold_recovery,
+                )
+            )
+        )
     elif args.command == "evidence-threshold-recheck-8m-short":
         from src.app.hammer_radar.operator.evidence_threshold_recheck_8m_short import (
             build_evidence_threshold_recheck_8m_short,
@@ -3950,6 +3965,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_readiness_gap_recheck_parser.add_argument("--record-recheck", action="store_true")
     tiny_live_readiness_gap_recheck_parser.add_argument("--confirm-tiny-live-gap-recheck", default=None)
+
+    capture_threshold_recovery_parser = subparsers.add_parser(
+        "capture-threshold-recovery-8m-short",
+        parents=[parent],
+    )
+    capture_threshold_recovery_parser.add_argument("--record-recovery", action="store_true")
+    capture_threshold_recovery_parser.add_argument("--confirm-capture-threshold-recovery", default=None)
 
     evidence_threshold_recheck_parser = subparsers.add_parser(
         "evidence-threshold-recheck-8m-short",

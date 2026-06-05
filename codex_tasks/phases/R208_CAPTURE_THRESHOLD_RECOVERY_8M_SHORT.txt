@@ -1,0 +1,442 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R208 Capture Threshold Recovery 8m Short
+
+BRANCH:
+r208-capture-threshold-recovery-8m-short
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R206 Tiny-Live Readiness Gap Recheck said tiny-live is still blocked.
+
+R206 operational readiness:
+- funding_status=ACCOUNT_NOT_FUNDED
+- available_balance_usdt=0.0
+- fresh_capture_count=3
+- required_fresh_capture_count=10
+- capture_threshold_met=false
+- risk_contract_applied=false
+- lane_mode=paper
+- operator_approval=false
+- live_flags_armed=false
+- kill_switch_allows_live=false
+- full_spectrum_harvester_running_or_recent=false
+
+But the operator reports that a full-spectrum harvester tmux session was started earlier in the morning.
+Therefore we must verify whether:
+1. The harvester is actually still running.
+2. The harvester is writing heartbeats.
+3. The harvester is writing captures.
+4. The capture count sync is reading the correct ledgers.
+5. The 8m short capture count is stale or actually still 3/10.
+6. Full-spectrum lanes are wide open and waiting correctly.
+7. No fresh candidate was missed because of a stale reader, wrong ledger path, wrong lane key, or overly strict freshness window.
+
+This phase must recover capture-threshold visibility without live execution.
+
+PURPOSE:
+Create a capture threshold recovery and harvester reality-check surface that:
+1. Inspects local tmux/process/heartbeat evidence indirectly through local logs and ps-safe optional commands documented for operator use.
+2. Reads R198 full-spectrum harvester heartbeats.
+3. Reads R198 full-spectrum harvester records.
+4. Reads 8m short capture ledgers and capture-count sync ledgers.
+5. Reads short paper evidence capture ledgers if present.
+6. Reads full-spectrum capture records across all expanded lanes.
+7. Recomputes the fresh capture count for:
+   - BTCUSDT|8m|short|ladder_close_50_618
+8. Recomputes capture counts for all full-spectrum lanes where possible.
+9. Detects stale harvester / stale watcher / stale heartbeat.
+10. Detects ledger mismatch:
+    - harvester caught candidates but capture-count sync did not count them
+    - capture-count sync reads wrong path
+    - lane key mismatch
+    - old R157/R176 watcher records not reconciled with R198 full-spectrum harvester
+11. Produces a safe operator command set to keep the correct harvester running.
+12. Does not write config.
+13. Does not call Binance/network.
+14. Does not place orders.
+15. Does not change lane mode.
+16. Does not arm live.
+
+CRITICAL SAFETY:
+This phase is paper capture visibility/recovery only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+
+PRIMARY LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+PRIMARY TARGET:
+Recover confidence in whether this lane is really at:
+- 3/10
+- greater than 3/10
+- stale/unknown because watcher is not writing
+- blocked because no fresh candidates exist
+
+FULL-SPECTRUM SCOPE:
+Use R198 expanded lanes:
+- configured paper lanes
+- discovered unconfigured paper lanes
+- tiny_live reference lanes as reference-only
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from capture recovery alone.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/capture_watcher_supervisor_8m_short.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py if present
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+- logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson
+- docs/hammer_radar/live_readiness/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+- docs/hammer_radar/live_readiness/R206_TINY_LIVE_READINESS_GAP_RECHECK.md
+- tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+- tests/hammer_radar/test_tiny_live_readiness_gap_recheck.py
+
+REUSE / EXTEND:
+Reuse capture-count sync logic if available.
+Reuse R198 harvester scope and heartbeat model.
+Reuse R206 readiness blocker format where useful.
+Do not create a second capture-count philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py
+
+Expose:
+- build_capture_threshold_recovery_8m_short
+- load_latest_full_spectrum_harvester_heartbeats
+- load_latest_full_spectrum_harvester_records
+- load_short_capture_records
+- load_capture_count_sync_records
+- recompute_8m_short_fresh_capture_count
+- recompute_full_spectrum_capture_counts
+- detect_harvester_runtime_status_from_ledgers
+- detect_capture_count_mismatch
+- build_capture_threshold_recovery_status
+- build_capture_threshold_recovery_actions
+- build_safe_operator_harvester_commands
+- append_capture_threshold_recovery_record
+- load_capture_threshold_recovery_records
+- summarize_capture_threshold_recovery_records
+
+STATUS ENUM:
+- CAPTURE_THRESHOLD_RECOVERY_READY
+- CAPTURE_THRESHOLD_RECOVERY_REJECTED
+- CAPTURE_THRESHOLD_RECOVERY_RECORDED
+- CAPTURE_THRESHOLD_RECOVERY_BLOCKED
+- CAPTURE_THRESHOLD_RECOVERY_ERROR
+
+WATCHER STATUS ENUM:
+- HARVESTER_RUNNING_RECENT_HEARTBEAT
+- HARVESTER_STALE
+- HARVESTER_NOT_FOUND
+- HEARTBEATS_FOUND_BUT_NO_CAPTURES
+- CAPTURES_FOUND_BUT_COUNT_STALE
+- COUNT_SYNC_MISMATCH
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+THRESHOLD STATUS ENUM:
+- CAPTURE_THRESHOLD_MET
+- CAPTURE_THRESHOLD_NOT_MET
+- CAPTURE_COUNT_STALE
+- CAPTURE_COUNT_UNKNOWN
+- CAPTURE_LEDGER_MISMATCH
+- NO_FRESH_CANDIDATES_FOUND
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+FRESHNESS:
+Use existing freshness thresholds where available.
+Default:
+- 8m short fresh window: use existing capture_count_sync logic if present
+- heartbeat stale_after_seconds: 180 unless existing module defines otherwise
+- full-spectrum harvester heartbeat recent threshold: 180 seconds unless existing module defines otherwise
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "recovery_recorded": false,
+  "recovery_id": null,
+  "record_recovery_requested": false,
+  "confirmation_valid": false,
+  "primary_lane": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618"
+  },
+  "harvester_runtime_status": {
+    "full_spectrum_heartbeat_found": true/false,
+    "latest_full_spectrum_heartbeat_at": "...",
+    "latest_full_spectrum_iteration": ...,
+    "full_spectrum_watcher_likely_running": true/false,
+    "full_spectrum_watcher_stale": true/false,
+    "short_capture_heartbeat_found": true/false,
+    "latest_short_capture_heartbeat_at": "...",
+    "short_capture_watcher_likely_running": true/false,
+    "short_capture_watcher_stale": true/false,
+    "watcher_status": "..."
+  },
+  "capture_count_recompute": {
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "unique_captured_signal_ids": [...],
+    "latest_captured_signal_id": "...",
+    "latest_capture_at": "...",
+    "source_ledgers_used": [...]
+  },
+  "full_spectrum_capture_counts": {
+    "lanes_in_scope": ...,
+    "lanes_with_fresh_captures": [...],
+    "lanes_with_stale_only": [...],
+    "top_capture_counts": [...]
+  },
+  "capture_count_mismatch_report": {
+    "mismatch_found": true/false,
+    "harvester_captures_not_counted": [...],
+    "counted_captures_not_in_harvester": [...],
+    "lane_key_mismatches": [...],
+    "ledger_path_warnings": [...]
+  },
+  "threshold_status": "...",
+  "recovery_actions": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "action": "...",
+      "why": "...",
+      "operator_command_safe": true/false
+    }
+  ],
+  "safe_operator_commands": {
+    "tmux_status_check": "...",
+    "heartbeat_tail": "...",
+    "full_spectrum_harvester_restart": "...",
+    "capture_count_recheck": "..."
+  },
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RESTART_FULL_SPECTRUM_HARVESTER|RUN_CAPTURE_COUNT_RECHECK|RUN_R207_EVENT_LEVEL_CONFLUENCE_MATCHER",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- capture_recovery_live_authorized=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/capture_threshold_recovery_8m_short.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM CAPTURE THRESHOLD RECOVERY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+capture-threshold-recovery-8m-short
+
+Args:
+- --record-recovery
+- --confirm-capture-threshold-recovery <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short \
+  --record-recovery \
+  --confirm-capture-threshold-recovery "I CONFIRM CAPTURE THRESHOLD RECOVERY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short \
+  --record-recovery \
+  --confirm-capture-threshold-recovery "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_capture_threshold_recovery_8m_short.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records recovery only
+- detects stale full-spectrum heartbeat
+- detects recent full-spectrum heartbeat
+- recomputes 8m short capture count
+- reports threshold not met when below 10
+- reports threshold met when >=10
+- detects capture-count mismatch
+- safe operator commands are present
+- no live authorization
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R198/R206 capture/readiness tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short \
+  | jq '.status, .primary_lane, .harvester_runtime_status, .capture_count_recompute, .full_spectrum_capture_counts, .capture_count_mismatch_report, .threshold_status, .recovery_actions, .safe_operator_commands, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short \
+  --record-recovery \
+  --confirm-capture-threshold-recovery "I CONFIRM CAPTURE THRESHOLD RECOVERY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .recovery_recorded, .harvester_runtime_status, .capture_count_recompute, .threshold_status, .capture_count_mismatch_report, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-threshold-recovery-8m-short \
+  --record-recovery \
+  --confirm-capture-threshold-recovery "wrong" \
+  | jq '.status, .confirmation_valid, .recovery_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R208_CAPTURE_THRESHOLD_RECOVERY_8M_SHORT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R208.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R207_EVENT_LEVEL_CONFLUENCE_MATCHER.md
+
+Create:
+codex_tasks/phases/R209_READONLY_FUNDING_STATUS_RECHECK.md
+
+R209 should:
+- recheck funding status using existing role-specific read-only path only
+- no config writes
+- no live execution
+- no trading endpoint calls
+- no secrets printed
+
+REPORT:
+Files changed, tests, smoke, safety, capture count, harvester status, mismatch report, recommended next operator move.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
