@@ -2107,6 +2107,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "anchor-signal-confluence-matrix":
+        from src.app.hammer_radar.operator.anchor_signal_confluence_matrix import (
+            build_anchor_signal_confluence_matrix,
+            format_anchor_signal_confluence_matrix_json,
+        )
+
+        print(
+            format_anchor_signal_confluence_matrix_json(
+                build_anchor_signal_confluence_matrix(
+                    log_dir=args.log_dir,
+                    record_matrix=args.record_matrix,
+                    confirm_anchor_signal_confluence=args.confirm_anchor_signal_confluence,
+                )
+            )
+        )
     elif args.command == "lane-matrix-after-crow-outcome-feedback":
         from src.app.hammer_radar.operator.lane_matrix_after_crow_outcome_feedback import (
             build_lane_matrix_after_crow_outcome_feedback,
@@ -3725,6 +3740,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     pattern_lane_matrix_review_parser.add_argument("--record-matrix", action="store_true")
     pattern_lane_matrix_review_parser.add_argument("--confirm-pattern-lane-matrix", default=None)
+
+    anchor_signal_confluence_matrix_parser = subparsers.add_parser(
+        "anchor-signal-confluence-matrix",
+        parents=[parent],
+    )
+    anchor_signal_confluence_matrix_parser.add_argument("--record-matrix", action="store_true")
+    anchor_signal_confluence_matrix_parser.add_argument("--confirm-anchor-signal-confluence", default=None)
 
     lane_matrix_after_crow_outcome_feedback_parser = subparsers.add_parser(
         "lane-matrix-after-crow-outcome-feedback",
