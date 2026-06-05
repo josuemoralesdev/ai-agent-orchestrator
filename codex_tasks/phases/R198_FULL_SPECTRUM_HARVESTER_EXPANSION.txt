@@ -1,0 +1,456 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R198 Full-Spectrum Harvester Expansion
+
+BRANCH:
+r198-full-spectrum-harvester-expansion
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R196 Full-Spectrum Paper Coverage Audit proved current coverage is incomplete.
+
+R196 found:
+- configured_lanes_count=8
+- paper_lanes_count=6
+- paper_outcomes_found=20358
+- signal_origins_registered=12
+- detectors_available=5
+- timeframes found:
+  4m, 8m, 13m, 22m, 44m, 55m, 88m, 222m, 444m, 666m, 888m, 4H, 13H, 13D
+
+R196 blind spots included:
+- signals present but not configured/harvested:
+  - BTCUSDT|22m|long|ladder_close_50_618
+  - BTCUSDT|22m|short|ladder_close_50_618
+  - BTCUSDT|55m|long|ladder_close_50_618
+  - BTCUSDT|55m|short|ladder_close_50_618
+  - BTCUSDT|88m|long|ladder_close_50_618
+  - BTCUSDT|88m|short|ladder_close_50_618
+  - BTCUSDT|222m|long|ladder_close_50_618
+  - BTCUSDT|222m|short|ladder_close_50_618
+  - BTCUSDT|444m|long|ladder_close_50_618
+  - BTCUSDT|444m|short|ladder_close_50_618
+  - BTCUSDT|666m|long|ladder_close_50_618
+  - BTCUSDT|666m|short|ladder_close_50_618
+  - BTCUSDT|888m|long|ladder_close_50_618
+  - BTCUSDT|888m|short|ladder_close_50_618
+  - BTCUSDT|4h|long|ladder_close_50_618
+  - BTCUSDT|4h|short|ladder_close_50_618
+  - BTCUSDT|13h|long|ladder_close_50_618
+  - BTCUSDT|13h|short|ladder_close_50_618
+
+R196 recommended:
+- R197 pattern detector family expansion
+- R198 full-spectrum harvester expansion
+
+Operator wants to ensure we are waiting correctly:
+- all paper trades
+- all TFs
+- all opened lanes
+- all signal origins
+- no hidden blind spots
+
+Operator also introduced near-future WMA/MA anchor layer:
+- WMA200 / MA200 as possible pivot/reversal/position anchor
+- custom WMA testing across 13D, 4H, 666m, 13H, 888m, and others
+- this should be future evidence-first anchor/context layer, not live permission
+
+R198 must expand full-spectrum paper harvesting coverage first.
+
+PURPOSE:
+Create a full-spectrum harvester expansion surface that:
+1. Uses R196 blind spots.
+2. Builds expanded paper-only harvest scope for all discovered BTCUSDT timeframe/direction ladder_close_50_618 lanes.
+3. Includes current R180 lanes plus discovered gaps.
+4. Keeps all new lanes paper-only / audit-only.
+5. Does not mutate lane_controls.json.
+6. Does not promote lanes.
+7. Does not call Binance/network.
+8. Does not place orders.
+9. Produces commands/runbook for bounded harvester loops.
+10. Prepares future anchor-layer integration but does not implement WMA/MA yet.
+
+CRITICAL SAFETY:
+This phase is harvester expansion only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote signal origins
+- promote lanes
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source lane controls.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not implement WMA/MA anchor live behavior in this phase.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/full_spectrum_paper_coverage_audit.py
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/fresh_signal_router.py
+- src/app/hammer_radar/operator/lane_control.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- logs/hammer_radar_forward/full_spectrum_paper_coverage_audit.ndjson
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson
+- tests/hammer_radar/test_full_spectrum_paper_coverage_audit.py
+- tests/hammer_radar/test_multi_lane_paper_capture_harvester.py
+- docs/hammer_radar/live_readiness/R196_FULL_SPECTRUM_PAPER_COVERAGE_AUDIT.md
+
+REUSE / EXTEND:
+Reuse R180 multi-lane harvester logic where possible.
+Reuse R196 discovered gaps.
+Do not duplicate signal parsing.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+
+Expose:
+- build_full_spectrum_harvester_expansion
+- load_latest_full_spectrum_coverage_audit
+- build_expanded_harvest_scope_from_blind_spots
+- build_full_spectrum_lane_candidates
+- build_full_spectrum_harvester_preview
+- capture_full_spectrum_paper_evidence_once
+- run_full_spectrum_harvester_loop
+- build_full_spectrum_harvest_summary
+- build_full_spectrum_harvester_commands
+- append_full_spectrum_harvester_record
+- append_full_spectrum_harvester_heartbeat
+- load_full_spectrum_harvester_records
+- summarize_full_spectrum_harvester_records
+
+STATUS ENUM:
+- FULL_SPECTRUM_HARVESTER_EXPANSION_READY
+- FULL_SPECTRUM_HARVESTER_EXPANSION_REJECTED
+- FULL_SPECTRUM_HARVESTER_EXPANSION_RECORDED
+- FULL_SPECTRUM_HARVESTER_EXPANSION_TIMEOUT
+- FULL_SPECTRUM_HARVESTER_EXPANSION_CAPTURED
+- FULL_SPECTRUM_HARVESTER_EXPANSION_BLOCKED
+- FULL_SPECTRUM_HARVESTER_EXPANSION_ERROR
+
+HARVEST STATUS ENUM:
+- FULL_SPECTRUM_SCOPE_READY
+- NO_FRESH_CANDIDATES
+- CAPTURED_ONE_OR_MORE_LANES
+- COVERAGE_GAPS_REMAIN
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+DEFAULT EXPANDED TIMEFRAMES:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 444m
+- 666m
+- 888m
+- 4H
+- 13H
+- 13D
+
+DEFAULT DIRECTIONS:
+- long
+- short
+
+DEFAULT ENTRY_MODE:
+- ladder_close_50_618
+
+IMPORTANT:
+- This phase may create an expanded runtime scope, but must not write lane_controls.json.
+- Any lane not in lane_controls.json must be treated as:
+  mode="paper_discovered_unconfigured"
+  config_write_allowed=false
+  live_authorized=false
+- Existing tiny_live lanes are observed reference only.
+- Paper/live separation must remain intact.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "harvest_recorded": false,
+  "harvest_id": null,
+  "record_harvest_requested": false,
+  "confirmation_valid": false,
+  "scope": {
+    "configured_paper_lanes": [...],
+    "discovered_unconfigured_paper_lanes": [...],
+    "tiny_live_reference_lanes": [...],
+    "timeframes": [...],
+    "directions": ["long", "short"],
+    "entry_modes": ["ladder_close_50_618"]
+  },
+  "coverage_gap_inputs": {
+    "signals_present_not_configured": [...],
+    "timeframes_seen_but_not_currently_harvested": [...],
+    "paper_outcomes_without_current_watcher_count": ...
+  },
+  "capture_summary": {
+    "total_fresh_candidates": ...,
+    "total_captured": ...,
+    "captured_lanes": [...],
+    "fresh_by_lane": {...},
+    "stale_by_lane": {...},
+    "blocked_by_lane": {...}
+  },
+  "full_spectrum_harvest_summary": {
+    "lanes_in_scope": ...,
+    "configured_lanes": ...,
+    "discovered_unconfigured_lanes": ...,
+    "lanes_with_fresh_flow": [...],
+    "lanes_with_stale_only": [...],
+    "coverage_gaps_remaining": [...]
+  },
+  "safe_run_commands": {
+    "tmux_session": "r198-full-spectrum-harvest",
+    "preview_command": "...",
+    "bounded_loop_command": "..."
+  },
+  "anchor_layer_future_note": {
+    "wma_ma_anchor_layer_not_implemented": true,
+    "future_phase": "R199_OR_LATER_WMA_MA_ANCHOR_LAYER_PREVIEW",
+    "candidate_timeframes": ["13D", "4H", "666m", "13H", "888m"],
+    "safety_note": "anchor layer must start paper-only and cannot authorize live"
+  },
+  "harvest_status": "...",
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R197_PATTERN_DETECTOR_FAMILY_EXPANSION|RUN_R199_WMA_MA_ANCHOR_LAYER_PREVIEW",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- wma_anchor_live_authorized=false
+
+LEDGERS:
+logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FULL SPECTRUM PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+full-spectrum-harvester-expansion
+
+Args:
+- --latest-signals <int>, default 3000
+- --latest-scans <int>, default 5000
+- --max-iterations <int>, default 60
+- --sleep-seconds <int>, default 60
+- --iteration-timeout-seconds <int>, default 30
+- --heartbeat-every <int>, default 1
+- --max-captures-per-iteration <int>, default 50
+- --run-harvester-loop
+- --record-harvest
+- --confirm-full-spectrum-harvest <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --latest-signals 3000 \
+  --latest-scans 5000
+
+Short 2-iteration smoke loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --latest-signals 3000 \
+  --latest-scans 5000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-harvester-loop \
+  --record-harvest \
+  --confirm-full-spectrum-harvest "I CONFIRM FULL SPECTRUM PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --record-harvest \
+  --confirm-full-spectrum-harvest "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records harvest only
+- expanded scope includes discovered timeframes from R196
+- discovered unconfigured lanes are paper-only
+- configured lanes remain unchanged
+- tiny-live lanes are reference-only
+- safe run commands included
+- WMA/MA anchor note is future-only, not implemented/live
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R196/R180 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --latest-signals 3000 \
+  --latest-scans 5000 \
+  | jq '.status, .scope, .coverage_gap_inputs, .capture_summary, .full_spectrum_harvest_summary, .anchor_layer_future_note, .harvest_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Short loop:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --latest-signals 3000 \
+  --latest-scans 5000 \
+  --max-iterations 2 \
+  --sleep-seconds 1 \
+  --iteration-timeout-seconds 30 \
+  --heartbeat-every 1 \
+  --run-harvester-loop \
+  --record-harvest \
+  --confirm-full-spectrum-harvest "I CONFIRM FULL SPECTRUM PAPER HARVESTING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | tail -80
+
+Heartbeat check:
+tail -n 5 logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson \
+  | jq '.status, .iteration, .max_iterations, .total_captured, .captured_lanes, .elapsed_seconds, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-harvester-expansion \
+  --record-harvest \
+  --confirm-full-spectrum-harvest "wrong" \
+  | jq '.status, .confirmation_valid, .harvest_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R198.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R199_WMA_MA_ANCHOR_LAYER_PREVIEW.md
+
+R199 should:
+- preview WMA/MA anchor layer
+- include WMA200/MA200 and custom WMA tests
+- include candidate timeframes: 13D, 4H, 666m, 13H, 888m
+- paper-only
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, expanded scope, captured lanes, remaining gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
