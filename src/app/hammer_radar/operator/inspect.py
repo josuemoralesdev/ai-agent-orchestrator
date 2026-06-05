@@ -2092,6 +2092,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "pattern-lane-matrix-review":
+        from src.app.hammer_radar.operator.pattern_lane_matrix_review import (
+            build_pattern_lane_matrix_review,
+            format_pattern_lane_matrix_review_json,
+        )
+
+        print(
+            format_pattern_lane_matrix_review_json(
+                build_pattern_lane_matrix_review(
+                    log_dir=args.log_dir,
+                    record_matrix=args.record_matrix,
+                    confirm_pattern_lane_matrix=args.confirm_pattern_lane_matrix,
+                )
+            )
+        )
     elif args.command == "lane-matrix-after-crow-outcome-feedback":
         from src.app.hammer_radar.operator.lane_matrix_after_crow_outcome_feedback import (
             build_lane_matrix_after_crow_outcome_feedback,
@@ -3703,6 +3718,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     pattern_keter_rescoring_family_parser.add_argument("--record-rescore", action="store_true")
     pattern_keter_rescoring_family_parser.add_argument("--confirm-pattern-keter-family", default=None)
+
+    pattern_lane_matrix_review_parser = subparsers.add_parser(
+        "pattern-lane-matrix-review",
+        parents=[parent],
+    )
+    pattern_lane_matrix_review_parser.add_argument("--record-matrix", action="store_true")
+    pattern_lane_matrix_review_parser.add_argument("--confirm-pattern-lane-matrix", default=None)
 
     lane_matrix_after_crow_outcome_feedback_parser = subparsers.add_parser(
         "lane-matrix-after-crow-outcome-feedback",
