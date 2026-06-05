@@ -1,0 +1,465 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R206 Tiny-Live Readiness Gap Recheck
+
+BRANCH:
+r206-tiny-live-readiness-gap-recheck
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+We have just completed a major evidence expansion sequence:
+
+R196:
+- Full-spectrum paper coverage audit exposed blind spots.
+
+R198:
+- Full-spectrum harvester expansion widened paper lane scope.
+
+R197:
+- Pattern detector family expansion added:
+  - three_white_soldiers
+  - bearish_engulfing
+  - bullish_engulfing
+  - exhaustion_wick
+
+R199/R201:
+- WMA/MA anchor preview and deepening added:
+  - SMA200
+  - WMA200
+  - custom_wma periods
+  - anchor candidates and risk warnings
+
+R200/R202/R204:
+- Pattern family feedback, outcome mapping, and Keter rescoring.
+
+R205:
+- Pattern lane matrix review showed:
+  - BTCUSDT|8m|short|ladder_close_50_618 + hammer_wick_reversal pair_score around 84
+  - BTCUSDT|8m|short|ladder_close_50_618 + bearish_engulfing pair_score around 82
+  - BTCUSDT|8m|short|ladder_close_50_618 + three_black_crows pair_score around 68
+  - hammer remains top, bearish_engulfing is serious paper candidate
+
+R203:
+- Anchor signal confluence matrix showed:
+  - summary_level_matches_found around 594
+  - event_level_matches_found 0
+  - top confluence candidates remain paper-only
+  - exact event-level confluence still pending R207
+
+The operator asked honestly how far tiny-live is.
+Last known blockers:
+- account funding was previously 0 USDT / ACCOUNT_NOT_FUNDED unless refreshed
+- 8m short fresh capture threshold previously around 3/10
+- risk contract not applied
+- lane mode still paper
+- operator approval false
+- live flags not armed
+- kill switch still engaged
+- confluence is summary-level only, not event-level
+
+R206 must recheck tiny-live readiness after the smarter evidence stack, without changing anything.
+
+PURPOSE:
+Create a tiny-live readiness gap recheck that:
+1. Reads current evidence stack:
+   - R198 full-spectrum harvester
+   - R203 confluence matrix
+   - R205 pattern lane matrix
+   - R204 pattern Keter rescoring
+   - R195 crow/hammer matrix
+   - R181/R184 lane evidence if useful
+2. Reads funding/balance readiness if existing local/read-only ledger exists.
+3. Reads capture count status, especially 8m short 10/10 threshold.
+4. Reads risk contract / lane mode / live flags from existing configs or ledgers, read-only only.
+5. Produces a brutally honest tiny-live distance.
+6. Lists exact remaining blockers.
+7. Produces a safe next-step roadmap.
+8. Does not call Binance/network unless an existing explicitly gated read-only balance check command already exists and this phase only documents it. Default: no network.
+9. Does not write config.
+10. Does not place orders.
+11. Does not arm live.
+12. Does not disable kill switch.
+
+CRITICAL SAFETY:
+This phase is readiness audit only.
+It must NOT:
+- call Binance trading endpoints
+- call Binance network by default
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance trading endpoints.
+- Do not call any network by default.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create live permission.
+- Do not infer live readiness from confluence alone.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+- src/app/hammer_radar/operator/funding_gate_role_specific_sync.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/capture_watcher_supervisor_8m_short.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_outcome_feedback.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/anchor_signal_confluence_matrix.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/pattern_keter_rescoring_family.py
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/final_live_preflight.py if present
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/funding_gate_role_specific_sync.ndjson
+- logs/hammer_radar_forward/lane_matrix_after_crow_outcome_feedback.ndjson
+- logs/hammer_radar_forward/pattern_lane_matrix_review.ndjson
+- logs/hammer_radar_forward/anchor_signal_confluence_matrix.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/tiny_live_blocker_burn_down.ndjson if present
+- docs/hammer_radar/live_readiness/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+- docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+- docs/hammer_radar/live_readiness/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+
+REUSE / EXTEND:
+Reuse existing readiness / blocker / funding / capture modules if present.
+Do not duplicate live readiness philosophy.
+Do not create live execution logic.
+Do not mutate configs.
+Do not call Binance/network by default.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py
+
+Expose:
+- build_tiny_live_readiness_gap_recheck
+- load_latest_capture_count_status
+- load_latest_funding_status_from_local_ledgers
+- load_lane_mode_status
+- load_risk_contract_status
+- load_live_flag_status
+- load_latest_pattern_lane_matrix_status
+- load_latest_anchor_confluence_status
+- load_latest_full_spectrum_harvester_status
+- build_evidence_stack_summary
+- build_tiny_live_blocker_list
+- classify_tiny_live_distance
+- build_tiny_live_readiness_roadmap
+- append_tiny_live_readiness_gap_recheck_record
+- load_tiny_live_readiness_gap_recheck_records
+- summarize_tiny_live_readiness_gap_recheck_records
+
+STATUS ENUM:
+- TINY_LIVE_READINESS_GAP_RECHECK_READY
+- TINY_LIVE_READINESS_GAP_RECHECK_REJECTED
+- TINY_LIVE_READINESS_GAP_RECHECK_RECORDED
+- TINY_LIVE_READINESS_GAP_RECHECK_BLOCKED
+- TINY_LIVE_READINESS_GAP_RECHECK_ERROR
+
+DISTANCE ENUM:
+- NOT_CLOSE_FUNDING_AND_EVIDENCE_BLOCKED
+- NOT_CLOSE_EVIDENCE_BLOCKED
+- STRUCTURALLY_CLOSE_OPERATIONALLY_BLOCKED
+- CLOSE_AFTER_FUNDING_AND_CAPTURE_THRESHOLD
+- READY_FOR_TINY_LIVE_REVIEW_PACKET
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+READINESS RULES:
+Tiny-live cannot be considered ready unless:
+- funding_status is FUNDED or equivalent
+- available_balance_usdt >= required minimum, likely 44 USDT or current risk contract requirement
+- chosen lane fresh captures >= required threshold, likely 10/10
+- risk contract exists and is applied for chosen lane
+- lane mode is explicitly tiny_live candidate / armed review, not plain paper
+- operator approval exists
+- live flags intentionally armed
+- kill switch policy allows the action
+- trading key separation is respected
+- no config/env mutation happens in this audit
+- no live order endpoint is called
+- final preflight packet passes later phase
+
+Evidence can be strong while readiness remains blocked.
+Say that clearly.
+
+CANDIDATE LANE / ORIGIN CONTEXT:
+Primary candidate remains:
+- BTCUSDT|8m|short|ladder_close_50_618 + hammer_wick_reversal
+Secondary paper candidates:
+- BTCUSDT|8m|short|ladder_close_50_618 + bearish_engulfing
+- BTCUSDT|8m|short|ladder_close_50_618 + three_black_crows
+Anchor context:
+- summary-level confluence available
+- event-level confluence not yet available
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "candidate_context": {
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "primary_signal_origin": "hammer_wick_reversal",
+    "secondary_signal_origins": ["bearish_engulfing", "three_black_crows"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "evidence_stack_summary": {
+    "pattern_lane_matrix_found": true/false,
+    "anchor_confluence_found": true/false,
+    "full_spectrum_harvester_found": true/false,
+    "primary_pair_score": ...,
+    "secondary_pair_scores": {...},
+    "summary_level_confluence_available": true/false,
+    "event_level_confluence_available": true/false,
+    "full_spectrum_harvester_running_or_recent": true/false
+  },
+  "operational_readiness": {
+    "funding_status": "FUNDED|ACCOUNT_NOT_FUNDED|UNKNOWN",
+    "available_balance_usdt": 0.0/null,
+    "minimum_required_usdt": 44.0,
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "capture_threshold_met": true/false,
+    "risk_contract_applied": true/false,
+    "lane_mode": "paper|tiny_live|unknown",
+    "operator_approval": true/false,
+    "live_flags_armed": true/false,
+    "kill_switch_allows_live": true/false,
+    "read_only_key_separation_ok": true/false/null
+  },
+  "tiny_live_blockers": [
+    {
+      "blocker": "funding|fresh_capture_threshold|risk_contract|lane_mode|operator_approval|live_flags|kill_switch|event_level_confluence_optional|...",
+      "severity": "HARD|SOFT|INFO",
+      "current": "...",
+      "required": "...",
+      "recommended_action": "..."
+    }
+  ],
+  "tiny_live_distance": {
+    "distance": "...",
+    "plain_english": "...",
+    "estimated_phases_after_hard_blockers_clear": "2-4|3-5|5-8|unknown",
+    "can_fund_now": true,
+    "should_fund_now": "operator_decision_not_required_for_this_audit",
+    "funding_alone_is_not_enough": true
+  },
+  "tiny_live_readiness_roadmap": [
+    {
+      "priority": 1,
+      "phase": "R207|R208|...",
+      "action": "...",
+      "why": "..."
+    }
+  ],
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|CHECK_READONLY_FUNDING_STATUS|RUN_R207_EVENT_LEVEL_CONFLUENCE_MATCHER|RUN_R208_CAPTURE_THRESHOLD_RECOVERY",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- pattern_family_live_authorized=false
+- anchor_live_authorized=false
+- confluence_live_authorized=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_readiness_gap_recheck.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE READINESS GAP RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+tiny-live-readiness-gap-recheck
+
+Args:
+- --record-recheck
+- --confirm-tiny-live-gap-recheck <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck \
+  --record-recheck \
+  --confirm-tiny-live-gap-recheck "I CONFIRM TINY LIVE READINESS GAP RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck \
+  --record-recheck \
+  --confirm-tiny-live-gap-recheck "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_readiness_gap_recheck.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records recheck only
+- funding unknown/not funded is hard blocker
+- fresh capture below threshold is hard blocker
+- risk contract missing is hard blocker
+- lane mode paper is hard blocker
+- operator approval false is hard blocker
+- live flags false is hard blocker
+- kill switch false/unknown is hard blocker
+- evidence stack can be strong while operational readiness is blocked
+- no live authorization
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R203/R205/R198 readiness tests if present.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck \
+  | jq '.status, .candidate_context, .evidence_stack_summary, .operational_readiness, .tiny_live_blockers, .tiny_live_distance, .tiny_live_readiness_roadmap, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck \
+  --record-recheck \
+  --confirm-tiny-live-gap-recheck "I CONFIRM TINY LIVE READINESS GAP RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .recheck_recorded, .operational_readiness, .tiny_live_blockers, .tiny_live_distance, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-readiness-gap-recheck \
+  --record-recheck \
+  --confirm-tiny-live-gap-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .recheck_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R206_TINY_LIVE_READINESS_GAP_RECHECK.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R206.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R207_EVENT_LEVEL_CONFLUENCE_MATCHER.md
+
+Create:
+codex_tasks/phases/R208_CAPTURE_THRESHOLD_RECOVERY_8M_SHORT.md
+
+R208 should:
+- focus on recovering/monitoring fresh capture threshold for primary candidate lane
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, tiny-live blockers, tiny-live distance, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
