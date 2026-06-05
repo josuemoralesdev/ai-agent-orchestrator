@@ -1,0 +1,530 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R202 Pattern Outcome Mapping Family
+
+BRANCH:
+r202-pattern-outcome-mapping-family
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R197 expanded the candle-pattern detector family:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- breakdown_retest preview-only
+- breakout_retest preview-only
+
+R197 detector counts:
+- three_white_soldiers: strict 7, loose 27
+- bearish_engulfing: strict 53, loose 178
+- bullish_engulfing: strict 75, loose 189
+- exhaustion_wick: strict 831, loose 1602
+
+R200 synced pattern family feedback:
+- three_white_soldiers ready for review
+- bearish_engulfing ready for review
+- bullish_engulfing ready for review
+- exhaustion_wick ready for review
+- breakdown_retest remains registry-only
+- breakout_retest remains registry-only
+- Keter rerun recommended
+- lane matrix rerun recommended
+- outcome mapping recommended
+
+R201 deepened anchor outcomes:
+- anchor confluence is available but only summary-level
+- exact event-level confluence still needs deeper mapping
+- R201 recommends mapping detector-backed pattern family outcomes before scoring confluence
+
+R202 must map pattern-family detections to future paper outcome windows.
+
+PURPOSE:
+Create a paper-only outcome mapping surface for:
+1. three_white_soldiers
+2. bearish_engulfing
+3. bullish_engulfing
+4. exhaustion_wick
+
+Keep these registry-only / blocked:
+5. breakdown_retest
+6. breakout_retest
+
+For each detector-backed origin:
+- load pattern detections from R197 records
+- load local candles from candle archive
+- map each detection to future outcome windows
+- compute long/short favorable behavior by origin direction
+- summarize results by signal origin, timeframe, mode, and confidence
+- recommend which origins deserve Keter feedback next
+- do not authorize live
+- do not write config
+- do not call Binance/network
+- do not place orders
+
+CRITICAL SAFETY:
+This phase is outcome mapping / audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate registry/scoring/matrix config
+- promote signal origins
+- promote lanes
+- create pattern-based entry permission
+
+TARGET SIGNAL ORIGINS:
+Outcome-mapped:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+
+Registry-only:
+- breakdown_retest
+- breakout_retest
+
+TARGET SYMBOL:
+BTCUSDT
+
+TARGET TIMEFRAMES:
+Use available local candle archives:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 444m
+- 666m
+- 888m
+- 4H
+- 13H
+- 13D if available
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create pattern-based live permission.
+- Do not infer outcomes without future candles.
+- Do not fake detections.
+- Do not fake OHLC.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/pattern_detector_family_expansion.py
+- src/app/hammer_radar/operator/pattern_family_feedback_sync.py
+- src/app/hammer_radar/operator/crow_outcome_mapping_preview.py
+- src/app/hammer_radar/operator/anchor_outcome_deepening.py
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/pattern_detector_family_expansion.ndjson
+- logs/hammer_radar_forward/pattern_family_feedback_sync.ndjson
+- logs/hammer_radar_forward/candle_archive/*.ndjson
+- logs/hammer_radar_forward/crow_outcome_mapping_preview.ndjson
+- tests/hammer_radar/test_pattern_detector_family_expansion.py
+- tests/hammer_radar/test_pattern_family_feedback_sync.py
+- tests/hammer_radar/test_crow_outcome_mapping_preview.py
+- tests/hammer_radar/test_anchor_outcome_deepening.py
+- docs/hammer_radar/live_readiness/R197_PATTERN_DETECTOR_FAMILY_EXPANSION.md
+- docs/hammer_radar/live_readiness/R200_PATTERN_FAMILY_FEEDBACK_SYNC.md
+- docs/hammer_radar/live_readiness/R201_ANCHOR_OUTCOME_DEEPENING.md
+
+REUSE / EXTEND:
+Reuse R193 crow outcome mapping concepts.
+Reuse R197 pattern detection summaries.
+Reuse local candle feed adapter.
+Reuse outcome window logic where practical.
+Do not duplicate OHLC parsing.
+Do not call Binance/network.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/pattern_outcome_mapping_family.py
+
+Expose:
+- build_pattern_outcome_mapping_family
+- load_latest_pattern_family_expansion
+- extract_pattern_family_detections
+- load_local_candles_for_pattern_outcomes
+- map_pattern_detection_to_future_candles
+- compute_pattern_outcome_window
+- build_pattern_origin_outcome_summary
+- build_pattern_timeframe_outcome_summary
+- build_pattern_family_aggregate_summary
+- build_pattern_outcome_rankings
+- build_pattern_outcome_keter_recommendations
+- classify_pattern_outcome_mapping_status
+- append_pattern_outcome_mapping_family_record
+- load_pattern_outcome_mapping_family_records
+- summarize_pattern_outcome_mapping_family_records
+
+STATUS ENUM:
+- PATTERN_OUTCOME_MAPPING_FAMILY_READY
+- PATTERN_OUTCOME_MAPPING_FAMILY_REJECTED
+- PATTERN_OUTCOME_MAPPING_FAMILY_RECORDED
+- PATTERN_OUTCOME_MAPPING_FAMILY_BLOCKED
+- PATTERN_OUTCOME_MAPPING_FAMILY_ERROR
+
+OUTCOME STATUS ENUM:
+- PATTERN_OUTCOME_MAPPING_AVAILABLE
+- PATTERN_OUTCOME_MAPPING_PARTIAL
+- PATTERN_OUTCOME_MAPPING_NO_DETECTIONS
+- PATTERN_OUTCOME_MAPPING_NO_LOCAL_CANDLES
+- PATTERN_OUTCOME_MAPPING_INSUFFICIENT_FUTURE_WINDOW
+- PATTERN_OUTCOME_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+DIRECTION RULES:
+- three_white_soldiers => long
+- bullish_engulfing => long
+- bearish_engulfing => short
+- exhaustion_wick => use detection direction when available; otherwise classify long/short from wick side
+- breakdown_retest => blocked registry-only
+- breakout_retest => blocked registry-only
+
+OUTCOME WINDOWS:
+Use:
+- 1 candle
+- 3 candles
+- 5 candles
+- 10 candles
+- 21 candles
+- 34 candles
+- 55 candles
+
+For long context:
+- favorable close return is positive
+- MFE favorable = upside move after detection
+- MAE adverse = downside move after detection
+
+For short context:
+- favorable close return is negative
+- MFE favorable = downside move after detection
+- MAE adverse = upside move after detection
+
+Thresholds:
+- success_threshold_pct default 0.10
+- adverse_threshold_pct default 0.10
+
+No leverage.
+No fees.
+No slippage.
+No position sizing.
+No live readiness.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "mapping_recorded": false,
+  "mapping_id": null,
+  "record_mapping_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "signal_origins": [
+      "three_white_soldiers",
+      "bearish_engulfing",
+      "bullish_engulfing",
+      "exhaustion_wick",
+      "breakdown_retest",
+      "breakout_retest"
+    ],
+    "timeframes": [...],
+    "outcome_windows": [1,3,5,10,21,34,55],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "pattern_expansion_found": true/false,
+    "detections_loaded_by_origin": {
+      "three_white_soldiers": ...,
+      "bearish_engulfing": ...,
+      "bullish_engulfing": ...,
+      "exhaustion_wick": ...
+    },
+    "candles_loaded_by_timeframe": {...},
+    "registry_only_origins": [
+      "breakdown_retest",
+      "breakout_retest"
+    ]
+  },
+  "origin_outcome_summary": {
+    "three_white_soldiers": {
+      "mapped_count": ...,
+      "strict_mapped_count": ...,
+      "loose_mapped_count": ...,
+      "best_window": "...",
+      "supports_directional_bias": true/false/null,
+      "paper_tracking_recommended": true/false,
+      "needs_more_samples": true/false,
+      "window_stats": {...},
+      "live_ready": false
+    },
+    "bearish_engulfing": {...},
+    "bullish_engulfing": {...},
+    "exhaustion_wick": {...},
+    "breakdown_retest": {
+      "mapped_count": 0,
+      "blocked_reason": "registry_only_until_retest_structure"
+    },
+    "breakout_retest": {
+      "mapped_count": 0,
+      "blocked_reason": "registry_only_until_retest_structure"
+    }
+  },
+  "timeframe_outcome_summary": {
+    "4m": {...},
+    "8m": {...},
+    "13m": {...}
+  },
+  "aggregate_summary": {
+    "total_mapped_count": ...,
+    "origins_with_positive_bias": [...],
+    "origins_with_mixed_bias": [...],
+    "origins_needing_more_samples": [...],
+    "registry_only_blocked": [...]
+  },
+  "pattern_outcome_rankings": [
+    {
+      "rank": 1,
+      "signal_origin": "...",
+      "timeframe": "...",
+      "mode": "strict|loose_preview|combined",
+      "direction_bias": "long|short",
+      "mapped_count": ...,
+      "best_window": "...",
+      "favorable_close_rate_pct": ...,
+      "simple_success_rate_pct": ...,
+      "simple_failure_rate_pct": ...,
+      "avg_favorable_move_pct": ...,
+      "avg_adverse_move_pct": ...,
+      "score": ...,
+      "confidence": "LOW|MEDIUM|HIGH",
+      "risk_warnings": [...],
+      "paper_only": true,
+      "live_authorized": false
+    }
+  ],
+  "keter_recommendations": [
+    {
+      "signal_origin": "...",
+      "recommended_action": "RUN_KETER_FEEDBACK|COLLECT_MORE_SAMPLES|KEEP_REGISTRY_ONLY",
+      "priority": "HIGH|MEDIUM|LOW",
+      "why": "..."
+    }
+  ],
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX|RUN_R204_PATTERN_KETER_RESCORING_FAMILY",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- pattern_family_live_authorized=false
+
+LEDGER:
+logs/hammer_radar_forward/pattern_outcome_mapping_family.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM PATTERN OUTCOME MAPPING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+pattern-outcome-mapping-family
+
+Args:
+- --symbol default BTCUSDT
+- --success-threshold-pct float default 0.10
+- --adverse-threshold-pct float default 0.10
+- --record-mapping
+- --confirm-pattern-outcome-family <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --symbol BTCUSDT
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --symbol BTCUSDT \
+  --record-mapping \
+  --confirm-pattern-outcome-family "I CONFIRM PATTERN OUTCOME MAPPING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --record-mapping \
+  --confirm-pattern-outcome-family "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_pattern_outcome_mapping_family.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records mapping only
+- maps bullish pattern as long outcome
+- maps bearish pattern as short outcome
+- exhaustion wick respects direction when available
+- registry-only retest origins remain blocked
+- computes favorable close correctly for long and short
+- computes MFE/MAE correctly
+- aggregate summary separates positive/mixed/sample-limited origins
+- rankings are paper_only and live_authorized false
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R197/R200/R193 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --symbol BTCUSDT \
+  | jq '.status, .target_scope, .input_summary, .origin_outcome_summary, .timeframe_outcome_summary, .aggregate_summary, .pattern_outcome_rankings[0:20], .keter_recommendations, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --symbol BTCUSDT \
+  --record-mapping \
+  --confirm-pattern-outcome-family "I CONFIRM PATTERN OUTCOME MAPPING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .mapping_recorded, .aggregate_summary, .pattern_outcome_rankings[0:10], .keter_recommendations, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-outcome-mapping-family \
+  --record-mapping \
+  --confirm-pattern-outcome-family "wrong" \
+  | jq '.status, .confirmation_valid, .mapping_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R202_PATTERN_OUTCOME_MAPPING_FAMILY.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R202.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+
+Create:
+codex_tasks/phases/R204_PATTERN_KETER_RESCORING_FAMILY.md
+
+R204 should:
+- feed R202 outcome mapping into Keter scoring for pattern family
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, outcome rankings, Keter recommendations, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
