@@ -1,0 +1,539 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R203 Anchor Signal Confluence Matrix
+
+BRANCH:
+r203-anchor-signal-confluence-matrix
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R199 created WMA/MA anchor preview:
+- SMA200
+- WMA200
+- custom WMA periods: 13, 21, 34, 55, 89, 144, 200, 233, 377, 610, 888
+- target timeframes included 13D, 4H, 666m, 13H, 888m, 8m, 4m, 13m, 22m, 44m, 55m, 88m, 222m, 444m
+- no live authorization
+- no config writes
+
+R201 deepened anchor outcomes:
+- anchor confluence exists but is summary-level only
+- top anchor candidates included:
+  - 4m custom_wma period 144 rejection_down
+  - 8m custom_wma period 21 cross_down / loss
+  - 8m custom_wma period 89 rejection_down
+- risk warnings were preserved
+- confluence_resolution=summary_level_only
+- anchor_live_authorized=false
+- anchor_position_permission_created=false
+
+R197/R200/R202/R204 built and scored the pattern family:
+- bearish_engulfing is strongest new pattern origin
+- bearish_engulfing Keter score around 74
+- three_black_crows projected score around 69
+- hammer reference around 82
+- exhaustion_wick/bullish_engulfing/three_white_soldiers remain mixed-bias review
+- retest origins remain registry-only blocked
+
+R205 built pattern lane matrix:
+- 8m short + hammer_wick_reversal pair_score around 84
+- 8m short + bearish_engulfing pair_score around 82
+- 8m short + three_black_crows pair_score around 68
+- bearish_engulfing beats crows in lane matrix but hammer remains top
+- all paper-only
+
+R203 must combine anchor evidence with signal-origin/lane evidence into a confluence matrix.
+
+PURPOSE:
+Create a paper-only confluence matrix that:
+1. Reads R201 anchor outcome deepening.
+2. Reads R205 pattern lane matrix review.
+3. Reads R204 pattern Keter rescoring.
+4. Reads R195/R192 crow/hammer lane matrix context.
+5. Builds confluence rows:
+   - lane
+   - signal origin
+   - anchor type
+   - anchor period
+   - anchor interaction
+   - direction bias
+   - pair score
+   - anchor score
+   - combined confluence score
+6. Separates exact event-level confluence from summary-level confluence.
+7. Keeps summary-level confluence clearly marked as weaker evidence.
+8. Identifies best paper-only confluence candidates.
+9. Produces next actions for event-level timestamp matching.
+10. Does not write config.
+11. Does not authorize live.
+12. Does not call Binance/network.
+13. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is confluence matrix/audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate registry/scoring/matrix config
+- promote signal origins
+- promote lanes
+- create anchor/signal live permission
+- create position sizing
+
+TARGET SIGNAL ORIGINS:
+Primary:
+- hammer_wick_reversal
+- bearish_engulfing
+- three_black_crows
+
+Secondary:
+- exhaustion_wick
+- bullish_engulfing
+- three_white_soldiers
+- golden_pocket_rejection
+- rsi_divergence_bearish
+- rsi_divergence_bullish
+
+Blocked:
+- breakdown_retest
+- breakout_retest
+
+TARGET ANCHORS:
+- SMA200
+- WMA200
+- custom_wma periods:
+  13, 21, 34, 55, 89, 144, 200, 233, 377, 610, 888
+
+TARGET TIMEFRAMES:
+Use available local anchor/pattern/lane surfaces:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 444m
+- 666m
+- 888m
+- 4H
+- 13H
+- 13D if available
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create confluence-based live permission.
+- Do not infer live readiness from confluence score.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/anchor_outcome_deepening.py
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/pattern_keter_rescoring_family.py
+- src/app/hammer_radar/operator/pattern_outcome_mapping_family.py
+- src/app/hammer_radar/operator/pattern_family_feedback_sync.py
+- src/app/hammer_radar/operator/pattern_detector_family_expansion.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_outcome_feedback.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/anchor_outcome_deepening.ndjson
+- logs/hammer_radar_forward/wma_ma_anchor_layer_preview.ndjson
+- logs/hammer_radar_forward/pattern_lane_matrix_review.ndjson
+- logs/hammer_radar_forward/pattern_keter_rescoring_family.ndjson
+- logs/hammer_radar_forward/pattern_outcome_mapping_family.ndjson
+- logs/hammer_radar_forward/lane_matrix_after_crow_outcome_feedback.ndjson
+- logs/hammer_radar_forward/signal_origin_lane_matrix.ndjson
+- logs/hammer_radar_forward/candle_archive/*.ndjson
+- tests/hammer_radar/test_anchor_outcome_deepening.py
+- tests/hammer_radar/test_wma_ma_anchor_layer_preview.py
+- tests/hammer_radar/test_pattern_lane_matrix_review.py
+- tests/hammer_radar/test_pattern_keter_rescoring_family.py
+- docs/hammer_radar/live_readiness/R201_ANCHOR_OUTCOME_DEEPENING.md
+- docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+- docs/hammer_radar/live_readiness/R204_PATTERN_KETER_RESCORING_FAMILY.md
+
+REUSE / EXTEND:
+Reuse R201 anchor rankings and confluence notes.
+Reuse R205 lane/pattern pair scores.
+Reuse R204 Keter scorecards.
+Do not duplicate OHLC parsing unless needed for timestamp matching preview.
+Do not call Binance/network.
+Do not mutate config.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/anchor_signal_confluence_matrix.py
+
+Expose:
+- build_anchor_signal_confluence_matrix
+- load_latest_anchor_outcome_deepening
+- load_latest_pattern_lane_matrix_review
+- load_latest_pattern_keter_rescoring
+- load_latest_crow_hammer_lane_references
+- build_signal_origin_confluence_inputs
+- build_anchor_confluence_inputs
+- match_summary_level_confluence
+- attempt_event_level_confluence_preview
+- score_anchor_signal_confluence_row
+- build_anchor_signal_confluence_rows
+- build_anchor_signal_confluence_rankings
+- build_confluence_evidence_quality_report
+- build_confluence_next_actions
+- classify_anchor_signal_confluence_status
+- append_anchor_signal_confluence_matrix_record
+- load_anchor_signal_confluence_matrix_records
+- summarize_anchor_signal_confluence_matrix_records
+
+STATUS ENUM:
+- ANCHOR_SIGNAL_CONFLUENCE_MATRIX_READY
+- ANCHOR_SIGNAL_CONFLUENCE_MATRIX_REJECTED
+- ANCHOR_SIGNAL_CONFLUENCE_MATRIX_RECORDED
+- ANCHOR_SIGNAL_CONFLUENCE_MATRIX_BLOCKED
+- ANCHOR_SIGNAL_CONFLUENCE_MATRIX_ERROR
+
+CONFLUENCE STATUS ENUM:
+- SUMMARY_LEVEL_CONFLUENCE_AVAILABLE
+- EVENT_LEVEL_CONFLUENCE_AVAILABLE
+- EVENT_LEVEL_CONFLUENCE_NOT_AVAILABLE
+- CONFLUENCE_NEEDS_TIMESTAMP_MAPPING
+- CONFLUENCE_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+CONFLUENCE RESOLUTION:
+- event_level:
+  Exact timestamps/candles are matched between anchor event and signal origin detection.
+- summary_level:
+  Timeframe/source overlap exists, but exact candle timestamps are not matched.
+- none:
+  No useful overlap.
+
+Scoring must penalize summary_level vs event_level.
+
+SCORING RULES:
+For each confluence row:
+Inputs:
+- signal_origin_score:
+  from R205 pair score or R204 Keter score
+- anchor_score:
+  from R201 anchor interaction ranking
+- lane_score:
+  from R205 lane matrix if available
+- sample_confidence:
+  high/medium/low from R201 and pattern evidence
+- confluence_resolution:
+  event_level > summary_level > none
+- direction_alignment:
+  signal direction should align with anchor interaction bias
+- risk warnings:
+  penalize high failure rate / adverse > favorable / mixed bias
+- configured lane:
+  configured lanes get less caution than discovered unconfigured lanes
+- fresh flow:
+  fresh > stale_only > unknown
+
+Suggested score:
+- 30% signal origin / pair score
+- 25% anchor score
+- 20% lane evidence / flow
+- 15% sample confidence / mapped events
+- 10% direction alignment
+Penalties:
+- summary_level_only confluence
+- high risk warnings
+- stale-only flow
+- discovered unconfigured lane
+- blocked origins
+- no event-level timestamp match
+
+Never convert score into live permission.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "matrix_recorded": false,
+  "matrix_id": null,
+  "record_matrix_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "signal_origins": [...],
+    "anchor_types": [...],
+    "timeframes": [...],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "anchor_deepening_found": true/false,
+    "pattern_lane_matrix_found": true/false,
+    "pattern_keter_found": true/false,
+    "anchor_candidates_loaded": ...,
+    "signal_origin_candidates_loaded": ...,
+    "event_level_matches_found": ...,
+    "summary_level_matches_found": ...
+  },
+  "confluence_evidence_quality_report": {
+    "event_level_rows": ...,
+    "summary_level_rows": ...,
+    "low_confidence_rows": ...,
+    "risk_warning_rows": ...,
+    "blocked_rows": ...
+  },
+  "anchor_signal_confluence_rows": [
+    {
+      "lane_key": "...",
+      "signal_origin": "bearish_engulfing",
+      "timeframe": "8m",
+      "direction_bias": "short",
+      "anchor_type": "WMA200|SMA200|custom_wma",
+      "anchor_period": 200,
+      "anchor_interaction": "cross_down|rejection_down|...",
+      "signal_score": ...,
+      "anchor_score": ...,
+      "lane_score": ...,
+      "confluence_score": ...,
+      "confluence_resolution": "event_level|summary_level|none",
+      "sample_confidence": "LOW|MEDIUM|HIGH",
+      "risk_warnings": [...],
+      "pair_readiness": "...",
+      "paper_only": true,
+      "live_authorized": false,
+      "signal_origin_promoted": false,
+      "lane_promoted": false,
+      "why": "..."
+    }
+  ],
+  "anchor_signal_confluence_rankings": [
+    {
+      "rank": 1,
+      "lane_key": "...",
+      "signal_origin": "...",
+      "anchor_type": "...",
+      "anchor_period": ...,
+      "anchor_interaction": "...",
+      "confluence_score": ...,
+      "confluence_resolution": "...",
+      "recommended_action": "TRACK_PAPER|DEEPEN_EVENT_MATCHING|COLLECT_MORE_FLOW|KEEP_REVIEW_ONLY|KEEP_BLOCKED",
+      "why": "..."
+    }
+  ],
+  "best_confluence_candidates": [
+    ...
+  ],
+  "confluence_next_actions": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "future_phase": "R206|R207|...",
+      "action": "...",
+      "why": "..."
+    }
+  ],
+  "confluence_status": "...",
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R206_TINY_LIVE_READINESS_GAP_RECHECK|RUN_R207_EVENT_LEVEL_CONFLUENCE_MATCHER",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- pattern_family_live_authorized=false
+- anchor_live_authorized=false
+- confluence_live_authorized=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/anchor_signal_confluence_matrix.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ANCHOR SIGNAL CONFLUENCE MATRIX RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+anchor-signal-confluence-matrix
+
+Args:
+- --record-matrix
+- --confirm-anchor-signal-confluence <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix \
+  --record-matrix \
+  --confirm-anchor-signal-confluence "I CONFIRM ANCHOR SIGNAL CONFLUENCE MATRIX RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix \
+  --record-matrix \
+  --confirm-anchor-signal-confluence "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_anchor_signal_confluence_matrix.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records matrix only
+- summary-level confluence is penalized versus event-level
+- risk warnings reduce score
+- stale-only flow reduces score
+- direction mismatch reduces score
+- blocked origins are excluded or marked blocked
+- no live authorization
+- no confluence live authorization
+- no position permission
+- no signal origin promoted
+- no lane promoted
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R201/R205/R204/R199 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix \
+  | jq '.status, .target_scope, .input_summary, .confluence_evidence_quality_report, .anchor_signal_confluence_rows[0:20], .anchor_signal_confluence_rankings[0:20], .best_confluence_candidates[0:20], .confluence_next_actions, .confluence_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix \
+  --record-matrix \
+  --confirm-anchor-signal-confluence "I CONFIRM ANCHOR SIGNAL CONFLUENCE MATRIX RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .matrix_recorded, .confluence_evidence_quality_report, .anchor_signal_confluence_rankings[0:10], .confluence_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-signal-confluence-matrix \
+  --record-matrix \
+  --confirm-anchor-signal-confluence "wrong" \
+  | jq '.status, .confirmation_valid, .matrix_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R203.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R206_TINY_LIVE_READINESS_GAP_RECHECK.md
+
+Create:
+codex_tasks/phases/R207_EVENT_LEVEL_CONFLUENCE_MATCHER.md
+
+R207 should:
+- attempt exact timestamp/candle-level matching between anchors and signal origins
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, best confluence candidates, confluence quality, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
