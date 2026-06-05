@@ -2077,6 +2077,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "pattern-keter-rescoring-family":
+        from src.app.hammer_radar.operator.pattern_keter_rescoring_family import (
+            build_pattern_keter_rescoring_family,
+            format_pattern_keter_rescoring_family_json,
+        )
+
+        print(
+            format_pattern_keter_rescoring_family_json(
+                build_pattern_keter_rescoring_family(
+                    log_dir=args.log_dir,
+                    record_rescore=args.record_rescore,
+                    confirm_pattern_keter_family=args.confirm_pattern_keter_family,
+                )
+            )
+        )
     elif args.command == "lane-matrix-after-crow-outcome-feedback":
         from src.app.hammer_radar.operator.lane_matrix_after_crow_outcome_feedback import (
             build_lane_matrix_after_crow_outcome_feedback,
@@ -3681,6 +3696,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     crow_outcome_keter_feedback_parser.add_argument("--record-feedback", action="store_true")
     crow_outcome_keter_feedback_parser.add_argument("--confirm-crow-outcome-keter-feedback", default=None)
+
+    pattern_keter_rescoring_family_parser = subparsers.add_parser(
+        "pattern-keter-rescoring-family",
+        parents=[parent],
+    )
+    pattern_keter_rescoring_family_parser.add_argument("--record-rescore", action="store_true")
+    pattern_keter_rescoring_family_parser.add_argument("--confirm-pattern-keter-family", default=None)
 
     lane_matrix_after_crow_outcome_feedback_parser = subparsers.add_parser(
         "lane-matrix-after-crow-outcome-feedback",
