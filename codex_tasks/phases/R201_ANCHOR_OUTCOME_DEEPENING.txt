@@ -1,0 +1,508 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R201 Anchor Outcome Deepening
+
+BRANCH:
+r201-anchor-outcome-deepening
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R199 created the WMA/MA anchor layer preview.
+
+R199 found:
+- anchor types:
+  - SMA200
+  - WMA200
+  - custom_wma
+- anchor periods:
+  - 13, 21, 34, 55, 89, 144, 200, 233, 377, 610, 888
+- timeframes inspected:
+  - 13D, 4H, 666m, 13H, 888m, 8m, 4m, 13m, 22m, 44m, 55m, 88m, 222m, 444m
+- 13D source was missing
+- 4H, 666m, 13H, 888m had partial anchor coverage
+- 8m, 4m, 13m, 22m, 44m, 55m had enough candles for the full anchor set
+- total anchor events around 209k
+- candidate examples included:
+  - 222m custom_wma period 144 rejection_up
+  - 8m WMA200 cross_down / loss
+  - 8m custom WMA period 89 cross_down / loss
+- all anchor results were paper-only
+- anchor_live_authorized=false
+- anchor_position_permission_created=false
+
+R200 synced pattern family feedback:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- breakdown_retest registry-only
+- breakout_retest registry-only
+
+The operator wants WMA/MA anchors to become a position-context layer:
+- WMA200 / MA200 pivot or direction anchor
+- custom WMA studies on 13D, 4H, 666m, 13H, 888m, and full-spectrum TFs
+- correlation with RSI, Three Black Crows, hammer, soldiers, engulfing, exhaustion wick
+- evidence-first, paper-only
+- no weakened live gates
+
+R201 must deepen anchor outcome analysis and prepare confluence ranking.
+
+PURPOSE:
+Create an anchor outcome deepening surface that:
+1. Reads R199 WMA/MA anchor preview records.
+2. Recomputes or reuses local OHLC anchor events where needed.
+3. Deepens outcome windows for anchor events.
+4. Separates high-sample candidates from low-sample traps.
+5. Produces per-anchor / per-timeframe / per-interaction outcome summaries.
+6. Adds signal-origin confluence overlay:
+   - hammer_wick_reversal
+   - three_black_crows
+   - three_white_soldiers
+   - bearish_engulfing
+   - bullish_engulfing
+   - exhaustion_wick
+   - RSI divergence origins where available
+   - golden_pocket_rejection where available
+7. Identifies anchor candidates worth later Keter/matrix scoring.
+8. Does not create position permission.
+9. Does not authorize live.
+10. Does not call Binance/network.
+11. Does not write config.
+12. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is paper-only anchor research.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate scoring/matrix config
+- promote signal origins
+- promote lanes
+- turn WMA/MA anchors into live entry permission
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source lane controls.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create anchor-based live permission.
+- Do not create position sizing.
+- Do not infer live readiness from anchor evidence.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/pattern_family_feedback_sync.py
+- src/app/hammer_radar/operator/pattern_detector_family_expansion.py
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/crow_outcome_mapping_preview.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/wma_ma_anchor_layer_preview.ndjson usage patterns
+- logs/hammer_radar_forward/pattern_family_feedback_sync.ndjson usage patterns
+- logs/hammer_radar_forward/pattern_detector_family_expansion.ndjson usage patterns
+- logs/hammer_radar_forward/three_black_crows_local_detections.ndjson usage patterns
+- logs/hammer_radar_forward/crow_outcome_mapping_preview.ndjson usage patterns
+- logs/hammer_radar_forward/candle_archive/*.ndjson
+- tests/hammer_radar/test_wma_ma_anchor_layer_preview.py
+- tests/hammer_radar/test_pattern_family_feedback_sync.py
+- tests/hammer_radar/test_pattern_detector_family_expansion.py
+- docs/hammer_radar/live_readiness/R199_WMA_MA_ANCHOR_LAYER_PREVIEW.md
+- docs/hammer_radar/live_readiness/R200_PATTERN_FAMILY_FEEDBACK_SYNC.md
+
+REUSE / EXTEND:
+Reuse R199 anchor calculation and event classification.
+Reuse local candle feed adapter.
+Reuse pattern family summaries for overlay.
+Do not duplicate OHLC parsing.
+Do not call Binance/network.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/anchor_outcome_deepening.py
+
+Expose:
+- build_anchor_outcome_deepening
+- load_latest_wma_ma_anchor_preview
+- load_anchor_event_candidates
+- deepen_anchor_outcome_windows
+- build_anchor_sample_quality_report
+- build_anchor_interaction_rankings
+- build_anchor_timeframe_rankings
+- build_anchor_signal_origin_confluence
+- build_anchor_confluence_rankings
+- build_anchor_risk_warnings
+- build_anchor_next_actions
+- append_anchor_outcome_deepening_record
+- load_anchor_outcome_deepening_records
+- summarize_anchor_outcome_deepening_records
+
+STATUS ENUM:
+- ANCHOR_OUTCOME_DEEPENING_READY
+- ANCHOR_OUTCOME_DEEPENING_REJECTED
+- ANCHOR_OUTCOME_DEEPENING_RECORDED
+- ANCHOR_OUTCOME_DEEPENING_BLOCKED
+- ANCHOR_OUTCOME_DEEPENING_ERROR
+
+ANCHOR DEEPENING STATUS ENUM:
+- ANCHOR_CANDIDATES_READY_FOR_PAPER_REVIEW
+- ANCHOR_CANDIDATES_NEED_MORE_SAMPLES
+- ANCHOR_CONFLUENCE_AVAILABLE
+- ANCHOR_CONFLUENCE_NEEDS_DEEPER_MAPPING
+- ANCHOR_LAYER_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+DEFAULT OUTCOME WINDOWS:
+- 1
+- 3
+- 5
+- 10
+- 21
+- 34
+- 55
+
+SAMPLE QUALITY RULES:
+- LOW sample confidence: mapped_events < 30
+- MEDIUM sample confidence: mapped_events >= 30 and < 100
+- HIGH sample confidence: mapped_events >= 100
+- Very high failure rate should create risk warning even when success rate is high.
+- Candidate should not be considered strong if avg adverse move exceeds avg favorable move by a large margin.
+- Direction bias must remain hypothesis, not permission.
+
+ANCHOR TYPES / PERIODS:
+Reuse R199 defaults:
+- SMA200
+- WMA200
+- custom_wma
+Periods:
+- 13
+- 21
+- 34
+- 55
+- 89
+- 144
+- 200
+- 233
+- 377
+- 610
+- 888
+
+ANCHOR INTERACTIONS:
+- touch
+- near_touch
+- cross_up
+- cross_down
+- reclaim
+- loss
+- rejection_up
+- rejection_down
+
+SIGNAL ORIGIN CONFLUENCE:
+Overlay anchor events with available recorded pattern summaries:
+- hammer_wick_reversal
+- three_black_crows
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- golden_pocket_rejection
+- rsi_divergence_bearish
+- rsi_divergence_bullish
+
+Confluence is preview-only.
+Do not claim exact trade confluence unless timestamps can be matched locally.
+If only summary-level overlap exists, mark:
+confluence_resolution="summary_level_only"
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "deepening_recorded": false,
+  "deepening_id": null,
+  "record_deepening_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "anchor_types": [...],
+    "anchor_periods": [...],
+    "timeframes": [...],
+    "outcome_windows": [1,3,5,10,21,34,55],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "anchor_sample_quality_report": {
+    "total_candidates_reviewed": ...,
+    "high_confidence_candidates": ...,
+    "medium_confidence_candidates": ...,
+    "low_confidence_candidates": ...,
+    "risk_warning_candidates": ...
+  },
+  "anchor_interaction_rankings": [
+    {
+      "rank": 1,
+      "timeframe": "...",
+      "anchor_type": "...",
+      "period": ...,
+      "interaction": "...",
+      "direction_bias": "long|short|neutral",
+      "mapped_events": ...,
+      "sample_confidence": "LOW|MEDIUM|HIGH",
+      "best_window": "...",
+      "success_rate_pct": ...,
+      "failure_rate_pct": ...,
+      "avg_favorable_move_pct": ...,
+      "avg_adverse_move_pct": ...,
+      "score": ...,
+      "risk_warnings": [...],
+      "paper_only": true,
+      "live_authorized": false
+    }
+  ],
+  "anchor_timeframe_rankings": [
+    {
+      "timeframe": "...",
+      "candidate_count": ...,
+      "best_anchor": "...",
+      "best_score": ...,
+      "notes": [...]
+    }
+  ],
+  "anchor_signal_origin_confluence": {
+    "confluence_records_found": ...,
+    "confluence_resolution": "event_level|summary_level_only|none",
+    "top_confluences": [
+      {
+        "signal_origin": "...",
+        "timeframe": "...",
+        "anchor_type": "...",
+        "period": ...,
+        "interaction": "...",
+        "confidence": "...",
+        "why": "..."
+      }
+    ]
+  },
+  "anchor_confluence_rankings": [
+    ...
+  ],
+  "anchor_risk_warnings": [
+    ...
+  ],
+  "anchor_next_actions": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "future_phase": "R202|R203|...",
+      "action": "...",
+      "why": "..."
+    }
+  ],
+  "deepening_status": "...",
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R202_PATTERN_OUTCOME_MAPPING_FAMILY|RUN_R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- anchor_live_authorized=false
+- anchor_position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/anchor_outcome_deepening.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM ANCHOR OUTCOME DEEPENING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+anchor-outcome-deepening
+
+Args:
+- --symbol default BTCUSDT
+- --record-deepening
+- --confirm-anchor-outcome-deepening <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --symbol BTCUSDT
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --symbol BTCUSDT \
+  --record-deepening \
+  --confirm-anchor-outcome-deepening "I CONFIRM ANCHOR OUTCOME DEEPENING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --record-deepening \
+  --confirm-anchor-outcome-deepening "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_anchor_outcome_deepening.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records deepening only
+- sample quality classification works
+- high failure rate produces warning
+- candidate score penalizes low sample count
+- candidate score penalizes adverse > favorable
+- confluence summary handles summary-level-only overlays
+- no live authorization
+- no anchor position permission
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R199/R200/R197 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --symbol BTCUSDT \
+  | jq '.status, .target_scope, .anchor_sample_quality_report, .anchor_interaction_rankings[0:20], .anchor_timeframe_rankings, .anchor_signal_origin_confluence, .anchor_confluence_rankings[0:20], .anchor_risk_warnings[0:20], .anchor_next_actions, .deepening_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --symbol BTCUSDT \
+  --record-deepening \
+  --confirm-anchor-outcome-deepening "I CONFIRM ANCHOR OUTCOME DEEPENING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .deepening_recorded, .anchor_sample_quality_report, .anchor_interaction_rankings[0:10], .anchor_next_actions, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  anchor-outcome-deepening \
+  --record-deepening \
+  --confirm-anchor-outcome-deepening "wrong" \
+  | jq '.status, .confirmation_valid, .deepening_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R201_ANCHOR_OUTCOME_DEEPENING.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R201.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R202_PATTERN_OUTCOME_MAPPING_FAMILY.md
+
+Create:
+codex_tasks/phases/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+
+R203 should:
+- combine anchor candidates with signal-origin detections and lane rankings
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, best anchor candidates, confluence status, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

@@ -1978,6 +1978,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "anchor-outcome-deepening":
+        from src.app.hammer_radar.operator.anchor_outcome_deepening import (
+            build_anchor_outcome_deepening,
+            format_anchor_outcome_deepening_json,
+        )
+
+        print(
+            format_anchor_outcome_deepening_json(
+                build_anchor_outcome_deepening(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    record_deepening=args.record_deepening,
+                    confirm_anchor_outcome_deepening=args.confirm_anchor_outcome_deepening,
+                )
+            )
+        )
     elif args.command == "keter-rescore-after-three-black-crows":
         from src.app.hammer_radar.operator.keter_rescoring_after_three_black_crows import (
             build_keter_rescoring_after_three_black_crows,
@@ -3596,6 +3612,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     pattern_family_feedback_sync_parser.add_argument("--record-feedback", action="store_true")
     pattern_family_feedback_sync_parser.add_argument("--confirm-pattern-family-feedback-sync", default=None)
+
+    anchor_outcome_deepening_parser = subparsers.add_parser(
+        "anchor-outcome-deepening",
+        parents=[parent],
+    )
+    anchor_outcome_deepening_parser.add_argument("--symbol", default="BTCUSDT")
+    anchor_outcome_deepening_parser.add_argument("--record-deepening", action="store_true")
+    anchor_outcome_deepening_parser.add_argument("--confirm-anchor-outcome-deepening", default=None)
 
     keter_rescore_after_three_black_crows_parser = subparsers.add_parser(
         "keter-rescore-after-three-black-crows",
