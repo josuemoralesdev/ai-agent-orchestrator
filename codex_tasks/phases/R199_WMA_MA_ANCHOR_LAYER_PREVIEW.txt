@@ -1,0 +1,520 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R199 WMA / MA Anchor Layer Preview
+
+BRANCH:
+r199-wma-ma-anchor-layer-preview
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: DIAGNOSTIC / AUDIT, WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R196 proved current paper coverage had gaps.
+R198 expanded full-spectrum paper harvester scope.
+R197 expanded the candle-pattern detector family:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- breakdown_retest preview-only
+- breakout_retest preview-only
+
+The operator now wants a near-future anchor layer:
+- WMA200 / MA200 as possible pivot/reversal/position anchors
+- custom WMA testing across higher and unusual timeframes
+- target timeframes include:
+  - 13D
+  - 4H
+  - 666m
+  - 13H
+  - 888m
+  - plus discovered/full-spectrum timeframes
+- anchor layer must combine with RSI, Three Black Crows, hammer, and the rest of the detector family
+- this must remain evidence-first and paper-only
+- it must not weaken live safety gates
+
+R199 creates the preview/research layer for WMA/MA anchors.
+
+PURPOSE:
+Create a paper-only WMA/MA anchor preview that:
+1. Reads local OHLC candle archives only.
+2. Discovers available candle timeframes.
+3. Computes MA200 and WMA200 where enough candles exist.
+4. Computes custom WMA anchors for candidate periods.
+5. Measures price interaction with anchors:
+   - touch
+   - near-touch
+   - rejection
+   - cross
+   - reclaim
+   - loss
+   - distance from anchor
+6. Maps anchor events to future outcome windows.
+7. Compares anchor context against existing signal-origin/lane evidence.
+8. Produces anchor candidates for later scoring.
+9. Does not call Binance/network.
+10. Does not write config.
+11. Does not place orders.
+12. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is research/audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote signal origins
+- promote lanes
+- authorize anchor-based live trading
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source lane controls.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create live anchor decisions.
+- Do not treat MA/WMA anchor as entry permission.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/full_spectrum_paper_coverage_audit.py
+- src/app/hammer_radar/operator/pattern_detector_family_expansion.py
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/crow_outcome_mapping_preview.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_outcome_feedback.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/candle_archive/*.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/pattern_detector_family_expansion.ndjson
+- logs/hammer_radar_forward/crow_outcome_mapping_preview.ndjson
+- tests/hammer_radar/test_local_candle_feed_adapter.py
+- tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+- tests/hammer_radar/test_pattern_detector_family_expansion.py
+- docs/hammer_radar/live_readiness/R197_PATTERN_DETECTOR_FAMILY_EXPANSION.md
+- docs/hammer_radar/live_readiness/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+
+REUSE / EXTEND:
+Reuse local candle archive readers and candle normalization.
+Do not duplicate OHLC parsing if adapters already exist.
+Do not create Binance/network logic.
+Do not mutate config.
+Do not create live trading logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+
+Expose:
+- build_wma_ma_anchor_layer_preview
+- discover_anchor_candle_sources
+- load_anchor_candles
+- compute_sma
+- compute_wma
+- compute_anchor_series
+- build_anchor_event_candidates
+- classify_anchor_interaction
+- map_anchor_event_outcomes
+- build_anchor_outcome_summary
+- build_anchor_signal_origin_overlay
+- build_anchor_candidate_ranking
+- build_anchor_layer_next_actions
+- append_wma_ma_anchor_preview_record
+- load_wma_ma_anchor_preview_records
+- summarize_wma_ma_anchor_preview_records
+
+STATUS ENUM:
+- WMA_MA_ANCHOR_LAYER_PREVIEW_READY
+- WMA_MA_ANCHOR_LAYER_PREVIEW_REJECTED
+- WMA_MA_ANCHOR_LAYER_PREVIEW_RECORDED
+- WMA_MA_ANCHOR_LAYER_PREVIEW_BLOCKED
+- WMA_MA_ANCHOR_LAYER_PREVIEW_ERROR
+
+ANCHOR STATUS ENUM:
+- ANCHOR_EVENTS_FOUND
+- ANCHOR_EVENTS_NOT_FOUND
+- INSUFFICIENT_CANDLES_FOR_ANCHOR
+- LOCAL_CANDLE_FEED_MISSING
+- ANCHOR_OUTCOME_MAPPING_AVAILABLE
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+ANCHOR TYPES:
+- SMA200
+- WMA200
+- custom_wma
+
+DEFAULT ANCHOR PERIODS:
+- 13
+- 21
+- 34
+- 55
+- 89
+- 144
+- 200
+- 233
+- 377
+- 610
+- 888
+
+DEFAULT TIMEFRAMES:
+Use discovered local candle archives plus explicit target list:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 444m
+- 666m
+- 888m
+- 4H
+- 13H
+- 13D
+
+PRIORITY TIMEFRAMES:
+- 13D
+- 4H
+- 666m
+- 13H
+- 888m
+- 8m
+- 4m
+
+ANCHOR INTERACTION RULES:
+For each candle after anchor is available, compute:
+- close_distance_pct = (close - anchor) / anchor * 100
+- high_distance_pct
+- low_distance_pct
+- touched_anchor:
+  true when low <= anchor <= high
+- near_touch:
+  true when abs(close_distance_pct) <= near_touch_threshold_pct
+- above_anchor:
+  close > anchor
+- below_anchor:
+  close < anchor
+- cross_up:
+  previous close < previous anchor and current close > current anchor
+- cross_down:
+  previous close > previous anchor and current close < current anchor
+- rejection_down:
+  high touches or rises above anchor, close below anchor
+- rejection_up:
+  low touches or falls below anchor, close above anchor
+- reclaim:
+  cross_up after being below anchor
+- loss:
+  cross_down after being above anchor
+
+Default thresholds:
+- near_touch_threshold_pct = 0.15
+- outcome windows = 1, 3, 5, 10, 21 candles
+- success threshold pct = 0.10
+- adverse threshold pct = 0.10
+
+OUTCOME MAPPING:
+For each anchor event:
+- direction hypothesis:
+  - rejection_down / loss / cross_down => short bias
+  - rejection_up / reclaim / cross_up => long bias
+  - touch / near_touch => neutral context until paired with signal origin
+- compute future close return
+- compute MFE in hypothesized direction
+- compute MAE against hypothesized direction
+- compute simple_success / simple_failure preview
+- no leverage, no fees, no slippage, no position sizing
+
+SIGNAL ORIGIN OVERLAY:
+If existing pattern detector / signal origin records overlap nearby:
+- hammer_wick_reversal
+- three_black_crows
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- RSI divergence origins if available
+- golden_pocket_rejection if inferable
+
+The overlay should be preview-only:
+- do not create live permission
+- do not promote signal origin
+- do not mutate registry
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "preview_recorded": false,
+  "preview_id": null,
+  "record_preview_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "timeframes": [...],
+    "anchor_types": ["SMA200", "WMA200", "custom_wma"],
+    "anchor_periods": [...]
+  },
+  "candle_source_summary": {
+    "sources_found": [...],
+    "sources_missing": [...],
+    "timeframes_with_enough_candles": [...],
+    "timeframes_without_enough_candles": [...]
+  },
+  "anchor_event_summary": {
+    "total_anchor_events": ...,
+    "events_by_timeframe": {...},
+    "events_by_anchor": {...},
+    "events_by_interaction": {...}
+  },
+  "anchor_outcome_summary": {
+    "mapped_events": ...,
+    "best_anchor_timeframe": "...",
+    "best_anchor_type": "...",
+    "best_anchor_period": ...,
+    "best_interaction": "...",
+    "window_stats": {...}
+  },
+  "anchor_signal_origin_overlay": {
+    "overlap_records_found": ...,
+    "top_overlaps": [...],
+    "notes": [...]
+  },
+  "anchor_candidate_ranking": [
+    {
+      "rank": 1,
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "anchor_type": "WMA200|SMA200|custom_wma",
+      "period": ...,
+      "interaction": "...",
+      "direction_bias": "long|short|neutral",
+      "mapped_events": ...,
+      "success_rate_pct": ...,
+      "failure_rate_pct": ...,
+      "avg_favorable_move_pct": ...,
+      "avg_adverse_move_pct": ...,
+      "score": ...,
+      "confidence": "LOW|MEDIUM|HIGH",
+      "why": "...",
+      "paper_only": true,
+      "live_authorized": false
+    }
+  ],
+  "anchor_layer_next_actions": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "action": "...",
+      "future_phase": "R200|R201|...",
+      "why": "..."
+    }
+  ],
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R200_PATTERN_FAMILY_FEEDBACK_SYNC|RUN_R201_ANCHOR_OUTCOME_DEEPENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- anchor_live_authorized=false
+- anchor_position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/wma_ma_anchor_layer_preview.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM WMA MA ANCHOR LAYER PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+wma-ma-anchor-layer-preview
+
+Args:
+- --symbol default BTCUSDT
+- --timeframes comma-separated optional
+- --periods comma-separated optional
+- --near-touch-threshold-pct float default 0.15
+- --success-threshold-pct float default 0.10
+- --adverse-threshold-pct float default 0.10
+- --record-preview
+- --confirm-wma-ma-anchor-preview <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --symbol BTCUSDT
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --symbol BTCUSDT \
+  --record-preview \
+  --confirm-wma-ma-anchor-preview "I CONFIRM WMA MA ANCHOR LAYER PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --record-preview \
+  --confirm-wma-ma-anchor-preview "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_wma_ma_anchor_layer_preview.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records preview only
+- SMA calculation works
+- WMA calculation works
+- insufficient candles are blocked
+- touch / near_touch / cross_up / cross_down / rejection_up / rejection_down classifications work
+- outcome mapping works for long and short hypotheses
+- anchor rankings are paper_only and live_authorized false
+- anchor layer does not create position permission
+- signal-origin overlay is preview-only
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R198/R197/local candle adapter tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --symbol BTCUSDT \
+  | jq '.status, .target_scope, .candle_source_summary, .anchor_event_summary, .anchor_outcome_summary, .anchor_signal_origin_overlay, .anchor_candidate_ranking[0:20], .anchor_layer_next_actions, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --symbol BTCUSDT \
+  --record-preview \
+  --confirm-wma-ma-anchor-preview "I CONFIRM WMA MA ANCHOR LAYER PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .preview_recorded, .anchor_event_summary, .anchor_outcome_summary, .anchor_candidate_ranking[0:10], .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  wma-ma-anchor-layer-preview \
+  --record-preview \
+  --confirm-wma-ma-anchor-preview "wrong" \
+  | jq '.status, .confirmation_valid, .preview_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R199_WMA_MA_ANCHOR_LAYER_PREVIEW.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R199.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R200_PATTERN_FAMILY_FEEDBACK_SYNC.md if missing.
+Create:
+codex_tasks/phases/R201_ANCHOR_OUTCOME_DEEPENING.md
+
+R201 should:
+- deepen WMA/MA anchor outcome studies
+- compare WMA200/MA200/custom WMA across selected timeframes
+- map anchor + signal-origin confluence
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, anchor candidates, best anchors, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

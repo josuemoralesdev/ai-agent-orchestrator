@@ -1925,6 +1925,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "wma-ma-anchor-layer-preview":
+        from src.app.hammer_radar.operator.wma_ma_anchor_layer_preview import (
+            build_wma_ma_anchor_layer_preview,
+            format_wma_ma_anchor_layer_preview_json,
+        )
+
+        print(
+            format_wma_ma_anchor_layer_preview_json(
+                build_wma_ma_anchor_layer_preview(
+                    log_dir=args.log_dir,
+                    symbol=args.symbol,
+                    timeframes=args.timeframes,
+                    periods=args.periods,
+                    near_touch_threshold_pct=args.near_touch_threshold_pct,
+                    success_threshold_pct=args.success_threshold_pct,
+                    adverse_threshold_pct=args.adverse_threshold_pct,
+                    record_preview=args.record_preview,
+                    confirm_wma_ma_anchor_preview=args.confirm_wma_ma_anchor_preview,
+                )
+            )
+        )
     elif args.command == "signal-origin-feedback-sync":
         from src.app.hammer_radar.operator.signal_origin_feedback_sync import (
             build_signal_origin_feedback_sync_after_three_black_crows,
@@ -3531,6 +3552,19 @@ def _build_parser() -> argparse.ArgumentParser:
     pattern_detector_family_expansion_parser.add_argument("--latest-candles", type=int, default=500)
     pattern_detector_family_expansion_parser.add_argument("--record-expansion", action="store_true")
     pattern_detector_family_expansion_parser.add_argument("--confirm-pattern-family-expansion", default=None)
+
+    wma_ma_anchor_layer_preview_parser = subparsers.add_parser(
+        "wma-ma-anchor-layer-preview",
+        parents=[parent],
+    )
+    wma_ma_anchor_layer_preview_parser.add_argument("--symbol", default="BTCUSDT")
+    wma_ma_anchor_layer_preview_parser.add_argument("--timeframes", default=None)
+    wma_ma_anchor_layer_preview_parser.add_argument("--periods", default=None)
+    wma_ma_anchor_layer_preview_parser.add_argument("--near-touch-threshold-pct", type=float, default=0.15)
+    wma_ma_anchor_layer_preview_parser.add_argument("--success-threshold-pct", type=float, default=0.10)
+    wma_ma_anchor_layer_preview_parser.add_argument("--adverse-threshold-pct", type=float, default=0.10)
+    wma_ma_anchor_layer_preview_parser.add_argument("--record-preview", action="store_true")
+    wma_ma_anchor_layer_preview_parser.add_argument("--confirm-wma-ma-anchor-preview", default=None)
 
     signal_origin_feedback_sync_parser = subparsers.add_parser(
         "signal-origin-feedback-sync",
