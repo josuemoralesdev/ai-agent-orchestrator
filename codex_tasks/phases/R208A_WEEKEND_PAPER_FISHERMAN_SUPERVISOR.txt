@@ -1,0 +1,454 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R208A Weekend Paper Fisherman Supervisor
+
+BRANCH:
+r208a-weekend-paper-fisherman-supervisor
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R208 proved the "fisherman" problem is real.
+
+R208 findings:
+- full-spectrum watcher was stale / not likely running
+- short capture watcher was stale / not likely running
+- 8m short capture count stayed 3/10
+- threshold not met
+- full-spectrum harvester caught one lane:
+  BTCUSDT|222m|long|ladder_close_50_618
+- after capture, the full-spectrum harvester exited
+- capture ledger mismatch was reported:
+  missing logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+
+The operator is explicitly worried that the weekend will pass and on Monday we discover:
+- the fisherman was not running
+- capture heartbeat was stale
+- no fresh candidates were captured because the process was dead
+- betrayal/inverse evidence was not watched unless manually mentioned
+
+This phase must fix paper-fishing reliability before more theory work.
+
+PURPOSE:
+Create a paper-only weekend fisherman supervisor that:
+1. Checks whether the full-spectrum harvester is alive/recent.
+2. Checks whether the 8m short capture watcher is alive/recent.
+3. Checks whether heartbeats are recent.
+4. Checks whether captures are flowing.
+5. Distinguishes:
+   - no signal found
+   - fisherman not running
+   - fisherman stale
+   - fisherman exited after capture
+   - capture ledger mismatch
+   - capture count below threshold
+6. Provides safe restart commands for tmux, but does not run them automatically in Codex.
+7. Adds a supervisor CLI that can run repeatedly and report status.
+8. Adds a safe weekend runbook.
+9. Includes betrayal/inverse watch context explicitly:
+   - 222m betrayal/inverse primary candidate from R80/R81 path
+   - 88m betrayal/inverse watchlist
+   - any 222m fresh full-spectrum capture must be surfaced in the report
+10. Does not call Binance/network.
+11. Does not place orders.
+12. Does not mutate env/config.
+13. Does not change lane mode.
+14. Does not arm live.
+
+CRITICAL SAFETY:
+This phase is paper-fisherman supervision only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+- run sudo
+- install systemd units automatically
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from capture/fishing status.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/capture_watcher_supervisor_8m_short.py
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py
+- src/app/hammer_radar/operator/full_spectrum_betrayal_short_review.py if present
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson if present
+- logs/hammer_radar_forward/betrayal_*.ndjson if present
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R81_TRUE_INVERSE_PAPER_OUTCOME_VALIDATION.md
+- docs/hammer_radar/R82_MARKOV_REGIME_GATE.md
+- docs/hammer_radar/R83_MIRO_FISH_QUALITY_GATE.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- docs/hammer_radar/live_readiness/R208_CAPTURE_THRESHOLD_RECOVERY_8M_SHORT.md
+- tests/hammer_radar/test_capture_threshold_recovery_8m_short.py
+- tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+
+REUSE / EXTEND:
+Reuse R208 capture recovery logic.
+Reuse R198 full-spectrum harvester scope and command format.
+Reuse existing heartbeat parsing.
+Reuse betrayal audit facts as paper-only context.
+Do not create a second capture-count philosophy.
+Do not call Binance/network.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+
+Expose:
+- build_weekend_paper_fisherman_supervisor
+- load_latest_full_spectrum_heartbeats
+- load_latest_full_spectrum_harvest_records
+- load_latest_short_capture_heartbeats
+- load_latest_short_capture_records
+- load_capture_count_sync_status
+- load_betrayal_inverse_context
+- detect_fisherman_process_health_from_ledgers
+- detect_harvester_exit_after_capture
+- detect_no_signal_vs_no_fisherman
+- build_weekend_capture_watch_summary
+- build_betrayal_watch_summary
+- build_weekend_supervisor_actions
+- build_safe_weekend_operator_commands
+- append_weekend_paper_fisherman_supervisor_record
+- load_weekend_paper_fisherman_supervisor_records
+- summarize_weekend_paper_fisherman_supervisor_records
+
+STATUS ENUM:
+- WEEKEND_PAPER_FISHERMAN_SUPERVISOR_READY
+- WEEKEND_PAPER_FISHERMAN_SUPERVISOR_REJECTED
+- WEEKEND_PAPER_FISHERMAN_SUPERVISOR_RECORDED
+- WEEKEND_PAPER_FISHERMAN_SUPERVISOR_BLOCKED
+- WEEKEND_PAPER_FISHERMAN_SUPERVISOR_ERROR
+
+FISHERMAN STATUS ENUM:
+- FISHERMAN_RUNNING_RECENT
+- FISHERMAN_STALE
+- FISHERMAN_EXITED_AFTER_CAPTURE
+- FISHERMAN_NOT_RUNNING
+- NO_SIGNAL_BUT_FISHERMAN_RUNNING
+- SIGNAL_CAPTURED_AND_FISHERMAN_EXITED
+- LEDGER_MISMATCH_REQUIRES_RECONCILIATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+WEEKEND POLICY:
+The supervisor must clearly distinguish:
+- acceptable: fisherman running, no fresh signals
+- unacceptable: fisherman not running
+- unacceptable: stale heartbeat
+- unacceptable: exited after one capture unless intentionally bounded
+- warning: capture ledger mismatch
+- warning: betrayal candidate capture exists but is not integrated into count/matrix
+
+DEFAULT THRESHOLDS:
+- heartbeat stale after 180 seconds
+- 8m short required capture count 10
+- full-spectrum harvester should be treated as stale if last heartbeat >180s
+- weekend loop recommended duration: 1440 iterations, 60 seconds sleep
+
+BETRAYAL / INVERSE CONTEXT:
+Must include a paper-only section:
+- 222m aggregate betrayal primary candidate from R80:
+  original win rate 12.5%, naive inverse 87.5%
+- 88m aggregate betrayal watchlist from R80:
+  original win rate 36.67%, naive inverse 63.33%
+- true inverse validation remains required before promotion
+- betrayal is not live-ready
+- any 222m capture from R198 must be surfaced
+- if betrayal data is not integrated into current matrix, say so explicitly
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "supervisor_recorded": false,
+  "supervisor_id": null,
+  "record_supervisor_requested": false,
+  "confirmation_valid": false,
+  "weekend_policy": {
+    "acceptable_no_signal_if_fisherman_running": true,
+    "unacceptable_no_fisherman": true,
+    "unacceptable_stale_heartbeat": true,
+    "unacceptable_exit_after_capture_without_restart": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "fisherman_health": {
+    "full_spectrum_heartbeat_found": true/false,
+    "latest_full_spectrum_heartbeat_at": "...",
+    "latest_full_spectrum_iteration": ...,
+    "latest_full_spectrum_status": "...",
+    "full_spectrum_watcher_likely_running": true/false,
+    "full_spectrum_watcher_stale": true/false,
+    "short_capture_heartbeat_found": true/false,
+    "latest_short_capture_heartbeat_at": "...",
+    "short_capture_watcher_likely_running": true/false,
+    "short_capture_watcher_stale": true/false,
+    "fisherman_status": "..."
+  },
+  "capture_watch_summary": {
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "capture_threshold_met": true/false,
+    "latest_8m_short_capture": "...",
+    "full_spectrum_captures_found": ...,
+    "captured_lanes": [...],
+    "harvester_exited_after_capture": true/false,
+    "ledger_mismatch_found": true/false,
+    "ledger_path_warnings": [...]
+  },
+  "betrayal_watch_summary": {
+    "betrayal_context_included": true,
+    "primary_betrayal_candidate": "222m aggregate",
+    "watchlist_betrayal_candidate": "88m aggregate",
+    "latest_222m_capture_found": true/false,
+    "latest_222m_capture_lane": "...",
+    "betrayal_integrated_into_current_matrix": false,
+    "betrayal_live_ready": false,
+    "required_before_betrayal_promotion": [
+      "true inverse paper outcomes",
+      "regime support",
+      "Miro Fish quality",
+      "funding",
+      "risk contract",
+      "operator approval",
+      "live gates"
+    ]
+  },
+  "no_signal_vs_no_fisherman": {
+    "classification": "NO_SIGNAL_BUT_FISHERMAN_RUNNING|FISHERMAN_NOT_RUNNING|FISHERMAN_STALE|FISHERMAN_EXITED_AFTER_CAPTURE|UNKNOWN",
+    "plain_english": "..."
+  },
+  "weekend_supervisor_actions": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "action": "...",
+      "why": "...",
+      "operator_command_safe": true/false
+    }
+  ],
+  "safe_weekend_operator_commands": {
+    "tmux_status_check": "...",
+    "heartbeat_tail": "...",
+    "full_spectrum_harvester_restart_24h": "...",
+    "short_capture_watcher_restart_24h": "...",
+    "capture_count_recheck": "...",
+    "weekend_supervisor_preview": "..."
+  },
+  "recommended_next_operator_move": "RESTART_FULL_SPECTRUM_HARVESTER_24H|KEEP_FISHERMAN_RUNNING|RUN_CAPTURE_COUNT_RECHECK|RUN_R209_BETRAYAL_INTEGRATION_RECHECK",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- weekend_supervisor_live_authorized=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM WEEKEND PAPER FISHERMAN SUPERVISOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+weekend-paper-fisherman-supervisor
+
+Args:
+- --record-supervisor
+- --confirm-weekend-fisherman-supervisor <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  --record-supervisor \
+  --confirm-weekend-fisherman-supervisor "I CONFIRM WEEKEND PAPER FISHERMAN SUPERVISOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  --record-supervisor \
+  --confirm-weekend-fisherman-supervisor "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_weekend_paper_fisherman_supervisor.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records supervisor only
+- detects no signal but fisherman running
+- detects fisherman stale
+- detects fisherman exited after capture
+- detects ledger mismatch warning
+- includes betrayal 222m and 88m context
+- marks betrayal not live-ready
+- safe operator commands are present
+- no live authorization
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R208/R198/R206 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  | jq '.status, .weekend_policy, .fisherman_health, .capture_watch_summary, .betrayal_watch_summary, .no_signal_vs_no_fisherman, .weekend_supervisor_actions, .safe_weekend_operator_commands, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  --record-supervisor \
+  --confirm-weekend-fisherman-supervisor "I CONFIRM WEEKEND PAPER FISHERMAN SUPERVISOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .supervisor_recorded, .fisherman_health, .capture_watch_summary, .betrayal_watch_summary, .no_signal_vs_no_fisherman, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  --record-supervisor \
+  --confirm-weekend-fisherman-supervisor "wrong" \
+  | jq '.status, .confirmation_valid, .supervisor_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R208A_WEEKEND_PAPER_FISHERMAN_SUPERVISOR.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R208A.
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R209_BETRAYAL_INTEGRATION_RECHECK.md
+
+R209 should:
+- explicitly integrate betrayal/inverse context into current strategy/ranking/readiness review
+- include 222m primary and 88m watchlist
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, fisherman status, capture status, betrayal context, exact safe weekend commands.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
