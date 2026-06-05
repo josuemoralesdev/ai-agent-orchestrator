@@ -1,0 +1,448 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R196 Full-Spectrum Paper Coverage Audit
+
+BRANCH:
+r196-full-spectrum-paper-coverage-audit
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY, DUPLICATE RISK
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+The operator correctly challenged the current assumption that the system is watching "all paper trades / all TFs / all lanes / all signal origins."
+
+Recent state:
+- R180 created multi-lane paper harvester, but its scope was limited to selected BTCUSDT paper lanes:
+  - 4m long/short
+  - 8m long/short
+  - 13m short
+  - 44m short
+  - observed tiny-live references 13m long and 44m long
+- R181 ranked these lanes and kept 8m short as lead.
+- R182-R195 added signal-origin registry, Keter scoring, Three Black Crows detector, local candle feed, outcome mapping, and crow feedback.
+- R195 still reported tiny-live as blocked by funding/evidence/risk contract/lane mode/operator approval/live flags.
+- The operator now wants to make sure waiting is happening the correct way:
+  - all paper trades
+  - all TFs
+  - all opened lanes
+  - all signal origins / pattern families
+  - no hidden blind spots
+
+R196 must audit full paper coverage before more tiny-live readiness work.
+
+PURPOSE:
+Create a full-spectrum paper coverage audit that:
+1. Enumerates all configured lanes from lane_controls.json.
+2. Enumerates all paper lanes.
+3. Enumerates all tiny-live lanes as observed references only.
+4. Enumerates all timeframes appearing in configs/logs:
+   - 4m, 8m, 13m, 22m, 44m, 55m, 88m, 222m, 444m, 666m, 888m, 4H, 13H, 13D and any others found
+5. Enumerates all symbols present in paper scans/signals/outcomes.
+6. Compares configured lanes against active harvesters/watchers.
+7. Compares paper executions/outcomes against lane coverage.
+8. Compares signal-origin coverage:
+   - hammer_wick_reversal
+   - golden_pocket_rejection
+   - three_black_crows
+   - three_white_soldiers
+   - bearish_engulfing
+   - bullish_engulfing
+   - exhaustion_wick
+   - breakdown_retest
+   - breakout_retest
+   - RSI divergence origins
+9. Identifies blind spots:
+   - configured but not harvested
+   - harvested but not ranked
+   - ranked but not captured
+   - signals present but no paper lane
+   - paper outcomes present but no current watcher
+   - signal origin registered but detector missing
+10. Produces a precise next action plan.
+11. Does not call Binance/network.
+12. Does not write config.
+13. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is audit-only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- promote signal origins
+- promote lanes
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- src/app/hammer_radar/operator/multi_lane_paper_capture_harvester.py
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py
+- src/app/hammer_radar/operator/capture_watcher_supervisor_8m_short.py
+- src/app/hammer_radar/operator/tiny_live_blocker_burn_down.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/three_black_crows_local_feed_detection.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_outcome_feedback.py
+- src/app/hammer_radar/operator/expanded_paper_watch.py
+- src/app/hammer_radar/operator/paper_opportunity_expansion.py
+- src/app/hammer_radar/operator/promotion_candidate_audit.py
+- src/app/hammer_radar/operator/strategy_performance.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/*.ndjson usage patterns
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson
+- logs/hammer_radar_forward/expanded_paper_watch.ndjson
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+- logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson
+- logs/hammer_radar_forward/paper_executions.ndjson
+- logs/hammer_radar_forward/outcomes.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/signal_origin_registry.ndjson
+- logs/hammer_radar_forward/keter_signal_origin_scoring.ndjson
+- logs/hammer_radar_forward/three_black_crows_paper_tags.ndjson
+- logs/hammer_radar_forward/crow_outcome_mapping_preview.ndjson
+- docs/hammer_radar/live_readiness/R180_MULTI_LANE_PAPER_CAPTURE_HARVESTER.md
+- docs/hammer_radar/live_readiness/R195_LANE_MATRIX_AFTER_CROW_OUTCOME_FEEDBACK.md
+- tests/hammer_radar/test_multi_lane_paper_capture_harvester.py
+- tests/hammer_radar/test_multi_lane_evidence_ranking.py
+
+REUSE / EXTEND:
+Reuse existing lane controls, ranking, harvester, and signal-origin modules where possible.
+Do not create live execution logic.
+Do not create Binance/network logic.
+Do not mutate configs.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/full_spectrum_paper_coverage_audit.py
+
+Expose:
+- build_full_spectrum_paper_coverage_audit
+- load_configured_lanes
+- load_paper_lanes
+- load_tiny_live_reference_lanes
+- discover_timeframes_from_configs_and_logs
+- discover_symbols_from_logs
+- discover_paper_execution_coverage
+- discover_paper_outcome_coverage
+- discover_signal_origin_coverage
+- discover_active_harvester_coverage
+- build_lane_coverage_matrix
+- build_timeframe_coverage_matrix
+- build_symbol_coverage_matrix
+- build_signal_origin_coverage_matrix
+- build_blind_spot_report
+- build_full_spectrum_next_action_plan
+- append_full_spectrum_paper_coverage_audit_record
+- load_full_spectrum_paper_coverage_audit_records
+- summarize_full_spectrum_paper_coverage_audit_records
+
+STATUS ENUM:
+- FULL_SPECTRUM_PAPER_COVERAGE_AUDIT_READY
+- FULL_SPECTRUM_PAPER_COVERAGE_AUDIT_REJECTED
+- FULL_SPECTRUM_PAPER_COVERAGE_AUDIT_RECORDED
+- FULL_SPECTRUM_PAPER_COVERAGE_AUDIT_BLOCKED
+- FULL_SPECTRUM_PAPER_COVERAGE_AUDIT_ERROR
+
+COVERAGE STATUS ENUM:
+- COVERED_ACTIVE
+- COVERED_STALE
+- CONFIGURED_NOT_HARVESTED
+- SIGNALS_PRESENT_NOT_CONFIGURED
+- OUTCOMES_PRESENT_NOT_WATCHED
+- ORIGIN_REGISTERED_NO_DETECTOR
+- ORIGIN_DETECTOR_AVAILABLE_NOT_MATRIXED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "audit_recorded": false,
+  "audit_id": null,
+  "record_audit_requested": false,
+  "confirmation_valid": false,
+  "coverage_summary": {
+    "configured_lanes_count": ...,
+    "paper_lanes_count": ...,
+    "tiny_live_reference_lanes_count": ...,
+    "symbols_found_count": ...,
+    "timeframes_found": [...],
+    "paper_executions_found": ...,
+    "paper_outcomes_found": ...,
+    "signal_origins_registered": ...,
+    "detectors_available": ...
+  },
+  "lane_coverage_matrix": [
+    {
+      "lane_key": "...",
+      "mode": "paper|tiny_live|disabled|unknown",
+      "symbol": "...",
+      "timeframe": "...",
+      "direction": "...",
+      "entry_mode": "...",
+      "signals_found": ...,
+      "paper_executions_found": ...,
+      "outcomes_found": ...,
+      "harvester_coverage": "covered|missing|stale",
+      "watcher_coverage": "covered|missing|stale",
+      "coverage_status": "...",
+      "recommended_action": "..."
+    }
+  ],
+  "timeframe_coverage_matrix": {
+    "4m": {...},
+    "8m": {...},
+    "13m": {...},
+    "22m": {...},
+    "44m": {...},
+    "55m": {...},
+    "88m": {...},
+    "222m": {...},
+    "444m": {...},
+    "666m": {...},
+    "888m": {...},
+    "4H": {...},
+    "13H": {...},
+    "13D": {...}
+  },
+  "symbol_coverage_matrix": {
+    "BTCUSDT": {...},
+    "ETHUSDT": {...}
+  },
+  "signal_origin_coverage_matrix": {
+    "hammer_wick_reversal": {...},
+    "three_black_crows": {...},
+    "three_white_soldiers": {...},
+    "bearish_engulfing": {...},
+    "bullish_engulfing": {...},
+    "exhaustion_wick": {...}
+  },
+  "blind_spot_report": {
+    "configured_not_harvested": [...],
+    "signals_present_not_configured": [...],
+    "paper_outcomes_without_current_watcher": [...],
+    "origins_registered_without_detector": [...],
+    "origins_detector_available_but_not_ranked": [...],
+    "timeframes_seen_but_not_currently_harvested": [...]
+  },
+  "full_spectrum_next_action_plan": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "action": "...",
+      "why": "...",
+      "future_phase": "R197|R198|..."
+    }
+  ],
+  "recommended_next_operator_move": "KEEP_8M_SHORT_WATCHER_RUNNING|KEEP_MULTI_LANE_HARVESTER_RUNNING|RUN_R197_PATTERN_DETECTOR_FAMILY_EXPANSION|RUN_R198_FULL_SPECTRUM_HARVESTER_EXPANSION",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+
+LEDGER:
+logs/hammer_radar_forward/full_spectrum_paper_coverage_audit.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FULL SPECTRUM PAPER COVERAGE AUDIT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+full-spectrum-paper-coverage-audit
+
+Args:
+- --record-audit
+- --confirm-full-spectrum-paper-audit <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit \
+  --record-audit \
+  --confirm-full-spectrum-paper-audit "wrong"
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit \
+  --record-audit \
+  --confirm-full-spectrum-paper-audit "I CONFIRM FULL SPECTRUM PAPER COVERAGE AUDIT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_full_spectrum_paper_coverage_audit.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records audit only
+- configured paper lanes are listed
+- tiny-live lanes are reference-only
+- timeframes are discovered from config/log fixtures
+- signals present but not configured are flagged
+- registered origins without detectors are flagged
+- paper outcomes without watcher coverage are flagged
+- 8m short is recognized as covered/lead if fixtures include it
+- safety object blocks env/config/network/order/live
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R180/R181/R182/R195 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit \
+  | jq '.status, .coverage_summary, .lane_coverage_matrix[0:20], .timeframe_coverage_matrix, .signal_origin_coverage_matrix, .blind_spot_report, .full_spectrum_next_action_plan, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit \
+  --record-audit \
+  --confirm-full-spectrum-paper-audit "I CONFIRM FULL SPECTRUM PAPER COVERAGE AUDIT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .audit_recorded, .coverage_summary, .blind_spot_report, .full_spectrum_next_action_plan, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-paper-coverage-audit \
+  --record-audit \
+  --confirm-full-spectrum-paper-audit "wrong" \
+  | jq '.status, .confirmation_valid, .audit_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R196_FULL_SPECTRUM_PAPER_COVERAGE_AUDIT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R196.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R197_PATTERN_DETECTOR_FAMILY_EXPANSION.md
+codex_tasks/phases/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+
+R197 should:
+- build/reuse candle-pattern detector family paths for:
+  - three_white_soldiers
+  - bearish_engulfing
+  - bullish_engulfing
+  - exhaustion_wick
+- paper-only
+- no live execution
+- no config writes
+- no Binance/network calls
+
+R198 should:
+- expand paper harvester coverage based on R196 blind spots
+- include timeframes/signals not covered
+- paper-only
+- no live execution
+- no config writes
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, coverage gaps, next phases.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
