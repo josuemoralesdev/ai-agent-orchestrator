@@ -1,0 +1,519 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R205 Pattern Lane Matrix Review
+
+BRANCH:
+r205-pattern-lane-matrix-review
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R204 rescored the pattern detector family using R202 outcome evidence.
+
+R204 pattern Keter hierarchy:
+- hammer_wick_reversal reference: 82
+- bearish_engulfing: 74
+- three_black_crows reference: 69
+- exhaustion_wick: 53
+- bullish_engulfing: 49
+- three_white_soldiers: 40
+- breakdown_retest: blocked / registry-only
+- breakout_retest: blocked / registry-only
+
+R204 result:
+- bearish_engulfing is ready for paper matrix review
+- bearish_engulfing beats Three Black Crows projected score but does not beat hammer
+- exhaustion_wick / bullish_engulfing / three_white_soldiers remain mixed-bias review candidates
+- retest origins remain blocked
+- no live authorization
+- no config writes
+- no Binance/network calls
+- no orders
+
+R205 must build a pattern-origin lane matrix review:
+- compare hammer, crows, bearish engulfing, and other pattern family origins by lane
+- keep everything paper-only
+- no config mutation
+- no live authority
+
+PURPOSE:
+Create a paper-only pattern lane matrix review that:
+1. Reads R204 pattern Keter rescoring.
+2. Reads R195/R192 lane matrix context.
+3. Reads R198 full-spectrum harvester expansion scope.
+4. Reads R200/R202 pattern family evidence where useful.
+5. Builds lane × signal-origin pair scores for:
+   - hammer_wick_reversal
+   - three_black_crows
+   - bearish_engulfing
+   - exhaustion_wick
+   - bullish_engulfing
+   - three_white_soldiers
+6. Keeps blocked origins out:
+   - breakdown_retest
+   - breakout_retest
+7. Identifies strongest paper matrix pairs.
+8. Shows if bearish_engulfing deserves active paper tracking lanes.
+9. Keeps hammer as current best if score remains higher.
+10. Does not promote lanes.
+11. Does not promote signal origins.
+12. Does not write config.
+13. Does not call Binance/network.
+14. Does not place orders.
+
+CRITICAL SAFETY:
+This phase is matrix/audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate registry/scoring/matrix config
+- promote signal origins
+- promote lanes
+- create pattern-based entry permission
+
+TARGET LANES:
+Use current configured paper lanes plus discovered full-spectrum paper lanes from R198.
+
+Configured paper lanes include:
+- BTCUSDT|4m|long|ladder_close_50_618
+- BTCUSDT|4m|short|ladder_close_50_618
+- BTCUSDT|8m|long|ladder_close_50_618
+- BTCUSDT|8m|short|ladder_close_50_618
+- BTCUSDT|13m|short|ladder_close_50_618
+- BTCUSDT|44m|short|ladder_close_50_618
+
+Discovered unconfigured paper lanes include:
+- BTCUSDT|22m|long|ladder_close_50_618
+- BTCUSDT|22m|short|ladder_close_50_618
+- BTCUSDT|55m|long|ladder_close_50_618
+- BTCUSDT|55m|short|ladder_close_50_618
+- BTCUSDT|88m|long|ladder_close_50_618
+- BTCUSDT|88m|short|ladder_close_50_618
+- BTCUSDT|222m|long|ladder_close_50_618
+- BTCUSDT|222m|short|ladder_close_50_618
+- BTCUSDT|444m|long|ladder_close_50_618
+- BTCUSDT|444m|short|ladder_close_50_618
+- BTCUSDT|666m|long|ladder_close_50_618
+- BTCUSDT|666m|short|ladder_close_50_618
+- BTCUSDT|888m|long|ladder_close_50_618
+- BTCUSDT|888m|short|ladder_close_50_618
+- BTCUSDT|4h|long|ladder_close_50_618
+- BTCUSDT|4h|short|ladder_close_50_618
+- BTCUSDT|13h|long|ladder_close_50_618
+- BTCUSDT|13h|short|ladder_close_50_618
+- BTCUSDT|13d|long|ladder_close_50_618
+- BTCUSDT|13d|short|ladder_close_50_618
+
+SIGNAL ORIGINS:
+Primary:
+- hammer_wick_reversal
+- bearish_engulfing
+- three_black_crows
+
+Secondary review:
+- exhaustion_wick
+- bullish_engulfing
+- three_white_soldiers
+
+Blocked:
+- breakdown_retest
+- breakout_retest
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create pattern-based live permission.
+- Do not infer live readiness from matrix score.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/pattern_keter_rescoring_family.py
+- src/app/hammer_radar/operator/pattern_outcome_mapping_family.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_outcome_feedback.py
+- src/app/hammer_radar/operator/lane_matrix_after_crow_rescoring.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/full_spectrum_paper_coverage_audit.py
+- src/app/hammer_radar/operator/multi_lane_evidence_ranking.py
+- src/app/hammer_radar/operator/keter_rescoring_after_three_black_crows.py
+- src/app/hammer_radar/operator/crow_outcome_keter_feedback.py
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/anchor_outcome_deepening.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/pattern_keter_rescoring_family.ndjson
+- logs/hammer_radar_forward/pattern_outcome_mapping_family.ndjson
+- logs/hammer_radar_forward/lane_matrix_after_crow_outcome_feedback.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/multi_lane_evidence_rankings.ndjson
+- tests/hammer_radar/test_pattern_keter_rescoring_family.py
+- tests/hammer_radar/test_pattern_outcome_mapping_family.py
+- tests/hammer_radar/test_lane_matrix_after_crow_outcome_feedback.py
+- docs/hammer_radar/live_readiness/R204_PATTERN_KETER_RESCORING_FAMILY.md
+- docs/hammer_radar/live_readiness/R198_FULL_SPECTRUM_HARVESTER_EXPANSION.md
+
+REUSE / EXTEND:
+Reuse R184/R192/R195 lane matrix concepts.
+Reuse R204 pattern Keter scorecards.
+Reuse R198 lane scope.
+Do not create a second matrix philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+
+Expose:
+- build_pattern_lane_matrix_review
+- load_latest_pattern_keter_rescoring
+- load_latest_full_spectrum_harvester_scope
+- load_latest_lane_matrix_reference
+- build_pattern_lane_candidates
+- score_pattern_lane_pair
+- build_pattern_lane_pair_matrix
+- build_current_best_pattern_pairs
+- build_pattern_vs_reference_comparison
+- build_pattern_lane_tracking_recommendations
+- build_remaining_pattern_matrix_blockers
+- classify_pattern_lane_matrix_status
+- append_pattern_lane_matrix_review_record
+- load_pattern_lane_matrix_review_records
+- summarize_pattern_lane_matrix_review_records
+
+STATUS ENUM:
+- PATTERN_LANE_MATRIX_REVIEW_READY
+- PATTERN_LANE_MATRIX_REVIEW_REJECTED
+- PATTERN_LANE_MATRIX_REVIEW_RECORDED
+- PATTERN_LANE_MATRIX_REVIEW_BLOCKED
+- PATTERN_LANE_MATRIX_REVIEW_ERROR
+
+PAIR READINESS ENUM:
+- PATTERN_PAIR_READY_FOR_PAPER_TRACKING
+- PATTERN_PAIR_NEEDS_MORE_FRESH_FLOW
+- PATTERN_PAIR_MIXED_BIAS_REVIEW_REQUIRED
+- PATTERN_PAIR_REGISTRY_ONLY_BLOCKED
+- PATTERN_PAIR_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+MATRIX STATUS ENUM:
+- HAMMER_REMAINS_TOP_PATTERN_REFERENCE
+- BEARISH_ENGULFING_READY_FOR_PAPER_MATRIX
+- CROWS_AND_ENGULFING_BOTH_PAPER_CANDIDATES
+- PATTERN_FAMILY_NEEDS_MORE_FLOW
+- PATTERN_MATRIX_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+SCORING RULES:
+For each lane × origin pair:
+Inputs:
+- lane_score from R181/R184/R195 where available
+- fresh flow / stale-only status from R198
+- origin Keter score from R204 or reference ledgers
+- pattern mapped_count / outcome quality
+- direction alignment:
+  - bearish_engulfing: short lanes
+  - three_black_crows: short lanes
+  - hammer_wick_reversal: direction from existing origin/lane context
+  - bullish_engulfing: long lanes
+  - three_white_soldiers: long lanes
+  - exhaustion_wick: both, but penalize mixed bias unless direction-specific evidence exists
+- configured lane bonus vs discovered unconfigured lane caution
+- stale-only penalty
+- registry-only blocked = not eligible
+
+Suggested pair score:
+- 35% origin Keter score
+- 25% lane score / lane evidence
+- 15% fresh-flow status
+- 15% outcome sample / mapped evidence
+- 10% direction alignment
+Then apply penalties:
+- stale-only flow
+- mixed bias
+- unconfigured discovered lane
+- risk warnings
+- no live authorization always remains but should not zero paper score
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "matrix_recorded": false,
+  "matrix_id": null,
+  "record_matrix_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "lanes_considered": ...,
+    "origins_considered": [...],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "pattern_keter_found": true/false,
+    "full_spectrum_scope_found": true/false,
+    "lane_reference_found": true/false,
+    "configured_lanes": ...,
+    "discovered_unconfigured_lanes": ...,
+    "blocked_origins": [...]
+  },
+  "pattern_lane_pair_matrix": [
+    {
+      "lane_key": "...",
+      "signal_origin": "bearish_engulfing",
+      "direction": "short",
+      "timeframe": "...",
+      "lane_mode": "paper|paper_discovered_unconfigured|tiny_live_reference",
+      "origin_keter_score": ...,
+      "lane_score": ...,
+      "pair_score": ...,
+      "pair_readiness": "...",
+      "fresh_flow_status": "fresh|stale_only|unknown",
+      "configured_lane": true/false,
+      "mapped_count": ...,
+      "risk_warnings": [...],
+      "paper_only": true,
+      "live_authorized": false,
+      "signal_origin_promoted": false,
+      "lane_promoted": false,
+      "why": "..."
+    }
+  ],
+  "current_best_pattern_pairs": [
+    {
+      "rank": 1,
+      "lane_key": "...",
+      "signal_origin": "...",
+      "pair_score": ...,
+      "pair_readiness": "...",
+      "why": "..."
+    }
+  ],
+  "pattern_vs_reference_comparison": {
+    "hammer_reference_score": 82,
+    "three_black_crows_reference_score": 69,
+    "top_pattern_origin": "bearish_engulfing",
+    "top_pattern_pair_score": ...,
+    "hammer_still_best_reference": true/false/null,
+    "bearish_engulfing_beats_crows": true/false/null,
+    "why": "..."
+  },
+  "pattern_lane_tracking_recommendations": [
+    {
+      "lane_key": "...",
+      "signal_origin": "...",
+      "recommended_action": "TRACK_PAPER|COLLECT_FRESH_FLOW|KEEP_REVIEW_ONLY|KEEP_BLOCKED",
+      "priority": "HIGH|MEDIUM|LOW",
+      "why": "..."
+    }
+  ],
+  "remaining_pattern_matrix_blockers": [
+    ...
+  ],
+  "matrix_status": "...",
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX|RUN_R206_TINY_LIVE_READINESS_GAP_RECHECK",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- pattern_family_live_authorized=false
+- anchor_live_authorized=false
+
+LEDGER:
+logs/hammer_radar_forward/pattern_lane_matrix_review.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM PATTERN LANE MATRIX REVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+pattern-lane-matrix-review
+
+Args:
+- --record-matrix
+- --confirm-pattern-lane-matrix <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review \
+  --record-matrix \
+  --confirm-pattern-lane-matrix "I CONFIRM PATTERN LANE MATRIX REVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review \
+  --record-matrix \
+  --confirm-pattern-lane-matrix "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_pattern_lane_matrix_review.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records matrix only
+- bearish_engulfing aligns with short lanes
+- bullish_engulfing aligns with long lanes
+- three_white_soldiers aligns with long lanes
+- registry-only retest origins are blocked
+- stale-only flow creates penalty
+- discovered unconfigured lane creates caution
+- no live authorization
+- no signal origin promoted
+- no lane promoted
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R204/R202/R198/R195 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review \
+  | jq '.status, .target_scope, .input_summary, .pattern_lane_pair_matrix[0:30], .current_best_pattern_pairs[0:20], .pattern_vs_reference_comparison, .pattern_lane_tracking_recommendations[0:20], .remaining_pattern_matrix_blockers, .matrix_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review \
+  --record-matrix \
+  --confirm-pattern-lane-matrix "I CONFIRM PATTERN LANE MATRIX REVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .matrix_recorded, .current_best_pattern_pairs[0:10], .pattern_vs_reference_comparison, .matrix_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-lane-matrix-review \
+  --record-matrix \
+  --confirm-pattern-lane-matrix "wrong" \
+  | jq '.status, .confirmation_valid, .matrix_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R205.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+
+Create:
+codex_tasks/phases/R206_TINY_LIVE_READINESS_GAP_RECHECK.md
+
+R206 should:
+- recheck tiny-live readiness after full-spectrum, pattern, anchor, and lane matrix improvements
+- include funding
+- include fresh capture count
+- include risk contract
+- include lane mode
+- include operator approval
+- include live flags
+- no config writes
+- no live execution
+- no Binance/network calls unless explicitly read-only and gated
+
+REPORT:
+Files changed, tests, smoke, safety, best pattern pairs, blockers, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
