@@ -1979,6 +1979,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "full-spectrum-paper-coverage-audit":
+        from src.app.hammer_radar.operator.full_spectrum_paper_coverage_audit import (
+            build_full_spectrum_paper_coverage_audit,
+            format_full_spectrum_paper_coverage_audit_json,
+        )
+
+        print(
+            format_full_spectrum_paper_coverage_audit_json(
+                build_full_spectrum_paper_coverage_audit(
+                    log_dir=args.log_dir,
+                    record_audit=args.record_audit,
+                    confirm_full_spectrum_paper_audit=args.confirm_full_spectrum_paper_audit,
+                )
+            )
+        )
     elif args.command == "promotion-candidate-audit":
         from src.app.hammer_radar.operator.promotion_candidate_audit import (
             build_promotion_candidate_audit,
@@ -3492,6 +3507,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--confirm-lane-matrix-after-crow-outcome",
         default=None,
     )
+
+    full_spectrum_paper_coverage_audit_parser = subparsers.add_parser(
+        "full-spectrum-paper-coverage-audit",
+        parents=[parent],
+    )
+    full_spectrum_paper_coverage_audit_parser.add_argument("--record-audit", action="store_true")
+    full_spectrum_paper_coverage_audit_parser.add_argument("--confirm-full-spectrum-paper-audit", default=None)
 
     promotion_candidate_audit_parser = subparsers.add_parser(
         "promotion-candidate-audit",
