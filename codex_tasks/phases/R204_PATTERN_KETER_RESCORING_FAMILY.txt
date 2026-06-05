@@ -1,0 +1,496 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R204 Pattern Keter Rescoring Family
+
+BRANCH:
+r204-pattern-keter-rescoring-family
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: MEDIUM
+
+WHY THIS PHASE EXISTS:
+R197 expanded the pattern detector family:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+- breakdown_retest registry-only
+- breakout_retest registry-only
+
+R200 synced detector-family feedback:
+- three_white_soldiers review-ready
+- bearish_engulfing review-ready
+- bullish_engulfing review-ready
+- exhaustion_wick review-ready
+- breakdown_retest and breakout_retest remain registry-only
+
+R202 mapped pattern-family outcomes:
+- total_mapped_count around 16,235
+- positive directional bias:
+  - bearish_engulfing
+- mixed bias:
+  - three_white_soldiers
+  - bullish_engulfing
+  - exhaustion_wick
+- registry-only blocked:
+  - breakdown_retest
+  - breakout_retest
+- top rankings were dominated by exhaustion_wick short-bias rows, but many rows carry risk/failure warnings
+- all paper-only
+- live_authorized=false
+- no Binance/network calls
+- no orders
+- no config writes
+
+R204 must feed R202 outcome evidence into Keter-style rescoring for the pattern family, without writing config or promoting anything.
+
+PURPOSE:
+Create a paper-only Keter rescoring surface for pattern-family origins:
+1. three_white_soldiers
+2. bearish_engulfing
+3. bullish_engulfing
+4. exhaustion_wick
+5. breakdown_retest blocked / registry-only
+6. breakout_retest blocked / registry-only
+
+R204 must:
+- read R202 pattern outcome mapping
+- read R200 pattern family feedback
+- compute per-origin Keter scores
+- separate detector evidence from outcome evidence
+- penalize mixed directional bias
+- penalize high failure/adverse risk warnings
+- reward strong sample size and favorable directional behavior
+- recommend which pattern origins should enter lane/anchor confluence matrix
+- keep everything paper-only
+- do not write config
+- do not call Binance/network
+- do not place orders
+- do not promote signal origins or lanes
+
+CRITICAL SAFETY:
+This phase is scoring/audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- mutate registry/scoring/matrix config
+- promote signal origins
+- promote lanes
+- create live pattern permissions
+
+TARGET SIGNAL ORIGINS:
+Scored:
+- three_white_soldiers
+- bearish_engulfing
+- bullish_engulfing
+- exhaustion_wick
+
+Blocked:
+- breakdown_retest
+- breakout_retest
+
+REFERENCE ORIGINS:
+- hammer_wick_reversal
+- three_black_crows
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not create pattern-based live permission.
+- Do not infer live readiness from Keter score.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/pattern_outcome_mapping_family.py
+- src/app/hammer_radar/operator/pattern_family_feedback_sync.py
+- src/app/hammer_radar/operator/pattern_detector_family_expansion.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/keter_rescoring_after_three_black_crows.py
+- src/app/hammer_radar/operator/crow_outcome_keter_feedback.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/anchor_outcome_deepening.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/pattern_outcome_mapping_family.ndjson usage patterns
+- logs/hammer_radar_forward/pattern_family_feedback_sync.ndjson usage patterns
+- logs/hammer_radar_forward/pattern_detector_family_expansion.ndjson usage patterns
+- logs/hammer_radar_forward/keter_signal_origin_scoring.ndjson usage patterns
+- logs/hammer_radar_forward/keter_rescore_after_three_black_crows.ndjson usage patterns
+- logs/hammer_radar_forward/crow_outcome_keter_feedback.ndjson usage patterns
+- tests/hammer_radar/test_pattern_outcome_mapping_family.py
+- tests/hammer_radar/test_pattern_family_feedback_sync.py
+- tests/hammer_radar/test_keter_signal_origin_scoring.py
+- tests/hammer_radar/test_keter_rescoring_after_three_black_crows.py
+- docs/hammer_radar/live_readiness/R202_PATTERN_OUTCOME_MAPPING_FAMILY.md
+- docs/hammer_radar/live_readiness/R200_PATTERN_FAMILY_FEEDBACK_SYNC.md
+
+REUSE / EXTEND:
+Reuse R183 Keter scoring ideas.
+Reuse R191/R194 crow rescoring style where useful.
+Reuse R202 pattern outcome summaries.
+Do not create a second scoring philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/pattern_keter_rescoring_family.py
+
+Expose:
+- build_pattern_keter_rescoring_family
+- load_latest_pattern_outcome_mapping_family
+- load_latest_pattern_family_feedback_sync
+- build_pattern_keter_dimensions
+- score_pattern_origin
+- build_pattern_origin_scorecard
+- compare_pattern_origins_to_references
+- build_pattern_keter_rankings
+- build_pattern_lane_matrix_recommendations
+- build_pattern_anchor_confluence_recommendations
+- classify_pattern_keter_rescoring_status
+- append_pattern_keter_rescoring_family_record
+- load_pattern_keter_rescoring_family_records
+- summarize_pattern_keter_rescoring_family_records
+
+STATUS ENUM:
+- PATTERN_KETER_RESCORING_FAMILY_READY
+- PATTERN_KETER_RESCORING_FAMILY_REJECTED
+- PATTERN_KETER_RESCORING_FAMILY_RECORDED
+- PATTERN_KETER_RESCORING_FAMILY_BLOCKED
+- PATTERN_KETER_RESCORING_FAMILY_ERROR
+
+KETER READINESS ENUM:
+- PATTERN_READY_FOR_PAPER_MATRIX_REVIEW
+- PATTERN_NEEDS_MORE_OUTCOME_EVIDENCE
+- PATTERN_MIXED_BIAS_REVIEW_REQUIRED
+- PATTERN_REGISTRY_ONLY_BLOCKED
+- PATTERN_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+SCORING DIMENSIONS:
+For each scored pattern origin:
+- detector_availability_score
+- detection_volume_score
+- outcome_sample_score
+- directional_bias_score
+- favorable_move_score
+- adverse_risk_penalty
+- failure_rate_penalty
+- mixed_bias_penalty
+- timeframe_coverage_score
+- anchor_overlay_readiness_score
+- live_safety_penalty
+
+Guidance:
+- detector available = positive
+- high mapped_count = positive
+- supports_directional_bias true = positive
+- mixed bias = penalty
+- high failure rate = penalty
+- avg adverse > avg favorable = penalty
+- registry-only = blocked score, not zero hallucination
+- live_authorized must remain false
+- high Keter score still does not authorize live
+
+REFERENCE CONTEXT:
+Known-ish previous references:
+- hammer_wick_reversal Keter around 82
+- three_black_crows projected around 69 after outcome feedback
+These values may be loaded from ledgers if present; otherwise use null and mark source unavailable.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "rescore_recorded": false,
+  "rescore_id": null,
+  "record_rescore_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "symbol": "BTCUSDT",
+    "signal_origins": [
+      "three_white_soldiers",
+      "bearish_engulfing",
+      "bullish_engulfing",
+      "exhaustion_wick",
+      "breakdown_retest",
+      "breakout_retest"
+    ],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "pattern_outcome_mapping_found": true/false,
+    "pattern_family_feedback_found": true/false,
+    "total_mapped_count": ...,
+    "origins_with_positive_bias": [...],
+    "origins_with_mixed_bias": [...],
+    "registry_only_blocked": [...]
+  },
+  "pattern_origin_scorecards": {
+    "bearish_engulfing": {
+      "keter_score": ...,
+      "score_band": "...",
+      "readiness": "...",
+      "dimension_scores": {...},
+      "mapped_count": ...,
+      "supports_directional_bias": true/false,
+      "risk_warnings": [...],
+      "paper_only": true,
+      "live_authorized": false,
+      "signal_origin_promoted": false
+    },
+    "bullish_engulfing": {...},
+    "three_white_soldiers": {...},
+    "exhaustion_wick": {...},
+    "breakdown_retest": {
+      "keter_score": 0,
+      "readiness": "PATTERN_REGISTRY_ONLY_BLOCKED",
+      "blocked_reason": "registry_only_until_retest_structure"
+    },
+    "breakout_retest": {
+      "keter_score": 0,
+      "readiness": "PATTERN_REGISTRY_ONLY_BLOCKED",
+      "blocked_reason": "registry_only_until_retest_structure"
+    }
+  },
+  "pattern_keter_rankings": [
+    {
+      "rank": 1,
+      "signal_origin": "...",
+      "keter_score": ...,
+      "readiness": "...",
+      "why": "...",
+      "paper_only": true,
+      "live_authorized": false
+    }
+  ],
+  "reference_comparison": {
+    "hammer_wick_reversal_keter_score": ...,
+    "three_black_crows_projected_score": ...,
+    "top_pattern_origin": "...",
+    "top_pattern_score": ...,
+    "pattern_beats_crows": true/false/null,
+    "pattern_beats_hammer": true/false/null,
+    "why": "..."
+  },
+  "lane_matrix_recommendations": [
+    {
+      "signal_origin": "...",
+      "recommended_action": "INCLUDE_IN_PAPER_MATRIX|COLLECT_MORE_SAMPLES|KEEP_BLOCKED",
+      "priority": "HIGH|MEDIUM|LOW",
+      "why": "..."
+    }
+  ],
+  "anchor_confluence_recommendations": [
+    {
+      "signal_origin": "...",
+      "recommended_action": "INCLUDE_IN_R203_CONFLUENCE|WAIT_FOR_OUTCOME_DEPTH|KEEP_BLOCKED",
+      "priority": "HIGH|MEDIUM|LOW",
+      "why": "..."
+    }
+  ],
+  "rescore_status": "...",
+  "recommended_next_operator_move": "KEEP_FULL_SPECTRUM_HARVESTER_RUNNING|RUN_R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX|RUN_R205_PATTERN_LANE_MATRIX_REVIEW",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- pattern_family_live_authorized=false
+- anchor_live_authorized=false
+
+LEDGER:
+logs/hammer_radar_forward/pattern_keter_rescoring_family.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM PATTERN KETER RESCORING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+pattern-keter-rescoring-family
+
+Args:
+- --record-rescore
+- --confirm-pattern-keter-family <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family \
+  --record-rescore \
+  --confirm-pattern-keter-family "I CONFIRM PATTERN KETER RESCORING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family \
+  --record-rescore \
+  --confirm-pattern-keter-family "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_pattern_keter_rescoring_family.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records rescore only
+- positive directional bias increases score
+- mixed bias creates penalty
+- high failure/adverse risk creates penalty
+- registry-only retest origins remain blocked
+- no pattern becomes live authorized
+- no signal origin promoted
+- no lane promoted
+- reference comparison exists
+- lane matrix recommendations exist
+- anchor confluence recommendations exist
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R202/R200/R183/R191/R194 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family \
+  | jq '.status, .target_scope, .input_summary, .pattern_origin_scorecards, .pattern_keter_rankings, .reference_comparison, .lane_matrix_recommendations, .anchor_confluence_recommendations, .rescore_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family \
+  --record-rescore \
+  --confirm-pattern-keter-family "I CONFIRM PATTERN KETER RESCORING FAMILY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .rescore_recorded, .pattern_keter_rankings, .reference_comparison, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  pattern-keter-rescoring-family \
+  --record-rescore \
+  --confirm-pattern-keter-family "wrong" \
+  | jq '.status, .confirmation_valid, .rescore_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R204_PATTERN_KETER_RESCORING_FAMILY.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R204.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+
+Create:
+codex_tasks/phases/R205_PATTERN_LANE_MATRIX_REVIEW.md
+
+R205 should:
+- build pattern-origin lane matrix review from R204 scores
+- include bearish_engulfing, exhaustion_wick, soldiers, bullish_engulfing
+- compare against hammer/crows
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, Keter rankings, reference comparison, recommendations, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
