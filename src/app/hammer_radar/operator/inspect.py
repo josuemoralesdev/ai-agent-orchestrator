@@ -2445,6 +2445,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-readiness-gap-recheck":
+        from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
+            build_tiny_live_readiness_gap_recheck,
+            format_tiny_live_readiness_gap_recheck_json,
+        )
+
+        print(
+            format_tiny_live_readiness_gap_recheck_json(
+                build_tiny_live_readiness_gap_recheck(
+                    log_dir=args.log_dir,
+                    record_recheck=args.record_recheck,
+                    confirm_tiny_live_gap_recheck=args.confirm_tiny_live_gap_recheck,
+                )
+            )
+        )
     elif args.command == "evidence-threshold-recheck-8m-short":
         from src.app.hammer_radar.operator.evidence_threshold_recheck_8m_short import (
             build_evidence_threshold_recheck_8m_short,
@@ -3928,6 +3943,13 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_count_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     capture_count_sync_parser.add_argument("--record-sync", action="store_true")
     capture_count_sync_parser.add_argument("--confirm-capture-count-sync", default=None)
+
+    tiny_live_readiness_gap_recheck_parser = subparsers.add_parser(
+        "tiny-live-readiness-gap-recheck",
+        parents=[parent],
+    )
+    tiny_live_readiness_gap_recheck_parser.add_argument("--record-recheck", action="store_true")
+    tiny_live_readiness_gap_recheck_parser.add_argument("--confirm-tiny-live-gap-recheck", default=None)
 
     evidence_threshold_recheck_parser = subparsers.add_parser(
         "evidence-threshold-recheck-8m-short",
