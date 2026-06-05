@@ -1963,6 +1963,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "pattern-family-feedback-sync":
+        from src.app.hammer_radar.operator.pattern_family_feedback_sync import (
+            build_pattern_family_feedback_sync,
+            format_pattern_family_feedback_sync_json,
+        )
+
+        print(
+            format_pattern_family_feedback_sync_json(
+                build_pattern_family_feedback_sync(
+                    log_dir=args.log_dir,
+                    record_feedback=args.record_feedback,
+                    confirm_pattern_family_feedback_sync=args.confirm_pattern_family_feedback_sync,
+                )
+            )
+        )
     elif args.command == "keter-rescore-after-three-black-crows":
         from src.app.hammer_radar.operator.keter_rescoring_after_three_black_crows import (
             build_keter_rescoring_after_three_black_crows,
@@ -3574,6 +3589,13 @@ def _build_parser() -> argparse.ArgumentParser:
     signal_origin_feedback_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     signal_origin_feedback_sync_parser.add_argument("--record-feedback", action="store_true")
     signal_origin_feedback_sync_parser.add_argument("--confirm-signal-origin-feedback-sync", default=None)
+
+    pattern_family_feedback_sync_parser = subparsers.add_parser(
+        "pattern-family-feedback-sync",
+        parents=[parent],
+    )
+    pattern_family_feedback_sync_parser.add_argument("--record-feedback", action="store_true")
+    pattern_family_feedback_sync_parser.add_argument("--confirm-pattern-family-feedback-sync", default=None)
 
     keter_rescore_after_three_black_crows_parser = subparsers.add_parser(
         "keter-rescore-after-three-black-crows",
