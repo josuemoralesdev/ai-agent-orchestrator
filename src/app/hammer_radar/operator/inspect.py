@@ -2513,6 +2513,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "weekend-paper-fisherman-supervisor":
+        from src.app.hammer_radar.operator.weekend_paper_fisherman_supervisor import (
+            build_weekend_paper_fisherman_supervisor,
+            format_weekend_paper_fisherman_supervisor_json,
+        )
+
+        print(
+            format_weekend_paper_fisherman_supervisor_json(
+                build_weekend_paper_fisherman_supervisor(
+                    log_dir=args.log_dir,
+                    record_supervisor=args.record_supervisor,
+                    confirm_weekend_fisherman_supervisor=args.confirm_weekend_fisherman_supervisor,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -3992,6 +4007,13 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_watcher_supervisor_parser.add_argument("--max-supervisor-iterations", type=int, default=60)
     capture_watcher_supervisor_parser.add_argument("--sleep-seconds", type=int, default=60)
     capture_watcher_supervisor_parser.add_argument("--allow-paper-watcher-restart", action="store_true")
+
+    weekend_paper_fisherman_supervisor_parser = subparsers.add_parser(
+        "weekend-paper-fisherman-supervisor",
+        parents=[parent],
+    )
+    weekend_paper_fisherman_supervisor_parser.add_argument("--record-supervisor", action="store_true")
+    weekend_paper_fisherman_supervisor_parser.add_argument("--confirm-weekend-fisherman-supervisor", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
