@@ -1,0 +1,519 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R211 Betrayal Paper Matrix Context
+
+BRANCH:
+r211-betrayal-paper-matrix-context
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R209 proved betrayal/inverse evidence was missing from the current matrix stack.
+
+R209 found:
+- 222m aggregate is BETRAYAL_PRIMARY_CANDIDATE
+  - original win rate: 12.5%
+  - naive inverse win rate: 87.5%
+  - true inverse validation required
+- 88m aggregate is BETRAYAL_WATCHLIST
+  - original win rate: 36.67%
+  - naive inverse win rate: 63.33%
+  - true inverse validation required
+- 55m aggregate was found historically as optional watchlist
+- betrayal was included in weekend supervisor, but not in:
+  - pattern lane matrix
+  - anchor confluence matrix
+  - tiny-live readiness
+
+R210 refreshed true inverse evidence:
+- 222m:
+  - resolved_true_inverse_samples: 15
+  - shadow_outcome_count: 20
+  - unresolved_shadow_samples: 5
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+  - live_ready=false
+- 88m:
+  - resolved_true_inverse_samples: 32
+  - shadow_outcome_count: 46
+  - unresolved_shadow_samples: 14
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+  - live_ready=false
+- 55m:
+  - resolved_true_inverse_samples: 26
+  - shadow_outcome_count: 52
+  - unresolved_shadow_samples: 26
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+  - live_ready=false
+
+R210 also preserved safety:
+- naive inverse was not counted as validated edge
+- raw 222m capture was not counted as a validated sample
+- betrayal was not promoted
+- betrayal was not live-authorized
+- no Binance/network/order/config writes
+
+R211 must now add betrayal/inverse evidence as PAPER MATRIX CONTEXT ONLY.
+
+PURPOSE:
+Create a betrayal-aware paper matrix context surface that:
+1. Reads R210 betrayal true inverse refresh.
+2. Reads R209 betrayal integration recheck.
+3. Reads R205 pattern lane matrix.
+4. Reads R203 anchor/signal confluence.
+5. Reads R206/R208/R208A fisherman and readiness status.
+6. Creates betrayal paper matrix rows for:
+   - 222m aggregate
+   - 88m aggregate
+   - 55m aggregate if supported
+7. Compares betrayal context against:
+   - hammer_wick_reversal
+   - bearish_engulfing
+   - three_black_crows
+   - anchor confluence candidates
+8. Clearly marks betrayal as:
+   - paper-only
+   - context-only
+   - not live-ready
+   - not promoted
+   - not lane-mode eligible
+9. Produces next actions for event tracking and later matrix scoring.
+10. Does not write config.
+11. Does not call Binance/network.
+12. Does not place orders.
+13. Does not promote betrayal.
+14. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is paper matrix context only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- treat betrayal context as live-ready
+- treat refreshed samples as enough for live execution
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from betrayal paper matrix context.
+- Do not infer tiny-live readiness from betrayal matrix context.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/anchor_signal_confluence_matrix.py
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/markov_regime_gate.py if present
+- src/app/hammer_radar/operator/miro_fish_quality_gate.py if present
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/pattern_lane_matrix_review.ndjson
+- logs/hammer_radar_forward/anchor_signal_confluence_matrix.ndjson
+- logs/hammer_radar_forward/tiny_live_readiness_gap_recheck.ndjson
+- logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- docs/hammer_radar/live_readiness/R210_BETRAYAL_TRUE_INVERSE_REFRESH.md
+- docs/hammer_radar/live_readiness/R209_BETRAYAL_INTEGRATION_RECHECK.md
+- docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+- docs/hammer_radar/live_readiness/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R81_TRUE_INVERSE_PAPER_OUTCOME_VALIDATION.md
+- docs/hammer_radar/R82_MARKOV_REGIME_GATE.md
+- docs/hammer_radar/R83_MIRO_FISH_QUALITY_GATE.md
+- tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+- tests/hammer_radar/test_betrayal_integration_recheck.py
+- tests/hammer_radar/test_pattern_lane_matrix_review.py
+- tests/hammer_radar/test_anchor_signal_confluence_matrix.py
+
+REUSE / EXTEND:
+Reuse R210 refreshed true inverse summaries.
+Reuse R209 candidate metadata.
+Reuse R205 matrix scoring style where appropriate.
+Reuse R203 confluence quality labels where appropriate.
+Do not create a second betrayal scoring philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+
+Expose:
+- build_betrayal_paper_matrix_context
+- load_latest_betrayal_true_inverse_refresh
+- load_latest_betrayal_integration_recheck
+- load_latest_pattern_lane_matrix_review
+- load_latest_anchor_signal_confluence_matrix
+- load_latest_tiny_live_readiness_gap
+- build_betrayal_context_rows
+- score_betrayal_context_row
+- build_betrayal_vs_normal_comparison
+- build_betrayal_matrix_gap_report
+- build_betrayal_context_recommendations
+- classify_betrayal_paper_matrix_context_status
+- append_betrayal_paper_matrix_context_record
+- load_betrayal_paper_matrix_context_records
+- summarize_betrayal_paper_matrix_context_records
+
+STATUS ENUM:
+- BETRAYAL_PAPER_MATRIX_CONTEXT_READY
+- BETRAYAL_PAPER_MATRIX_CONTEXT_REJECTED
+- BETRAYAL_PAPER_MATRIX_CONTEXT_RECORDED
+- BETRAYAL_PAPER_MATRIX_CONTEXT_BLOCKED
+- BETRAYAL_PAPER_MATRIX_CONTEXT_ERROR
+
+BETRAYAL MATRIX STATUS ENUM:
+- BETRAYAL_CONTEXT_ADDED_PAPER_ONLY
+- BETRAYAL_CONTEXT_BLOCKED_PENDING_EVENT_TRACKER
+- BETRAYAL_CONTEXT_NEEDS_MORE_TRUE_INVERSE_SAMPLES
+- BETRAYAL_CONTEXT_NOT_LIVE_AUTHORIZED
+- BETRAYAL_MATRIX_REVIEW_READY_PAPER_ONLY
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET BETRAYAL CONTEXT:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate if refreshed true inverse samples exist
+
+REFERENCE NORMAL CONTEXT:
+From recent matrix stack:
+- 8m short + hammer_wick_reversal pair_score around 84
+- 8m short + bearish_engulfing pair_score around 82
+- 8m short + three_black_crows pair_score around 68
+- R203 anchor/signal confluence top rows are summary-level only, not event-level
+
+SCORING RULES:
+For betrayal context rows:
+Inputs:
+- refreshed true inverse sample count
+- shadow outcome count
+- unresolved sample count
+- original win rate
+- naive inverse win rate
+- validation status
+- event tracker availability
+- matrix integration status
+- regime / Miro Fish availability if present
+- live safety state
+
+Suggested context score:
+- 25% refreshed true inverse sample depth
+- 20% validation status
+- 15% inverse signal strength from original failure profile
+- 15% candle/timeframe coverage
+- 10% unresolved penalty
+- 10% regime/Miro Fish readiness if present
+- 5% integration readiness
+
+Penalties:
+- no event tracker
+- unresolved samples
+- no regime support
+- no Miro Fish support
+- aggregate direction only
+- not included in current live readiness
+- never score into live permission
+
+Context score is paper-only and cannot promote.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "matrix_recorded": false,
+  "matrix_id": null,
+  "record_matrix_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "betrayal_true_inverse_refresh_found": true/false,
+    "betrayal_integration_recheck_found": true/false,
+    "pattern_lane_matrix_found": true/false,
+    "anchor_confluence_found": true/false,
+    "tiny_live_readiness_found": true/false
+  },
+  "betrayal_context_rows": [
+    {
+      "candidate": "222m aggregate",
+      "label": "BETRAYAL_PRIMARY_CANDIDATE",
+      "timeframe": "222m",
+      "original_win_rate_pct": 12.5,
+      "naive_inverse_win_rate_pct": 87.5,
+      "resolved_true_inverse_samples": 15,
+      "shadow_outcome_count": 20,
+      "unresolved_shadow_samples": 5,
+      "validation_status": "TRUE_INVERSE_VALIDATION_REFRESHED",
+      "context_score": ...,
+      "context_readiness": "...",
+      "live_ready": false,
+      "promotion_allowed": false,
+      "paper_only": true,
+      "live_authorized": false,
+      "risk_warnings": [...],
+      "why": "..."
+    }
+  ],
+  "betrayal_vs_normal_comparison": {
+    "normal_reference_rows": [
+      {
+        "name": "8m short + hammer_wick_reversal",
+        "score": 84,
+        "paper_only": true
+      },
+      {
+        "name": "8m short + bearish_engulfing",
+        "score": 82,
+        "paper_only": true
+      },
+      {
+        "name": "8m short + three_black_crows",
+        "score": 68,
+        "paper_only": true
+      }
+    ],
+    "betrayal_rows": [...],
+    "top_betrayal_candidate": "...",
+    "betrayal_can_enter_paper_matrix": true/false,
+    "betrayal_can_enter_live_readiness": false,
+    "why": "..."
+  },
+  "betrayal_matrix_gap_report": {
+    "event_tracker_missing": true/false,
+    "regime_gate_missing_or_pending": true/false,
+    "miro_fish_missing_or_pending": true/false,
+    "direction_split_missing": true/false,
+    "tiny_live_excluded": true,
+    "hard_live_blockers": [...]
+  },
+  "betrayal_context_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "BUILD_BETRAYAL_EVENT_TRACKER|RUN_REGIME_GATE|RUN_MIRO_FISH_GATE|KEEP_PAPER_ONLY|...",
+      "future_phase": "R212|R213|...",
+      "why": "..."
+    }
+  ],
+  "betrayal_matrix_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R212_BETRAYAL_EVENT_TRACKER|RUN_R213_BETRAYAL_REGIME_MIRO_RECHECK|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_paper_matrix_context.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL PAPER MATRIX CONTEXT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-paper-matrix-context
+
+Args:
+- --record-matrix
+- --confirm-betrayal-paper-matrix-context <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context \
+  --record-matrix \
+  --confirm-betrayal-paper-matrix-context "I CONFIRM BETRAYAL PAPER MATRIX CONTEXT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context \
+  --record-matrix \
+  --confirm-betrayal-paper-matrix-context "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_paper_matrix_context.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records matrix only
+- includes 222m betrayal context
+- includes 88m betrayal context
+- includes 55m if refreshed evidence exists
+- uses refreshed true inverse sample counts
+- compares betrayal to normal paper references
+- marks betrayal as paper-only context
+- does not live authorize betrayal
+- does not promote betrayal
+- identifies event tracker/regime/Miro gaps
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R210/R209/R205/R203 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context \
+  | jq '.status, .target_scope, .input_summary, .betrayal_context_rows, .betrayal_vs_normal_comparison, .betrayal_matrix_gap_report, .betrayal_context_recommendations, .betrayal_matrix_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context \
+  --record-matrix \
+  --confirm-betrayal-paper-matrix-context "I CONFIRM BETRAYAL PAPER MATRIX CONTEXT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .matrix_recorded, .betrayal_context_rows, .betrayal_matrix_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-matrix-context \
+  --record-matrix \
+  --confirm-betrayal-paper-matrix-context "wrong" \
+  | jq '.status, .confirmation_valid, .matrix_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R211.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R212_BETRAYAL_EVENT_TRACKER.md
+
+Create:
+codex_tasks/phases/R213_BETRAYAL_REGIME_MIRO_RECHECK.md
+
+R213 should:
+- recheck betrayal candidates against current regime and Miro Fish gate
+- keep paper-only
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, betrayal context scores, comparison to normal matrix, gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

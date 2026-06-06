@@ -2558,6 +2558,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-paper-matrix-context":
+        from src.app.hammer_radar.operator.betrayal_paper_matrix_context import (
+            build_betrayal_paper_matrix_context,
+            format_betrayal_paper_matrix_context_json,
+        )
+
+        print(
+            format_betrayal_paper_matrix_context_json(
+                build_betrayal_paper_matrix_context(
+                    log_dir=args.log_dir,
+                    record_matrix=args.record_matrix,
+                    confirm_betrayal_paper_matrix_context=args.confirm_betrayal_paper_matrix_context,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4058,6 +4073,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_true_inverse_refresh_parser.add_argument("--record-refresh", action="store_true")
     betrayal_true_inverse_refresh_parser.add_argument("--confirm-betrayal-true-inverse-refresh", default=None)
+
+    betrayal_paper_matrix_context_parser = subparsers.add_parser(
+        "betrayal-paper-matrix-context",
+        parents=[parent],
+    )
+    betrayal_paper_matrix_context_parser.add_argument("--record-matrix", action="store_true")
+    betrayal_paper_matrix_context_parser.add_argument("--confirm-betrayal-paper-matrix-context", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
