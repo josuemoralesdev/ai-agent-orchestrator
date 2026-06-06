@@ -1,0 +1,471 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R209 Betrayal Integration Recheck
+
+BRANCH:
+r209-betrayal-integration-recheck
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+The operator correctly identified a dangerous project-memory problem:
+
+If betrayal/inverse evidence is not explicitly named in a new phase, recent strategy/ranking/readiness surfaces may ignore it.
+
+This is not acceptable.
+
+Historical betrayal path:
+- R80 Betrayal Strategy Audit identified:
+  - 222m aggregate as BETRAYAL_PRIMARY_CANDIDATE
+    - original sample count: 48
+    - original win rate: 12.5%
+    - naive inverse win rate: 87.5%
+  - 88m aggregate as BETRAYAL_WATCHLIST
+    - original sample count: 90
+    - original win rate: 36.67%
+    - naive inverse win rate: 63.33%
+- R81/R81.1/R81.2/R81.3/R81.4 dealt with true inverse validation / candle archive / safe timestamp issues.
+- R82 added regime context.
+- R83 added Miro Fish quality gate.
+- R95-R100 rebuilt betrayal paper tracking / source emission pathways.
+
+Recent phases R196-R208A expanded:
+- full-spectrum harvesting
+- candle pattern detectors
+- WMA/MA anchor layer
+- pattern outcome mapping
+- Keter scoring
+- confluence matrix
+- tiny-live readiness gap checks
+- weekend fisherman supervisor
+
+But R208A showed:
+- latest 222m full-spectrum capture exists:
+  BTCUSDT|222m|long|ladder_close_50_618
+- betrayal context was included but not integrated into current matrix
+- betrayal_live_ready=false
+- true_inverse_validation_required=true
+
+R209 must explicitly integrate betrayal/inverse context into the current evidence stack as paper-only audit context, without promotion or live readiness.
+
+PURPOSE:
+Create a betrayal integration recheck that:
+1. Reads historical betrayal docs/ledgers.
+2. Reads R208A weekend fisherman supervisor output.
+3. Reads R198 full-spectrum harvester captures.
+4. Reads R203 anchor/signal confluence.
+5. Reads R205 pattern lane matrix.
+6. Reads R206 tiny-live readiness gap.
+7. Checks whether 222m/88m betrayal evidence is currently included, ignored, blocked, or stale.
+8. Connects the 222m full-spectrum capture to betrayal context if applicable.
+9. Separates:
+   - naive inverse audit evidence
+   - true inverse paper validation
+   - regime support
+   - Miro Fish quality
+   - current matrix integration
+   - live readiness
+10. Produces explicit recommendations:
+   - keep betrayal audit-only
+   - build/refresh true inverse outcomes
+   - add betrayal-aware paper matrix row later
+   - do not promote
+   - do not live authorize
+11. Does not call Binance/network.
+12. Does not write config.
+13. Does not place orders.
+14. Does not mutate lane modes.
+15. Does not arm live.
+
+CRITICAL SAFETY:
+This phase is betrayal/inverse audit integration only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+- treat naive inverse as validated edge
+- treat betrayal as live-ready
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from betrayal evidence.
+- Do not infer true inverse validation from naive inverse audit math.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/anchor_signal_confluence_matrix.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/betrayal_paper_outcomes.py if present
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/markov_regime_gate.py if present
+- src/app/hammer_radar/operator/miro_fish_quality_gate.py if present
+- src/app/hammer_radar/operator/inspect.py
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R81_TRUE_INVERSE_PAPER_OUTCOME_VALIDATION.md
+- docs/hammer_radar/R81_1_BETRAYAL_SHADOW_OUTCOME_RESOLVER.md
+- docs/hammer_radar/R81_2_BETRAYAL_CANDLE_ARCHIVE_REPLAY_BRIDGE.md
+- docs/hammer_radar/R81_3_SAFE_CANDLE_CAPTURE_BACKFILL_SOURCE.md
+- docs/hammer_radar/R82_MARKOV_REGIME_GATE.md
+- docs/hammer_radar/R83_MIRO_FISH_QUALITY_GATE.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R96_BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- docs/hammer_radar/live_readiness/R208A_WEEKEND_PAPER_FISHERMAN_SUPERVISOR.md
+- docs/hammer_radar/live_readiness/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+- docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+- logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/betrayal_*.ndjson if present
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson if present
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson if present
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson if present
+
+REUSE / EXTEND:
+Reuse R80/R81/R82/R83 facts.
+Reuse R208A betrayal summary where present.
+Reuse R198 capture evidence.
+Reuse current matrix/readiness status from recent ledgers.
+Do not duplicate live readiness philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_integration_recheck.py
+
+Expose:
+- build_betrayal_integration_recheck
+- load_betrayal_docs_context
+- load_betrayal_audit_ledgers
+- load_true_inverse_validation_status
+- load_betrayal_shadow_outcome_status
+- load_latest_weekend_fisherman_betrayal_summary
+- load_latest_full_spectrum_222m_capture
+- load_current_matrix_integration_status
+- build_betrayal_candidate_summary
+- build_true_inverse_validation_summary
+- build_betrayal_capture_linkage_summary
+- build_betrayal_current_stack_gap_report
+- build_betrayal_integration_recommendations
+- classify_betrayal_integration_status
+- append_betrayal_integration_recheck_record
+- load_betrayal_integration_recheck_records
+- summarize_betrayal_integration_recheck_records
+
+STATUS ENUM:
+- BETRAYAL_INTEGRATION_RECHECK_READY
+- BETRAYAL_INTEGRATION_RECHECK_REJECTED
+- BETRAYAL_INTEGRATION_RECHECK_RECORDED
+- BETRAYAL_INTEGRATION_RECHECK_BLOCKED
+- BETRAYAL_INTEGRATION_RECHECK_ERROR
+
+BETRAYAL STATUS ENUM:
+- BETRAYAL_CONTEXT_AVAILABLE_NOT_INTEGRATED
+- BETRAYAL_TRUE_INVERSE_VALIDATION_PENDING
+- BETRAYAL_CAPTURE_LINKAGE_AVAILABLE
+- BETRAYAL_MATRIX_INTEGRATION_MISSING
+- BETRAYAL_PAPER_ONLY_REVIEW_REQUIRED
+- BETRAYAL_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+CANDIDATES:
+Primary:
+- 222m aggregate
+  - original_win_rate_pct=12.5
+  - naive_inverse_win_rate_pct=87.5
+  - label=BETRAYAL_PRIMARY_CANDIDATE
+Watchlist:
+- 88m aggregate
+  - original_win_rate_pct=36.67
+  - naive_inverse_win_rate_pct=63.33
+  - label=BETRAYAL_WATCHLIST
+
+Optional historical watchlist if found in docs/ledgers:
+- 55m aggregate
+
+REQUIRED OUTPUT:
+{
+  "status": "...",
+  "generated_at": "...",
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "betrayal_scope": {
+    "primary_candidate": "222m aggregate",
+    "watchlist_candidates": ["88m aggregate"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "betrayal_candidate_summary": {
+    "222m": {
+      "label": "BETRAYAL_PRIMARY_CANDIDATE",
+      "original_sample_count": 48,
+      "original_win_rate_pct": 12.5,
+      "naive_inverse_win_rate_pct": 87.5,
+      "true_inverse_validation_required": true,
+      "live_ready": false
+    },
+    "88m": {
+      "label": "BETRAYAL_WATCHLIST",
+      "original_sample_count": 90,
+      "original_win_rate_pct": 36.67,
+      "naive_inverse_win_rate_pct": 63.33,
+      "true_inverse_validation_required": true,
+      "live_ready": false
+    }
+  },
+  "true_inverse_validation_summary": {
+    "validation_records_found": true/false,
+    "resolved_true_inverse_samples": ...,
+    "validation_status": "...",
+    "validation_required_before_promotion": true
+  },
+  "betrayal_capture_linkage": {
+    "latest_222m_capture_found": true/false,
+    "latest_222m_capture_lane": "...",
+    "latest_222m_capture_at": "...",
+    "capture_matches_primary_candidate_timeframe": true/false,
+    "capture_direction_context": "long|short|aggregate_context_only|unknown",
+    "can_use_capture_as_true_inverse_sample_now": false,
+    "why": "..."
+  },
+  "current_stack_gap_report": {
+    "included_in_pattern_lane_matrix": true/false,
+    "included_in_anchor_confluence_matrix": true/false,
+    "included_in_tiny_live_readiness": true/false,
+    "included_in_weekend_supervisor": true/false,
+    "matrix_integration_missing": true/false,
+    "reason_if_missing": "..."
+  },
+  "betrayal_integration_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "BUILD_TRUE_INVERSE_EVENT_MATCHER|ADD_PAPER_MATRIX_CONTEXT|KEEP_AUDIT_ONLY|COLLECT_MORE_BETRAYAL_PAPER|...",
+      "future_phase": "R210|R211|...",
+      "why": "..."
+    }
+  ],
+  "betrayal_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R210_BETRAYAL_TRUE_INVERSE_REFRESH|RUN_R207_EVENT_LEVEL_CONFLUENCE_MATCHER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL INTEGRATION RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-integration-recheck
+
+Args:
+- --record-recheck
+- --confirm-betrayal-integration-recheck <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck \
+  --record-recheck \
+  --confirm-betrayal-integration-recheck "I CONFIRM BETRAYAL INTEGRATION RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck \
+  --record-recheck \
+  --confirm-betrayal-integration-recheck "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_integration_recheck.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records recheck only
+- includes 222m primary candidate context
+- includes 88m watchlist context
+- marks true inverse validation required
+- marks betrayal not live-ready
+- detects latest 222m capture linkage when present
+- does not treat capture as validated true inverse sample
+- reports missing current matrix integration
+- no live authorization
+- no betrayal promotion
+- no env/config mutation
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R208A/R80/R81 betrayal tests if present.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck \
+  | jq '.status, .betrayal_scope, .betrayal_candidate_summary, .true_inverse_validation_summary, .betrayal_capture_linkage, .current_stack_gap_report, .betrayal_integration_recommendations, .betrayal_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck \
+  --record-recheck \
+  --confirm-betrayal-integration-recheck "I CONFIRM BETRAYAL INTEGRATION RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .recheck_recorded, .betrayal_capture_linkage, .current_stack_gap_report, .betrayal_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-integration-recheck \
+  --record-recheck \
+  --confirm-betrayal-integration-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .recheck_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R209_BETRAYAL_INTEGRATION_RECHECK.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R209.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R210_BETRAYAL_TRUE_INVERSE_REFRESH.md
+
+R210 should:
+- refresh true inverse paper validation using local evidence only
+- try to connect 222m capture into actual true inverse paper tracking if schema supports it
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create:
+codex_tasks/phases/R208B_FISHERMAN_WATCHDOG_HARDENING.md
+
+R208B should:
+- make paper fisherman watchdog behavior explicit and less dependent on manual tmux loops
+- still no systemd install unless explicitly approved
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, betrayal integration gaps, latest 222m capture linkage, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
