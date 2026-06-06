@@ -1,0 +1,474 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R215 Betrayal Direction Split Resolver
+
+BRANCH:
+r215-betrayal-direction-split-resolver
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R213 Betrayal Regime + Miro Recheck showed betrayal candidates have local regime support but remain blocked.
+
+R213 result:
+- 222m aggregate:
+  - regime_support=supports
+  - Miro=pending/blocked
+  - direction_split_resolved=false
+  - paper_review_status=PAPER_REVIEW_BLOCKED_DIRECTION_SPLIT
+- 88m aggregate:
+  - regime_support=supports
+  - Miro=pending
+  - direction_split_resolved=false
+  - paper_review_status=PAPER_REVIEW_BLOCKED_DIRECTION_SPLIT
+- 55m aggregate:
+  - regime_support=supports
+  - Miro=pending
+  - direction_split_resolved=false
+  - paper_review_status=PAPER_REVIEW_BLOCKED_DIRECTION_SPLIT
+
+R212 Betrayal Event Tracker created deterministic event identities but showed:
+- aggregate_context_only_events=3
+- direction_specific_events=0
+- BETRAYAL_EVENT_DIRECTION_SPLIT_REQUIRED
+- 88m and 55m capture seeds are schema-complete enough for future tracking, but still aggregate context only
+- 222m context remains incomplete as direction-specific event evidence
+
+R211/R210 confirmed:
+- 222m, 88m, 55m have refreshed true inverse paper evidence
+- betrayal can enter paper matrix context
+- betrayal cannot enter live readiness
+- betrayal is not promoted
+
+R215 must attempt to resolve direction split from local evidence only:
+- original direction
+- inverse direction
+- entry mode
+- signal timestamp
+- lane key
+- source identity
+
+PURPOSE:
+Create a paper-only direction split resolver that:
+1. Reads R213 betrayal regime/Miro recheck.
+2. Reads R212 betrayal event tracker.
+3. Reads R211 betrayal paper matrix context.
+4. Reads R210 betrayal true inverse refresh.
+5. Reads R80/R95/R96/R100 betrayal docs and ledgers.
+6. Reads local full-spectrum captures.
+7. Reads betrayal paper signals if present.
+8. Reads shadow outcomes / true inverse outcomes if present.
+9. Attempts to infer or resolve direction split ONLY when local schema is explicit.
+10. Marks aggregate-only records as unresolved when direction cannot be proven.
+11. Produces resolved direction-split candidates where possible.
+12. Produces blockers where not possible.
+13. Does not fabricate direction.
+14. Does not write config.
+15. Does not call Binance/network.
+16. Does not place orders.
+17. Does not promote betrayal.
+18. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is direction split audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- treat inferred aggregate direction as proven direction
+- fabricate original/inverse direction
+- fabricate outcomes
+- destructively rewrite ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from direction split.
+- Do not infer live readiness from direction split.
+- Do not mark direction_split_resolved unless explicit source schema supports it.
+- Do not count aggregate context as direction-specific proof.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_regime_miro_recheck.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/betrayal_paper_outcomes.py if present
+- src/app/hammer_radar/operator/betrayal_paper_signal_detector.py if present
+- src/app/hammer_radar/operator/betrayal_detector_source_wiring.py if present
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_regime_miro_recheck.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/betrayal_paper_matrix_context.ndjson
+- logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R96_BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- docs/hammer_radar/live_readiness/R213_BETRAYAL_REGIME_MIRO_RECHECK.md
+- docs/hammer_radar/live_readiness/R212_BETRAYAL_EVENT_TRACKER.md
+- docs/hammer_radar/live_readiness/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+- tests/hammer_radar/test_betrayal_regime_miro_recheck.py
+- tests/hammer_radar/test_betrayal_event_tracker.py
+- tests/hammer_radar/test_betrayal_paper_matrix_context.py
+- tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+
+REUSE / EXTEND:
+Reuse R212 event identity model.
+Reuse R210/R211/R213 candidate metadata.
+Reuse R100 source emitter direction rules if present.
+Reuse R96 deterministic identity rules if present.
+Do not duplicate betrayal philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+
+Expose:
+- build_betrayal_direction_split_resolver
+- load_latest_betrayal_regime_miro_recheck
+- load_latest_betrayal_event_tracker
+- load_latest_betrayal_paper_matrix_context
+- load_latest_betrayal_true_inverse_refresh
+- load_betrayal_paper_signals
+- load_betrayal_true_paper_outcomes
+- load_betrayal_shadow_outcomes
+- load_full_spectrum_capture_seeds
+- extract_direction_from_lane_key
+- infer_inverse_direction
+- resolve_direction_split_candidate
+- build_direction_split_resolution_rows
+- build_direction_split_gap_report
+- build_direction_split_recommendations
+- classify_betrayal_direction_split_status
+- append_betrayal_direction_split_resolver_record
+- load_betrayal_direction_split_resolver_records
+- summarize_betrayal_direction_split_resolver_records
+
+STATUS ENUM:
+- BETRAYAL_DIRECTION_SPLIT_RESOLVER_READY
+- BETRAYAL_DIRECTION_SPLIT_RESOLVER_REJECTED
+- BETRAYAL_DIRECTION_SPLIT_RESOLVER_RECORDED
+- BETRAYAL_DIRECTION_SPLIT_RESOLVER_BLOCKED
+- BETRAYAL_DIRECTION_SPLIT_RESOLVER_ERROR
+
+DIRECTION SPLIT STATUS ENUM:
+- DIRECTION_SPLIT_RESOLVED_FOR_PAPER_REVIEW
+- DIRECTION_SPLIT_PARTIAL
+- DIRECTION_SPLIT_STILL_REQUIRED
+- AGGREGATE_CONTEXT_ONLY
+- DIRECTION_SCHEMA_MISSING
+- DIRECTION_SPLIT_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+DIRECTION RULES:
+- If lane_key contains explicit direction long/short, source_direction may be extracted.
+- For betrayal inverse:
+  - original_direction = source/original direction when explicitly identified
+  - inverse_direction = opposite(original_direction)
+- If a record only says aggregate, do not resolve original/inverse direction.
+- If a record has lane direction but no source/original direction, mark partial unless source schema clearly defines whether lane direction is original or inverse.
+- Do not assume all fresh full-spectrum captures are betrayal inverse entries.
+- Do not count "short" in lane_key as inverse proof unless source says this is betrayal/inverse direction.
+
+TARGET CANDIDATES:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate if available
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "resolver_recorded": false,
+  "resolver_id": null,
+  "record_resolver_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "regime_miro_recheck_found": true/false,
+    "event_tracker_found": true/false,
+    "paper_matrix_context_found": true/false,
+    "true_inverse_refresh_found": true/false,
+    "betrayal_paper_signals_found": true/false,
+    "betrayal_paper_signal_count": ...,
+    "true_paper_outcomes_found": true/false,
+    "true_paper_outcome_count": ...,
+    "full_spectrum_capture_seed_count": ...
+  },
+  "direction_split_resolution_rows": [
+    {
+      "candidate": "88m aggregate",
+      "source": "full_spectrum_capture|betrayal_paper_signal|shadow_outcome|true_paper_outcome|event_tracker",
+      "lane_key": "...",
+      "source_signal_id": "...",
+      "signal_timestamp": "...",
+      "source_direction": "long|short|null",
+      "original_direction": "long|short|null",
+      "inverse_direction": "long|short|null",
+      "entry_mode": "...",
+      "direction_context": "direction_specific|aggregate_context_only|partial|unknown",
+      "direction_split_resolved": true/false,
+      "can_enter_event_outcome_resolver": true/false,
+      "can_count_as_validated_sample_now": false,
+      "paper_only": true,
+      "live_authorized": false,
+      "why": "..."
+    }
+  ],
+  "direction_split_summary": {
+    "rows_reviewed": ...,
+    "direction_split_resolved_count": ...,
+    "partial_direction_split_count": ...,
+    "aggregate_context_only_count": ...,
+    "schema_missing_count": ...,
+    "candidates_with_resolved_direction_split": [...],
+    "candidates_still_blocked": [...]
+  },
+  "direction_split_gap_report": {
+    "original_direction_missing": ...,
+    "inverse_direction_missing": ...,
+    "entry_mode_missing": ...,
+    "signal_timestamp_missing": ...,
+    "source_identity_missing": ...,
+    "aggregate_context_only_count": ...,
+    "hard_live_blockers": [...]
+  },
+  "direction_split_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "WIRE_BETRAYAL_SOURCE_EMITTER|RUN_EVENT_OUTCOME_RESOLVER|COLLECT_DIRECTION_SPECIFIC_SIGNALS|KEEP_CONTEXT_ONLY|...",
+      "future_phase": "R214|R216|...",
+      "why": "..."
+    }
+  ],
+  "direction_split_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R216_BETRAYAL_SOURCE_EMITTER_REFRESH|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL DIRECTION SPLIT RESOLVER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-direction-split-resolver
+
+Args:
+- --record-resolver
+- --confirm-betrayal-direction-split-resolver <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver \
+  --record-resolver \
+  --confirm-betrayal-direction-split-resolver "I CONFIRM BETRAYAL DIRECTION SPLIT RESOLVER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver \
+  --record-resolver \
+  --confirm-betrayal-direction-split-resolver "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_direction_split_resolver.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records resolver only
+- extracts direction from explicit lane key
+- inverse direction is opposite original direction
+- aggregate-only records remain unresolved
+- partial records do not become resolved without original/source direction
+- no raw capture becomes validated sample now
+- no betrayal promotion
+- no live authorization
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R213/R212/R211/R210 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver \
+  | jq '.status, .target_scope, .input_summary, .direction_split_resolution_rows, .direction_split_summary, .direction_split_gap_report, .direction_split_recommendations, .direction_split_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver \
+  --record-resolver \
+  --confirm-betrayal-direction-split-resolver "I CONFIRM BETRAYAL DIRECTION SPLIT RESOLVER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .resolver_recorded, .direction_split_summary, .direction_split_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-direction-split-resolver \
+  --record-resolver \
+  --confirm-betrayal-direction-split-resolver "wrong" \
+  | jq '.status, .confirmation_valid, .resolver_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R215_BETRAYAL_DIRECTION_SPLIT_RESOLVER.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R215.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R214_BETRAYAL_EVENT_OUTCOME_RESOLVER.md
+
+Create:
+codex_tasks/phases/R216_BETRAYAL_SOURCE_EMITTER_REFRESH.md
+
+R216 should:
+- refresh betrayal source emitter so future events carry explicit original/inverse direction
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, direction split status, resolved rows, gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
