@@ -2603,6 +2603,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-direction-split-resolver":
+        from src.app.hammer_radar.operator.betrayal_direction_split_resolver import (
+            build_betrayal_direction_split_resolver,
+            format_betrayal_direction_split_resolver_json,
+        )
+
+        print(
+            format_betrayal_direction_split_resolver_json(
+                build_betrayal_direction_split_resolver(
+                    log_dir=args.log_dir,
+                    record_resolver=args.record_resolver,
+                    confirm_betrayal_direction_split_resolver=args.confirm_betrayal_direction_split_resolver,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4124,6 +4139,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_regime_miro_recheck_parser.add_argument("--record-recheck", action="store_true")
     betrayal_regime_miro_recheck_parser.add_argument("--confirm-betrayal-regime-miro-recheck", default=None)
+
+    betrayal_direction_split_resolver_parser = subparsers.add_parser(
+        "betrayal-direction-split-resolver",
+        parents=[parent],
+    )
+    betrayal_direction_split_resolver_parser.add_argument("--record-resolver", action="store_true")
+    betrayal_direction_split_resolver_parser.add_argument("--confirm-betrayal-direction-split-resolver", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
