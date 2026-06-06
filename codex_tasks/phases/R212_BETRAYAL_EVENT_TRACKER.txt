@@ -1,0 +1,506 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R212 Betrayal Event Tracker
+
+BRANCH:
+r212-betrayal-event-tracker
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: WIRING / INTEGRATION, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R211 added betrayal paper matrix context.
+
+R211 confirmed:
+- betrayal_can_enter_paper_matrix=true
+- betrayal_can_enter_live_readiness=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+
+R211 betrayal context rows:
+- 88m aggregate:
+  - context_score: around 47.56
+  - resolved_true_inverse_samples: 32
+  - unresolved_shadow_samples: 14
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+- 222m aggregate:
+  - context_score: around 36.75
+  - resolved_true_inverse_samples: 15
+  - unresolved_shadow_samples: 5
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+- 55m aggregate:
+  - context_score: around 28.75
+  - resolved_true_inverse_samples: 26
+  - unresolved_shadow_samples: 26
+  - validation_status: TRUE_INVERSE_VALIDATION_REFRESHED
+
+R211 blockers:
+- event_tracker_missing
+- regime_gate_missing_or_pending
+- miro_fish_missing_or_pending
+- aggregate_direction_only
+- direction_split_missing
+- not_live_ready
+- not_lane_mode_eligible
+
+R210 refreshed true inverse evidence, but R211 still treats betrayal as context-only because future samples need deterministic event identities, direction split, declared outcome windows, and event-level tracking.
+
+R212 must build a paper-only betrayal event tracker.
+
+PURPOSE:
+Create a deterministic betrayal event tracker that:
+1. Reads R211 betrayal paper matrix context.
+2. Reads R210 betrayal true inverse refresh.
+3. Reads R209 betrayal integration recheck.
+4. Reads full-spectrum harvester captures.
+5. Reads betrayal shadow outcomes / true paper outcomes / paper signals if present.
+6. Defines deterministic betrayal event identities for:
+   - 222m aggregate
+   - 88m aggregate
+   - 55m aggregate if supported
+7. Creates paper-only event tracker previews for future betrayal samples.
+8. Separates aggregate context from direction-specific event tracking.
+9. Defines direction split requirements:
+   - original direction
+   - inverse direction
+   - entry mode
+   - signal timestamp
+   - outcome window
+10. Links latest 222m capture as a possible event seed only if schema supports it.
+11. Produces append-only tracker records only with explicit confirmation.
+12. Does not write config.
+13. Does not call Binance/network.
+14. Does not place orders.
+15. Does not promote betrayal.
+16. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is paper event tracking only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- treat event identity as trade permission
+- fabricate outcomes
+- fabricate candles
+- destructively rewrite existing ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from event tracking.
+- Do not count a raw capture as a resolved outcome.
+- Do not count aggregate context as direction-specific proof.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/betrayal_paper_outcomes.py if present
+- src/app/hammer_radar/operator/betrayal_paper_signal_detector.py if present
+- src/app/hammer_radar/operator/betrayal_detector_source_wiring.py if present
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_paper_matrix_context.ndjson
+- logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_222m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_88m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_55m.ndjson
+- docs/hammer_radar/live_readiness/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+- docs/hammer_radar/live_readiness/R210_BETRAYAL_TRUE_INVERSE_REFRESH.md
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R81_TRUE_INVERSE_PAPER_OUTCOME_VALIDATION.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R96_BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- tests/hammer_radar/test_betrayal_paper_matrix_context.py
+- tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+- tests/hammer_radar/test_betrayal_integration_recheck.py
+- tests/hammer_radar/test_betrayal_strategy_audit.py
+
+REUSE / EXTEND:
+Reuse R96 betrayal true paper scaffold concepts if present.
+Reuse R100 betrayal source signal emitter identity rules if present.
+Reuse R210 true inverse refresh summaries.
+Reuse R211 context rows.
+Do not duplicate betrayal philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_event_tracker.py
+
+Expose:
+- build_betrayal_event_tracker
+- load_latest_betrayal_paper_matrix_context
+- load_latest_betrayal_true_inverse_refresh
+- load_latest_full_spectrum_captures
+- load_existing_betrayal_paper_signals
+- load_existing_betrayal_true_paper_outcomes
+- build_betrayal_event_identity
+- build_betrayal_event_seed_candidates
+- validate_betrayal_event_seed_schema
+- classify_betrayal_event_direction_context
+- build_betrayal_event_tracker_preview
+- build_betrayal_event_tracker_records
+- build_betrayal_event_tracker_gap_report
+- build_betrayal_event_tracker_recommendations
+- classify_betrayal_event_tracker_status
+- append_betrayal_event_tracker_record
+- load_betrayal_event_tracker_records
+- summarize_betrayal_event_tracker_records
+
+STATUS ENUM:
+- BETRAYAL_EVENT_TRACKER_READY
+- BETRAYAL_EVENT_TRACKER_REJECTED
+- BETRAYAL_EVENT_TRACKER_RECORDED
+- BETRAYAL_EVENT_TRACKER_BLOCKED
+- BETRAYAL_EVENT_TRACKER_ERROR
+
+EVENT TRACKER STATUS ENUM:
+- BETRAYAL_EVENT_TRACKER_PREVIEW_READY
+- BETRAYAL_EVENT_SEEDS_AVAILABLE
+- BETRAYAL_EVENT_SEEDS_SCHEMA_INCOMPLETE
+- BETRAYAL_EVENT_DIRECTION_SPLIT_REQUIRED
+- BETRAYAL_EVENT_TRACKING_APPEND_ONLY_READY
+- BETRAYAL_EVENT_TRACKER_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET CANDIDATES:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate if available
+
+BETRAYAL EVENT IDENTITY RULES:
+Each betrayal event identity must include:
+- symbol
+- timeframe
+- candidate_label
+- original_direction when known
+- inverse_direction when known
+- entry_mode when known
+- source_signal_id or source_capture_id when known
+- signal_timestamp when known
+- event_timeframe
+- outcome_window
+- event_identity_hash
+
+For aggregate-only candidates:
+- original_direction may be null
+- inverse_direction may be null
+- direction_context must be aggregate_context_only
+- event must be marked not_direction_specific
+- cannot count as resolved directional proof
+- can be used as context seed only
+
+For direction-specific candidates:
+- original_direction and inverse_direction must be present
+- entry_mode must be present
+- signal timestamp must be present
+- outcome window must be declared
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "tracker_recorded": false,
+  "tracker_id": null,
+  "record_tracker_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "betrayal_matrix_context_found": true/false,
+    "true_inverse_refresh_found": true/false,
+    "full_spectrum_captures_found": ...,
+    "existing_betrayal_paper_signals_found": true/false,
+    "existing_betrayal_paper_signal_count": ...,
+    "existing_true_paper_outcomes_found": true/false,
+    "existing_true_paper_outcome_count": ...
+  },
+  "event_seed_candidates": [
+    {
+      "candidate": "222m aggregate",
+      "source": "full_spectrum_capture|betrayal_paper_signal|shadow_outcome|true_inverse_refresh",
+      "lane_key": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "222m",
+      "signal_timestamp": "...",
+      "direction_context": "aggregate_context_only|direction_specific|unknown",
+      "schema_complete": true/false,
+      "can_track_future_outcome": true/false,
+      "can_count_as_validated_sample_now": false,
+      "why": "..."
+    }
+  ],
+  "event_tracker_preview": {
+    "events_previewed": ...,
+    "schema_complete_events": ...,
+    "aggregate_context_only_events": ...,
+    "direction_specific_events": ...,
+    "events_ready_for_append_only_tracking": ...,
+    "events_blocked": ...
+  },
+  "event_tracker_records_preview": [
+    {
+      "event_identity": "...",
+      "event_identity_hash": "...",
+      "candidate": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction_context": "...",
+      "original_direction": "long|short|null",
+      "inverse_direction": "long|short|null",
+      "entry_mode": "...",
+      "signal_timestamp": "...",
+      "outcome_windows": [1,3,5,10,21,34,55],
+      "paper_only": true,
+      "live_authorized": false,
+      "promotion_allowed": false
+    }
+  ],
+  "event_tracker_gap_report": {
+    "direction_split_missing": true/false,
+    "entry_mode_missing": true/false,
+    "timestamp_missing": true/false,
+    "outcome_window_missing": false,
+    "aggregate_context_only_count": ...,
+    "schema_incomplete_count": ...,
+    "required_for_validated_future_samples": [...]
+  },
+  "event_tracker_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "APPEND_TRACKER_EVENTS|COLLECT_DIRECTION_SPLIT|WIRE_SOURCE_EMITTER|KEEP_CONTEXT_ONLY|...",
+      "future_phase": "R213|R214|...",
+      "why": "..."
+    }
+  ],
+  "event_tracker_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R213_BETRAYAL_REGIME_MIRO_RECHECK|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL EVENT TRACKER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-event-tracker
+
+Args:
+- --record-tracker
+- --confirm-betrayal-event-tracker <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker \
+  --record-tracker \
+  --confirm-betrayal-event-tracker "I CONFIRM BETRAYAL EVENT TRACKER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker \
+  --record-tracker \
+  --confirm-betrayal-event-tracker "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_event_tracker.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records tracker only
+- builds deterministic event identity
+- identity hash is stable
+- aggregate-only candidate is marked aggregate_context_only
+- aggregate-only candidate cannot count as validated directional proof
+- direction-specific event requires original/inverse direction
+- latest 222m capture can become seed if present but not validated sample
+- event tracker records are paper_only and live_authorized false
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R211/R210/R209 betrayal tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker \
+  | jq '.status, .target_scope, .input_summary, .event_seed_candidates, .event_tracker_preview, .event_tracker_records_preview[0:20], .event_tracker_gap_report, .event_tracker_recommendations, .event_tracker_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker \
+  --record-tracker \
+  --confirm-betrayal-event-tracker "I CONFIRM BETRAYAL EVENT TRACKER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .tracker_recorded, .event_tracker_preview, .event_tracker_gap_report, .event_tracker_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-event-tracker \
+  --record-tracker \
+  --confirm-betrayal-event-tracker "wrong" \
+  | jq '.status, .confirmation_valid, .tracker_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R212_BETRAYAL_EVENT_TRACKER.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R212.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R213_BETRAYAL_REGIME_MIRO_RECHECK.md
+
+Create:
+codex_tasks/phases/R214_BETRAYAL_EVENT_OUTCOME_RESOLVER.md
+
+R214 should:
+- resolve tracked betrayal events into future paper outcomes
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, event tracker readiness, seed candidates, gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

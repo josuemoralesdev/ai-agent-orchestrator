@@ -2573,6 +2573,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-event-tracker":
+        from src.app.hammer_radar.operator.betrayal_event_tracker import (
+            build_betrayal_event_tracker,
+            format_betrayal_event_tracker_json,
+        )
+
+        print(
+            format_betrayal_event_tracker_json(
+                build_betrayal_event_tracker(
+                    log_dir=args.log_dir,
+                    record_tracker=args.record_tracker,
+                    confirm_betrayal_event_tracker=args.confirm_betrayal_event_tracker,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4080,6 +4095,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_paper_matrix_context_parser.add_argument("--record-matrix", action="store_true")
     betrayal_paper_matrix_context_parser.add_argument("--confirm-betrayal-paper-matrix-context", default=None)
+
+    betrayal_event_tracker_parser = subparsers.add_parser(
+        "betrayal-event-tracker",
+        parents=[parent],
+    )
+    betrayal_event_tracker_parser.add_argument("--record-tracker", action="store_true")
+    betrayal_event_tracker_parser.add_argument("--confirm-betrayal-event-tracker", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
