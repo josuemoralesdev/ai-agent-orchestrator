@@ -1,0 +1,525 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R210 Betrayal True Inverse Refresh
+
+BRANCH:
+r210-betrayal-true-inverse-refresh
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R209 Betrayal Integration Recheck closed the memory gap by explicitly bringing betrayal/inverse evidence back into the current stack.
+
+R209 confirmed:
+- 222m aggregate is BETRAYAL_PRIMARY_CANDIDATE:
+  - original sample count: 48
+  - original win rate: 12.5%
+  - naive inverse win rate: 87.5%
+  - live_ready=false
+  - true_inverse_validation_required=true
+- 88m aggregate is BETRAYAL_WATCHLIST:
+  - original sample count: 90
+  - original win rate: 36.67%
+  - naive inverse win rate: 63.33%
+  - live_ready=false
+  - true_inverse_validation_required=true
+- 55m aggregate optional watchlist was found historically.
+- true inverse validation is pending:
+  - resolved_true_inverse_samples=0
+  - resolved_shadow_records=0
+  - shadow_record_count around 1000
+  - validation_status=TRUE_INVERSE_VALIDATION_PENDING
+- latest 222m full-spectrum capture exists:
+  - BTCUSDT|222m|long|ladder_close_50_618
+  - captured around 2026-06-05T09:20:43Z
+- capture matches primary candidate timeframe, but cannot count as validated inverse evidence yet.
+- betrayal is not included in current pattern lane matrix, anchor confluence matrix, or tiny-live readiness.
+- betrayal is paper-only and not live-ready.
+
+The operator wants to close the betrayal gap:
+- not forget 222m / 88m
+- not rely on naive inverse math
+- try to refresh true inverse paper validation from local evidence
+- keep all live gates intact
+
+R210 must attempt to convert available local betrayal/shadow/capture evidence into refreshed true inverse validation evidence, or clearly prove why it remains blocked.
+
+PURPOSE:
+Create a paper-only betrayal true inverse refresh surface that:
+1. Reads R209 betrayal integration recheck.
+2. Reads R80/R81/R82/R83/R95-R100 betrayal docs and ledgers.
+3. Reads betrayal shadow outcomes and shadow resolutions.
+4. Reads betrayal true paper outcomes if present.
+5. Reads local candle archives for target betrayal timeframes:
+   - 222m
+   - 88m
+   - 55m if present
+6. Reads latest full-spectrum captures, especially 222m.
+7. Attempts safe local event-level matching:
+   - shadow outcome -> local candle window
+   - 222m capture -> betrayal candidate timeframe
+   - betrayal paper signal -> local outcome if signal schema supports it
+8. Produces refreshed validation status:
+   - resolved true inverse samples
+   - unresolved samples
+   - blocked reasons
+   - candidate-level validation summaries
+9. Separates:
+   - naive inverse audit evidence
+   - shadow paper outcomes
+   - resolved true inverse samples
+   - capture linkage
+   - regime/Miro Fish prerequisites
+   - live readiness
+10. Recommends whether betrayal may later enter paper matrix context.
+11. Does not write config.
+12. Does not call Binance/network.
+13. Does not place orders.
+14. Does not promote betrayal.
+15. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is local paper validation only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+- count naive inverse math as validated edge
+- fabricate candles
+- fabricate outcomes
+- rewrite historical ledgers destructively
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer live readiness from refreshed true inverse evidence.
+- Do not treat 222m raw capture as validated true inverse sample unless schema and outcome match.
+- Do not use future candles outside allowed validation window.
+- Do not resolve timestamp matches without strict symbol/timeframe/window checks.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/betrayal_paper_outcomes.py if present
+- src/app/hammer_radar/operator/betrayal_paper_signal_detector.py if present
+- src/app/hammer_radar/operator/betrayal_detector_source_wiring.py if present
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/betrayal_candle_archive.py if present
+- src/app/hammer_radar/operator/betrayal_shadow_resolve.py if present
+- src/app/hammer_radar/operator/markov_regime_gate.py if present
+- src/app/hammer_radar/operator/miro_fish_quality_gate.py if present
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/inspect.py
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R81_TRUE_INVERSE_PAPER_OUTCOME_VALIDATION.md
+- docs/hammer_radar/R81_1_BETRAYAL_SHADOW_OUTCOME_RESOLVER.md
+- docs/hammer_radar/R81_2_BETRAYAL_CANDLE_ARCHIVE_REPLAY_BRIDGE.md
+- docs/hammer_radar/R81_3_SAFE_CANDLE_CAPTURE_BACKFILL_SOURCE.md
+- docs/hammer_radar/R82_MARKOV_REGIME_GATE.md
+- docs/hammer_radar/R83_MIRO_FISH_QUALITY_GATE.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R96_BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- docs/hammer_radar/live_readiness/R209_BETRAYAL_INTEGRATION_RECHECK.md
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/betrayal_strategy_audit.ndjson
+- logs/hammer_radar_forward/betrayal_inverse_validation.ndjson
+- logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_222m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_88m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_55m.ndjson
+- tests/hammer_radar/test_betrayal_integration_recheck.py
+- tests/hammer_radar/test_betrayal_strategy_audit.py
+- tests/hammer_radar/test_weekend_paper_fisherman_supervisor.py
+
+REUSE / EXTEND:
+Reuse existing betrayal validation/resolution models if present.
+Reuse strict timestamp matching safeguards from R81.4 if present.
+Reuse local candle archive; do not fetch.
+Reuse R209 candidate context.
+Reuse R208A 222m capture linkage.
+Do not create a second betrayal philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+
+Expose:
+- build_betrayal_true_inverse_refresh
+- load_latest_betrayal_integration_recheck
+- load_betrayal_shadow_outcomes
+- load_betrayal_shadow_resolutions
+- load_betrayal_true_paper_outcomes
+- load_betrayal_paper_signals
+- load_betrayal_candidate_docs_context
+- load_local_betrayal_candles
+- load_latest_222m_full_spectrum_capture
+- match_shadow_outcome_to_local_candles
+- resolve_true_inverse_outcome_preview
+- link_capture_to_betrayal_candidate
+- build_candidate_true_inverse_summary
+- build_capture_seed_validation_summary
+- build_betrayal_validation_gap_report
+- build_betrayal_refresh_recommendations
+- classify_betrayal_true_inverse_refresh_status
+- append_betrayal_true_inverse_refresh_record
+- load_betrayal_true_inverse_refresh_records
+- summarize_betrayal_true_inverse_refresh_records
+
+STATUS ENUM:
+- BETRAYAL_TRUE_INVERSE_REFRESH_READY
+- BETRAYAL_TRUE_INVERSE_REFRESH_REJECTED
+- BETRAYAL_TRUE_INVERSE_REFRESH_RECORDED
+- BETRAYAL_TRUE_INVERSE_REFRESH_BLOCKED
+- BETRAYAL_TRUE_INVERSE_REFRESH_ERROR
+
+VALIDATION STATUS ENUM:
+- TRUE_INVERSE_VALIDATION_REFRESHED
+- TRUE_INVERSE_VALIDATION_PENDING
+- TRUE_INVERSE_NO_RESOLVABLE_SAMPLES
+- TRUE_INVERSE_CANDLE_COVERAGE_MISSING
+- TRUE_INVERSE_TIMESTAMP_ALIGNMENT_BLOCKED
+- TRUE_INVERSE_CAPTURE_LINKED_NOT_VALIDATED
+- TRUE_INVERSE_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET CANDIDATES:
+Primary:
+- 222m aggregate
+  - label=BETRAYAL_PRIMARY_CANDIDATE
+  - original_sample_count=48
+  - original_win_rate_pct=12.5
+  - naive_inverse_win_rate_pct=87.5
+Watchlist:
+- 88m aggregate
+  - label=BETRAYAL_WATCHLIST
+  - original_sample_count=90
+  - original_win_rate_pct=36.67
+  - naive_inverse_win_rate_pct=63.33
+Optional:
+- 55m aggregate if found in docs/ledgers
+
+VALIDATION RULES:
+A true inverse sample can be counted only when:
+- symbol matches
+- timeframe matches
+- source betrayal/shadow signal has a timestamp
+- local candle window covers the required future evaluation horizon
+- direction is explicit enough to evaluate inverse
+- entry/exit or deterministic outcome schema is available
+- result is computed from local candles only
+- the sample is not duplicated
+- timestamp alignment is strict
+- no future data beyond declared validation window is used
+
+A raw full-spectrum capture can be linked to betrayal context but cannot count as true inverse sample unless it has enough schema to produce a valid inverse outcome.
+
+If no resolvable samples exist, say so.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "refresh_recorded": false,
+  "refresh_id": null,
+  "record_refresh_requested": false,
+  "confirmation_valid": false,
+  "betrayal_scope": {
+    "primary_candidate": "222m aggregate",
+    "watchlist_candidates": ["88m aggregate", "55m aggregate_if_found"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "integration_recheck_found": true/false,
+    "shadow_outcomes_found": true/false,
+    "shadow_outcome_count": ...,
+    "shadow_resolutions_found": true/false,
+    "shadow_resolution_count": ...,
+    "true_paper_outcomes_found": true/false,
+    "true_paper_outcome_count": ...,
+    "betrayal_paper_signals_found": true/false,
+    "betrayal_paper_signal_count": ...,
+    "local_candles_loaded": {
+      "222m": ...,
+      "88m": ...,
+      "55m": ...
+    },
+    "latest_222m_capture_found": true/false
+  },
+  "candidate_true_inverse_summary": {
+    "222m": {
+      "label": "BETRAYAL_PRIMARY_CANDIDATE",
+      "naive_inverse_win_rate_pct": 87.5,
+      "resolved_true_inverse_samples": ...,
+      "unresolved_shadow_samples": ...,
+      "refreshed_win_rate_pct": ...,
+      "validation_status": "...",
+      "live_ready": false,
+      "promotion_allowed": false,
+      "why": "..."
+    },
+    "88m": {
+      "label": "BETRAYAL_WATCHLIST",
+      "naive_inverse_win_rate_pct": 63.33,
+      "resolved_true_inverse_samples": ...,
+      "unresolved_shadow_samples": ...,
+      "refreshed_win_rate_pct": ...,
+      "validation_status": "...",
+      "live_ready": false,
+      "promotion_allowed": false,
+      "why": "..."
+    }
+  },
+  "capture_seed_validation_summary": {
+    "latest_222m_capture_lane": "...",
+    "capture_matches_222m": true/false,
+    "capture_can_seed_true_inverse_tracking": true/false,
+    "capture_counted_as_validated_sample": false,
+    "required_next_step": "..."
+  },
+  "validation_gap_report": {
+    "missing_candles": [...],
+    "missing_shadow_schema": [...],
+    "missing_direction_split": [...],
+    "timestamp_alignment_blockers": [...],
+    "duplicate_or_unresolved_counts": {...},
+    "matrix_integration_blocked_until_refresh": true/false
+  },
+  "refresh_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "BUILD_BETRAYAL_EVENT_TRACKER|COLLECT_MORE_SHADOW_OUTCOMES|ADD_PAPER_MATRIX_CONTEXT|KEEP_BLOCKED|...",
+      "future_phase": "R211|R212|...",
+      "why": "..."
+    }
+  ],
+  "refresh_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R211_BETRAYAL_PAPER_MATRIX_CONTEXT|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING|RUN_R207_EVENT_LEVEL_CONFLUENCE_MATCHER",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL TRUE INVERSE REFRESH RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-true-inverse-refresh
+
+Args:
+- --record-refresh
+- --confirm-betrayal-true-inverse-refresh <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh \
+  --record-refresh \
+  --confirm-betrayal-true-inverse-refresh "I CONFIRM BETRAYAL TRUE INVERSE REFRESH RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh \
+  --record-refresh \
+  --confirm-betrayal-true-inverse-refresh "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records refresh only
+- includes 222m primary candidate
+- includes 88m watchlist
+- loads shadow outcome summary
+- loads local candle availability summary
+- links latest 222m capture without counting it as validated sample
+- does not treat naive inverse as validated edge
+- blocks validation when timestamp/candle/schema is missing
+- keeps betrayal not live-ready
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R209/R208A/R80 betrayal tests if present.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh \
+  | jq '.status, .betrayal_scope, .input_summary, .candidate_true_inverse_summary, .capture_seed_validation_summary, .validation_gap_report, .refresh_recommendations, .refresh_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh \
+  --record-refresh \
+  --confirm-betrayal-true-inverse-refresh "I CONFIRM BETRAYAL TRUE INVERSE REFRESH RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .refresh_recorded, .candidate_true_inverse_summary, .capture_seed_validation_summary, .refresh_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-true-inverse-refresh \
+  --record-refresh \
+  --confirm-betrayal-true-inverse-refresh "wrong" \
+  | jq '.status, .confirmation_valid, .refresh_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R210_BETRAYAL_TRUE_INVERSE_REFRESH.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R210.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+
+R211 should:
+- add betrayal-aware paper matrix context from R210
+- if true inverse is still pending, keep blocked/context-only
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create:
+codex_tasks/phases/R212_BETRAYAL_EVENT_TRACKER.md
+
+R212 should:
+- define or refresh deterministic betrayal event tracker for future true inverse samples
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, true inverse validation status, resolved sample counts, latest 222m capture linkage, recommended next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
