@@ -1,0 +1,500 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R213 Betrayal Regime + Miro Recheck
+
+BRANCH:
+r213-betrayal-regime-miro-recheck
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R211 added betrayal to the paper matrix as context only.
+
+R211 context:
+- 88m aggregate:
+  - context_score around 47.56
+  - resolved_true_inverse_samples: 32
+  - unresolved_shadow_samples: 14
+  - paper-only
+  - not live-ready
+- 222m aggregate:
+  - context_score around 36.75
+  - resolved_true_inverse_samples: 15
+  - unresolved_shadow_samples: 5
+  - paper-only
+  - not live-ready
+- 55m aggregate:
+  - context_score around 28.75
+  - resolved_true_inverse_samples: 26
+  - unresolved_shadow_samples: 26
+  - paper-only
+  - not live-ready
+
+R211 blockers:
+- event_tracker_missing
+- regime_gate_missing_or_pending
+- miro_fish_missing_or_pending
+- aggregate_direction_only
+- direction_split_missing
+- not_live_ready
+- not_lane_mode_eligible
+
+R212 added betrayal event tracking:
+- event identities exist
+- 88m and 55m full-spectrum capture seeds were found
+- 222m aggregate context exists but schema incomplete
+- aggregate_context_only_events: 3
+- direction_specific_events: 0
+- event_tracker_status: BETRAYAL_EVENT_DIRECTION_SPLIT_REQUIRED
+- betrayal remains paper-only
+- no promotion
+- no live authorization
+
+R213 must now check betrayal candidates against regime and Miro Fish quality, while preserving all blockers.
+
+PURPOSE:
+Create a paper-only betrayal regime + Miro recheck that:
+1. Reads R212 betrayal event tracker.
+2. Reads R211 betrayal paper matrix context.
+3. Reads R210 betrayal true inverse refresh.
+4. Reads existing Markov regime gate outputs if present.
+5. Reads existing Miro Fish quality gate outputs if present.
+6. Reads local candle archives for betrayal timeframes:
+   - 222m
+   - 88m
+   - 55m
+7. Computes or reuses current regime context for betrayal candidates.
+8. Computes or reuses Miro Fish quality votes for betrayal candidates.
+9. Separates:
+   - regime support
+   - Miro Fish support
+   - true inverse validation
+   - event tracker readiness
+   - direction split
+   - live readiness
+10. Produces paper-only candidate review rows.
+11. Does not write config.
+12. Does not call Binance/network.
+13. Does not place orders.
+14. Does not promote betrayal.
+15. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is regime/Miro audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- infer live readiness from regime support
+- infer live readiness from Miro Fish support
+- bypass direction split requirements
+- fabricate regime data
+- fabricate Miro Fish votes
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from betrayal regime/Miro review.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/markov_regime_gate.py if present
+- src/app/hammer_radar/operator/miro_fish_quality_gate.py if present
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/betrayal_paper_matrix_context.ndjson
+- logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/markov_regime_gate.ndjson
+- logs/hammer_radar_forward/miro_fish_quality_gate.ndjson
+- logs/hammer_radar_forward/betrayal_inverse_validation.ndjson
+- logs/hammer_radar_forward/betrayal_strategy_audit.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_222m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_88m.ndjson
+- logs/hammer_radar_forward/candle_archive/BTCUSDT_55m.ndjson
+- docs/hammer_radar/R82_MARKOV_REGIME_GATE.md
+- docs/hammer_radar/R83_MIRO_FISH_QUALITY_GATE.md
+- docs/hammer_radar/live_readiness/R212_BETRAYAL_EVENT_TRACKER.md
+- docs/hammer_radar/live_readiness/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+- docs/hammer_radar/live_readiness/R210_BETRAYAL_TRUE_INVERSE_REFRESH.md
+- tests/hammer_radar/test_betrayal_event_tracker.py
+- tests/hammer_radar/test_betrayal_paper_matrix_context.py
+- tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+- tests/hammer_radar/test_betrayal_strategy_audit.py
+
+REUSE / EXTEND:
+Reuse existing Markov regime gate if present.
+Reuse existing Miro Fish quality gate if present.
+Reuse R212 event tracker status.
+Reuse R211 matrix context rows.
+Reuse R210 refreshed true inverse summaries.
+Do not create live readiness logic.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_regime_miro_recheck.py
+
+Expose:
+- build_betrayal_regime_miro_recheck
+- load_latest_betrayal_event_tracker
+- load_latest_betrayal_paper_matrix_context
+- load_latest_betrayal_true_inverse_refresh
+- load_existing_markov_regime_gate
+- load_existing_miro_fish_quality_gate
+- load_betrayal_local_candles_for_regime
+- build_betrayal_regime_context
+- build_betrayal_miro_fish_context
+- build_betrayal_regime_miro_candidate_rows
+- build_betrayal_regime_miro_gap_report
+- build_betrayal_regime_miro_recommendations
+- classify_betrayal_regime_miro_status
+- append_betrayal_regime_miro_recheck_record
+- load_betrayal_regime_miro_recheck_records
+- summarize_betrayal_regime_miro_recheck_records
+
+STATUS ENUM:
+- BETRAYAL_REGIME_MIRO_RECHECK_READY
+- BETRAYAL_REGIME_MIRO_RECHECK_REJECTED
+- BETRAYAL_REGIME_MIRO_RECHECK_RECORDED
+- BETRAYAL_REGIME_MIRO_RECHECK_BLOCKED
+- BETRAYAL_REGIME_MIRO_RECHECK_ERROR
+
+REGIME / MIRO STATUS ENUM:
+- BETRAYAL_REGIME_SUPPORT_AVAILABLE
+- BETRAYAL_REGIME_NEUTRAL_OR_PENDING
+- BETRAYAL_REGIME_REJECTS_CANDIDATE
+- BETRAYAL_MIRO_SUPPORT_AVAILABLE
+- BETRAYAL_MIRO_PENDING_OR_BLOCKED
+- BETRAYAL_EVENT_DIRECTION_SPLIT_STILL_REQUIRED
+- BETRAYAL_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET CANDIDATES:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate if available
+
+REGIME CONTEXT RULES:
+If an existing Markov regime gate module/ledger exists, reuse it.
+If not, produce local candle-based preview only:
+- trend direction from recent candle closes
+- volatility regime from recent ranges
+- momentum roughness
+- candidate timeframe support/neutral/reject
+This preview is context only and not a replacement for the existing Markov gate.
+
+MIRO FISH CONTEXT RULES:
+If an existing Miro Fish module/ledger exists, reuse it.
+If not, report:
+- miro_fish_support_found=false
+- miro_fish_status=MIRO_FISH_PENDING_OR_BLOCKED
+Do not fake Miro Fish support.
+
+CANDIDATE STATUS RULES:
+A betrayal candidate cannot be matrix-strengthened beyond paper context unless:
+- true inverse refresh exists
+- event tracker exists
+- direction split is resolved
+- regime does not reject candidate
+- Miro Fish does not reject candidate
+Even then:
+- live readiness remains false
+- promotion remains false
+- lane mode eligibility remains false
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "recheck_recorded": false,
+  "recheck_id": null,
+  "record_recheck_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "betrayal_event_tracker_found": true/false,
+    "betrayal_matrix_context_found": true/false,
+    "true_inverse_refresh_found": true/false,
+    "markov_regime_gate_found": true/false,
+    "miro_fish_gate_found": true/false,
+    "local_candles_loaded": {
+      "222m": ...,
+      "88m": ...,
+      "55m": ...
+    }
+  },
+  "betrayal_regime_context": {
+    "222m": {
+      "regime_status": "...",
+      "regime_support": "supports|neutral|rejects|pending",
+      "regime_source": "existing_markov_gate|local_preview|missing",
+      "notes": [...]
+    },
+    "88m": {...},
+    "55m": {...}
+  },
+  "betrayal_miro_fish_context": {
+    "222m": {
+      "miro_status": "...",
+      "miro_support": "supports|neutral|rejects|pending",
+      "miro_source": "existing_miro_gate|missing",
+      "notes": [...]
+    },
+    "88m": {...},
+    "55m": {...}
+  },
+  "betrayal_regime_miro_candidate_rows": [
+    {
+      "candidate": "88m aggregate",
+      "context_score": ...,
+      "resolved_true_inverse_samples": ...,
+      "event_tracker_status": "...",
+      "direction_split_resolved": false,
+      "regime_support": "...",
+      "miro_support": "...",
+      "paper_review_status": "...",
+      "live_ready": false,
+      "promotion_allowed": false,
+      "risk_warnings": [...],
+      "why": "..."
+    }
+  ],
+  "betrayal_regime_miro_gap_report": {
+    "direction_split_missing": true/false,
+    "miro_fish_missing_or_pending": true/false,
+    "regime_gate_missing_or_pending": true/false,
+    "event_tracker_missing": true/false,
+    "hard_live_blockers": [...]
+  },
+  "betrayal_regime_miro_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "RESOLVE_DIRECTION_SPLIT|BUILD_MIRO_FISH_RECHECK|BUILD_EVENT_OUTCOME_RESOLVER|KEEP_PAPER_ONLY|...",
+      "future_phase": "R214|R215|...",
+      "why": "..."
+    }
+  ],
+  "regime_miro_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R215_BETRAYAL_DIRECTION_SPLIT_RESOLVER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_regime_miro_recheck.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL REGIME MIRO RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-regime-miro-recheck
+
+Args:
+- --record-recheck
+- --confirm-betrayal-regime-miro-recheck <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck \
+  --record-recheck \
+  --confirm-betrayal-regime-miro-recheck "I CONFIRM BETRAYAL REGIME MIRO RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck \
+  --record-recheck \
+  --confirm-betrayal-regime-miro-recheck "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_regime_miro_recheck.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records recheck only
+- includes 222m/88m/55m candidates
+- reuses event tracker status
+- marks direction split unresolved
+- reports Miro Fish missing/pending when no Miro evidence exists
+- reports regime missing/pending or local preview when no Markov evidence exists
+- does not live authorize betrayal
+- does not promote betrayal
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R212/R211/R210/R209 betrayal tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck \
+  | jq '.status, .target_scope, .input_summary, .betrayal_regime_context, .betrayal_miro_fish_context, .betrayal_regime_miro_candidate_rows, .betrayal_regime_miro_gap_report, .betrayal_regime_miro_recommendations, .regime_miro_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck \
+  --record-recheck \
+  --confirm-betrayal-regime-miro-recheck "I CONFIRM BETRAYAL REGIME MIRO RECHECK RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .recheck_recorded, .betrayal_regime_miro_candidate_rows, .regime_miro_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-regime-miro-recheck \
+  --record-recheck \
+  --confirm-betrayal-regime-miro-recheck "wrong" \
+  | jq '.status, .confirmation_valid, .recheck_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R213_BETRAYAL_REGIME_MIRO_RECHECK.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R213.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R214_BETRAYAL_EVENT_OUTCOME_RESOLVER.md
+
+Create:
+codex_tasks/phases/R215_BETRAYAL_DIRECTION_SPLIT_RESOLVER.md
+
+R215 should:
+- attempt to resolve direction split for aggregate betrayal candidates from local paper signals/captures only
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, regime/Miro status, remaining blockers, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

@@ -2588,6 +2588,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-regime-miro-recheck":
+        from src.app.hammer_radar.operator.betrayal_regime_miro_recheck import (
+            build_betrayal_regime_miro_recheck,
+            format_betrayal_regime_miro_recheck_json,
+        )
+
+        print(
+            format_betrayal_regime_miro_recheck_json(
+                build_betrayal_regime_miro_recheck(
+                    log_dir=args.log_dir,
+                    record_recheck=args.record_recheck,
+                    confirm_betrayal_regime_miro_recheck=args.confirm_betrayal_regime_miro_recheck,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4102,6 +4117,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_event_tracker_parser.add_argument("--record-tracker", action="store_true")
     betrayal_event_tracker_parser.add_argument("--confirm-betrayal-event-tracker", default=None)
+
+    betrayal_regime_miro_recheck_parser = subparsers.add_parser(
+        "betrayal-regime-miro-recheck",
+        parents=[parent],
+    )
+    betrayal_regime_miro_recheck_parser.add_argument("--record-recheck", action="store_true")
+    betrayal_regime_miro_recheck_parser.add_argument("--confirm-betrayal-regime-miro-recheck", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
