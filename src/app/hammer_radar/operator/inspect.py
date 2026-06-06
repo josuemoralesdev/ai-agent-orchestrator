@@ -2543,6 +2543,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-true-inverse-refresh":
+        from src.app.hammer_radar.operator.betrayal_true_inverse_refresh import (
+            build_betrayal_true_inverse_refresh,
+            format_betrayal_true_inverse_refresh_json,
+        )
+
+        print(
+            format_betrayal_true_inverse_refresh_json(
+                build_betrayal_true_inverse_refresh(
+                    log_dir=args.log_dir,
+                    record_refresh=args.record_refresh,
+                    confirm_betrayal_true_inverse_refresh=args.confirm_betrayal_true_inverse_refresh,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4036,6 +4051,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_integration_recheck_parser.add_argument("--record-recheck", action="store_true")
     betrayal_integration_recheck_parser.add_argument("--confirm-betrayal-integration-recheck", default=None)
+
+    betrayal_true_inverse_refresh_parser = subparsers.add_parser(
+        "betrayal-true-inverse-refresh",
+        parents=[parent],
+    )
+    betrayal_true_inverse_refresh_parser.add_argument("--record-refresh", action="store_true")
+    betrayal_true_inverse_refresh_parser.add_argument("--confirm-betrayal-true-inverse-refresh", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
