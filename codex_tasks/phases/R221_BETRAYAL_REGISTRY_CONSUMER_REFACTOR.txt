@@ -1,0 +1,461 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R221 Betrayal Registry Consumer Refactor
+
+BRANCH:
+r221-betrayal-registry-consumer-refactor
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R218 created the Strategy Evidence Registry / Source Identity Manifest.
+
+R219 wired the betrayal source family against the registry and proved:
+- strategy_evidence_registry_found=true
+- registry_valid=true
+- betrayal candidates are registry-backed
+- candidates exist in registry:
+  - 222m aggregate
+  - 88m aggregate
+  - 55m aggregate_if_available
+- all registry-backed rows remain:
+  - paper_only=true
+  - live_authorized=false
+  - promotion_allowed=false
+
+R219 also exposed the remaining core blocker:
+- resolver_ready_rows=0
+- missing_entry_mode_rows=138
+- missing_source_identity_rows=141
+- missing_direction_rows=143
+- wiring_status=BETRAYAL_SOURCE_FAMILY_SOURCE_IDENTITY_BLOCKED
+
+This means the registry exists, but betrayal consumer modules are still not fully consuming it as their source of truth.
+
+R221 must refactor betrayal consumer surfaces so they read registry manifests directly instead of carrying hardcoded candidate/source-field logic.
+
+PURPOSE:
+Create a paper-only registry consumer refactor for the betrayal family that:
+1. Reads the R218 strategy evidence registry.
+2. Reads R219 registry wiring output.
+3. Updates betrayal consumer logic to use registry helper functions where safe.
+4. Does not rewrite historical ledgers.
+5. Does not mutate configs.
+6. Keeps all live gates closed.
+7. Produces a compatibility report showing which modules now consume registry-backed requirements.
+8. Produces a gap report for remaining hardcoded target lists.
+9. Preserves existing public outputs and tests.
+10. Does not call Binance/network.
+11. Does not place orders.
+12. Does not promote betrayal.
+13. Does not authorize live.
+
+TARGET CONSUMER MODULES:
+Refactor only where safe and low-risk:
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+
+Audit but do not heavily refactor unless trivial:
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+
+Registry source:
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+
+CRITICAL SAFETY:
+This phase is registry consumer wiring/refactor only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- turn registry inclusion into readiness
+- rewrite existing ledgers destructively
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from registry consumer refactor.
+- Do not infer live readiness from registry consumer refactor.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/registry_wiring_betrayal_source_family.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+- logs/hammer_radar_forward/registry_wiring_betrayal_source_family.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- docs/hammer_radar/live_readiness/R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST.md
+- docs/hammer_radar/live_readiness/R219_REGISTRY_WIRING_FOR_BETRAYAL_SOURCE_FAMILY.md
+- docs/hammer_radar/live_readiness/R217_BETRAYAL_AGGREGATE_DECOMPOSITION.md
+- docs/hammer_radar/live_readiness/R216_BETRAYAL_SOURCE_EMITTER_REFRESH.md
+- tests/hammer_radar/test_strategy_evidence_registry.py
+- tests/hammer_radar/test_registry_wiring_betrayal_source_family.py
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+- tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+- tests/hammer_radar/test_betrayal_direction_split_resolver.py
+- tests/hammer_radar/test_betrayal_event_tracker.py
+
+REUSE / EXTEND:
+Reuse R218 registry helper functions.
+Reuse R219 registry validation logic.
+Do not duplicate candidate lists if registry exposes them.
+Do not duplicate betrayal_source_emitter_v2 required fields.
+Do not mutate configs.
+Do not call Binance/network.
+
+IMPLEMENTATION GUIDANCE:
+Prefer small helper functions in betrayal modules that call the registry.
+
+Examples:
+- get_betrayal_candidates_from_registry(log_dir)
+- get_betrayal_source_required_fields_from_registry(log_dir)
+- get_betrayal_safety_defaults_from_registry(log_dir)
+- validate_betrayal_row_with_registry(row, registry)
+
+Keep backwards-compatible fallback behavior:
+- If registry missing, module should not crash.
+- It should return blocked/registry_missing where appropriate.
+- It must not silently continue with hardcoded assumptions as ready.
+
+Do NOT rewrite every betrayal module aggressively.
+Do surgical refactor only:
+- replace repeated candidate lists
+- replace repeated required-field lists
+- replace repeated safety defaults
+- add a reporting surface that proves which modules now consume registry-backed requirements
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_registry_consumer_refactor.py
+
+Expose:
+- build_betrayal_registry_consumer_refactor
+- load_latest_strategy_evidence_registry
+- load_latest_registry_wiring_betrayal_source_family
+- build_betrayal_registry_consumer_inventory
+- inspect_betrayal_module_registry_usage
+- build_registry_consumer_compatibility_report
+- build_registry_consumer_gap_report
+- build_registry_consumer_recommendations
+- classify_betrayal_registry_consumer_status
+- append_betrayal_registry_consumer_refactor_record
+- load_betrayal_registry_consumer_refactor_records
+- summarize_betrayal_registry_consumer_refactor_records
+
+STATUS ENUM:
+- BETRAYAL_REGISTRY_CONSUMER_REFACTOR_READY
+- BETRAYAL_REGISTRY_CONSUMER_REFACTOR_REJECTED
+- BETRAYAL_REGISTRY_CONSUMER_REFACTOR_RECORDED
+- BETRAYAL_REGISTRY_CONSUMER_REFACTOR_BLOCKED
+- BETRAYAL_REGISTRY_CONSUMER_REFACTOR_ERROR
+
+CONSUMER STATUS ENUM:
+- BETRAYAL_CONSUMERS_REGISTRY_BACKED
+- BETRAYAL_CONSUMERS_PARTIALLY_REGISTRY_BACKED
+- BETRAYAL_CONSUMERS_REGISTRY_GAPS_REMAIN
+- BETRAYAL_CONSUMERS_REGISTRY_MISSING
+- BETRAYAL_CONSUMERS_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+REGISTRY-BACKED CONSUMER EXPECTATIONS:
+For each target module, report:
+- consumes_betrayal_candidates_from_registry true/false
+- consumes_source_identity_requirements_from_registry true/false
+- consumes_safety_defaults_from_registry true/false
+- fallback_behavior_if_registry_missing
+- hardcoded_target_list_remaining true/false
+- notes
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "refactor_recorded": false,
+  "refactor_id": null,
+  "record_refactor_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "family": "betrayal",
+    "registry_backed": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "strategy_evidence_registry_found": true/false,
+    "registry_valid": true/false,
+    "registry_wiring_found": true/false,
+    "target_modules_inspected": [...]
+  },
+  "registry_consumer_inventory": [
+    {
+      "module": "betrayal_source_emitter_refresh",
+      "path": "...",
+      "consumes_betrayal_candidates_from_registry": true/false,
+      "consumes_source_identity_requirements_from_registry": true/false,
+      "consumes_safety_defaults_from_registry": true/false,
+      "hardcoded_target_list_remaining": true/false,
+      "fallback_behavior_if_registry_missing": "blocked|legacy_context_only|unknown",
+      "paper_only": true,
+      "live_authorized": false,
+      "notes": [...]
+    }
+  ],
+  "registry_consumer_compatibility_report": {
+    "modules_inspected": ...,
+    "modules_registry_backed": ...,
+    "modules_partially_registry_backed": ...,
+    "modules_with_hardcoded_lists_remaining": ...,
+    "modules_with_safe_fallback": ...,
+    "registry_missing_would_block_readiness": true/false
+  },
+  "registry_consumer_gap_report": {
+    "remaining_hardcoded_candidate_lists": [...],
+    "remaining_hardcoded_required_fields": [...],
+    "remaining_hardcoded_safety_defaults": [...],
+    "entry_mode_source_identity_still_blocked": true/false,
+    "resolver_ready_rows": 0,
+    "hard_live_blockers": [...]
+  },
+  "registry_consumer_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "WIRE_MODULE_TO_REGISTRY|KEEP_CONTEXT_ONLY|RUN_R222_PATTERN_ANCHOR_REGISTRY_WIRING|RUN_R223_SOURCE_IDENTITY_NORMALIZER|...",
+      "future_phase": "R222|R223|...",
+      "why": "..."
+    }
+  ],
+  "consumer_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R220_REGISTRY_WIRING_FOR_PATTERN_ANCHOR_FAMILIES|RUN_R223_BETRAYAL_SOURCE_IDENTITY_NORMALIZER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_registry_consumer_refactor.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL REGISTRY CONSUMER REFACTOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-registry-consumer-refactor
+
+Args:
+- --record-refactor
+- --confirm-betrayal-registry-consumer-refactor <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor \
+  --record-refactor \
+  --confirm-betrayal-registry-consumer-refactor "I CONFIRM BETRAYAL REGISTRY CONSUMER REFACTOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor \
+  --record-refactor \
+  --confirm-betrayal-registry-consumer-refactor "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_registry_consumer_refactor.py
+
+Also update, only if needed:
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+- tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+- tests/hammer_radar/test_betrayal_direction_split_resolver.py
+- tests/hammer_radar/test_betrayal_event_tracker.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records refactor only
+- registry missing blocks readiness or forces safe fallback
+- target modules report registry usage inventory
+- registry-backed source requirements are used
+- registry-backed betrayal candidates are used
+- remaining hardcoded lists are reported if still present
+- all rows remain paper_only
+- all rows live_authorized false
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R219/R218/R217/R216/R215 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor \
+  | jq '.status, .target_scope, .input_summary, .registry_consumer_inventory, .registry_consumer_compatibility_report, .registry_consumer_gap_report, .registry_consumer_recommendations, .consumer_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor \
+  --record-refactor \
+  --confirm-betrayal-registry-consumer-refactor "I CONFIRM BETRAYAL REGISTRY CONSUMER REFACTOR RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .refactor_recorded, .registry_consumer_compatibility_report, .consumer_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-registry-consumer-refactor \
+  --record-refactor \
+  --confirm-betrayal-registry-consumer-refactor "wrong" \
+  | jq '.status, .confirmation_valid, .refactor_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R221_BETRAYAL_REGISTRY_CONSUMER_REFACTOR.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R221.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R222_PATTERN_ANCHOR_REGISTRY_CONSUMER_REFACTOR.md
+
+R222 should:
+- wire pattern, anchor, and normal matrix surfaces to consume strategy_evidence_registry
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create:
+codex_tasks/phases/R223_BETRAYAL_SOURCE_IDENTITY_NORMALIZER.md
+
+R223 should:
+- use registry-backed requirements to normalize source_identity/entry_mode for betrayal rows where local evidence supports it
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, registry consumer status, remaining hardcoded areas, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

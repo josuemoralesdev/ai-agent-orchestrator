@@ -22,6 +22,10 @@ from src.app.hammer_radar.operator.betrayal_event_tracker import build_betrayal_
 from src.app.hammer_radar.operator.betrayal_source_emitter_refresh import SCHEMA_VERSION as SOURCE_SCHEMA_VERSION
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
+from src.app.hammer_radar.operator.registry_wiring_betrayal_source_family import (
+    build_registry_backed_betrayal_candidate_view,
+    load_latest_strategy_evidence_registry,
+)
 
 BETRAYAL_AGGREGATE_DECOMPOSITION_READY = "BETRAYAL_AGGREGATE_DECOMPOSITION_READY"
 BETRAYAL_AGGREGATE_DECOMPOSITION_REJECTED = "BETRAYAL_AGGREGATE_DECOMPOSITION_REJECTED"
@@ -127,6 +131,7 @@ def build_betrayal_aggregate_decomposition(
         true_paper_outcomes = load_betrayal_true_paper_outcomes(log_dir=resolved_log_dir)
         paper_signals = load_betrayal_paper_signals(log_dir=resolved_log_dir)
         capture_seeds = load_full_spectrum_capture_seeds(log_dir=resolved_log_dir)
+        registry_view = get_betrayal_registry_candidate_view(log_dir=resolved_log_dir)
         grouped = group_betrayal_evidence_by_direction_entry(
             source_emitter_refresh=source_refresh,
             direction_split_resolver=direction_split,
@@ -136,8 +141,9 @@ def build_betrayal_aggregate_decomposition(
             true_paper_outcomes=true_paper_outcomes,
             betrayal_paper_signals=paper_signals,
             full_spectrum_capture_seeds=capture_seeds,
+            registry_candidate_view=registry_view,
         )
-        rows = build_decomposition_rows(grouped_evidence=grouped)
+        rows = build_decomposition_rows(grouped_evidence=grouped, registry_candidate_view=registry_view)
         preview = build_v2_source_rows_preview(decomposition_rows=rows, generated_at=generated_at)
         gap_report = build_decomposition_gap_report(rows)
         recommendations = build_decomposition_recommendations(gap_report=gap_report, rows=rows)
@@ -153,12 +159,9 @@ def build_betrayal_aggregate_decomposition(
             "decomposition_id": None,
             "record_decomposition_requested": bool(record_decomposition),
             "confirmation_valid": bool(confirmation_valid),
-            "target_scope": {
-                "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
-                "paper_only": True,
-                "live_authorized": False,
-            },
+            "target_scope": build_betrayal_registry_target_scope(registry_candidate_view=registry_view),
             "input_summary": {
+                "strategy_evidence_registry_found": bool(registry_view.get("registry_found")),
                 "source_emitter_refresh_found": bool(source_refresh),
                 "direction_split_resolver_found": bool(direction_split),
                 "event_tracker_found": bool(event_tracker),
@@ -258,6 +261,79 @@ def load_full_spectrum_capture_seeds(*, log_dir: str | Path | None = None, limit
     return _dedupe_raw_records(captures)
 
 
+def get_betrayal_registry_candidate_view(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    registry = load_latest_strategy_evidence_registry(log_dir=log_dir)
+    manifest = registry.get("registry_manifest") if isinstance(registry.get("registry_manifest"), Mapping) else {}
+    view = build_registry_backed_betrayal_candidate_view(manifest if isinstance(manifest, Mapping) else {})
+    return _sanitize(
+        {
+            **view,
+            "registry_found": bool(registry),
+            "registry_valid": bool((registry.get("registry_validation") or {}).get("valid")) if isinstance(registry, Mapping) else False,
+            "fallback_behavior_if_registry_missing": "legacy_context_only" if not registry else "blocked",
+        }
+    )
+
+
+def get_betrayal_candidates_from_registry(*, log_dir: str | Path | None = None) -> list[dict[str, Any]]:
+    return list(get_betrayal_registry_candidate_view(log_dir=log_dir).get("candidates") or [])
+
+
+def get_betrayal_source_required_fields_from_registry(*, log_dir: str | Path | None = None) -> list[str]:
+    return [str(field) for field in get_betrayal_registry_candidate_view(log_dir=log_dir).get("required_source_fields") or []]
+
+
+def get_betrayal_safety_defaults_from_registry(*, log_dir: str | Path | None = None) -> dict[str, bool]:
+    safety = get_betrayal_registry_candidate_view(log_dir=log_dir).get("safety_defaults")
+    return dict(safety) if isinstance(safety, Mapping) else _betrayal_legacy_safety_defaults()
+
+
+def build_betrayal_registry_target_scope(*, registry_candidate_view: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    view = registry_candidate_view or {}
+    candidates = [str(row.get("candidate") or row.get("label") or row.get("candidate_id")) for row in view.get("candidates") or []]
+    safety = view.get("safety_defaults") if isinstance(view.get("safety_defaults"), Mapping) else _betrayal_legacy_safety_defaults()
+    return {
+        "betrayal_candidates": candidates or _legacy_betrayal_candidate_labels(),
+        "registry_backed": bool(view.get("registry_found") and candidates),
+        "paper_only": bool(safety.get("paper_only", True)),
+        "live_authorized": bool(safety.get("live_authorized", False)),
+    }
+
+
+def _betrayal_candidate_specs(registry_candidate_view: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
+    specs = []
+    view = registry_candidate_view or {}
+    for row in view.get("candidates") or []:
+        if not isinstance(row, Mapping):
+            continue
+        timeframe = str(row.get("timeframe") or "")
+        candidate = str(row.get("candidate") or row.get("label") or "")
+        if timeframe and candidate:
+            specs.append({"timeframe": timeframe, "candidate": candidate})
+    if specs:
+        return specs
+    return [{"timeframe": timeframe, "candidate": f"{timeframe} aggregate"} for timeframe in TARGET_TIMEFRAMES]
+
+
+def _betrayal_target_timeframes(registry_candidate_view: Mapping[str, Any] | None = None) -> list[str]:
+    return [spec["timeframe"] for spec in _betrayal_candidate_specs(registry_candidate_view)]
+
+
+def _legacy_betrayal_candidate_labels() -> list[str]:
+    return [f"{timeframe} aggregate" for timeframe in TARGET_TIMEFRAMES[:-1]] + ["55m aggregate_if_available"]
+
+
+def _betrayal_legacy_safety_defaults() -> dict[str, bool]:
+    return {
+        "paper_only": True,
+        "live_authorized": False,
+        "promotion_allowed": False,
+        "config_write_allowed": False,
+        "order_allowed": False,
+        "binance_network_allowed": False,
+    }
+
+
 def group_betrayal_evidence_by_direction_entry(
     *,
     source_emitter_refresh: Mapping[str, Any],
@@ -268,6 +344,7 @@ def group_betrayal_evidence_by_direction_entry(
     true_paper_outcomes: Sequence[Mapping[str, Any]],
     betrayal_paper_signals: Sequence[Mapping[str, Any]],
     full_spectrum_capture_seeds: Sequence[Mapping[str, Any]],
+    registry_candidate_view: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     raw_rows: list[dict[str, Any]] = []
     raw_rows.extend(_rows_from_payload(source_emitter_refresh, "source_emitter_refresh"))
@@ -280,10 +357,11 @@ def group_betrayal_evidence_by_direction_entry(
     raw_rows.extend({**dict(row), "evidence_source": "full_spectrum_capture"} for row in full_spectrum_capture_seeds if isinstance(row, Mapping))
 
     groups: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+    target_timeframes = set(_betrayal_target_timeframes(registry_candidate_view))
     for row in raw_rows:
         candidate = _candidate_label(row)
         timeframe = _candidate_timeframe(candidate)
-        if timeframe not in TARGET_TIMEFRAMES:
+        if timeframe not in target_timeframes:
             continue
         normalized = _normalize_evidence_row(row, candidate=candidate, timeframe=timeframe)
         key = (
@@ -369,12 +447,17 @@ def build_decomposition_candidate(group: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
-def build_decomposition_rows(*, grouped_evidence: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def build_decomposition_rows(
+    *,
+    grouped_evidence: Sequence[Mapping[str, Any]],
+    registry_candidate_view: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     rows = [build_decomposition_candidate(group) for group in grouped_evidence]
     rows = _dedupe_decomposition_rows(rows)
     present = {str(row.get("candidate")) for row in rows}
-    for timeframe in TARGET_TIMEFRAMES:
-        candidate = f"{timeframe} aggregate"
+    for candidate_spec in _betrayal_candidate_specs(registry_candidate_view):
+        timeframe = candidate_spec["timeframe"]
+        candidate = candidate_spec["candidate"]
         if timeframe == "55m" and candidate not in present and not any(row.get("timeframe") == "55m" for row in rows):
             continue
         if candidate not in present:
