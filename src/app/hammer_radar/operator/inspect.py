@@ -2714,6 +2714,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-source-identity-evidence-collector":
+        from src.app.hammer_radar.operator.betrayal_source_identity_evidence_collector import (
+            build_betrayal_source_identity_evidence_collector,
+            format_betrayal_source_identity_evidence_collector_json,
+        )
+
+        print(
+            format_betrayal_source_identity_evidence_collector_json(
+                build_betrayal_source_identity_evidence_collector(
+                    log_dir=args.log_dir,
+                    record_collector=args.record_collector,
+                    confirm_betrayal_source_identity_evidence_collector=(
+                        args.confirm_betrayal_source_identity_evidence_collector
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4291,6 +4308,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_source_identity_normalizer_parser.add_argument("--record-normalizer", action="store_true")
     betrayal_source_identity_normalizer_parser.add_argument(
         "--confirm-betrayal-source-identity-normalizer",
+        default=None,
+    )
+
+    betrayal_source_identity_evidence_collector_parser = subparsers.add_parser(
+        "betrayal-source-identity-evidence-collector",
+        parents=[parent],
+    )
+    betrayal_source_identity_evidence_collector_parser.add_argument("--record-collector", action="store_true")
+    betrayal_source_identity_evidence_collector_parser.add_argument(
+        "--confirm-betrayal-source-identity-evidence-collector",
         default=None,
     )
 
