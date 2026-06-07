@@ -1,0 +1,504 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R223 Betrayal Source Identity Normalizer
+
+BRANCH:
+r223-betrayal-source-identity-normalizer
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R221 Betrayal Registry Consumer Refactor wired key betrayal consumers to the Strategy Evidence Registry, but it did not solve the core blocker.
+
+R221 result:
+- modules_inspected=7
+- modules_registry_backed=4
+- modules_with_safe_fallback=4
+- modules_with_hardcoded_lists_remaining=7
+- consumer_status=BETRAYAL_CONSUMERS_PARTIALLY_REGISTRY_BACKED
+- entry_mode_source_identity_still_blocked=true
+- resolver_ready_rows=0
+
+R219 showed:
+- missing_entry_mode_rows=138
+- missing_source_identity_rows=141
+- missing_direction_rows=143
+- resolver_ready_rows=0
+- wiring_status=BETRAYAL_SOURCE_FAMILY_SOURCE_IDENTITY_BLOCKED
+
+R217 showed:
+- ready_rows=0
+- partial_rows=9
+- blocked_rows=5
+- decomposition_status=AGGREGATE_DECOMPOSITION_REQUIRES_ENTRY_MODE
+
+R216 created betrayal_source_emitter_v2 contract:
+Required fields include:
+- entry_mode
+- original_direction
+- inverse_direction
+- emitted_direction
+- source_identity
+- source_signal_id
+- emitted_signal_id
+- source_signal_timestamp
+- lane_key
+- betrayal_event_identity
+- betrayal_event_identity_hash
+
+R223 must normalize source_identity and entry_mode only where local evidence supports it. It must not fabricate missing evidence.
+
+PURPOSE:
+Create a paper-only source identity normalizer that:
+1. Reads R218 strategy evidence registry.
+2. Reads R221 betrayal registry consumer refactor.
+3. Reads R219 registry wiring.
+4. Reads R217 aggregate decomposition.
+5. Reads R216 source emitter refresh.
+6. Reads R215 direction split resolver.
+7. Reads R212 event tracker.
+8. Looks for local evidence that can safely fill:
+   - entry_mode
+   - source_identity
+   - source_signal_id
+   - emitted_signal_id
+   - lane_key
+   - emitted_direction
+9. Produces normalized preview rows only when evidence supports the fields.
+10. Classifies rows as:
+   - normalizer_ready
+   - partial_normalization
+   - blocked_missing_identity
+   - blocked_missing_entry_mode
+   - blocked_aggregate_context_only
+11. Does not write configs.
+12. Does not call Binance/network.
+13. Does not place orders.
+14. Does not promote betrayal.
+15. Does not authorize live.
+16. Does not rewrite old ledgers destructively.
+
+CRITICAL SAFETY:
+This phase is source identity normalization only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- fabricate entry_mode
+- fabricate source_identity
+- fabricate emitted_direction
+- fabricate outcomes
+- count normalized rows as resolved outcomes
+- destructively rewrite historical ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from normalization.
+- Do not infer live readiness from normalization.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/betrayal_registry_consumer_refactor.py
+- src/app/hammer_radar/operator/registry_wiring_betrayal_source_family.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+- logs/hammer_radar_forward/betrayal_registry_consumer_refactor.ndjson
+- logs/hammer_radar_forward/registry_wiring_betrayal_source_family.ndjson
+- logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- docs/hammer_radar/live_readiness/R221_BETRAYAL_REGISTRY_CONSUMER_REFACTOR.md
+- docs/hammer_radar/live_readiness/R219_REGISTRY_WIRING_FOR_BETRAYAL_SOURCE_FAMILY.md
+- docs/hammer_radar/live_readiness/R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST.md
+- docs/hammer_radar/live_readiness/R217_BETRAYAL_AGGREGATE_DECOMPOSITION.md
+- docs/hammer_radar/live_readiness/R216_BETRAYAL_SOURCE_EMITTER_REFRESH.md
+- tests/hammer_radar/test_betrayal_registry_consumer_refactor.py
+- tests/hammer_radar/test_registry_wiring_betrayal_source_family.py
+- tests/hammer_radar/test_strategy_evidence_registry.py
+- tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+- tests/hammer_radar/test_betrayal_direction_split_resolver.py
+- tests/hammer_radar/test_betrayal_event_tracker.py
+
+REUSE / EXTEND:
+Reuse R218 registry source identity requirements.
+Reuse R219 registry-backed validation.
+Reuse R217 decomposition rows.
+Reuse R216 source emitter v2 contract.
+Reuse R212 event identity model.
+Do not duplicate registry philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+NORMALIZATION RULES:
+A normalized row may fill entry_mode only if:
+- source row explicitly has entry_mode; OR
+- lane_key explicitly includes entry_mode; OR
+- source_signal_id follows a known lane/signal schema that includes entry_mode; OR
+- registry candidate has exactly one allowed entry mode AND source explicitly references that mode.
+
+Do NOT fill entry_mode merely because ladder_close_50_618 is common.
+
+A normalized row may fill source_identity only if:
+- source_identity exists; OR
+- source_signal_id exists; OR
+- source_capture_id exists; OR
+- emitted_signal_id exists; OR
+- deterministic source identity can be built from symbol/timeframe/direction/entry_mode/timestamp/source family.
+
+Do NOT build source_identity from candidate label alone.
+
+A normalized row may fill emitted_direction only if:
+- inverse_direction exists; and
+- emitted_direction can equal inverse_direction.
+
+A normalized row may become resolver-ready only if all registry-required betrayal_source_emitter_v2 fields are present and:
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+- candidate exists in registry
+- entry_mode exists in registry and is not blocked placeholder
+- emitted_direction equals inverse_direction
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+
+Expose:
+- build_betrayal_source_identity_normalizer
+- load_latest_strategy_evidence_registry
+- load_latest_betrayal_registry_consumer_refactor
+- load_latest_registry_wiring_betrayal_source_family
+- load_latest_betrayal_aggregate_decomposition
+- load_latest_betrayal_source_emitter_refresh
+- load_latest_betrayal_direction_split_resolver
+- load_latest_betrayal_event_tracker
+- extract_entry_mode_from_lane_key
+- build_deterministic_source_identity
+- normalize_betrayal_source_row
+- validate_normalized_row_against_registry
+- build_normalized_source_rows_preview
+- build_source_identity_normalizer_gap_report
+- build_source_identity_normalizer_recommendations
+- classify_betrayal_source_identity_normalizer_status
+- append_betrayal_source_identity_normalizer_record
+- load_betrayal_source_identity_normalizer_records
+- summarize_betrayal_source_identity_normalizer_records
+
+STATUS ENUM:
+- BETRAYAL_SOURCE_IDENTITY_NORMALIZER_READY
+- BETRAYAL_SOURCE_IDENTITY_NORMALIZER_REJECTED
+- BETRAYAL_SOURCE_IDENTITY_NORMALIZER_RECORDED
+- BETRAYAL_SOURCE_IDENTITY_NORMALIZER_BLOCKED
+- BETRAYAL_SOURCE_IDENTITY_NORMALIZER_ERROR
+
+NORMALIZER STATUS ENUM:
+- SOURCE_IDENTITY_NORMALIZED_ROWS_READY
+- SOURCE_IDENTITY_PARTIAL_NORMALIZATION
+- SOURCE_IDENTITY_ENTRY_MODE_BLOCKED
+- SOURCE_IDENTITY_IDENTITY_BLOCKED
+- SOURCE_IDENTITY_NO_RESOLVER_READY_ROWS
+- SOURCE_IDENTITY_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "normalizer_recorded": false,
+  "normalizer_id": null,
+  "record_normalizer_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "family": "betrayal",
+    "registry_backed": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "strategy_evidence_registry_found": true/false,
+    "registry_valid": true/false,
+    "registry_wiring_found": true/false,
+    "consumer_refactor_found": true/false,
+    "aggregate_decomposition_found": true/false,
+    "source_emitter_refresh_found": true/false,
+    "direction_split_resolver_found": true/false,
+    "event_tracker_found": true/false
+  },
+  "normalized_source_rows_preview": [
+    {
+      "candidate": "...",
+      "source": "aggregate_decomposition|source_emitter_refresh|direction_split_resolver|event_tracker",
+      "schema_version": "betrayal_source_emitter_v2",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "entry_mode": "...",
+      "original_direction": "long|short|null",
+      "inverse_direction": "long|short|null",
+      "emitted_direction": "long|short|null",
+      "source_identity": "...",
+      "source_signal_id": "...",
+      "emitted_signal_id": "...",
+      "source_signal_timestamp": "...",
+      "lane_key": "...",
+      "betrayal_event_identity": "...",
+      "betrayal_event_identity_hash": "...",
+      "outcome_windows": [1,3,5,10,21,34,55],
+      "schema_complete": true/false,
+      "registry_valid": true/false,
+      "resolver_ready": true/false,
+      "normalization_status": "...",
+      "missing_required_fields": [...],
+      "normalization_sources_used": [...],
+      "paper_only": true,
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "why": "..."
+    }
+  ],
+  "normalization_summary": {
+    "rows_reviewed": ...,
+    "rows_normalized": ...,
+    "resolver_ready_rows": ...,
+    "partial_rows": ...,
+    "blocked_rows": ...,
+    "entry_mode_filled_count": ...,
+    "source_identity_filled_count": ...,
+    "emitted_signal_id_filled_count": ...
+  },
+  "source_identity_normalizer_gap_report": {
+    "missing_entry_mode_rows": ...,
+    "missing_source_identity_rows": ...,
+    "missing_direction_rows": ...,
+    "registry_invalid_rows": ...,
+    "resolver_ready_rows": ...,
+    "hard_live_blockers": [...]
+  },
+  "source_identity_normalizer_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "APPEND_NORMALIZED_V2_ROWS|COLLECT_MORE_SOURCE_IDENTITY|KEEP_CONTEXT_ONLY|RUN_R214_EVENT_OUTCOME_RESOLVER|...",
+      "future_phase": "R224|R214|...",
+      "why": "..."
+    }
+  ],
+  "normalizer_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R224_BETRAYAL_NORMALIZED_SOURCE_ROW_APPEND|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_source_identity_normalizer.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL SOURCE IDENTITY NORMALIZER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-source-identity-normalizer
+
+Args:
+- --record-normalizer
+- --confirm-betrayal-source-identity-normalizer <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer \
+  --record-normalizer \
+  --confirm-betrayal-source-identity-normalizer "I CONFIRM BETRAYAL SOURCE IDENTITY NORMALIZER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer \
+  --record-normalizer \
+  --confirm-betrayal-source-identity-normalizer "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_source_identity_normalizer.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records normalizer only
+- entry_mode can be extracted from lane_key
+- source_identity can be built only from adequate local fields
+- candidate label alone cannot create source_identity
+- resolver_ready requires all registry fields
+- emitted_direction must equal inverse_direction
+- registry invalid rows stay blocked
+- no normalized row becomes live authorized
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R221/R219/R218/R217/R216/R215 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer \
+  | jq '.status, .target_scope, .input_summary, .normalized_source_rows_preview[0:50], .normalization_summary, .source_identity_normalizer_gap_report, .source_identity_normalizer_recommendations, .normalizer_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer \
+  --record-normalizer \
+  --confirm-betrayal-source-identity-normalizer "I CONFIRM BETRAYAL SOURCE IDENTITY NORMALIZER RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .normalizer_recorded, .normalization_summary, .normalizer_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-source-identity-normalizer \
+  --record-normalizer \
+  --confirm-betrayal-source-identity-normalizer "wrong" \
+  | jq '.status, .confirmation_valid, .normalizer_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R223_BETRAYAL_SOURCE_IDENTITY_NORMALIZER.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R223.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R224_BETRAYAL_NORMALIZED_SOURCE_ROW_APPEND.md
+
+R224 should:
+- append normalized v2 source rows only if R223 has resolver_ready rows
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Ensure existing:
+codex_tasks/phases/R214_BETRAYAL_EVENT_OUTCOME_RESOLVER.md
+
+REPORT:
+Files changed, tests, smoke, safety, resolver-ready rows, remaining source identity gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
