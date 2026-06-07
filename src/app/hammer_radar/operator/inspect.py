@@ -2633,6 +2633,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-aggregate-decomposition":
+        from src.app.hammer_radar.operator.betrayal_aggregate_decomposition import (
+            build_betrayal_aggregate_decomposition,
+            format_betrayal_aggregate_decomposition_json,
+        )
+
+        print(
+            format_betrayal_aggregate_decomposition_json(
+                build_betrayal_aggregate_decomposition(
+                    log_dir=args.log_dir,
+                    record_decomposition=args.record_decomposition,
+                    confirm_betrayal_aggregate_decomposition=args.confirm_betrayal_aggregate_decomposition,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4168,6 +4183,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_source_emitter_refresh_parser.add_argument("--record-refresh", action="store_true")
     betrayal_source_emitter_refresh_parser.add_argument("--confirm-betrayal-source-emitter-refresh", default=None)
+
+    betrayal_aggregate_decomposition_parser = subparsers.add_parser(
+        "betrayal-aggregate-decomposition",
+        parents=[parent],
+    )
+    betrayal_aggregate_decomposition_parser.add_argument("--record-decomposition", action="store_true")
+    betrayal_aggregate_decomposition_parser.add_argument("--confirm-betrayal-aggregate-decomposition", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
