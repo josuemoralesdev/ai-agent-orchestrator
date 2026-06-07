@@ -18,6 +18,10 @@ from uuid import uuid4
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
+from src.app.hammer_radar.operator.registry_wiring_betrayal_source_family import (
+    build_registry_backed_betrayal_candidate_view,
+    load_latest_strategy_evidence_registry,
+)
 
 BETRAYAL_DIRECTION_SPLIT_RESOLVER_READY = "BETRAYAL_DIRECTION_SPLIT_RESOLVER_READY"
 BETRAYAL_DIRECTION_SPLIT_RESOLVER_REJECTED = "BETRAYAL_DIRECTION_SPLIT_RESOLVER_REJECTED"
@@ -116,6 +120,7 @@ def build_betrayal_direction_split_resolver(
         true_outcomes = load_betrayal_true_paper_outcomes(log_dir=resolved_log_dir)
         shadow_outcomes = load_betrayal_shadow_outcomes(log_dir=resolved_log_dir)
         capture_seeds = load_full_spectrum_capture_seeds(log_dir=resolved_log_dir)
+        registry_view = get_betrayal_registry_candidate_view(log_dir=resolved_log_dir)
         rows = build_direction_split_resolution_rows(
             regime_miro_recheck=regime_miro,
             event_tracker=event_tracker,
@@ -125,6 +130,7 @@ def build_betrayal_direction_split_resolver(
             true_paper_outcomes=true_outcomes,
             shadow_outcomes=shadow_outcomes,
             full_spectrum_capture_seeds=capture_seeds,
+            registry_candidate_view=registry_view,
         )
         gap_report = build_direction_split_gap_report(rows)
         recommendations = build_direction_split_recommendations(gap_report=gap_report, rows=rows)
@@ -140,12 +146,9 @@ def build_betrayal_direction_split_resolver(
             "resolver_id": None,
             "record_resolver_requested": bool(record_resolver),
             "confirmation_valid": bool(confirmation_valid),
-            "target_scope": {
-                "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
-                "paper_only": True,
-                "live_authorized": False,
-            },
+            "target_scope": build_betrayal_registry_target_scope(registry_candidate_view=registry_view),
             "input_summary": {
+                "strategy_evidence_registry_found": bool(registry_view.get("registry_found")),
                 "regime_miro_recheck_found": bool(regime_miro),
                 "event_tracker_found": bool(event_tracker),
                 "paper_matrix_context_found": bool(matrix_context),
@@ -159,7 +162,7 @@ def build_betrayal_direction_split_resolver(
                 "full_spectrum_capture_seed_count": len(capture_seeds),
             },
             "direction_split_resolution_rows": rows,
-            "direction_split_summary": _direction_split_summary(rows),
+            "direction_split_summary": _direction_split_summary(rows, registry_candidate_view=registry_view),
             "direction_split_gap_report": gap_report,
             "direction_split_recommendations": recommendations,
             "direction_split_status": split_status,
@@ -241,6 +244,79 @@ def load_full_spectrum_capture_seeds(*, log_dir: str | Path | None = None, limit
         for record in _read_recent(resolved_log_dir / filename, limit=limit):
             captures.extend(_extract_capture_rows(record, source="full_spectrum_capture"))
     return _dedupe_rows(captures)
+
+
+def get_betrayal_registry_candidate_view(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    registry = load_latest_strategy_evidence_registry(log_dir=log_dir)
+    manifest = registry.get("registry_manifest") if isinstance(registry.get("registry_manifest"), Mapping) else {}
+    view = build_registry_backed_betrayal_candidate_view(manifest if isinstance(manifest, Mapping) else {})
+    return _sanitize(
+        {
+            **view,
+            "registry_found": bool(registry),
+            "registry_valid": bool((registry.get("registry_validation") or {}).get("valid")) if isinstance(registry, Mapping) else False,
+            "fallback_behavior_if_registry_missing": "legacy_context_only" if not registry else "blocked",
+        }
+    )
+
+
+def get_betrayal_candidates_from_registry(*, log_dir: str | Path | None = None) -> list[dict[str, Any]]:
+    return list(get_betrayal_registry_candidate_view(log_dir=log_dir).get("candidates") or [])
+
+
+def get_betrayal_source_required_fields_from_registry(*, log_dir: str | Path | None = None) -> list[str]:
+    return [str(field) for field in get_betrayal_registry_candidate_view(log_dir=log_dir).get("required_source_fields") or []]
+
+
+def get_betrayal_safety_defaults_from_registry(*, log_dir: str | Path | None = None) -> dict[str, bool]:
+    safety = get_betrayal_registry_candidate_view(log_dir=log_dir).get("safety_defaults")
+    return dict(safety) if isinstance(safety, Mapping) else _betrayal_legacy_safety_defaults()
+
+
+def build_betrayal_registry_target_scope(*, registry_candidate_view: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    view = registry_candidate_view or {}
+    candidates = [str(row.get("candidate") or row.get("label") or row.get("candidate_id")) for row in view.get("candidates") or []]
+    safety = view.get("safety_defaults") if isinstance(view.get("safety_defaults"), Mapping) else _betrayal_legacy_safety_defaults()
+    return {
+        "betrayal_candidates": candidates or _legacy_betrayal_candidate_labels(),
+        "registry_backed": bool(view.get("registry_found") and candidates),
+        "paper_only": bool(safety.get("paper_only", True)),
+        "live_authorized": bool(safety.get("live_authorized", False)),
+    }
+
+
+def _betrayal_candidate_specs(registry_candidate_view: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
+    specs = []
+    view = registry_candidate_view or {}
+    for row in view.get("candidates") or []:
+        if not isinstance(row, Mapping):
+            continue
+        timeframe = str(row.get("timeframe") or "")
+        candidate = str(row.get("candidate") or row.get("label") or "")
+        if timeframe and candidate:
+            specs.append({"timeframe": timeframe, "candidate": candidate})
+    if specs:
+        return specs
+    return [{"timeframe": timeframe, "candidate": f"{timeframe} aggregate"} for timeframe in TARGET_TIMEFRAMES]
+
+
+def _betrayal_target_timeframes(registry_candidate_view: Mapping[str, Any] | None = None) -> list[str]:
+    return [spec["timeframe"] for spec in _betrayal_candidate_specs(registry_candidate_view)]
+
+
+def _legacy_betrayal_candidate_labels() -> list[str]:
+    return [f"{timeframe} aggregate" for timeframe in TARGET_TIMEFRAMES[:-1]] + ["55m aggregate_if_available"]
+
+
+def _betrayal_legacy_safety_defaults() -> dict[str, bool]:
+    return {
+        "paper_only": True,
+        "live_authorized": False,
+        "promotion_allowed": False,
+        "config_write_allowed": False,
+        "order_allowed": False,
+        "binance_network_allowed": False,
+    }
 
 
 def extract_direction_from_lane_key(lane_key: str | None) -> str | None:
@@ -341,8 +417,10 @@ def build_direction_split_resolution_rows(
     true_paper_outcomes: Sequence[Mapping[str, Any]],
     shadow_outcomes: Sequence[Mapping[str, Any]],
     full_spectrum_capture_seeds: Sequence[Mapping[str, Any]],
+    registry_candidate_view: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     del regime_miro_recheck, paper_matrix_context, true_inverse_refresh
+    target_timeframes = set(_betrayal_target_timeframes(registry_candidate_view))
     rows: list[dict[str, Any]] = []
     for row in _event_tracker_rows(event_tracker):
         rows.append(resolve_direction_split_candidate(row, candidate=_candidate_label(row), source="event_tracker"))
@@ -354,7 +432,7 @@ def build_direction_split_resolution_rows(
     ):
         for record in records:
             candidate = _candidate_label(record)
-            if _candidate_timeframe(candidate) not in TARGET_TIMEFRAMES:
+            if _candidate_timeframe(candidate) not in target_timeframes:
                 continue
             rows.append(resolve_direction_split_candidate(record, candidate=candidate, source=source))
     return _dedupe_resolution_rows(rows)
@@ -515,9 +593,13 @@ def format_betrayal_direction_split_resolver_json(payload: Mapping[str, Any]) ->
     return json.dumps(_sanitize(dict(payload)), sort_keys=True, separators=(",", ":"))
 
 
-def _direction_split_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _direction_split_summary(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    registry_candidate_view: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     resolved_candidates = sorted({str(row.get("candidate")) for row in rows if row.get("direction_split_resolved")})
-    target_candidates = [f"{timeframe} aggregate" for timeframe in TARGET_TIMEFRAMES]
+    target_candidates = [spec["candidate"] for spec in _betrayal_candidate_specs(registry_candidate_view)]
     blocked = sorted(
         candidate for candidate in target_candidates if candidate not in resolved_candidates and any(row.get("candidate") == candidate for row in rows)
     )

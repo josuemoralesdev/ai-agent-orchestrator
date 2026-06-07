@@ -20,6 +20,10 @@ from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.betrayal_event_tracker import build_betrayal_event_identity
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
+from src.app.hammer_radar.operator.registry_wiring_betrayal_source_family import (
+    build_registry_backed_betrayal_candidate_view,
+    load_latest_strategy_evidence_registry,
+)
 
 BETRAYAL_SOURCE_EMITTER_REFRESH_READY = "BETRAYAL_SOURCE_EMITTER_REFRESH_READY"
 BETRAYAL_SOURCE_EMITTER_REFRESH_REJECTED = "BETRAYAL_SOURCE_EMITTER_REFRESH_REJECTED"
@@ -141,19 +145,24 @@ def build_betrayal_source_emitter_refresh(
         true_inverse = load_latest_betrayal_true_inverse_refresh(log_dir=resolved_log_dir)
         paper_signals = load_existing_betrayal_paper_signals(log_dir=resolved_log_dir)
         source_emitter_records = load_existing_betrayal_source_emitter_records(log_dir=resolved_log_dir)
-        contract = build_refreshed_betrayal_source_contract()
+        registry_view = get_betrayal_registry_candidate_view(log_dir=resolved_log_dir)
+        contract = build_refreshed_betrayal_source_contract(registry_candidate_view=registry_view)
         candidate_rows = build_betrayal_source_candidate_rows(
             direction_split_resolver=direction_split,
             event_tracker=event_tracker,
             paper_matrix_context=matrix_context,
             true_inverse_refresh=true_inverse,
             existing_betrayal_paper_signals=paper_signals,
+            registry_candidate_view=registry_view,
         )
         preview = build_direction_specific_source_preview(
             source_candidate_rows=candidate_rows,
             generated_at=generated_at,
         )
-        decomposition = build_aggregate_decomposition_requirements(candidate_rows)
+        decomposition = build_aggregate_decomposition_requirements(
+            candidate_rows,
+            registry_candidate_view=registry_view,
+        )
         gap_report = build_betrayal_source_emitter_gap_report(candidate_rows, preview)
         recommendations = build_betrayal_source_emitter_recommendations(gap_report=gap_report, candidate_rows=candidate_rows)
         source_status = classify_betrayal_source_emitter_refresh_status(
@@ -171,12 +180,9 @@ def build_betrayal_source_emitter_refresh(
             "refresh_id": None,
             "record_refresh_requested": bool(record_refresh),
             "confirmation_valid": bool(confirmation_valid),
-            "target_scope": {
-                "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
-                "paper_only": True,
-                "live_authorized": False,
-            },
+            "target_scope": build_betrayal_registry_target_scope(registry_candidate_view=registry_view),
             "input_summary": {
+                "strategy_evidence_registry_found": bool(registry_view.get("registry_found")),
                 "direction_split_resolver_found": bool(direction_split),
                 "event_tracker_found": bool(event_tracker),
                 "paper_matrix_context_found": bool(matrix_context),
@@ -267,16 +273,89 @@ def load_existing_betrayal_source_emitter_records(*, log_dir: str | Path | None 
     return [_sanitize(record) for record in records]
 
 
-def build_refreshed_betrayal_source_contract() -> dict[str, Any]:
+def get_betrayal_registry_candidate_view(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    registry = load_latest_strategy_evidence_registry(log_dir=log_dir)
+    manifest = registry.get("registry_manifest") if isinstance(registry.get("registry_manifest"), Mapping) else {}
+    view = build_registry_backed_betrayal_candidate_view(manifest if isinstance(manifest, Mapping) else {})
+    return _sanitize(
+        {
+            **view,
+            "registry_found": bool(registry),
+            "registry_valid": bool((registry.get("registry_validation") or {}).get("valid")) if isinstance(registry, Mapping) else False,
+            "fallback_behavior_if_registry_missing": "legacy_context_only" if not registry else "blocked",
+        }
+    )
+
+
+def get_betrayal_candidates_from_registry(*, log_dir: str | Path | None = None) -> list[dict[str, Any]]:
+    return list(get_betrayal_registry_candidate_view(log_dir=log_dir).get("candidates") or [])
+
+
+def get_betrayal_source_required_fields_from_registry(*, log_dir: str | Path | None = None) -> list[str]:
+    return [str(field) for field in get_betrayal_registry_candidate_view(log_dir=log_dir).get("required_source_fields") or []]
+
+
+def get_betrayal_safety_defaults_from_registry(*, log_dir: str | Path | None = None) -> dict[str, bool]:
+    safety = get_betrayal_registry_candidate_view(log_dir=log_dir).get("safety_defaults")
+    return dict(safety) if isinstance(safety, Mapping) else _betrayal_legacy_safety_defaults()
+
+
+def build_betrayal_registry_target_scope(*, registry_candidate_view: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    view = registry_candidate_view or {}
+    candidates = [str(row.get("candidate") or row.get("label") or row.get("candidate_id")) for row in view.get("candidates") or []]
+    safety = view.get("safety_defaults") if isinstance(view.get("safety_defaults"), Mapping) else _betrayal_legacy_safety_defaults()
     return {
-        "schema_version": SCHEMA_VERSION,
-        "source_type": SOURCE_TYPE,
-        "required_fields": list(REQUIRED_FIELDS),
-        "direction_fields_required": True,
-        "aggregate_decomposition_required": True,
+        "betrayal_candidates": candidates or _legacy_betrayal_candidate_labels(),
+        "registry_backed": bool(view.get("registry_found") and candidates),
+        "paper_only": bool(safety.get("paper_only", True)),
+        "live_authorized": bool(safety.get("live_authorized", False)),
+    }
+
+
+def _betrayal_candidate_specs(registry_candidate_view: Mapping[str, Any] | None = None) -> list[dict[str, str]]:
+    specs = []
+    view = registry_candidate_view or {}
+    for row in view.get("candidates") or []:
+        if not isinstance(row, Mapping):
+            continue
+        timeframe = str(row.get("timeframe") or "")
+        candidate = str(row.get("candidate") or row.get("label") or "")
+        if timeframe and candidate:
+            specs.append({"timeframe": timeframe, "candidate": candidate})
+    if specs:
+        return specs
+    return [{"timeframe": timeframe, "candidate": f"{timeframe} aggregate"} for timeframe in TARGET_TIMEFRAMES]
+
+
+def _legacy_betrayal_candidate_labels() -> list[str]:
+    return [f"{timeframe} aggregate" for timeframe in TARGET_TIMEFRAMES[:-1]] + ["55m aggregate_if_available"]
+
+
+def _betrayal_legacy_safety_defaults() -> dict[str, bool]:
+    return {
         "paper_only": True,
         "live_authorized": False,
         "promotion_allowed": False,
+        "config_write_allowed": False,
+        "order_allowed": False,
+        "binance_network_allowed": False,
+    }
+
+
+def build_refreshed_betrayal_source_contract(*, registry_candidate_view: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    view = registry_candidate_view or {}
+    required_fields = [str(field) for field in view.get("required_source_fields") or []] or list(REQUIRED_FIELDS)
+    safety = view.get("safety_defaults") if isinstance(view.get("safety_defaults"), Mapping) else _betrayal_legacy_safety_defaults()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "source_type": SOURCE_TYPE,
+        "required_fields": required_fields,
+        "required_fields_source": "strategy_evidence_registry" if view.get("registry_found") and required_fields else "legacy_constant",
+        "direction_fields_required": True,
+        "aggregate_decomposition_required": True,
+        "paper_only": bool(safety.get("paper_only", True)),
+        "live_authorized": bool(safety.get("live_authorized", False)),
+        "promotion_allowed": bool(safety.get("promotion_allowed", False)),
         "direction_rules": [
             "original_direction must be explicit, not inferred from aggregate context.",
             "inverse_direction must be opposite(original_direction).",
@@ -294,12 +373,14 @@ def build_betrayal_source_candidate_rows(
     paper_matrix_context: Mapping[str, Any],
     true_inverse_refresh: Mapping[str, Any],
     existing_betrayal_paper_signals: Sequence[Mapping[str, Any]],
+    registry_candidate_view: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     del paper_matrix_context, true_inverse_refresh
     source_rows = _source_rows(direction_split_resolver, event_tracker, existing_betrayal_paper_signals)
     rows: list[dict[str, Any]] = []
-    for timeframe in TARGET_TIMEFRAMES:
-        candidate = f"{timeframe} aggregate"
+    for candidate_spec in _betrayal_candidate_specs(registry_candidate_view):
+        timeframe = candidate_spec["timeframe"]
+        candidate = candidate_spec["candidate"]
         candidate_sources = [row for row in source_rows if _candidate_label(row) == candidate]
         if not candidate_sources and timeframe == "55m":
             continue
@@ -413,7 +494,11 @@ def build_direction_specific_source_preview(
     return preview
 
 
-def build_aggregate_decomposition_requirements(source_candidate_rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
+def build_aggregate_decomposition_requirements(
+    source_candidate_rows: Sequence[Mapping[str, Any]],
+    *,
+    registry_candidate_view: Mapping[str, Any] | None = None,
+) -> dict[str, list[str]]:
     requirements: dict[str, list[str]] = {}
     default_requirements = [
         "direction-specific candidate identity",
@@ -431,8 +516,8 @@ def build_aggregate_decomposition_requirements(source_candidate_rows: Sequence[M
             requirements[candidate] = missing or list(default_requirements)
         else:
             requirements[candidate] = []
-    for timeframe in TARGET_TIMEFRAMES:
-        requirements.setdefault(f"{timeframe} aggregate", list(default_requirements))
+    for candidate_spec in _betrayal_candidate_specs(registry_candidate_view):
+        requirements.setdefault(candidate_spec["candidate"], list(default_requirements))
     return requirements
 
 

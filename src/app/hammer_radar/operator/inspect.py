@@ -2680,6 +2680,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-registry-consumer-refactor":
+        from src.app.hammer_radar.operator.betrayal_registry_consumer_refactor import (
+            build_betrayal_registry_consumer_refactor,
+            format_betrayal_registry_consumer_refactor_json,
+        )
+
+        print(
+            format_betrayal_registry_consumer_refactor_json(
+                build_betrayal_registry_consumer_refactor(
+                    log_dir=args.log_dir,
+                    record_refactor=args.record_refactor,
+                    confirm_betrayal_registry_consumer_refactor=(
+                        args.confirm_betrayal_registry_consumer_refactor
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4237,6 +4254,16 @@ def _build_parser() -> argparse.ArgumentParser:
     registry_wiring_betrayal_parser.add_argument("--record-wiring", action="store_true")
     registry_wiring_betrayal_parser.add_argument(
         "--confirm-registry-wiring-betrayal-source-family",
+        default=None,
+    )
+
+    betrayal_registry_consumer_refactor_parser = subparsers.add_parser(
+        "betrayal-registry-consumer-refactor",
+        parents=[parent],
+    )
+    betrayal_registry_consumer_refactor_parser.add_argument("--record-refactor", action="store_true")
+    betrayal_registry_consumer_refactor_parser.add_argument(
+        "--confirm-betrayal-registry-consumer-refactor",
         default=None,
     )
 
