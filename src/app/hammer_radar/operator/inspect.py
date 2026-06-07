@@ -2697,6 +2697,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-source-identity-normalizer":
+        from src.app.hammer_radar.operator.betrayal_source_identity_normalizer import (
+            build_betrayal_source_identity_normalizer,
+            format_betrayal_source_identity_normalizer_json,
+        )
+
+        print(
+            format_betrayal_source_identity_normalizer_json(
+                build_betrayal_source_identity_normalizer(
+                    log_dir=args.log_dir,
+                    record_normalizer=args.record_normalizer,
+                    confirm_betrayal_source_identity_normalizer=(
+                        args.confirm_betrayal_source_identity_normalizer
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4264,6 +4281,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_registry_consumer_refactor_parser.add_argument("--record-refactor", action="store_true")
     betrayal_registry_consumer_refactor_parser.add_argument(
         "--confirm-betrayal-registry-consumer-refactor",
+        default=None,
+    )
+
+    betrayal_source_identity_normalizer_parser = subparsers.add_parser(
+        "betrayal-source-identity-normalizer",
+        parents=[parent],
+    )
+    betrayal_source_identity_normalizer_parser.add_argument("--record-normalizer", action="store_true")
+    betrayal_source_identity_normalizer_parser.add_argument(
+        "--confirm-betrayal-source-identity-normalizer",
         default=None,
     )
 
