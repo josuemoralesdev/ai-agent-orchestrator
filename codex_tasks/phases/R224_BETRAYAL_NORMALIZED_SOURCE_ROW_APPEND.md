@@ -35,6 +35,10 @@ Append normalized `betrayal_source_emitter_v2` rows only when R223 reports `reso
 
 - R223 ledger missing.
 - R223 latest record has zero resolver-ready rows.
+- R224A collector missing.
+- R224A latest record has `resolver_ready_preview_rows=0`.
 - Any candidate is not registry-backed.
 - Any row fails `betrayal_source_emitter_v2` validation.
 - Any row implies live authorization, promotion, config writes, or execution.
+
+R224 must explicitly refuse to append normalized rows when R224A evidence collection reports zero resolver-ready preview rows, even if contextual evidence exists. Partial evidence is not append authority.
