@@ -1,0 +1,521 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R217 Betrayal Aggregate Decomposition
+
+BRANCH:
+r217-betrayal-aggregate-decomposition
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R216 Betrayal Source Emitter Refresh created a refreshed betrayal source emitter v2 contract but could not emit resolver-ready rows.
+
+R216 result:
+- source_emitter_status=SOURCE_EMITTER_AGGREGATE_DECOMPOSITION_REQUIRED
+- direction_specific_rows_ready=0
+- aggregate_rows_blocked=3
+- missing_entry_mode=3
+- missing_source_identity=3
+- original_direction and inverse_direction could exist in partial shadow rows, but source identity and entry mode were missing
+- lane direction alone was not treated as proof
+- all results remained paper-only
+- no config writes
+- no Binance/network calls
+- no orders
+- no promotion
+- no live authorization
+
+R215 Direction Split Resolver showed:
+- rows_reviewed=126
+- direction_split_resolved_count=0
+- partial_direction_split_count=120
+- aggregate_context_only_count=6
+- candidates still blocked:
+  - 222m aggregate
+  - 88m aggregate
+  - 55m aggregate
+- the main missing parts were:
+  - entry_mode
+  - source_identity
+  - explicit source/original schema
+
+R217 must attempt to decompose aggregate betrayal candidates into direction/entry-mode candidates using local evidence only.
+
+PURPOSE:
+Create a paper-only aggregate decomposition surface that:
+1. Reads R216 source emitter refresh.
+2. Reads R215 direction split resolver.
+3. Reads R212 event tracker.
+4. Reads R210 true inverse refresh.
+5. Reads R80/R95/R96/R100 docs and ledgers.
+6. Reads local shadow outcomes / true inverse evidence / full-spectrum captures.
+7. Groups aggregate betrayal evidence by:
+   - timeframe
+   - original_direction
+   - inverse_direction
+   - entry_mode if present
+   - source_identity if present
+   - source family
+8. Identifies candidate direction/entry-mode decompositions for:
+   - 222m
+   - 88m
+   - 55m
+9. Marks rows as:
+   - decomposition_ready
+   - decomposition_partial
+   - decomposition_blocked
+10. Produces v2 source rows only as preview unless explicitly recorded.
+11. Does not fabricate missing entry_mode or source_identity.
+12. Does not mutate configs.
+13. Does not call Binance/network.
+14. Does not place orders.
+15. Does not promote betrayal.
+16. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is decomposition audit only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- fabricate direction
+- fabricate entry mode
+- fabricate source identity
+- fabricate outcomes
+- destructively rewrite ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit source registry definitions.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from decomposition.
+- Do not infer live readiness from decomposition.
+- Do not mark decomposition ready unless local evidence has explicit direction and enough identity fields.
+- Do not count aggregate context as decomposition proof.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/betrayal_strategy_audit.py if present
+- src/app/hammer_radar/operator/betrayal_true_paper_scaffold.py if present
+- src/app/hammer_radar/operator/betrayal_paper_outcomes.py if present
+- src/app/hammer_radar/operator/betrayal_paper_signal_detector.py if present
+- src/app/hammer_radar/operator/betrayal_detector_source_wiring.py if present
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/betrayal_inverse_validation.py if present
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/local_candle_feed_adapter.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/betrayal_paper_matrix_context.ndjson
+- logs/hammer_radar_forward/betrayal_true_inverse_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_integration_recheck.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- docs/hammer_radar/R80_BETRAYAL_STRATEGY_AUDIT.md
+- docs/hammer_radar/R95_DUAL_LANE_CANDIDATE_WATCH_NORMAL_BETRAYAL.md
+- docs/hammer_radar/R96_BETRAYAL_TRUE_PAPER_TRACKING_SCAFFOLD.md
+- docs/hammer_radar/R100_BETRAYAL_SOURCE_SIGNAL_EMITTER.md
+- docs/hammer_radar/live_readiness/R216_BETRAYAL_SOURCE_EMITTER_REFRESH.md
+- docs/hammer_radar/live_readiness/R215_BETRAYAL_DIRECTION_SPLIT_RESOLVER.md
+- docs/hammer_radar/live_readiness/R212_BETRAYAL_EVENT_TRACKER.md
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+- tests/hammer_radar/test_betrayal_direction_split_resolver.py
+- tests/hammer_radar/test_betrayal_event_tracker.py
+- tests/hammer_radar/test_betrayal_paper_matrix_context.py
+- tests/hammer_radar/test_betrayal_true_inverse_refresh.py
+
+REUSE / EXTEND:
+Reuse R216 v2 source contract.
+Reuse R215 direction split rows.
+Reuse R212 event identity model.
+Reuse R210 true inverse refresh summaries.
+Reuse R100 source emitter identity rules if present.
+Reuse R96 scaffold schema if present.
+Do not duplicate betrayal philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+
+Expose:
+- build_betrayal_aggregate_decomposition
+- load_latest_betrayal_source_emitter_refresh
+- load_latest_betrayal_direction_split_resolver
+- load_latest_betrayal_event_tracker
+- load_betrayal_shadow_outcomes
+- load_betrayal_true_paper_outcomes
+- load_betrayal_paper_signals
+- load_full_spectrum_capture_seeds
+- group_betrayal_evidence_by_direction_entry
+- build_decomposition_candidate
+- build_decomposition_rows
+- build_v2_source_rows_preview
+- build_decomposition_gap_report
+- build_decomposition_recommendations
+- classify_betrayal_aggregate_decomposition_status
+- append_betrayal_aggregate_decomposition_record
+- load_betrayal_aggregate_decomposition_records
+- summarize_betrayal_aggregate_decomposition_records
+
+STATUS ENUM:
+- BETRAYAL_AGGREGATE_DECOMPOSITION_READY
+- BETRAYAL_AGGREGATE_DECOMPOSITION_REJECTED
+- BETRAYAL_AGGREGATE_DECOMPOSITION_RECORDED
+- BETRAYAL_AGGREGATE_DECOMPOSITION_BLOCKED
+- BETRAYAL_AGGREGATE_DECOMPOSITION_ERROR
+
+DECOMPOSITION STATUS ENUM:
+- AGGREGATE_DECOMPOSITION_READY_FOR_SOURCE_ROWS
+- AGGREGATE_DECOMPOSITION_PARTIAL
+- AGGREGATE_DECOMPOSITION_BLOCKED
+- AGGREGATE_DECOMPOSITION_REQUIRES_SOURCE_IDENTITY
+- AGGREGATE_DECOMPOSITION_REQUIRES_ENTRY_MODE
+- AGGREGATE_DECOMPOSITION_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TARGET CANDIDATES:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate if available
+
+DECOMPOSITION RULES:
+A decomposed row is ready only if:
+- timeframe is known
+- original_direction is explicit
+- inverse_direction is explicit and opposite original_direction
+- entry_mode is explicit
+- source_identity or source_signal_id exists
+- signal_timestamp exists
+- paper_only true
+- live_authorized false
+
+A row is partial if:
+- original/inverse direction exists but entry_mode or source identity is missing
+
+A row is blocked if:
+- aggregate-only with no explicit direction
+- direction inferred only from lane key
+- no timestamp
+- no identity
+
+Do not infer entry_mode from default ladder mode unless source explicitly identifies it.
+Do not infer source_identity from candidate label alone.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "decomposition_recorded": false,
+  "decomposition_id": null,
+  "record_decomposition_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "betrayal_candidates": ["222m aggregate", "88m aggregate", "55m aggregate_if_available"],
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "source_emitter_refresh_found": true/false,
+    "direction_split_resolver_found": true/false,
+    "event_tracker_found": true/false,
+    "shadow_outcomes_found": true/false,
+    "shadow_outcome_count": ...,
+    "true_paper_outcomes_found": true/false,
+    "true_paper_outcome_count": ...,
+    "betrayal_paper_signals_found": true/false,
+    "betrayal_paper_signal_count": ...,
+    "full_spectrum_capture_seed_count": ...
+  },
+  "decomposition_rows": [
+    {
+      "candidate": "88m aggregate",
+      "timeframe": "88m",
+      "original_direction": "long|short|null",
+      "inverse_direction": "long|short|null",
+      "entry_mode": "...",
+      "source_identity": "...",
+      "source_signal_id": "...",
+      "signal_timestamp": "...",
+      "evidence_source": "shadow_outcome|true_paper_outcome|betrayal_paper_signal|full_spectrum_capture|...",
+      "decomposition_status": "...",
+      "ready_for_v2_source_row": true/false,
+      "can_enter_event_outcome_resolver": true/false,
+      "can_count_as_validated_sample_now": false,
+      "paper_only": true,
+      "live_authorized": false,
+      "why": "..."
+    }
+  ],
+  "decomposition_summary": {
+    "rows_reviewed": ...,
+    "ready_rows": ...,
+    "partial_rows": ...,
+    "blocked_rows": ...,
+    "ready_candidates": [...],
+    "partial_candidates": [...],
+    "blocked_candidates": [...]
+  },
+  "v2_source_rows_preview": [
+    {
+      "schema_version": "betrayal_source_emitter_v2",
+      "candidate": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "entry_mode": "...",
+      "original_direction": "...",
+      "inverse_direction": "...",
+      "emitted_direction": "...",
+      "source_identity": "...",
+      "source_signal_id": "...",
+      "emitted_signal_id": "...",
+      "source_signal_timestamp": "...",
+      "lane_key": "...",
+      "betrayal_event_identity": "...",
+      "betrayal_event_identity_hash": "...",
+      "schema_complete": true/false,
+      "paper_only": true,
+      "live_authorized": false,
+      "promotion_allowed": false
+    }
+  ],
+  "decomposition_gap_report": {
+    "missing_entry_mode": ...,
+    "missing_source_identity": ...,
+    "missing_original_direction": ...,
+    "missing_inverse_direction": ...,
+    "missing_signal_timestamp": ...,
+    "lane_direction_only_rows": ...,
+    "aggregate_only_rows": ...,
+    "hard_live_blockers": [...]
+  },
+  "decomposition_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "APPEND_V2_SOURCE_ROWS|COLLECT_SOURCE_IDENTITY|WIRE_SOURCE_EMITTER|KEEP_CONTEXT_ONLY|RUN_EVENT_OUTCOME_RESOLVER|...",
+      "future_phase": "R218|R214|...",
+      "why": "..."
+    }
+  ],
+  "decomposition_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R218_BETRAYAL_V2_SOURCE_ROW_APPEND|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL AGGREGATE DECOMPOSITION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-aggregate-decomposition
+
+Args:
+- --record-decomposition
+- --confirm-betrayal-aggregate-decomposition <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition \
+  --record-decomposition \
+  --confirm-betrayal-aggregate-decomposition "I CONFIRM BETRAYAL AGGREGATE DECOMPOSITION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition \
+  --record-decomposition \
+  --confirm-betrayal-aggregate-decomposition "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records decomposition only
+- ready row requires original_direction/inverse_direction/entry_mode/source_identity/timestamp
+- partial row with missing source_identity stays partial
+- lane direction alone is not enough
+- aggregate-only row stays blocked
+- v2 source row preview only includes complete rows as schema_complete true
+- no raw capture becomes validated sample now
+- no betrayal promotion
+- no live authorization
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R216/R215/R212/R210 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition \
+  | jq '.status, .target_scope, .input_summary, .decomposition_rows[0:50], .decomposition_summary, .v2_source_rows_preview[0:20], .decomposition_gap_report, .decomposition_recommendations, .decomposition_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition \
+  --record-decomposition \
+  --confirm-betrayal-aggregate-decomposition "I CONFIRM BETRAYAL AGGREGATE DECOMPOSITION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .decomposition_recorded, .decomposition_summary, .decomposition_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-aggregate-decomposition \
+  --record-decomposition \
+  --confirm-betrayal-aggregate-decomposition "wrong" \
+  | jq '.status, .confirmation_valid, .decomposition_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R217_BETRAYAL_AGGREGATE_DECOMPOSITION.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R217.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R218_BETRAYAL_V2_SOURCE_ROW_APPEND.md
+
+R218 should:
+- append v2 betrayal source rows only if R217 has schema-complete ready rows
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create if missing:
+codex_tasks/phases/R214_BETRAYAL_EVENT_OUTCOME_RESOLVER.md
+
+REPORT:
+Files changed, tests, smoke, safety, ready/partial/blocked decomposition rows, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
