@@ -2618,6 +2618,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-source-emitter-refresh":
+        from src.app.hammer_radar.operator.betrayal_source_emitter_refresh import (
+            build_betrayal_source_emitter_refresh,
+            format_betrayal_source_emitter_refresh_json,
+        )
+
+        print(
+            format_betrayal_source_emitter_refresh_json(
+                build_betrayal_source_emitter_refresh(
+                    log_dir=args.log_dir,
+                    record_refresh=args.record_refresh,
+                    confirm_betrayal_source_emitter_refresh=args.confirm_betrayal_source_emitter_refresh,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4146,6 +4161,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_direction_split_resolver_parser.add_argument("--record-resolver", action="store_true")
     betrayal_direction_split_resolver_parser.add_argument("--confirm-betrayal-direction-split-resolver", default=None)
+
+    betrayal_source_emitter_refresh_parser = subparsers.add_parser(
+        "betrayal-source-emitter-refresh",
+        parents=[parent],
+    )
+    betrayal_source_emitter_refresh_parser.add_argument("--record-refresh", action="store_true")
+    betrayal_source_emitter_refresh_parser.add_argument("--confirm-betrayal-source-emitter-refresh", default=None)
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
