@@ -2663,6 +2663,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "registry-wiring-betrayal-source-family":
+        from src.app.hammer_radar.operator.registry_wiring_betrayal_source_family import (
+            build_registry_wiring_betrayal_source_family,
+            format_registry_wiring_betrayal_source_family_json,
+        )
+
+        print(
+            format_registry_wiring_betrayal_source_family_json(
+                build_registry_wiring_betrayal_source_family(
+                    log_dir=args.log_dir,
+                    record_wiring=args.record_wiring,
+                    confirm_registry_wiring_betrayal_source_family=(
+                        args.confirm_registry_wiring_betrayal_source_family
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4212,6 +4229,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     betrayal_aggregate_decomposition_parser.add_argument("--record-decomposition", action="store_true")
     betrayal_aggregate_decomposition_parser.add_argument("--confirm-betrayal-aggregate-decomposition", default=None)
+
+    registry_wiring_betrayal_parser = subparsers.add_parser(
+        "registry-wiring-betrayal-source-family",
+        parents=[parent],
+    )
+    registry_wiring_betrayal_parser.add_argument("--record-wiring", action="store_true")
+    registry_wiring_betrayal_parser.add_argument(
+        "--confirm-registry-wiring-betrayal-source-family",
+        default=None,
+    )
 
     risk_contract_apply_packet_parser = subparsers.add_parser(
         "risk-contract-apply-packet-8m-short",
