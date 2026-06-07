@@ -1,0 +1,595 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R218 Strategy Evidence Registry / Source Identity Manifest
+
+BRANCH:
+r218-strategy-evidence-registry-source-identity-manifest
+
+PHASE CLASSIFICATION:
+Primary: NEW CAPABILITY
+Secondary: WIRING / INTEGRATION, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+Recent phases exposed an architecture smell.
+
+We keep adding:
+- new timeframes
+- new signal origins
+- new pattern families
+- WMA/MA anchors
+- betrayal candidates
+- entry modes
+- lane matrices
+- source emitters
+- direction split rules
+- evidence requirements
+- safety gates
+
+But too much is being stitched directly into each phase.
+
+That creates duplicate-risk and memory-risk:
+- betrayal can be forgotten unless explicitly named
+- 222m / 88m / 55m can be missed
+- entry modes get assumed instead of declared
+- source_identity gets lost
+- direction split rules drift across modules
+- each new phase reinvents its own target list
+
+R217 showed the latest example:
+- ready_rows=0
+- partial_rows=9
+- blocked_rows=5
+- decomposition_status=AGGREGATE_DECOMPOSITION_REQUIRES_ENTRY_MODE
+- missing fields are entry_mode and source_identity
+- future rows need an explicit registry/manifest layer so emitters/resolvers know what is required
+
+R218 must create a central paper-only strategy evidence registry / source identity manifest.
+
+PURPOSE:
+Create a registry/manifest layer that:
+1. Defines known timeframes in one place.
+2. Defines known entry modes in one place.
+3. Defines known signal origins in one place.
+4. Defines betrayal candidates in one place.
+5. Defines direction rules in one place.
+6. Defines source identity requirements in one place.
+7. Defines evidence requirements by source family.
+8. Defines safety status by capability family.
+9. Allows future phases to ask:
+   - what timeframes are in scope?
+   - what entry modes are valid?
+   - what signal origins exist?
+   - what betrayal candidates exist?
+   - what fields are required for resolver-ready source rows?
+   - can this source family become live? Answer must remain false by default.
+10. Does not mutate trading configs.
+11. Does not call Binance/network.
+12. Does not place orders.
+13. Does not authorize live.
+14. Does not promote any signal origin or lane.
+
+CRITICAL SAFETY:
+This phase is registry/manifest only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote signal origins
+- promote lanes
+- create live permission
+- make registry entries live-ready by default
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from registry inclusion.
+- Do not infer live readiness from registry inclusion.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_paper_matrix_context.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/pattern_keter_rescoring_family.py
+- src/app/hammer_radar/operator/pattern_outcome_mapping_family.py
+- src/app/hammer_radar/operator/anchor_signal_confluence_matrix.py
+- src/app/hammer_radar/operator/wma_ma_anchor_layer_preview.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/signal_origin_registry.py
+- src/app/hammer_radar/operator/signal_origin_lane_matrix.py
+- src/app/hammer_radar/operator/keter_signal_origin_scoring.py
+- src/app/hammer_radar/operator/inspect.py
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R217_BETRAYAL_AGGREGATE_DECOMPOSITION.md
+- docs/hammer_radar/live_readiness/R216_BETRAYAL_SOURCE_EMITTER_REFRESH.md
+- docs/hammer_radar/live_readiness/R215_BETRAYAL_DIRECTION_SPLIT_RESOLVER.md
+- docs/hammer_radar/live_readiness/R211_BETRAYAL_PAPER_MATRIX_CONTEXT.md
+- docs/hammer_radar/live_readiness/R205_PATTERN_LANE_MATRIX_REVIEW.md
+- docs/hammer_radar/live_readiness/R203_ANCHOR_SIGNAL_CONFLUENCE_MATRIX.md
+- tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+- tests/hammer_radar/test_pattern_lane_matrix_review.py
+- tests/hammer_radar/test_anchor_signal_confluence_matrix.py
+
+REUSE / EXTEND:
+Reuse existing signal_origin_registry ideas if present.
+Reuse R216 source emitter contract fields.
+Reuse R217 decomposition requirements.
+Reuse R198 full-spectrum timeframe scope.
+Reuse R205 pattern matrix signal origins.
+Reuse R199/R201 anchor period/timeframe scope.
+Do not duplicate source rules across new modules.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/strategy_evidence_registry.py
+
+Expose:
+- build_strategy_evidence_registry
+- load_strategy_evidence_registry_records
+- append_strategy_evidence_registry_record
+- summarize_strategy_evidence_registry_records
+- get_timeframe_manifest
+- get_entry_mode_manifest
+- get_signal_origin_manifest
+- get_betrayal_candidate_manifest
+- get_anchor_manifest
+- get_direction_rule_manifest
+- get_source_identity_requirements
+- get_evidence_requirements_by_family
+- get_safety_manifest
+- validate_registry_entry
+- validate_source_identity_requirements
+- build_registry_gap_report
+- build_registry_recommendations
+- classify_strategy_evidence_registry_status
+
+STATUS ENUM:
+- STRATEGY_EVIDENCE_REGISTRY_READY
+- STRATEGY_EVIDENCE_REGISTRY_REJECTED
+- STRATEGY_EVIDENCE_REGISTRY_RECORDED
+- STRATEGY_EVIDENCE_REGISTRY_BLOCKED
+- STRATEGY_EVIDENCE_REGISTRY_ERROR
+
+REGISTRY STATUS ENUM:
+- REGISTRY_MANIFEST_READY
+- REGISTRY_MANIFEST_RECORDED
+- REGISTRY_GAPS_REMAIN
+- REGISTRY_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+TIMEFRAME MANIFEST MUST INCLUDE:
+- 4m
+- 8m
+- 13m
+- 22m
+- 44m
+- 55m
+- 88m
+- 222m
+- 444m
+- 666m
+- 888m
+- 4H
+- 13H
+- 13D
+
+ENTRY MODE MANIFEST MUST INCLUDE:
+- ladder_close_50_618
+- ladder_382_50_618
+- ladder_22_44_22
+- market_close
+- fib_618
+- fib_650
+- unknown / entry_unknown as blocked placeholder
+
+SIGNAL ORIGIN MANIFEST MUST INCLUDE:
+Primary normal:
+- hammer_wick_reversal
+- three_black_crows
+- bearish_engulfing
+- bullish_engulfing
+- three_white_soldiers
+- exhaustion_wick
+
+Secondary / context:
+- golden_pocket_rejection
+- rsi_divergence_bearish
+- rsi_divergence_bullish
+- WMA/MA anchor context
+- breakdown_retest registry-only
+- breakout_retest registry-only
+
+BETRAYAL MANIFEST MUST INCLUDE:
+- 222m aggregate
+- 88m aggregate
+- 55m aggregate_if_available
+
+For each betrayal candidate:
+- candidate_id
+- timeframe
+- candidate_type=aggregate
+- label
+- original_win_rate_pct when known
+- naive_inverse_win_rate_pct when known
+- true_inverse_validation_required=true
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+- required_before_promotion:
+  - direction_split
+  - entry_mode
+  - source_identity
+  - true_inverse_samples
+  - regime_support
+  - Miro Fish support
+  - risk contract
+  - operator approval
+  - live gates
+
+ANCHOR MANIFEST MUST INCLUDE:
+Anchor types:
+- SMA200
+- WMA200
+- custom_wma
+
+Anchor periods:
+- 13
+- 21
+- 34
+- 55
+- 89
+- 144
+- 200
+- 233
+- 377
+- 610
+- 888
+
+SOURCE IDENTITY REQUIREMENTS MUST INCLUDE:
+For normal signal origins:
+- symbol
+- timeframe
+- direction
+- entry_mode
+- signal_origin
+- signal_id
+- signal_timestamp
+- lane_key
+- paper_only
+- live_authorized
+
+For betrayal source emitter v2:
+- schema_version
+- source_type
+- candidate
+- symbol
+- timeframe
+- entry_mode
+- original_direction
+- inverse_direction
+- emitted_direction
+- source_identity
+- source_signal_id
+- emitted_signal_id
+- source_signal_timestamp
+- emitted_at
+- lane_key
+- betrayal_event_identity
+- betrayal_event_identity_hash
+- outcome_windows
+- paper_only
+- live_authorized
+- promotion_allowed
+
+For anchor context:
+- symbol
+- timeframe
+- anchor_type
+- anchor_period
+- anchor_interaction
+- direction_bias
+- event_timestamp or summary_level flag
+- paper_only
+- live_authorized
+
+EVIDENCE REQUIREMENTS BY FAMILY:
+normal_pattern:
+- detector evidence
+- outcome mapping
+- Keter score
+- lane matrix score
+- paper tracking
+- no live authorization
+
+anchor_context:
+- anchor events
+- outcome windows
+- event-level confluence if possible
+- summary-level confluence must be marked weaker
+- no live authorization
+
+betrayal:
+- source identity
+- direction split
+- entry mode
+- true inverse sample
+- regime support
+- Miro Fish support
+- paper matrix context
+- no live authorization
+
+full_spectrum_harvester:
+- lane key
+- signal id
+- timestamp
+- direction
+- entry mode
+- heartbeat
+- paper-only confirmation
+
+SAFETY MANIFEST:
+Every registry family must default to:
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+- config_write_allowed=false
+- order_allowed=false
+- binance_network_allowed=false
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "registry_recorded": false,
+  "registry_id": null,
+  "record_registry_requested": false,
+  "confirmation_valid": false,
+  "registry_manifest": {
+    "timeframes": [...],
+    "entry_modes": [...],
+    "signal_origins": {...},
+    "betrayal_candidates": {...},
+    "anchors": {...},
+    "direction_rules": {...},
+    "source_identity_requirements": {...},
+    "evidence_requirements_by_family": {...},
+    "safety_manifest": {...}
+  },
+  "registry_validation": {
+    "valid": true/false,
+    "missing_required_sections": [...],
+    "families_with_live_authorized_true": [],
+    "families_with_config_write_allowed_true": [],
+    "families_with_order_allowed_true": []
+  },
+  "registry_gap_report": {
+    "betrayal_missing_entry_mode_source_identity": true/false,
+    "summary_level_anchor_confluence_still_weaker": true/false,
+    "capture_count_sync_missing": true/false,
+    "hard_live_blockers": [...]
+  },
+  "registry_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "USE_REGISTRY_IN_R219|REFACTOR_PHASE_TARGET_LISTS|KEEP_PAPER_ONLY|...",
+      "future_phase": "R219|R220|...",
+      "why": "..."
+    }
+  ],
+  "registry_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R219_REGISTRY_WIRING_FOR_BETRAYAL|RUN_R214_BETRAYAL_EVENT_OUTCOME_RESOLVER|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM STRATEGY EVIDENCE REGISTRY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+strategy-evidence-registry
+
+Args:
+- --record-registry
+- --confirm-strategy-evidence-registry <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry \
+  --record-registry \
+  --confirm-strategy-evidence-registry "I CONFIRM STRATEGY EVIDENCE REGISTRY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry \
+  --record-registry \
+  --confirm-strategy-evidence-registry "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_strategy_evidence_registry.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records registry only
+- manifest includes all current timeframes
+- manifest includes known entry modes
+- manifest includes normal signal origins
+- manifest includes betrayal candidates 222m/88m/55m
+- manifest includes anchor types/periods
+- betrayal v2 source requirements include original_direction/inverse_direction/source_identity/entry_mode
+- all families default live_authorized false
+- all families default order_allowed false
+- no config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R217/R216/R205/R203 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry \
+  | jq '.status, .registry_manifest.timeframes, .registry_manifest.entry_modes, .registry_manifest.signal_origins, .registry_manifest.betrayal_candidates, .registry_manifest.source_identity_requirements, .registry_validation, .registry_gap_report, .registry_recommendations, .registry_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry \
+  --record-registry \
+  --confirm-strategy-evidence-registry "I CONFIRM STRATEGY EVIDENCE REGISTRY RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .registry_recorded, .registry_validation, .registry_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  strategy-evidence-registry \
+  --record-registry \
+  --confirm-strategy-evidence-registry "wrong" \
+  | jq '.status, .confirmation_valid, .registry_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R218.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R219_REGISTRY_WIRING_FOR_BETRAYAL_SOURCE_FAMILY.md
+
+R219 should:
+- wire betrayal source emitter/decomposition/event tracker to consume strategy_evidence_registry
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create:
+codex_tasks/phases/R220_REGISTRY_WIRING_FOR_PATTERN_ANCHOR_FAMILIES.md
+
+R220 should:
+- wire pattern and anchor family surfaces to consume the same registry
+- no config writes
+- no live execution
+- no Binance/network calls
+
+REPORT:
+Files changed, tests, smoke, safety, registry completeness, gaps, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

@@ -1,5 +1,16 @@
 # R218 Betrayal V2 Source Row Append
 
+## Superseded
+
+This draft is superseded by `R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST`.
+The R218 phase is now a strategy evidence registry / source identity manifest only.
+It does not append v2 source rows.
+
+Move any future row-append or betrayal source-family wiring work behind
+`R219_REGISTRY_WIRING_FOR_BETRAYAL_SOURCE_FAMILY.md`, after the R218 registry is
+available and still with no config writes, no Binance/network calls, no order
+payloads, no live authorization, and no betrayal promotion.
+
 ## Purpose
 
 Append paper-only betrayal source emitter v2 rows only when R217 produced schema-complete ready rows.

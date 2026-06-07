@@ -2122,6 +2122,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "strategy-evidence-registry":
+        from src.app.hammer_radar.operator.strategy_evidence_registry import (
+            build_strategy_evidence_registry,
+            format_strategy_evidence_registry_json,
+        )
+
+        print(
+            format_strategy_evidence_registry_json(
+                build_strategy_evidence_registry(
+                    log_dir=args.log_dir,
+                    record_registry=args.record_registry,
+                    confirm_strategy_evidence_registry=args.confirm_strategy_evidence_registry,
+                )
+            )
+        )
     elif args.command == "lane-matrix-after-crow-outcome-feedback":
         from src.app.hammer_radar.operator.lane_matrix_after_crow_outcome_feedback import (
             build_lane_matrix_after_crow_outcome_feedback,
@@ -3912,6 +3927,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     anchor_signal_confluence_matrix_parser.add_argument("--record-matrix", action="store_true")
     anchor_signal_confluence_matrix_parser.add_argument("--confirm-anchor-signal-confluence", default=None)
+
+    strategy_evidence_registry_parser = subparsers.add_parser(
+        "strategy-evidence-registry",
+        parents=[parent],
+    )
+    strategy_evidence_registry_parser.add_argument("--record-registry", action="store_true")
+    strategy_evidence_registry_parser.add_argument("--confirm-strategy-evidence-registry", default=None)
 
     lane_matrix_after_crow_outcome_feedback_parser = subparsers.add_parser(
         "lane-matrix-after-crow-outcome-feedback",
