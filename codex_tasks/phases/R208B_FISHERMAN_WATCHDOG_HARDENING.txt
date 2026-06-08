@@ -1,0 +1,460 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R208B Fisherman Watchdog / Capture Ledger Reconciliation
+
+BRANCH:
+r208b-fisherman-watchdog-ledger-reconciliation
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+Tiny-live remains the north star.
+
+Current operational state:
+- BTCUSDT 8m short capture threshold is 7/10.
+- Required threshold is 10/10.
+- Fisherman/watchers are alive.
+- Full-spectrum harvester heartbeat is fresh.
+- 8m short capture heartbeat is fresh.
+- Latest 8m short capture:
+  BTCUSDT|8m|short|2026-06-07T21:19:59.999000+00:00
+- capture-count-sync reports:
+  fresh_capture_count=7
+  threshold_met=false
+  watcher_likely_running=true
+  watcher_stale=false
+
+Weekend supervisor still reports:
+- fisherman_status=LEDGER_MISMATCH_REQUIRES_RECONCILIATION
+- ledger_mismatch_found=true
+- missing ledger:
+  logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- no_signal_vs_no_fisherman classification UNKNOWN
+
+This is a blocker for tiny-live readiness because when 10/10 is reached, the operator must be able to trust the count and ledger state.
+
+R208B must reconcile capture-count ledgers and harden watchdog reporting without changing trading/live state.
+
+PURPOSE:
+Create a paper-only fisherman watchdog and capture ledger reconciliation surface that:
+1. Reads current 8m short capture evidence.
+2. Reads short paper capture heartbeats.
+3. Reads full-spectrum harvester heartbeats.
+4. Reads full-spectrum harvest captures.
+5. Reads capture-count-sync output if present.
+6. Detects missing capture_count_sync_8m_short.ndjson.
+7. Rebuilds or previews a capture-count sync record from existing local paper-only ledgers.
+8. Writes an append-only reconciliation record only with explicit confirmation.
+9. Does not rewrite existing ledgers destructively.
+10. Produces a clean classification:
+    - fisherman alive + no fresh signal
+    - fisherman alive + threshold not met
+    - fisherman alive + threshold met
+    - fisherman stale
+    - ledger mismatch
+    - ledger reconciled
+11. Produces operator truth:
+    - current capture count
+    - required count
+    - latest capture id
+    - unique capture ids
+    - watcher health
+    - whether funding should still wait
+12. Does not mutate config.
+13. Does not call Binance/network.
+14. Does not place orders.
+15. Does not arm live.
+16. Does not disable kill switch.
+
+CRITICAL SAFETY:
+This phase is paper ledger reconciliation only.
+It must NOT:
+- call Binance
+- call any network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote lanes
+- promote signal origins
+- create live permission
+- fake captures
+- fabricate signal ids
+- rewrite historical ledgers destructively
+- mark threshold met unless unique local captures prove it
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not infer funding readiness.
+- Do not infer live readiness.
+- Do not fabricate missing capture ledgers.
+- Do not count stale duplicate captures as fresh unique captures.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py if present
+- src/app/hammer_radar/operator/short_paper_evidence_capture_loop.py if present
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py if present
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_paper_coverage_audit.ndjson
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson if present
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/ if related R157/R176/R198/R208 docs exist
+- tests/hammer_radar/test_weekend_paper_fisherman_supervisor.py if present
+- tests/hammer_radar/test_capture_count_sync_8m_short.py if present
+- tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+- tests/hammer_radar/ relevant capture/fisherman tests
+
+REUSE / EXTEND:
+Reuse existing capture-count logic if present.
+Reuse weekend supervisor health checks.
+Reuse full-spectrum heartbeat parsing.
+Reuse 8m short capture counting rules.
+Do not duplicate ledger parsing if helper functions already exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+TARGET PRIMARY LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+KNOWN CURRENT CAPTURE IDS:
+- BTCUSDT|8m|short|2026-06-07T21:19:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-06T22:23:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-06T19:59:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-06T18:15:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-03T00:23:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-01T17:35:59.999000+00:00
+- BTCUSDT|8m|short|2026-06-01T10:55:59.999000+00:00
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/fisherman_watchdog_ledger_reconciliation.py
+
+Expose:
+- build_fisherman_watchdog_ledger_reconciliation
+- load_short_capture_heartbeats
+- load_full_spectrum_heartbeats
+- load_short_capture_records
+- load_full_spectrum_capture_records
+- load_capture_count_sync_records
+- parse_8m_short_capture_ids
+- dedupe_capture_ids
+- classify_capture_freshness
+- build_reconciled_capture_count_snapshot
+- build_watcher_health_snapshot
+- build_ledger_mismatch_report
+- build_no_signal_vs_no_fisherman_classification
+- build_reconciliation_recommendations
+- classify_fisherman_reconciliation_status
+- append_fisherman_reconciliation_record
+- load_fisherman_reconciliation_records
+- summarize_fisherman_reconciliation_records
+
+STATUS ENUM:
+- FISHERMAN_WATCHDOG_RECONCILIATION_READY
+- FISHERMAN_WATCHDOG_RECONCILIATION_REJECTED
+- FISHERMAN_WATCHDOG_RECONCILIATION_RECORDED
+- FISHERMAN_WATCHDOG_RECONCILIATION_BLOCKED
+- FISHERMAN_WATCHDOG_RECONCILIATION_ERROR
+
+RECONCILIATION STATUS ENUM:
+- LEDGER_RECONCILED_THRESHOLD_NOT_MET
+- LEDGER_RECONCILED_THRESHOLD_MET
+- LEDGER_MISMATCH_REMAINS
+- FISHERMAN_ALIVE_NO_SIGNAL
+- FISHERMAN_ALIVE_CAPTURE_FLOW_PRESENT
+- FISHERMAN_STALE
+- CAPTURE_COUNT_SYNC_LEDGER_MISSING
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+CAPTURE COUNT RULES:
+- Count unique captured_signal_id values only.
+- Primary lane must match BTCUSDT|8m|short|ladder_close_50_618 or compatible signal id BTCUSDT|8m|short|timestamp.
+- Do not count duplicates.
+- Do not count non-8m short lanes toward 8m short threshold.
+- Do not count full-spectrum captures for other lanes toward 8m short threshold.
+- Do not mark threshold_met unless fresh_capture_count >= 10.
+- Do not fabricate capture ids from stale watcher loops.
+
+LEDGER WRITE RULES:
+- Preview mode must write nothing.
+- Record mode may append exactly one reconciliation record to:
+  logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+  only if confirmation phrase is exact.
+- Record mode may also append one audit record to:
+  logs/hammer_radar_forward/fisherman_watchdog_ledger_reconciliation.ndjson
+- Do not modify any existing line.
+- Do not rewrite historical ledgers.
+- Do not create non-paper execution records.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "reconciliation_recorded": false,
+  "record_reconciliation_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "primary_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "short_capture_heartbeats_found": true/false,
+    "full_spectrum_heartbeats_found": true/false,
+    "short_capture_records_found": true/false,
+    "full_spectrum_capture_records_found": true/false,
+    "capture_count_sync_ledger_found": true/false
+  },
+  "watcher_health": {
+    "short_capture_watcher_likely_running": true/false,
+    "short_capture_watcher_stale": true/false,
+    "short_capture_latest_heartbeat_at": "...",
+    "short_capture_latest_iteration": ...,
+    "full_spectrum_watcher_likely_running": true/false,
+    "full_spectrum_watcher_stale": true/false,
+    "full_spectrum_latest_heartbeat_at": "...",
+    "full_spectrum_latest_iteration": ...
+  },
+  "reconciled_capture_count": {
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "latest_captured_signal_id": "...",
+    "unique_captured_signal_ids": [...]
+  },
+  "ledger_mismatch_report": {
+    "ledger_mismatch_found": true/false,
+    "missing_ledgers": [...],
+    "stale_ledgers": [...],
+    "reconciliation_possible_from_local_evidence": true/false,
+    "reconciled_capture_count_would_write": true/false
+  },
+  "no_signal_vs_no_fisherman": {
+    "classification": "FISHERMAN_ALIVE_NO_SIGNAL|FISHERMAN_ALIVE_CAPTURE_FLOW_PRESENT|FISHERMAN_STALE|LEDGER_MISMATCH|UNKNOWN",
+    "plain_english": "..."
+  },
+  "reconciliation_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "RECORD_RECONCILED_CAPTURE_COUNT|KEEP_FISHERMAN_RUNNING|WAIT_FOR_MORE_CAPTURES|MOVE_TO_RISK_CONTRACT_AFTER_10_OF_10|...",
+      "future_phase": "...",
+      "why": "..."
+    }
+  ],
+  "reconciliation_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|WAIT_FOR_10_OF_10|PREPARE_FUNDING_CHECK|RUN_R227_BETRAYAL_DIRECTION_COMPLETION|RUN_RISK_CONTRACT_READINESS",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- position_permission_created=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- capture_count_sync_appended=true/false
+- reconciliation_audit_appended=true/false
+
+LEDGERS:
+logs/hammer_radar_forward/fisherman_watchdog_ledger_reconciliation.ndjson
+logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FISHERMAN WATCHDOG LEDGER RECONCILIATION ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+fisherman-watchdog-ledger-reconciliation
+
+Args:
+- --record-reconciliation
+- --confirm-fisherman-watchdog-ledger-reconciliation <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation \
+  --record-reconciliation \
+  --confirm-fisherman-watchdog-ledger-reconciliation "I CONFIRM FISHERMAN WATCHDOG LEDGER RECONCILIATION ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation \
+  --record-reconciliation \
+  --confirm-fisherman-watchdog-ledger-reconciliation "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_fisherman_watchdog_ledger_reconciliation.py
+
+Test:
+- preview writes no ledger
+- wrong confirmation rejects and writes no ledger
+- correct confirmation appends reconciliation only
+- missing capture_count_sync ledger is detected
+- capture count can be rebuilt from local evidence
+- unique 8m short captures are counted
+- non-8m-short lanes are not counted toward threshold
+- duplicates are not counted
+- threshold false when count < 10
+- threshold true only when count >= 10
+- fisherman alive/no signal classification works
+- fisherman stale classification works
+- safety object forbids config/network/order/live
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related fisherman/capture/full-spectrum tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation \
+  | jq '.status, .target_scope, .input_summary, .watcher_health, .reconciled_capture_count, .ledger_mismatch_report, .no_signal_vs_no_fisherman, .reconciliation_recommendations, .reconciliation_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation \
+  --record-reconciliation \
+  --confirm-fisherman-watchdog-ledger-reconciliation "I CONFIRM FISHERMAN WATCHDOG LEDGER RECONCILIATION ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .reconciliation_recorded, .reconciled_capture_count, .ledger_mismatch_report, .reconciliation_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  fisherman-watchdog-ledger-reconciliation \
+  --record-reconciliation \
+  --confirm-fisherman-watchdog-ledger-reconciliation "wrong" \
+  | jq '.status, .confirmation_valid, .reconciliation_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+Post-reconciliation check:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  weekend-paper-fisherman-supervisor \
+  | jq '.status, .fisherman_health.fisherman_status, .capture_watch_summary, .no_signal_vs_no_fisherman, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R208B_FISHERMAN_WATCHDOG_LEDGER_RECONCILIATION.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R208B.
+
+FUTURE TASKS:
+Create if missing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+R228 should:
+- only activate if capture_count threshold reaches 10/10 and ledger reconciliation is clean
+- still no live execution
+- no Binance/network calls
+- prepare funding/risk contract readiness checklist only
+
+REPORT:
+Files changed, tests, smoke, reconciliation result, capture count, whether threshold met, whether funding still waits, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
