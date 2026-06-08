@@ -1,0 +1,477 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R225 Betrayal Entry Mode Evidence Wiring
+
+BRANCH:
+r225-betrayal-entry-mode-evidence-wiring
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R224A Betrayal Source Identity Evidence Collector proved source identity is mostly present, but entry mode remains the bottleneck.
+
+R224A result:
+- rows_reviewed=1866
+- source_identity_evidence_rows=1613
+- emitted_signal_id_preview_rows=1613
+- entry_mode_evidence_rows=26
+- lane_key_preview_rows=26
+- resolver_ready_preview_rows=0
+- insufficient_rows=1841
+- evidence_status=SOURCE_IDENTITY_ENTRY_MODE_STILL_BLOCKED
+
+R223 result:
+- resolver_ready_rows=0
+- rows_reviewed=146
+- rows_normalized=0
+- partial_rows=2
+- blocked_rows=144
+- entry_mode_filled_count=2
+- source_identity_filled_count=7
+- emitted_signal_id_filled_count=0
+- normalizer_status=SOURCE_IDENTITY_ENTRY_MODE_BLOCKED
+
+R224 append must NOT run yet because resolver_ready_preview_rows=0.
+
+The practical blocker:
+entry_mode is not being carried forward consistently by betrayal source/capture/shadow/emitter surfaces.
+
+R225 must wire future betrayal emission/capture surfaces so entry_mode is explicit at source, using registry-backed rules, without changing live/trading state.
+
+PURPOSE:
+Create a paper-only entry mode evidence wiring layer that:
+1. Reads R224A source identity evidence collector.
+2. Reads R223 source identity normalizer.
+3. Reads R218 strategy evidence registry.
+4. Reads R219 registry wiring betrayal source family.
+5. Reads R217 aggregate decomposition.
+6. Reads R216 source emitter refresh.
+7. Reads full-spectrum capture records.
+8. Identifies where entry_mode is present, missing, or parseable.
+9. Defines a registry-backed entry_mode propagation contract.
+10. Produces future-safe wiring recommendations for source surfaces:
+    - full-spectrum harvest capture records
+    - betrayal source emitter v2 rows
+    - betrayal event tracker rows
+    - betrayal aggregate decomposition rows
+    - direction split rows
+11. Adds a CLI/report that proves where entry_mode is missing.
+12. Optionally adds helper functions for future modules to normalize entry_mode from local source rows.
+13. Does not append normalized rows.
+14. Does not write configs.
+15. Does not call Binance/network.
+16. Does not place orders.
+17. Does not promote betrayal.
+18. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is entry-mode evidence wiring only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- fabricate entry_mode
+- append normalized source rows
+- count partial rows as resolver-ready
+- destructively rewrite historical ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from entry-mode wiring.
+- Do not infer live readiness from entry-mode wiring.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_source_identity_evidence_collector.py
+- src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/registry_wiring_betrayal_source_family.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_source_identity_evidence_collector.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_normalizer.ndjson
+- logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+- logs/hammer_radar_forward/registry_wiring_betrayal_source_family.ndjson
+- logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- docs/hammer_radar/live_readiness/R224A_BETRAYAL_SOURCE_IDENTITY_EVIDENCE_COLLECTOR.md
+- docs/hammer_radar/live_readiness/R223_BETRAYAL_SOURCE_IDENTITY_NORMALIZER.md
+- docs/hammer_radar/live_readiness/R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST.md
+- tests/hammer_radar/test_betrayal_source_identity_evidence_collector.py
+- tests/hammer_radar/test_betrayal_source_identity_normalizer.py
+- tests/hammer_radar/test_strategy_evidence_registry.py
+- tests/hammer_radar/test_betrayal_aggregate_decomposition.py
+- tests/hammer_radar/test_betrayal_source_emitter_refresh.py
+
+REUSE / EXTEND:
+Reuse R224A parsing and evidence rules.
+Reuse R223 normalizer helpers where safe.
+Reuse R218 registry entry mode manifest.
+Reuse R219 registry validation.
+Reuse R216 source emitter v2 contract.
+Do not duplicate registry philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+ENTRY MODE RULES:
+Entry mode is valid only if:
+- present explicitly in row.entry_mode and exists in registry; OR
+- parseable from lane_key and exists in registry; OR
+- parseable from source_signal_id/source_capture_id and exists in registry; OR
+- emitted by source family under a registry-backed contract.
+
+Entry mode is invalid/blocked if:
+- missing
+- unknown
+- entry_unknown
+- inferred only because ladder_close_50_618 is common
+- inferred only from candidate label or timeframe
+
+This phase may produce entry_mode wiring previews but must not append resolver-ready source rows.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+
+Expose:
+- build_betrayal_entry_mode_evidence_wiring
+- load_latest_betrayal_source_identity_evidence_collector
+- load_latest_betrayal_source_identity_normalizer
+- load_latest_strategy_evidence_registry
+- load_latest_registry_wiring_betrayal_source_family
+- load_latest_betrayal_aggregate_decomposition
+- load_latest_betrayal_source_emitter_refresh
+- load_latest_betrayal_direction_split_resolver
+- load_latest_betrayal_event_tracker
+- load_full_spectrum_capture_records
+- extract_entry_mode_from_lane_key
+- extract_entry_mode_from_signal_id
+- validate_entry_mode_against_registry
+- build_entry_mode_evidence_rows
+- build_entry_mode_propagation_contract
+- build_entry_mode_gap_report
+- build_entry_mode_wiring_recommendations
+- classify_betrayal_entry_mode_evidence_status
+- append_betrayal_entry_mode_evidence_wiring_record
+- load_betrayal_entry_mode_evidence_wiring_records
+- summarize_betrayal_entry_mode_evidence_wiring_records
+
+STATUS ENUM:
+- BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING_READY
+- BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING_REJECTED
+- BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING_RECORDED
+- BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING_BLOCKED
+- BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING_ERROR
+
+ENTRY MODE STATUS ENUM:
+- ENTRY_MODE_EVIDENCE_WIRING_READY
+- ENTRY_MODE_EVIDENCE_PARTIAL
+- ENTRY_MODE_EVIDENCE_STILL_BLOCKED
+- ENTRY_MODE_PROPAGATION_CONTRACT_READY
+- ENTRY_MODE_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "wiring_recorded": false,
+  "wiring_id": null,
+  "record_wiring_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "family": "betrayal",
+    "registry_backed": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "source_identity_evidence_collector_found": true/false,
+    "source_identity_normalizer_found": true/false,
+    "registry_found": true/false,
+    "registry_valid": true/false,
+    "full_spectrum_records_found": true/false,
+    "aggregate_decomposition_found": true/false,
+    "source_emitter_refresh_found": true/false
+  },
+  "entry_mode_evidence_rows": [
+    {
+      "candidate": "...",
+      "source": "collector|normalizer|aggregate_decomposition|source_emitter_refresh|direction_split_resolver|event_tracker|full_spectrum_capture",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "entry_mode": "...",
+      "entry_mode_source": "explicit|lane_key|source_signal_id|source_capture_id|registry_contract|insufficient",
+      "entry_mode_valid": true/false,
+      "registry_entry_mode_found": true/false,
+      "lane_key": "...",
+      "source_signal_id": "...",
+      "source_capture_id": "...",
+      "timestamp": "...",
+      "can_feed_source_identity_normalizer": true/false,
+      "can_feed_resolver_ready_preview": false,
+      "paper_only": true,
+      "live_authorized": false,
+      "why": "..."
+    }
+  ],
+  "entry_mode_summary": {
+    "rows_reviewed": ...,
+    "entry_mode_valid_rows": ...,
+    "entry_mode_explicit_rows": ...,
+    "entry_mode_from_lane_key_rows": ...,
+    "entry_mode_from_signal_id_rows": ...,
+    "entry_mode_still_missing_rows": ...,
+    "can_feed_normalizer_rows": ...
+  },
+  "entry_mode_propagation_contract": {
+    "contract_name": "betrayal_entry_mode_source_contract_v1",
+    "required_for_future_emitters": [
+      "entry_mode",
+      "lane_key",
+      "source_signal_id",
+      "source_signal_timestamp",
+      "source_family"
+    ],
+    "entry_mode_must_exist_in_registry": true,
+    "common_default_inference_allowed": false,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "entry_mode_gap_report": {
+    "missing_entry_mode_rows": ...,
+    "invalid_entry_mode_rows": ...,
+    "registry_missing_rows": ...,
+    "collector_resolver_ready_preview_rows": ...,
+    "hard_live_blockers": [...]
+  },
+  "entry_mode_wiring_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "WIRE_FULL_SPECTRUM_ENTRY_MODE|WIRE_BETRAYAL_EMITTER_ENTRY_MODE|RUN_R226_RENORMALIZE_WITH_ENTRY_MODE|KEEP_CONTEXT_ONLY|...",
+      "future_phase": "R226|R227|...",
+      "why": "..."
+    }
+  ],
+  "entry_mode_status": "...",
+  "recommended_next_operator_move": "KEEP_WEEKEND_FISHERMAN_RUNNING|RUN_R226_BETRAYAL_RENORMALIZE_WITH_ENTRY_MODE|RUN_R208B_FISHERMAN_WATCHDOG_HARDENING|CHECK_8M_CAPTURE_THRESHOLD",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_entry_mode_evidence_wiring.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL ENTRY MODE EVIDENCE WIRING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-entry-mode-evidence-wiring
+
+Args:
+- --record-wiring
+- --confirm-betrayal-entry-mode-evidence-wiring <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring \
+  --record-wiring \
+  --confirm-betrayal-entry-mode-evidence-wiring "I CONFIRM BETRAYAL ENTRY MODE EVIDENCE WIRING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring \
+  --record-wiring \
+  --confirm-betrayal-entry-mode-evidence-wiring "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_entry_mode_evidence_wiring.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records wiring only
+- extracts entry_mode from lane_key
+- extracts entry_mode from signal id when schema supports it
+- rejects common default inference
+- rejects unknown/entry_unknown
+- validates entry_mode against registry
+- creates propagation contract
+- does not mark resolver-ready rows
+- all rows remain paper_only
+- live_authorized false
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R224A/R223/R221/R218 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring \
+  | jq '.status, .target_scope, .input_summary, .entry_mode_evidence_rows[0:80], .entry_mode_summary, .entry_mode_propagation_contract, .entry_mode_gap_report, .entry_mode_wiring_recommendations, .entry_mode_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring \
+  --record-wiring \
+  --confirm-betrayal-entry-mode-evidence-wiring "I CONFIRM BETRAYAL ENTRY MODE EVIDENCE WIRING RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .wiring_recorded, .entry_mode_summary, .entry_mode_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-evidence-wiring \
+  --record-wiring \
+  --confirm-betrayal-entry-mode-evidence-wiring "wrong" \
+  | jq '.status, .confirmation_valid, .wiring_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R225_BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R225.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R226_BETRAYAL_RENORMALIZE_WITH_ENTRY_MODE.md
+
+R226 should:
+- rerun normalization using R225 entry_mode contract/evidence
+- produce resolver-ready previews only if all registry fields exist
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Create:
+codex_tasks/phases/R208B_FISHERMAN_WATCHDOG_HARDENING.md if missing
+
+REPORT:
+Files changed, tests, smoke, safety, entry_mode evidence counts, remaining blockers, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

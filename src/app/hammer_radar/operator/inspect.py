@@ -2731,6 +2731,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-entry-mode-evidence-wiring":
+        from src.app.hammer_radar.operator.betrayal_entry_mode_evidence_wiring import (
+            build_betrayal_entry_mode_evidence_wiring,
+            format_betrayal_entry_mode_evidence_wiring_json,
+        )
+
+        print(
+            format_betrayal_entry_mode_evidence_wiring_json(
+                build_betrayal_entry_mode_evidence_wiring(
+                    log_dir=args.log_dir,
+                    record_wiring=args.record_wiring,
+                    confirm_betrayal_entry_mode_evidence_wiring=(
+                        args.confirm_betrayal_entry_mode_evidence_wiring
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4318,6 +4335,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_source_identity_evidence_collector_parser.add_argument("--record-collector", action="store_true")
     betrayal_source_identity_evidence_collector_parser.add_argument(
         "--confirm-betrayal-source-identity-evidence-collector",
+        default=None,
+    )
+
+    betrayal_entry_mode_evidence_wiring_parser = subparsers.add_parser(
+        "betrayal-entry-mode-evidence-wiring",
+        parents=[parent],
+    )
+    betrayal_entry_mode_evidence_wiring_parser.add_argument("--record-wiring", action="store_true")
+    betrayal_entry_mode_evidence_wiring_parser.add_argument(
+        "--confirm-betrayal-entry-mode-evidence-wiring",
         default=None,
     )
 
