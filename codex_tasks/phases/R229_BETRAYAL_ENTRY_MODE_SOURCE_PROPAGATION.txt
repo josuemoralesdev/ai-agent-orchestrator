@@ -1,0 +1,524 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R229 Betrayal Entry Mode Source Propagation
+
+BRANCH:
+r229-betrayal-entry-mode-source-propagation
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+Tiny-live remains the north star, but BTCUSDT 8m short is still 8/10 and threshold is not met.
+
+Current tiny-live state:
+- BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=8
+- required_fresh_capture_count=10
+- threshold_met=false
+- watcher_likely_running=true
+- watcher_stale=false
+- fisherman_status=FISHERMAN_RUNNING_RECENT
+- ledger_mismatch_found=false
+- funding must wait
+- risk contract readiness must wait
+
+While waiting for 10/10, betrayal/reversal evidence remains priority.
+
+R227 Betrayal Direction Completion showed:
+- resolver_ready_preview_rows=0
+- rows_reviewed=1622
+- rows_with_original_direction=1615
+- rows_with_inverse_direction=1615
+- rows_with_emitted_direction=1615
+- rows_with_emitted_direction_equals_inverse=1582
+- rows_with_entry_mode=35
+- blocked_rows=1622
+- direction_completion_status=DIRECTION_COMPLETION_ENTRY_MODE_STILL_BLOCKED
+
+R227 proves direction is mostly present. The real blocker is now:
+- entry_mode missing
+- lane_key missing
+- many rows still cannot become resolver-ready because entry_mode was not emitted at the source
+
+R229 must wire betrayal source surfaces so entry_mode and lane_key are propagated from local source evidence into future betrayal rows.
+
+PURPOSE:
+Create a paper-only source propagation layer that:
+1. Reads R227 betrayal direction completion.
+2. Reads R226 renormalization with entry mode.
+3. Reads R225 entry mode evidence wiring.
+4. Reads R224A source identity evidence collector.
+5. Reads R223 source identity normalizer.
+6. Reads R218 strategy evidence registry.
+7. Reads R217 aggregate decomposition.
+8. Reads R216 source emitter refresh.
+9. Reads R215 direction split resolver.
+10. Identifies rows where direction/source identity are complete but entry_mode/lane_key are missing.
+11. Builds a registry-backed source propagation contract for future betrayal rows.
+12. Adds helper functions to propagate entry_mode and lane_key only when explicit local evidence exists.
+13. Produces propagated preview rows only.
+14. Does not append normalized source rows.
+15. Does not write configs.
+16. Does not call Binance/network.
+17. Does not place orders.
+18. Does not promote betrayal.
+19. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is source propagation preview only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- fabricate entry_mode
+- infer entry_mode from common default
+- infer entry_mode from candidate label
+- infer lane_key without symbol/timeframe/emitted_direction/entry_mode
+- append normalized source rows
+- count preview rows as resolved outcomes
+- destructively rewrite historical ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane config files.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from source propagation.
+- Do not infer live readiness from source propagation.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/betrayal_renormalize_with_entry_mode.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+- src/app/hammer_radar/operator/betrayal_source_identity_evidence_collector.py
+- src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_direction_completion.ndjson
+- logs/hammer_radar_forward/betrayal_renormalize_with_entry_mode.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_evidence_wiring.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_evidence_collector.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_normalizer.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- docs/hammer_radar/live_readiness/R227_BETRAYAL_DIRECTION_COMPLETION.md
+- docs/hammer_radar/live_readiness/R226_BETRAYAL_RENORMALIZE_WITH_ENTRY_MODE.md
+- docs/hammer_radar/live_readiness/R225_BETRAYAL_ENTRY_MODE_EVIDENCE_WIRING.md
+- tests/hammer_radar/test_betrayal_direction_completion.py
+- tests/hammer_radar/test_betrayal_renormalize_with_entry_mode.py
+- tests/hammer_radar/test_betrayal_entry_mode_evidence_wiring.py
+- tests/hammer_radar/test_betrayal_source_identity_evidence_collector.py
+- tests/hammer_radar/test_strategy_evidence_registry.py
+
+REUSE / EXTEND:
+Reuse R227 row shape.
+Reuse R226 registry validation logic.
+Reuse R225 entry_mode evidence contract.
+Reuse R224A source identity/emitted signal preview logic.
+Reuse R218 registry entry mode manifest.
+Reuse R212 event identity model if needed.
+Do not duplicate registry philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+SOURCE PROPAGATION RULES:
+entry_mode may be propagated only if:
+- row.entry_mode is explicit and registry-valid; OR
+- source row has explicit entry_mode and registry-valid; OR
+- lane_key contains entry_mode and registry-valid; OR
+- source_signal_id/source_capture_id contains a parseable entry_mode and registry-valid; OR
+- upstream source family contract explicitly carries entry_mode.
+
+Do NOT propagate entry_mode if:
+- it is null
+- it is unknown
+- it is entry_unknown
+- it is inferred because ladder_close_50_618 is common
+- it comes only from candidate label
+- it comes only from timeframe
+- it comes only from aggregate context
+
+lane_key may be previewed only if:
+- symbol exists
+- timeframe exists
+- emitted_direction exists
+- entry_mode exists and is registry-valid
+
+A propagated row may become resolver-ready preview only if:
+- candidate exists in registry
+- timeframe exists in registry
+- entry_mode exists in registry and is not unknown/entry_unknown
+- original_direction exists
+- inverse_direction exists
+- emitted_direction exists
+- emitted_direction equals inverse_direction
+- source_identity exists
+- source_signal_id exists
+- emitted_signal_id exists or can be previewed deterministically
+- source_signal_timestamp exists
+- lane_key exists or can be previewed
+- betrayal_event_identity exists
+- betrayal_event_identity_hash exists
+- outcome_windows exist
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+
+This phase may produce resolver-ready previews but must not append them.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+
+Expose:
+- build_betrayal_entry_mode_source_propagation
+- load_latest_betrayal_direction_completion
+- load_latest_betrayal_entry_mode_evidence_wiring
+- load_latest_betrayal_source_identity_evidence_collector
+- load_latest_betrayal_renormalize_with_entry_mode
+- load_latest_strategy_evidence_registry
+- load_betrayal_shadow_outcomes
+- load_betrayal_paper_signals
+- build_source_propagation_join_key
+- index_entry_mode_source_evidence
+- propagate_entry_mode_from_source
+- build_lane_key_preview
+- build_emitted_signal_id_preview
+- validate_propagated_row_against_registry
+- build_entry_mode_propagated_rows_preview
+- build_source_propagation_summary
+- build_source_propagation_gap_report
+- build_source_propagation_recommendations
+- classify_betrayal_source_propagation_status
+- append_betrayal_entry_mode_source_propagation_record
+- load_betrayal_entry_mode_source_propagation_records
+- summarize_betrayal_entry_mode_source_propagation_records
+
+STATUS ENUM:
+- BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION_READY
+- BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION_REJECTED
+- BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION_RECORDED
+- BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION_BLOCKED
+- BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION_ERROR
+
+SOURCE PROPAGATION STATUS ENUM:
+- ENTRY_MODE_SOURCE_PROPAGATION_RESOLVER_READY_PREVIEWS_AVAILABLE
+- ENTRY_MODE_SOURCE_PROPAGATION_PARTIAL_PREVIEWS_AVAILABLE
+- ENTRY_MODE_SOURCE_PROPAGATION_STILL_BLOCKED
+- ENTRY_MODE_SOURCE_PROPAGATION_NO_RESOLVER_READY_PREVIEWS
+- ENTRY_MODE_SOURCE_PROPAGATION_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "propagation_recorded": false,
+  "propagation_id": null,
+  "record_propagation_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "family": "betrayal",
+    "registry_backed": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "direction_completion_found": true/false,
+    "entry_mode_evidence_found": true/false,
+    "source_identity_evidence_found": true/false,
+    "renormalization_found": true/false,
+    "registry_found": true/false,
+    "registry_valid": true/false,
+    "shadow_outcomes_found": true/false,
+    "paper_signals_found": true/false
+  },
+  "entry_mode_propagated_rows_preview": [
+    {
+      "candidate": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "entry_mode": "...",
+      "entry_mode_propagation_source": "explicit|lane_key|source_signal_id|source_contract|none",
+      "original_direction": "long|short|null",
+      "inverse_direction": "long|short|null",
+      "emitted_direction": "long|short|null",
+      "source_identity": "...",
+      "source_signal_id": "...",
+      "emitted_signal_id_preview": "...",
+      "source_signal_timestamp": "...",
+      "lane_key_preview": "...",
+      "betrayal_event_identity": "...",
+      "betrayal_event_identity_hash": "...",
+      "outcome_windows": [1,3,5,10,21,34,55],
+      "registry_valid": true/false,
+      "schema_complete_preview": true/false,
+      "resolver_ready_preview": true/false,
+      "missing_required_fields": [...],
+      "evidence_sources_used": [...],
+      "paper_only": true,
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "why": "..."
+    }
+  ],
+  "source_propagation_summary": {
+    "rows_reviewed": ...,
+    "rows_with_entry_mode_before": ...,
+    "rows_with_entry_mode_after": ...,
+    "rows_with_lane_key_preview": ...,
+    "rows_with_emitted_signal_id_preview": ...,
+    "resolver_ready_preview_rows": ...,
+    "partial_preview_rows": ...,
+    "blocked_rows": ...
+  },
+  "source_propagation_gap_report": {
+    "missing_entry_mode_rows": ...,
+    "missing_lane_key_rows": ...,
+    "missing_source_identity_rows": ...,
+    "missing_direction_rows": ...,
+    "emitted_direction_mismatch_rows": ...,
+    "registry_invalid_rows": ...,
+    "resolver_ready_preview_rows": ...,
+    "hard_live_blockers": [...]
+  },
+  "source_propagation_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "RUN_R224_APPEND|WIRE_UPSTREAM_EMITTER_ENTRY_MODE|KEEP_CONTEXT_ONLY|CHECK_8M_CAPTURE_THRESHOLD|...",
+      "future_phase": "R224|R230|R228|...",
+      "why": "..."
+    }
+  ],
+  "source_propagation_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|RUN_R224_BETRAYAL_NORMALIZED_SOURCE_ROW_APPEND|CHECK_8M_CAPTURE_THRESHOLD|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_entry_mode_source_propagation.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL ENTRY MODE SOURCE PROPAGATION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-entry-mode-source-propagation
+
+Args:
+- --record-propagation
+- --confirm-betrayal-entry-mode-source-propagation <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation \
+  --record-propagation \
+  --confirm-betrayal-entry-mode-source-propagation "I CONFIRM BETRAYAL ENTRY MODE SOURCE PROPAGATION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation \
+  --record-propagation \
+  --confirm-betrayal-entry-mode-source-propagation "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_entry_mode_source_propagation.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records propagation only
+- propagates entry_mode only from explicit/local evidence
+- refuses common ladder default inference
+- refuses candidate label inference
+- builds lane_key preview only from symbol/timeframe/emitted_direction/entry_mode
+- resolver_ready requires all registry fields
+- no append of normalized rows
+- all rows remain paper_only
+- live_authorized false
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R227/R226/R225/R224A/R223/R218 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation \
+  | jq '.status, .target_scope, .input_summary, .entry_mode_propagated_rows_preview[0:80], .source_propagation_summary, .source_propagation_gap_report, .source_propagation_recommendations, .source_propagation_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation \
+  --record-propagation \
+  --confirm-betrayal-entry-mode-source-propagation "I CONFIRM BETRAYAL ENTRY MODE SOURCE PROPAGATION RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .propagation_recorded, .source_propagation_summary, .source_propagation_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-entry-mode-source-propagation \
+  --record-propagation \
+  --confirm-betrayal-entry-mode-source-propagation "wrong" \
+  | jq '.status, .confirmation_valid, .propagation_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R229_BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R229.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R230_BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT.md
+
+R230 should:
+- modify future betrayal emitter/capture surfaces to emit entry_mode and lane_key explicitly at creation time
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Update existing:
+codex_tasks/phases/R224_BETRAYAL_NORMALIZED_SOURCE_ROW_APPEND.md
+so it requires R229 resolver_ready_preview_rows > 0 before append.
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+REPORT:
+Files changed, tests, smoke, safety, resolver_ready_preview_rows, tiny-live count, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

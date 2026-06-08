@@ -2799,6 +2799,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-entry-mode-source-propagation":
+        from src.app.hammer_radar.operator.betrayal_entry_mode_source_propagation import (
+            build_betrayal_entry_mode_source_propagation,
+            format_betrayal_entry_mode_source_propagation_json,
+        )
+
+        print(
+            format_betrayal_entry_mode_source_propagation_json(
+                build_betrayal_entry_mode_source_propagation(
+                    log_dir=args.log_dir,
+                    record_propagation=args.record_propagation,
+                    confirm_betrayal_entry_mode_source_propagation=(
+                        args.confirm_betrayal_entry_mode_source_propagation
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4423,6 +4440,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_direction_completion_parser.add_argument("--record-completion", action="store_true")
     betrayal_direction_completion_parser.add_argument(
         "--confirm-betrayal-direction-completion",
+        default=None,
+    )
+
+    betrayal_entry_mode_source_propagation_parser = subparsers.add_parser(
+        "betrayal-entry-mode-source-propagation",
+        parents=[parent],
+    )
+    betrayal_entry_mode_source_propagation_parser.add_argument("--record-propagation", action="store_true")
+    betrayal_entry_mode_source_propagation_parser.add_argument(
+        "--confirm-betrayal-entry-mode-source-propagation",
         default=None,
     )
 
