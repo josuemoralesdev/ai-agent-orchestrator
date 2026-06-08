@@ -1775,6 +1775,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "capture-priority-rebalance":
+        from src.app.hammer_radar.operator.capture_priority_rebalance import (
+            build_capture_priority_rebalance,
+            format_capture_priority_rebalance_json,
+        )
+
+        print(
+            format_capture_priority_rebalance_json(
+                build_capture_priority_rebalance(
+                    log_dir=args.log_dir,
+                    record_rebalance=args.record_rebalance,
+                    confirm_capture_priority_rebalance=args.confirm_capture_priority_rebalance,
+                )
+            )
+        )
     elif args.command == "multi-lane-evidence-ranking":
         from src.app.hammer_radar.operator.multi_lane_evidence_ranking import (
             build_multi_lane_evidence_ranking,
@@ -3926,6 +3941,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lane_outcome_enrichment_parser.add_argument("--record-enrichment", action="store_true")
     lane_outcome_enrichment_parser.add_argument("--confirm-lane-outcome-enrichment", default=None)
+
+    capture_priority_rebalance_parser = subparsers.add_parser(
+        "capture-priority-rebalance",
+        parents=[parent],
+    )
+    capture_priority_rebalance_parser.add_argument("--record-rebalance", action="store_true")
+    capture_priority_rebalance_parser.add_argument("--confirm-capture-priority-rebalance", default=None)
 
     multi_lane_evidence_ranking_parser = subparsers.add_parser(
         "multi-lane-evidence-ranking",

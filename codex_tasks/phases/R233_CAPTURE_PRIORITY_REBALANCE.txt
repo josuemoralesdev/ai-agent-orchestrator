@@ -1,0 +1,558 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R233 Capture Priority Rebalance
+
+BRANCH:
+r233-capture-priority-rebalance
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R232 Lane Outcome Enrichment showed:
+- official tiny-live lane remains BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=8
+- required_fresh_capture_count=10
+- threshold_distance_remaining=2
+- threshold_met=false
+- fisherman_status=FISHERMAN_RUNNING_RECENT
+- watcher_likely_running=true
+- watcher_stale=false
+- official lane win_rate_pct=72.95
+- official lane known_outcome_count=292
+- official lane combined_watch_score=61.04
+- official lane remains capture-blocked, not live
+
+R232 also found:
+- alternate_outcome_edge_found=true
+- alternate_capture_blocked=true
+- enrichment_status=ALTERNATE_OUTCOME_EDGE_FOUND_BUT_CAPTURE_BLOCKED
+- 8m long ladder_close_50_618 has:
+  - unique_capture_count=6
+  - threshold_distance_remaining=4
+  - known_outcome_count=302
+  - win_rate_pct=71.85
+  - outcome_quality_score=57.77
+  - combined_watch_score=58.44
+- 4m short / 4m long / 13m short / 22m short have meaningful outcome evidence but remain capture-blocked
+- tiny sample traps exist, such as higher timeframe lanes with 100% win rate but only 1-4 known outcomes
+
+The system should now produce a paper-only capture priority rebalance:
+- keep official 8m short protected path first
+- raise watch priority for 8m long and other evidence-rich capture-blocked lanes
+- keep betrayal/inverse evidence in the active shadow-priority context
+- do not mutate configs
+- do not change lane modes
+- do not promote anything
+- keep waiting for a protected lane to reach 10/10
+
+IMPORTANT USER INTENT:
+Do not lose sight of betrayal.
+This phase must include betrayal/shadow-work as an explicit priority context.
+The goal is to keep building until we are mostly waiting for 10/10 on the protected path, while also keeping betrayal evidence from being forgotten.
+
+PURPOSE:
+Create a paper-only capture priority rebalance audit that:
+1. Reads latest R232 lane outcome enrichment.
+2. Reads latest R231 full-spectrum lane scoreboard.
+3. Reads latest tiny-live capture count sync.
+4. Reads latest betrayal upstream/source/direction context when available.
+5. Produces a prioritized paper fishing/watchlist plan.
+6. Keeps official tiny-live lane unchanged.
+7. Explicitly preserves betrayal/inverse evidence as shadow-priority context.
+8. Separates:
+   - official protected tiny-live path
+   - near-threshold alternate lanes
+   - outcome-strong but capture-blocked lanes
+   - betrayal/inverse shadow lanes
+   - tiny-sample traps
+9. Provides recommendations for what to monitor next.
+10. Provides future engineering phase suggestions.
+11. Does not write configs.
+12. Does not call Binance/network.
+13. Does not place orders.
+14. Does not promote lanes.
+15. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is audit/rebalance recommendation only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote lanes
+- promote signal origins
+- create live permission
+- infer funding readiness
+- infer live readiness
+- treat priority as promotion
+- treat outcome score as live eligibility
+- treat betrayal/inverse context as live eligibility
+- change official tiny-live lane
+- mutate fisherman service configs
+- mutate scheduler configs
+- rewrite historical ledgers
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from priority rank.
+- Do not infer live readiness from capture rebalance.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/full_spectrum_lane_scoreboard.py
+- src/app/hammer_radar/operator/fisherman_watchdog_ledger_reconciliation.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/betrayal_upstream_emitter_entry_mode_contract.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/betrayal_renormalize_with_entry_mode.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/full_spectrum_lane_scoreboard.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+- logs/hammer_radar_forward/fisherman_watchdog_ledger_reconciliation.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/betrayal_upstream_emitter_entry_mode_contract.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_source_propagation.ndjson
+- logs/hammer_radar_forward/betrayal_direction_completion.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R232_LANE_OUTCOME_ENRICHMENT.md
+- docs/hammer_radar/live_readiness/R231_FULL_SPECTRUM_LANE_SCOREBOARD_TINY_LIVE_ALTERNATE_AUDIT.md
+- docs/hammer_radar/live_readiness/R230_BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT.md
+- docs/hammer_radar/live_readiness/R229_BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION.md
+- docs/hammer_radar/live_readiness/R227_BETRAYAL_DIRECTION_COMPLETION.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- tests/hammer_radar/test_lane_outcome_enrichment.py
+- tests/hammer_radar/test_full_spectrum_lane_scoreboard.py
+- tests/hammer_radar/test_betrayal_upstream_emitter_entry_mode_contract.py
+- relevant fisherman/full-spectrum tests
+
+REUSE / EXTEND:
+Reuse R232 enriched lane rows.
+Reuse R231 official lane status.
+Reuse tiny-live capture count logic.
+Reuse betrayal status readers/helpers if present.
+Do not duplicate ledger parsing if existing helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+PRIORITY GROUPS:
+Build paper-only priority groups:
+
+1. OFFICIAL_PROTECTED_TINY_LIVE_PATH
+   - BTCUSDT|8m|short|ladder_close_50_618
+   - stays official
+   - currently 8/10
+   - wait for 10/10
+
+2. NEAR_THRESHOLD_ALTERNATES
+   - lanes with unique_capture_count >= 5 and known entry_mode
+   - example: BTCUSDT|8m|long|ladder_close_50_618 at 6/10
+   - paper-only watch
+
+3. OUTCOME_STRONG_CAPTURE_BLOCKED
+   - lanes with strong or very strong outcome score but unique captures < 10
+   - examples from R232: 4m short, 4m long, 13m short, 22m short, 55m long
+   - paper-only watch
+   - no promotion
+
+4. BETRAYAL_SHADOW_PRIORITY
+   - betrayal/inverse lanes/evidence from R215-R230 context
+   - include 222m and 88m betrayal/inverse evidence if present
+   - mark as shadow-context only
+   - must not imply live eligibility
+   - must not be dropped from next phases
+
+5. TINY_SAMPLE_TRAPS
+   - lanes with 100% win rate but known_outcome_count < 30
+   - example: 13H / 444m / 666m tiny-sample lanes
+   - keep as research only
+
+6. BLOCKED_OR_UNKNOWN
+   - missing entry_mode
+   - no unique captures
+   - no known outcomes
+   - stale only
+
+REBALANCE RULES:
+- Do not change official tiny-live lane.
+- Do not write a config.
+- Do not alter fisherman service behavior.
+- Do not promote alternate lanes.
+- Do not turn on live.
+- Produce a recommendation-only priority plan.
+- Priority rank may affect future paper-only engineering recommendations, not runtime config.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/capture_priority_rebalance.py
+
+Expose:
+- build_capture_priority_rebalance
+- load_latest_lane_outcome_enrichment
+- load_latest_full_spectrum_lane_scoreboard
+- load_latest_tiny_live_capture_count_sync
+- load_latest_fisherman_supervisor
+- load_latest_betrayal_context
+- classify_priority_group
+- build_official_protected_path_summary
+- build_near_threshold_alternates
+- build_outcome_strong_capture_blocked_lanes
+- build_betrayal_shadow_priority_context
+- build_tiny_sample_traps
+- build_blocked_or_unknown_lanes
+- calculate_capture_priority_score
+- build_capture_priority_rows
+- rank_capture_priority_rows
+- build_capture_priority_rebalance_plan
+- build_capture_priority_gap_report
+- build_capture_priority_recommendations
+- classify_capture_priority_rebalance_status
+- append_capture_priority_rebalance_record
+- load_capture_priority_rebalance_records
+- summarize_capture_priority_rebalance_records
+
+STATUS ENUM:
+- CAPTURE_PRIORITY_REBALANCE_READY
+- CAPTURE_PRIORITY_REBALANCE_REJECTED
+- CAPTURE_PRIORITY_REBALANCE_RECORDED
+- CAPTURE_PRIORITY_REBALANCE_BLOCKED
+- CAPTURE_PRIORITY_REBALANCE_ERROR
+
+REBALANCE STATUS ENUM:
+- OFFICIAL_PATH_STILL_PRIMARY
+- NEAR_THRESHOLD_ALTERNATES_FOUND
+- BETRAYAL_SHADOW_CONTEXT_PRESERVED
+- WAITING_FOR_10_OF_10
+- CAPTURE_PRIORITY_DATA_GAPS_REMAIN
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "rebalance_recorded": false,
+  "rebalance_id": null,
+  "record_rebalance_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "paper_only": true,
+    "live_authorized": false,
+    "official_tiny_live_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "official_tiny_live_lane_changed": false,
+    "betrayal_shadow_preserved": true
+  },
+  "input_summary": {
+    "lane_outcome_enrichment_found": true/false,
+    "full_spectrum_lane_scoreboard_found": true/false,
+    "tiny_live_capture_sync_found": true/false,
+    "fisherman_supervisor_found": true/false,
+    "betrayal_context_found": true/false
+  },
+  "official_protected_path_summary": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "threshold_distance_remaining": ...,
+    "combined_watch_score": ...,
+    "win_rate_pct": ...,
+    "known_outcome_count": ...,
+    "fisherman_status": "...",
+    "watcher_likely_running": true/false,
+    "watcher_stale": true/false,
+    "recommended_action": "KEEP_AS_OFFICIAL_AND_WAIT_FOR_10_OF_10"
+  },
+  "capture_priority_rows": [
+    {
+      "priority_rank": 1,
+      "priority_group": "OFFICIAL_PROTECTED_TINY_LIVE_PATH|NEAR_THRESHOLD_ALTERNATE|OUTCOME_STRONG_CAPTURE_BLOCKED|BETRAYAL_SHADOW_PRIORITY|TINY_SAMPLE_TRAP|BLOCKED_OR_UNKNOWN",
+      "lane_key": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction": "long|short|inverse|unknown",
+      "entry_mode": "...",
+      "unique_capture_count": ...,
+      "threshold_distance_remaining": ...,
+      "known_outcome_count": ...,
+      "win_rate_pct": null,
+      "combined_watch_score": ...,
+      "capture_priority_score": ...,
+      "paper_only": true,
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "recommended_paper_action": "KEEP_OFFICIAL|WATCH_CLOSELY|KEEP_SHADOW_CONTEXT|RESEARCH_ONLY|IGNORE_FOR_NOW",
+      "why": "..."
+    }
+  ],
+  "rebalance_plan": {
+    "official_lane_unchanged": true,
+    "paper_priority_order": [...],
+    "near_threshold_alternates": [...],
+    "outcome_strong_capture_blocked": [...],
+    "betrayal_shadow_priority": [...],
+    "tiny_sample_traps": [...],
+    "blocked_or_unknown": [...],
+    "runtime_config_change_required": false,
+    "live_readiness_implied": false
+  },
+  "betrayal_shadow_context": {
+    "preserved": true,
+    "status": "CONTEXT_ONLY|MISSING|READY_FOR_FUTURE_CONTRACT_SMOKE|...",
+    "candidate_lanes": [...],
+    "blockers": [...],
+    "recommended_next_betrayal_phase": "R231_FUTURE_BETRAYAL_CONTRACT_SMOKE|R234_BETRAYAL_SHADOW_PRIORITY_REFRESH|NONE",
+    "why": "..."
+  },
+  "capture_priority_gap_report": {
+    "official_lane_blockers": [...],
+    "alternate_lane_blockers": [...],
+    "betrayal_shadow_blockers": [...],
+    "tiny_sample_trap_count": ...,
+    "lanes_missing_entry_mode": ...,
+    "lanes_missing_unique_captures": ...,
+    "hard_live_blockers": [...]
+  },
+  "capture_priority_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "KEEP_FISHERMAN_RUNNING|WAIT_FOR_10_OF_10|WATCH_8M_LONG|PRESERVE_BETRAYAL_SHADOW|RUN_R228_IF_10_OF_10|RUN_R234_BETRAYAL_SHADOW_PRIORITY_REFRESH|...",
+      "future_phase": "R228|R234|...",
+      "why": "..."
+    }
+  ],
+  "rebalance_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET|WATCH_8M_LONG|PRESERVE_BETRAYAL_SHADOW",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- paper_outcome_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM CAPTURE PRIORITY REBALANCE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+capture-priority-rebalance
+
+Args:
+- --record-rebalance
+- --confirm-capture-priority-rebalance <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance \
+  --record-rebalance \
+  --confirm-capture-priority-rebalance "I CONFIRM CAPTURE PRIORITY REBALANCE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance \
+  --record-rebalance \
+  --confirm-capture-priority-rebalance "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_capture_priority_rebalance.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records rebalance only
+- official lane remains unchanged
+- 8m short official path is highest priority if still 8/10 and leading combined watch score
+- 8m long can be near-threshold alternate without promotion
+- betrayal context is preserved when available
+- tiny sample traps are separated from real candidates
+- priority score deterministic
+- priority rank does not imply live readiness
+- no lane promotion
+- no fisherman config mutation
+- no scheduler config mutation
+- no env/config mutation
+- no paper outcome ledger rewrite
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R232/R231/R230/fisherman/betrayal tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance \
+  | jq '.status, .target_scope, .input_summary, .official_protected_path_summary, .capture_priority_rows[0:40], .rebalance_plan, .betrayal_shadow_context, .capture_priority_gap_report, .capture_priority_recommendations, .rebalance_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance \
+  --record-rebalance \
+  --confirm-capture-priority-rebalance "I CONFIRM CAPTURE PRIORITY REBALANCE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .rebalance_recorded, .official_protected_path_summary, .rebalance_plan, .betrayal_shadow_context, .rebalance_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-priority-rebalance \
+  --record-rebalance \
+  --confirm-capture-priority-rebalance "wrong" \
+  | jq '.status, .confirmation_valid, .rebalance_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R233_CAPTURE_PRIORITY_REBALANCE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R233.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R234_BETRAYAL_SHADOW_PRIORITY_REFRESH.md
+
+R234 should:
+- refresh betrayal/inverse shadow context after R230/R233
+- preserve 222m/88m inverse evidence
+- show whether future betrayal contract smoke should run next
+- no config writes
+- no live execution
+- no Binance/network calls
+- no lane promotion
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+REPORT:
+Files changed, tests, smoke, safety, official protected path, near-threshold alternates, betrayal shadow context, tiny-live count, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
