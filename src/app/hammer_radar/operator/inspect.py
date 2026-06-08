@@ -2944,6 +2944,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-ranking-feed-preview":
+        from src.app.hammer_radar.operator.betrayal_ranking_feed_preview import (
+            build_betrayal_ranking_feed_preview,
+            format_betrayal_ranking_feed_preview_json,
+        )
+
+        print(
+            format_betrayal_ranking_feed_preview_json(
+                build_betrayal_ranking_feed_preview(
+                    log_dir=args.log_dir,
+                    record_ranking_preview=args.record_ranking_preview,
+                    confirm_betrayal_ranking_feed_preview=args.confirm_betrayal_ranking_feed_preview,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4649,6 +4664,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_true_inverse_outcome_capture_bridge_parser.add_argument("--record-capture-bridge", action="store_true")
     betrayal_true_inverse_outcome_capture_bridge_parser.add_argument(
         "--confirm-betrayal-true-inverse-outcome-capture-bridge",
+        default=None,
+    )
+
+    betrayal_ranking_feed_preview_parser = subparsers.add_parser(
+        "betrayal-ranking-feed-preview",
+        parents=[parent],
+    )
+    betrayal_ranking_feed_preview_parser.add_argument("--record-ranking-preview", action="store_true")
+    betrayal_ranking_feed_preview_parser.add_argument(
+        "--confirm-betrayal-ranking-feed-preview",
         default=None,
     )
 
