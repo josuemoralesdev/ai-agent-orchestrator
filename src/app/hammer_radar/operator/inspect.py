@@ -1760,6 +1760,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "lane-outcome-enrichment":
+        from src.app.hammer_radar.operator.lane_outcome_enrichment import (
+            build_lane_outcome_enrichment,
+            format_lane_outcome_enrichment_json,
+        )
+
+        print(
+            format_lane_outcome_enrichment_json(
+                build_lane_outcome_enrichment(
+                    log_dir=args.log_dir,
+                    record_enrichment=args.record_enrichment,
+                    confirm_lane_outcome_enrichment=args.confirm_lane_outcome_enrichment,
+                )
+            )
+        )
     elif args.command == "multi-lane-evidence-ranking":
         from src.app.hammer_radar.operator.multi_lane_evidence_ranking import (
             build_multi_lane_evidence_ranking,
@@ -3904,6 +3919,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     full_spectrum_lane_scoreboard_parser.add_argument("--record-scoreboard", action="store_true")
     full_spectrum_lane_scoreboard_parser.add_argument("--confirm-full-spectrum-lane-scoreboard", default=None)
+
+    lane_outcome_enrichment_parser = subparsers.add_parser(
+        "lane-outcome-enrichment",
+        parents=[parent],
+    )
+    lane_outcome_enrichment_parser.add_argument("--record-enrichment", action="store_true")
+    lane_outcome_enrichment_parser.add_argument("--confirm-lane-outcome-enrichment", default=None)
 
     multi_lane_evidence_ranking_parser = subparsers.add_parser(
         "multi-lane-evidence-ranking",
