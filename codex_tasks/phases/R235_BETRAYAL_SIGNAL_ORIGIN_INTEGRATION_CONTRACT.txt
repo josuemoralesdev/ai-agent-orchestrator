@@ -1,0 +1,661 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R235 Betrayal Signal-Origin Integration Contract
+
+BRANCH:
+r235-betrayal-signal-origin-integration-contract
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+The user clarified the intended Track B direction:
+
+Betrayal must not remain a special shadow-only island.
+Betrayal should become a tagged signal-origin family that flows through the same pipeline as every other input:
+- source event
+- signal origin
+- signal id
+- lane key
+- entry mode
+- direction
+- paper outcome
+- ranking
+- promotion gates
+- risk contract eligibility
+- live eligibility only after normal safety gates
+
+Current state from R234:
+- betrayal_shadow_active=true
+- betrayal_gate_prepared=true
+- can_auto_open_today=false
+- can_wait_at_gate=true
+- gate_packet_status=BETRAYAL_ACTIVE_SHADOW_NEEDS_ENTRY_MODE
+- official tiny-live lane remains BTCUSDT|8m|short|ladder_close_50_618
+- official lane remains 8/10
+- threshold_met=false
+- recommended action=WAIT_FOR_10_OF_10
+
+R234 blockers:
+- official_8m_short_not_10_of_10
+- entry_mode_missing
+- true_inverse_or_paper_outcomes_missing
+- risk_contract_not_written_by_this_phase
+- operator_approval_missing
+- live_execution_not_enabled
+- betrayal_live_authorization_missing
+
+R234 also showed betrayal candidates exist, but many are entry_unknown or special-case rows:
+- betrayal_source_emitter_v2|222m|short|entry_unknown
+- BTCUSDT|88m|inverse|entry_unknown
+- BTCUSDT|222m|long|ladder_close_50_618
+- BTCUSDT|8m|long|entry_unknown
+- BTCUSDT|8m|short|entry_unknown
+- BTCUSDT|4m, 13m, 22m, 44m, 55m, 88m, 222m shadow rows
+- some rows already have ladder_close_50_618 but need true inverse/paper outcomes
+
+R235 must create the integration contract so betrayal can be tagged as betrayal and then enter the same paper/ranking/promotion machinery as the rest of the system.
+
+CORE INTENT:
+Betrayal should become:
+- a first-class signal_origin family
+- tagged as betrayal/inverse
+- schema-compatible with normal lane flow
+- paper-outcome compatible
+- ranking-compatible
+- promotion-gate compatible
+- risk-contract compatible later
+- live-blocked today
+
+This phase must NOT promote or live-authorize betrayal.
+This phase must make betrayal eligible to be evaluated by the same machinery later.
+
+PURPOSE:
+Create a paper-only betrayal signal-origin integration contract that:
+1. Reads latest R234 betrayal gate-ready packet.
+2. Reads latest R233 capture priority rebalance.
+3. Reads latest R230 upstream emitter entry mode contract.
+4. Reads latest R229 source propagation.
+5. Reads existing signal-origin / paper outcome / ranking / promotion modules.
+6. Identifies the canonical schema required for all normal signal origins.
+7. Defines betrayal as a signal_origin family, for example:
+   - signal_origin_family="betrayal"
+   - signal_origin_type="inverse"
+   - signal_origin_variant="betrayal_inverse|betrayal_aggregate|betrayal_shadow"
+8. Produces a normalized betrayal signal-origin contract.
+9. Maps existing betrayal rows into integration-preview rows.
+10. Flags which rows can already enter the normal flow.
+11. Flags which rows are blocked by entry_mode, lane_key, direction, source identity, or outcome gaps.
+12. Defines required future fields so betrayal signals can be born into the normal flow.
+13. Produces a same-flow readiness report:
+   - paper_signal_ready
+   - paper_outcome_ready
+   - ranking_ready
+   - promotion_gate_ready
+   - risk_contract_ready_later
+   - live_ready_today=false
+14. Does not write configs.
+15. Does not call Binance/network.
+16. Does not place orders.
+17. Does not promote betrayal.
+18. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is integration-contract and preview only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- infer funding readiness
+- infer live readiness
+- treat betrayal win rate as live eligibility
+- treat integration readiness as promotion
+- rewrite historical ledgers
+- append normalized source rows unless a new preview-only ledger is used
+- fabricate entry_mode
+- fabricate lane_key
+- change official tiny-live lane
+- mutate fisherman/scheduler configs
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not promote betrayal.
+- Do not infer tiny-live readiness from betrayal.
+- Do not infer live readiness from betrayal integration.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_gate_ready_lane_packet.py
+- src/app/hammer_radar/operator/capture_priority_rebalance.py
+- src/app/hammer_radar/operator/betrayal_upstream_emitter_entry_mode_contract.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/betrayal_renormalize_with_entry_mode.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+- src/app/hammer_radar/operator/betrayal_source_identity_evidence_collector.py
+- src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/full_spectrum_lane_scoreboard.py
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py if present
+- src/app/hammer_radar/operator/inspect.py
+
+Inspect ledgers:
+- logs/hammer_radar_forward/betrayal_gate_ready_lane_packet.ndjson
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/betrayal_upstream_emitter_entry_mode_contract.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_source_propagation.ndjson
+- logs/hammer_radar_forward/betrayal_direction_completion.ndjson
+- logs/hammer_radar_forward/betrayal_renormalize_with_entry_mode.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_evidence_wiring.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_evidence_collector.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_normalizer.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/paper_outcomes.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+- logs/hammer_radar_forward/full_spectrum_lane_scoreboard.ndjson
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R234_BETRAYAL_GATE_READY_LANE_PACKET.md
+- docs/hammer_radar/live_readiness/R233_CAPTURE_PRIORITY_REBALANCE.md
+- docs/hammer_radar/live_readiness/R230_BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT.md
+- docs/hammer_radar/live_readiness/R229_BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION.md
+- docs/hammer_radar/live_readiness/R227_BETRAYAL_DIRECTION_COMPLETION.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_betrayal_gate_ready_lane_packet.py
+- tests/hammer_radar/test_capture_priority_rebalance.py
+- tests/hammer_radar/test_betrayal_upstream_emitter_entry_mode_contract.py
+- tests/hammer_radar/test_betrayal_entry_mode_source_propagation.py
+- tests/hammer_radar/test_betrayal_direction_completion.py
+- relevant strategy/promotion/performance tests
+
+REUSE / EXTEND:
+Reuse R234 betrayal gate-ready packet.
+Reuse R230 upstream contract fields.
+Reuse R229/R227 blocker extraction.
+Reuse existing normal lane score / outcome / promotion schemas.
+Do not duplicate parser logic if existing helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+NORMAL FLOW TARGET:
+The betrayal integration contract must define how betrayal rows enter the same normal flow:
+
+Canonical normalized signal-origin preview fields:
+- schema_version
+- signal_origin_family="betrayal"
+- signal_origin_type="inverse|aggregate|shadow"
+- signal_origin_variant
+- symbol
+- timeframe
+- direction
+- entry_mode
+- lane_key
+- signal_id
+- source_signal_id
+- source_identity
+- source_signal_timestamp
+- emitted_signal_id
+- betrayal_event_identity
+- betrayal_event_identity_hash
+- paper_signal_ready
+- paper_outcome_ready
+- ranking_ready
+- promotion_gate_ready
+- risk_contract_ready_later
+- live_ready_today=false
+- live_authorized=false
+- promotion_allowed=false
+- blockers
+
+SAME-FLOW READINESS RULES:
+A betrayal row is paper_signal_ready only if:
+- signal_origin_family="betrayal"
+- symbol exists
+- timeframe exists
+- direction exists
+- entry_mode exists and is registry-valid
+- lane_key exists
+- signal_id/source_signal_id exists
+- source identity exists
+- paper_only=true
+
+A betrayal row is paper_outcome_ready only if:
+- paper_signal_ready=true
+- paper outcome tracking identity exists
+- outcome window spec exists
+
+A betrayal row is ranking_ready only if:
+- paper outcomes exist or can be tracked
+- enough schema fields exist to join into ranking/performance
+
+A betrayal row is promotion_gate_ready only if:
+- ranking_ready=true
+- promotion blockers are explicit
+- live_authorized=false
+- promotion_allowed=false
+- no safety blocker hidden
+
+risk_contract_ready_later only if:
+- promotion_gate_ready=true
+- known risk contract requirements exist
+- no config is written by this phase
+
+live_ready_today is always false.
+
+BLOCKER CATEGORIES:
+- missing_entry_mode
+- missing_lane_key
+- missing_source_identity
+- missing_direction
+- missing_signal_id
+- missing_outcome_identity
+- true_inverse_outcomes_missing
+- contract_adoption_partial
+- promotion_gate_not_ready
+- risk_contract_missing
+- operator_approval_missing
+- global_live_gate_closed
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_signal_origin_integration_contract.py
+
+Expose:
+- build_betrayal_signal_origin_integration_contract
+- load_latest_betrayal_gate_ready_lane_packet
+- load_latest_capture_priority_rebalance
+- load_latest_betrayal_upstream_contract
+- load_latest_betrayal_entry_mode_source_propagation
+- load_latest_betrayal_direction_completion
+- load_existing_signal_origin_schema_context
+- build_betrayal_signal_origin_contract
+- normalize_betrayal_candidate_to_signal_origin_preview
+- build_betrayal_same_flow_readiness_rows
+- classify_betrayal_same_flow_readiness
+- build_betrayal_integration_gap_report
+- build_betrayal_promotion_path_requirements
+- build_betrayal_integration_recommendations
+- classify_betrayal_signal_origin_integration_status
+- append_betrayal_signal_origin_integration_contract_record
+- load_betrayal_signal_origin_integration_contract_records
+- summarize_betrayal_signal_origin_integration_contract_records
+
+STATUS ENUM:
+- BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_READY
+- BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_REJECTED
+- BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_RECORDED
+- BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_BLOCKED
+- BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_ERROR
+
+INTEGRATION STATUS ENUM:
+- BETRAYAL_SIGNAL_ORIGIN_CONTRACT_READY
+- BETRAYAL_SAME_FLOW_PARTIALLY_READY
+- BETRAYAL_SAME_FLOW_NEEDS_ENTRY_MODE
+- BETRAYAL_SAME_FLOW_NEEDS_OUTCOME_TRACKING
+- BETRAYAL_PROMOTION_PATH_KNOWN_BUT_BLOCKED
+- BETRAYAL_NOT_ENOUGH_DATA
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "contract_recorded": false,
+  "contract_id": null,
+  "record_contract_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "paper_only": true,
+    "live_authorized": false,
+    "betrayal_signal_origin_family": "betrayal",
+    "same_flow_target": true,
+    "official_tiny_live_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "official_tiny_live_lane_changed": false
+  },
+  "input_summary": {
+    "betrayal_gate_ready_packet_found": true/false,
+    "capture_priority_rebalance_found": true/false,
+    "betrayal_upstream_contract_found": true/false,
+    "betrayal_source_propagation_found": true/false,
+    "betrayal_direction_completion_found": true/false,
+    "normal_signal_schema_context_found": true/false
+  },
+  "betrayal_signal_origin_contract": {
+    "contract_name": "betrayal_signal_origin_contract_v1",
+    "signal_origin_family": "betrayal",
+    "allowed_signal_origin_types": ["inverse", "aggregate", "shadow"],
+    "required_fields_for_paper_signal": [...],
+    "required_fields_for_paper_outcome": [...],
+    "required_fields_for_ranking": [...],
+    "required_fields_for_promotion_gate": [...],
+    "live_ready_today": false
+  },
+  "same_flow_readiness_rows": [
+    {
+      "candidate": "...",
+      "signal_origin_family": "betrayal",
+      "signal_origin_type": "inverse|aggregate|shadow",
+      "signal_origin_variant": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction": "...",
+      "entry_mode": "...",
+      "lane_key": "...",
+      "signal_id": "...",
+      "source_signal_id": "...",
+      "source_identity": "...",
+      "paper_signal_ready": true/false,
+      "paper_outcome_ready": true/false,
+      "ranking_ready": true/false,
+      "promotion_gate_ready": true/false,
+      "risk_contract_ready_later": true/false,
+      "live_ready_today": false,
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "blockers": [...],
+      "why": "..."
+    }
+  ],
+  "same_flow_summary": {
+    "rows_reviewed": ...,
+    "paper_signal_ready_rows": ...,
+    "paper_outcome_ready_rows": ...,
+    "ranking_ready_rows": ...,
+    "promotion_gate_ready_rows": ...,
+    "risk_contract_ready_later_rows": ...,
+    "live_ready_today_rows": 0,
+    "blocked_rows": ...
+  },
+  "betrayal_integration_gap_report": {
+    "missing_entry_mode_rows": ...,
+    "missing_lane_key_rows": ...,
+    "missing_source_identity_rows": ...,
+    "missing_direction_rows": ...,
+    "missing_signal_id_rows": ...,
+    "missing_outcome_identity_rows": ...,
+    "true_inverse_outcomes_missing_rows": ...,
+    "contract_adoption_partial": true/false,
+    "hard_live_blockers": [...]
+  },
+  "betrayal_promotion_path_requirements": {
+    "can_enter_same_flow": true/false,
+    "promotion_path_known": true,
+    "promotion_path_blocked": true,
+    "requirements": [
+      "registry-valid entry_mode",
+      "lane_key",
+      "paper signal identity",
+      "paper outcome tracking",
+      "ranking/performance evidence",
+      "promotion gate",
+      "risk contract later",
+      "operator approval later",
+      "global live gate later"
+    ],
+    "live_ready_today": false
+  },
+  "betrayal_integration_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "ADOPT_SIGNAL_ORIGIN_CONTRACT|WIRE_BETRAYAL_OUTCOME_TRACKING|WAIT_FOR_10_OF_10|RUN_R228_IF_10_OF_10|...",
+      "future_phase": "R236|R228|...",
+      "why": "..."
+    }
+  ],
+  "integration_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|WAIT_FOR_10_OF_10|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- betrayal_same_flow_contract_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_signal_origin_integration_contract.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL SIGNAL ORIGIN INTEGRATION CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-signal-origin-integration-contract
+
+Args:
+- --record-contract
+- --confirm-betrayal-signal-origin-integration-contract <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract \
+  --record-contract \
+  --confirm-betrayal-signal-origin-integration-contract "I CONFIRM BETRAYAL SIGNAL ORIGIN INTEGRATION CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract \
+  --record-contract \
+  --confirm-betrayal-signal-origin-integration-contract "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_signal_origin_integration_contract.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records contract only
+- betrayal signal_origin_family is betrayal
+- allowed types include inverse, aggregate, shadow
+- same-flow readiness rows produced
+- paper_signal_ready requires entry_mode, lane_key, source identity, signal id
+- paper_outcome_ready requires paper_signal_ready and outcome identity
+- ranking_ready does not imply promotion
+- promotion_gate_ready does not imply live
+- live_ready_today always false
+- official tiny-live lane remains unchanged
+- missing entry_mode remains blocker
+- missing lane_key remains blocker
+- no betrayal promotion
+- no signal origin promotion
+- no lane promotion
+- no env/config mutation
+- no paper outcome ledger rewrite
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R234/R233/R232/R231/R230/R229/R227/promotion tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract \
+  | jq '.status, .target_scope, .input_summary, .betrayal_signal_origin_contract, .same_flow_readiness_rows[0:80], .same_flow_summary, .betrayal_integration_gap_report, .betrayal_promotion_path_requirements, .betrayal_integration_recommendations, .integration_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract \
+  --record-contract \
+  --confirm-betrayal-signal-origin-integration-contract "I CONFIRM BETRAYAL SIGNAL ORIGIN INTEGRATION CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .contract_recorded, .same_flow_summary, .betrayal_promotion_path_requirements, .integration_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-signal-origin-integration-contract \
+  --record-contract \
+  --confirm-betrayal-signal-origin-integration-contract "wrong" \
+  | jq '.status, .confirmation_valid, .contract_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R235_BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R235.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R236_BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE.md
+
+R236 should:
+- wire betrayal signal-origin preview rows into paper outcome tracking identity
+- no config writes
+- no live execution
+- no Binance/network calls
+- no promotion
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+FINAL REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- same_flow_summary
+- integration_status
+- tiny-live count
+- betrayal blockers
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
