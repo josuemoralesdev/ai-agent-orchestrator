@@ -32,6 +32,9 @@ from src.app.hammer_radar.operator.capture_threshold_recovery_8m_short import (
     recompute_8m_short_fresh_capture_count,
 )
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
+from src.app.hammer_radar.operator.fisherman_watchdog_ledger_reconciliation import (
+    load_fisherman_reconciliation_records,
+)
 from src.app.hammer_radar.operator.full_spectrum_harvester_expansion import (
     FULL_SPECTRUM_HARVEST_CAPTURED,
     FULL_SPECTRUM_HARVEST_EXITED,
@@ -356,6 +359,14 @@ def load_capture_count_sync_status(
         missing = f"missing:{path}"
         if missing not in warnings:
             warnings.append(missing)
+    reconciliation_records = load_fisherman_reconciliation_records(log_dir=resolved_log_dir, limit=1)
+    mismatch = _apply_r208b_reconciliation_to_mismatch(
+        mismatch=mismatch,
+        reconciliation_records=reconciliation_records,
+        recomputed_count=count,
+        warnings=warnings,
+    )
+    warnings = list(mismatch.get("ledger_path_warnings") or warnings)
     return {
         "latest_sync_found": bool(sync_records),
         "latest_sync_at": sync_records[0].get("generated_at") if sync_records else None,
@@ -365,6 +376,35 @@ def load_capture_count_sync_status(
         "ledger_path_warnings": warnings,
         "mismatch_report": {**dict(mismatch), "ledger_path_warnings": warnings, "mismatch_found": bool(mismatch.get("mismatch_found") or warnings)},
     }
+
+
+def _apply_r208b_reconciliation_to_mismatch(
+    *,
+    mismatch: Mapping[str, Any],
+    reconciliation_records: list[Mapping[str, Any]],
+    recomputed_count: Mapping[str, Any],
+    warnings: list[str],
+) -> dict[str, Any]:
+    report = dict(mismatch)
+    if not reconciliation_records:
+        return report
+    latest = reconciliation_records[0]
+    status = str(latest.get("reconciliation_status") or "")
+    reconciled = dict(latest.get("reconciled_capture_count") or {})
+    if not status.startswith("LEDGER_RECONCILED_"):
+        return report
+    if _int_value(reconciled.get("fresh_capture_count")) != _int_value(recomputed_count.get("fresh_capture_count")):
+        return report
+    if list(reconciled.get("unique_captured_signal_ids") or []) != list(recomputed_count.get("unique_captured_signal_ids") or []):
+        return report
+    if report.get("harvester_captures_not_counted") or report.get("lane_key_mismatches") or warnings:
+        return report
+    if report.get("counted_captures_not_in_harvester"):
+        report["counted_captures_not_in_harvester"] = []
+        report["r208b_reconciliation_applied"] = True
+        report["latest_r208b_reconciliation_id"] = latest.get("reconciliation_id")
+        report["mismatch_found"] = False
+    return report
 
 
 def load_betrayal_inverse_context(*, log_dir: str | Path | None = None) -> dict[str, Any]:

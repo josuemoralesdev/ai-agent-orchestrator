@@ -2543,6 +2543,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "fisherman-watchdog-ledger-reconciliation":
+        from src.app.hammer_radar.operator.fisherman_watchdog_ledger_reconciliation import (
+            build_fisherman_watchdog_ledger_reconciliation,
+            format_fisherman_watchdog_ledger_reconciliation_json,
+        )
+
+        print(
+            format_fisherman_watchdog_ledger_reconciliation_json(
+                build_fisherman_watchdog_ledger_reconciliation(
+                    log_dir=args.log_dir,
+                    record_reconciliation=args.record_reconciliation,
+                    confirm_fisherman_watchdog_ledger_reconciliation=(
+                        args.confirm_fisherman_watchdog_ledger_reconciliation
+                    ),
+                )
+            )
+        )
     elif args.command == "betrayal-integration-recheck":
         from src.app.hammer_radar.operator.betrayal_integration_recheck import (
             build_betrayal_integration_recheck,
@@ -4258,6 +4275,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     weekend_paper_fisherman_supervisor_parser.add_argument("--record-supervisor", action="store_true")
     weekend_paper_fisherman_supervisor_parser.add_argument("--confirm-weekend-fisherman-supervisor", default=None)
+
+    fisherman_watchdog_reconciliation_parser = subparsers.add_parser(
+        "fisherman-watchdog-ledger-reconciliation",
+        parents=[parent],
+    )
+    fisherman_watchdog_reconciliation_parser.add_argument("--record-reconciliation", action="store_true")
+    fisherman_watchdog_reconciliation_parser.add_argument("--confirm-fisherman-watchdog-ledger-reconciliation", default=None)
 
     betrayal_integration_recheck_parser = subparsers.add_parser(
         "betrayal-integration-recheck",
