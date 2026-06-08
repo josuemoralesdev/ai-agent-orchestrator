@@ -1,0 +1,592 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R236 Betrayal Paper Outcome Tracking Bridge
+
+BRANCH:
+r236-betrayal-paper-outcome-tracking-bridge
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R235 Betrayal Signal-Origin Integration Contract succeeded.
+
+Current R235 status:
+- status=BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT_READY
+- signal_origin_family=betrayal
+- same_flow_target=true
+- rows_reviewed=1658
+- paper_signal_ready_rows=33
+- paper_outcome_ready_rows=33
+- ranking_ready_rows=33
+- promotion_gate_ready_rows=33
+- risk_contract_ready_later_rows=33
+- live_ready_today_rows=0
+- blocked_rows=1658
+- integration_status=BETRAYAL_SAME_FLOW_NEEDS_ENTRY_MODE
+- recommended_next_operator_move=WAIT_FOR_10_OF_10
+- recommended_next_engineering_move=Build R236 betrayal paper outcome tracking bridge without config writes or live execution
+
+R235 means betrayal is no longer just shadow context.
+It is now a tagged signal-origin family:
+- signal_origin_family="betrayal"
+- allowed types: inverse, aggregate, shadow
+- some rows are already same-flow ready
+- many rows remain blocked by missing entry_mode/lane_key/source identity/outcome identity
+
+R236 must bridge betrayal-tagged same-flow preview rows into paper outcome tracking identity so betrayal can later be evaluated, ranked, and promoted through the normal machinery.
+
+The official tiny-live path remains separate:
+- BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=8
+- required_fresh_capture_count=10
+- threshold_met=false
+- watcher_likely_running=true
+- watcher_stale=false
+- recommended move=RUN_R158_AFTER_MORE_CAPTURES / WAIT_FOR_10_OF_10
+
+CORE INTENT:
+Betrayal should follow the same normal flow:
+source -> signal origin -> paper signal -> paper outcome tracking -> ranking -> promotion gate -> risk contract later -> live eligibility later.
+
+This phase only bridges betrayal to paper outcome tracking.
+It must not promote, live-authorize, write configs, call Binance, or place orders.
+
+PURPOSE:
+Create a paper-only betrayal paper outcome tracking bridge that:
+1. Reads latest R235 betrayal signal-origin integration contract.
+2. Reads latest R234 betrayal gate-ready lane packet.
+3. Reads existing paper outcome tracking schemas/helpers/ledgers.
+4. Identifies betrayal same-flow preview rows that are paper_signal_ready and paper_outcome_ready.
+5. Builds deterministic betrayal paper outcome tracking identities.
+6. Builds preview-only paper outcome tracking rows for betrayal.
+7. Separates rows into:
+   - BRIDGE_READY
+   - NEEDS_ENTRY_MODE
+   - NEEDS_LANE_KEY
+   - NEEDS_SIGNAL_ID
+   - NEEDS_SOURCE_IDENTITY
+   - NEEDS_OUTCOME_IDENTITY
+   - NEEDS_TRUE_INVERSE_OUTCOME
+   - BLOCKED
+8. Produces a bridge readiness report:
+   - bridge_ready_rows
+   - outcome_tracking_ready_rows
+   - ranking_feed_ready_rows
+   - promotion_gate_preview_rows
+   - blocked_rows
+9. Produces a future promotion-path report, but does not promote.
+10. Records only a bridge audit/preview ledger when confirmed.
+11. Does not mutate historical paper_outcomes.
+12. Does not append executable orders.
+13. Does not write configs.
+14. Does not call Binance/network.
+15. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is paper outcome tracking bridge preview only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- infer funding readiness
+- infer live readiness
+- rewrite historical paper_outcomes
+- rewrite historical ledgers
+- fabricate entry_mode
+- fabricate lane_key
+- change official tiny-live lane
+- mutate fisherman/scheduler configs
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not promote betrayal.
+- Do not rewrite paper_outcomes.
+- Do not infer tiny-live readiness from betrayal bridge readiness.
+- Do not infer live readiness from paper outcome bridge.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_signal_origin_integration_contract.py
+- src/app/hammer_radar/operator/betrayal_gate_ready_lane_packet.py
+- src/app/hammer_radar/operator/betrayal_upstream_emitter_entry_mode_contract.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/full_spectrum_lane_scoreboard.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/paper_outcome* files if present
+- src/app/hammer_radar/operator/outcome* files if present
+- src/app/hammer_radar/operator/inspect.py
+
+Inspect ledgers:
+- logs/hammer_radar_forward/betrayal_signal_origin_integration_contract.ndjson
+- logs/hammer_radar_forward/betrayal_gate_ready_lane_packet.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/paper_outcomes.ndjson
+- logs/hammer_radar_forward/outcomes.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R235_BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT.md
+- docs/hammer_radar/live_readiness/R234_BETRAYAL_GATE_READY_LANE_PACKET.md
+- docs/hammer_radar/live_readiness/R233_CAPTURE_PRIORITY_REBALANCE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_betrayal_signal_origin_integration_contract.py
+- tests/hammer_radar/test_betrayal_gate_ready_lane_packet.py
+- tests/hammer_radar/test_lane_outcome_enrichment.py
+- relevant paper outcome / strategy performance / promotion tests
+
+REUSE / EXTEND:
+Reuse R235 same-flow rows and contract output.
+Reuse any existing paper outcome identity logic.
+Reuse existing outcome window conventions.
+Do not duplicate ledger parsing where existing helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+BRIDGE RULES:
+A betrayal row is bridge_ready only if:
+- signal_origin_family="betrayal"
+- paper_signal_ready=true
+- paper_outcome_ready=true
+- symbol exists
+- timeframe exists
+- direction exists
+- entry_mode exists and is registry-valid
+- lane_key exists
+- signal_id exists
+- source_signal_id exists
+- source_identity exists
+- paper_outcome_tracking_identity exists
+- outcome_window_spec exists
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+
+A betrayal paper outcome bridge row must include:
+- schema_version="betrayal_paper_outcome_bridge_preview_v1"
+- bridge_id
+- signal_origin_family="betrayal"
+- signal_origin_type
+- signal_origin_variant
+- symbol
+- timeframe
+- direction
+- entry_mode
+- lane_key
+- signal_id
+- source_signal_id
+- source_identity
+- paper_outcome_tracking_identity
+- outcome_window_spec
+- outcome_tracking_ready
+- ranking_feed_ready
+- promotion_gate_preview
+- true_inverse_outcome_required
+- live_ready_today=false
+- live_authorized=false
+- promotion_allowed=false
+- blockers
+
+Do not write into paper_outcomes.ndjson.
+Write only to the R236 bridge audit ledger when confirmed.
+
+BRIDGE STATUS CATEGORIES:
+- BRIDGE_READY
+- OUTCOME_TRACKING_READY
+- RANKING_FEED_READY
+- PROMOTION_GATE_PREVIEW_READY
+- NEEDS_ENTRY_MODE
+- NEEDS_LANE_KEY
+- NEEDS_SIGNAL_ID
+- NEEDS_SOURCE_IDENTITY
+- NEEDS_OUTCOME_IDENTITY
+- NEEDS_TRUE_INVERSE_OUTCOME
+- BLOCKED
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_paper_outcome_tracking_bridge.py
+
+Expose:
+- build_betrayal_paper_outcome_tracking_bridge
+- load_latest_betrayal_signal_origin_integration_contract
+- load_latest_betrayal_gate_ready_lane_packet
+- load_existing_paper_outcome_schema_context
+- build_betrayal_paper_outcome_bridge_id
+- build_betrayal_paper_outcome_tracking_identity
+- normalize_betrayal_same_flow_row_for_outcome_bridge
+- classify_betrayal_outcome_bridge_status
+- build_betrayal_outcome_bridge_preview_rows
+- build_betrayal_outcome_bridge_summary
+- build_betrayal_outcome_bridge_gap_report
+- build_betrayal_outcome_bridge_promotion_path
+- build_betrayal_outcome_bridge_recommendations
+- classify_betrayal_paper_outcome_bridge_overall_status
+- append_betrayal_paper_outcome_tracking_bridge_record
+- load_betrayal_paper_outcome_tracking_bridge_records
+- summarize_betrayal_paper_outcome_tracking_bridge_records
+
+STATUS ENUM:
+- BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE_READY
+- BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE_REJECTED
+- BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE_RECORDED
+- BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE_BLOCKED
+- BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE_ERROR
+
+BRIDGE OVERALL STATUS ENUM:
+- BETRAYAL_OUTCOME_BRIDGE_READY
+- BETRAYAL_OUTCOME_BRIDGE_PARTIALLY_READY
+- BETRAYAL_OUTCOME_BRIDGE_NEEDS_ENTRY_MODE
+- BETRAYAL_OUTCOME_BRIDGE_NEEDS_TRUE_INVERSE_OUTCOMES
+- BETRAYAL_OUTCOME_BRIDGE_PROMOTION_PATH_KNOWN_BUT_BLOCKED
+- BETRAYAL_OUTCOME_BRIDGE_NOT_ENOUGH_DATA
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "bridge_recorded": false,
+  "bridge_record_id": null,
+  "record_bridge_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "paper_only": true,
+    "live_authorized": false,
+    "betrayal_signal_origin_family": "betrayal",
+    "paper_outcome_bridge_preview_only": true,
+    "official_tiny_live_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "official_tiny_live_lane_changed": false
+  },
+  "input_summary": {
+    "betrayal_signal_origin_contract_found": true/false,
+    "betrayal_gate_ready_packet_found": true/false,
+    "paper_outcome_schema_context_found": true/false,
+    "tiny_live_capture_sync_found": true/false
+  },
+  "official_tiny_live_status": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "threshold_distance_remaining": ...,
+    "recommended_action": "WAIT_FOR_10_OF_10|RUN_R228_IF_10_OF_10"
+  },
+  "bridge_preview_rows": [
+    {
+      "bridge_id": "...",
+      "bridge_status": "BRIDGE_READY|...",
+      "signal_origin_family": "betrayal",
+      "signal_origin_type": "inverse|aggregate|shadow",
+      "signal_origin_variant": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction": "...",
+      "entry_mode": "...",
+      "lane_key": "...",
+      "signal_id": "...",
+      "source_signal_id": "...",
+      "source_identity": "...",
+      "paper_outcome_tracking_identity": "...",
+      "outcome_window_spec": [...],
+      "outcome_tracking_ready": true/false,
+      "ranking_feed_ready": true/false,
+      "promotion_gate_preview": true/false,
+      "true_inverse_outcome_required": true,
+      "live_ready_today": false,
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "blockers": [...],
+      "why": "..."
+    }
+  ],
+  "bridge_summary": {
+    "rows_reviewed": ...,
+    "bridge_ready_rows": ...,
+    "outcome_tracking_ready_rows": ...,
+    "ranking_feed_ready_rows": ...,
+    "promotion_gate_preview_rows": ...,
+    "live_ready_today_rows": 0,
+    "blocked_rows": ...
+  },
+  "bridge_gap_report": {
+    "missing_entry_mode_rows": ...,
+    "missing_lane_key_rows": ...,
+    "missing_signal_id_rows": ...,
+    "missing_source_identity_rows": ...,
+    "missing_outcome_identity_rows": ...,
+    "needs_true_inverse_outcome_rows": ...,
+    "hard_live_blockers": [...]
+  },
+  "bridge_promotion_path": {
+    "can_feed_paper_outcome_tracking": true/false,
+    "can_feed_ranking_later": true/false,
+    "promotion_path_known": true,
+    "promotion_path_blocked": true,
+    "risk_contract_ready_later_rows": ...,
+    "live_ready_today": false,
+    "requirements_remaining": [...]
+  },
+  "bridge_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "COLLECT_TRUE_INVERSE_OUTCOMES|ADOPT_BETRAYAL_OUTCOME_BRIDGE|WAIT_FOR_10_OF_10|RUN_R228_IF_10_OF_10|...",
+      "future_phase": "R237|R228|...",
+      "why": "..."
+    }
+  ],
+  "bridge_overall_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|WAIT_FOR_10_OF_10|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- paper_outcomes_appended=false
+- bridge_preview_ledger_only=true
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- betrayal_outcome_bridge_preview_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_paper_outcome_tracking_bridge.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL PAPER OUTCOME TRACKING BRIDGE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-paper-outcome-tracking-bridge
+
+Args:
+- --record-bridge
+- --confirm-betrayal-paper-outcome-tracking-bridge <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge \
+  --record-bridge \
+  --confirm-betrayal-paper-outcome-tracking-bridge "I CONFIRM BETRAYAL PAPER OUTCOME TRACKING BRIDGE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge \
+  --record-bridge \
+  --confirm-betrayal-paper-outcome-tracking-bridge "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_paper_outcome_tracking_bridge.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records bridge preview only
+- bridge reads R235 same-flow rows
+- bridge_ready requires paper_signal_ready and paper_outcome_ready
+- outcome_tracking_ready requires paper_outcome_tracking_identity and outcome_window_spec
+- ranking_feed_ready does not imply promotion
+- promotion_gate_preview does not imply live
+- paper_outcomes.ndjson is not rewritten
+- paper_outcomes are not appended
+- bridge preview ledger only
+- live_ready_today always false
+- official tiny-live lane remains unchanged
+- no betrayal promotion
+- no signal origin promotion
+- no lane promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R235/R234/R233/R232/R231/paper-outcome tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge \
+  | jq '.status, .target_scope, .input_summary, .official_tiny_live_status, .bridge_preview_rows[0:80], .bridge_summary, .bridge_gap_report, .bridge_promotion_path, .bridge_recommendations, .bridge_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge \
+  --record-bridge \
+  --confirm-betrayal-paper-outcome-tracking-bridge "I CONFIRM BETRAYAL PAPER OUTCOME TRACKING BRIDGE RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .bridge_recorded, .bridge_summary, .bridge_promotion_path, .bridge_overall_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-paper-outcome-tracking-bridge \
+  --record-bridge \
+  --confirm-betrayal-paper-outcome-tracking-bridge "wrong" \
+  | jq '.status, .confirmation_valid, .bridge_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- bridge_summary
+- bridge_overall_status
+- tiny-live count
+- bridge blockers
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R236_BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R236.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R237_BETRAYAL_TRUE_INVERSE_OUTCOME_CAPTURE_BRIDGE.md
+
+R237 should:
+- capture/bridge true inverse outcomes for betrayal-tagged paper outcome identities
+- no config writes
+- no live execution
+- no Binance/network calls
+- no promotion
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
