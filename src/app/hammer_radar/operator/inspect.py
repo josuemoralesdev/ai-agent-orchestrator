@@ -2878,6 +2878,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-gate-ready-lane-packet":
+        from src.app.hammer_radar.operator.betrayal_gate_ready_lane_packet import (
+            build_betrayal_gate_ready_lane_packet,
+            format_betrayal_gate_ready_lane_packet_json,
+        )
+
+        print(
+            format_betrayal_gate_ready_lane_packet_json(
+                build_betrayal_gate_ready_lane_packet(
+                    log_dir=args.log_dir,
+                    record_packet=args.record_packet,
+                    confirm_betrayal_gate_ready_lane_packet=args.confirm_betrayal_gate_ready_lane_packet,
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4543,6 +4558,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_upstream_emitter_entry_mode_contract_parser.add_argument("--record-contract", action="store_true")
     betrayal_upstream_emitter_entry_mode_contract_parser.add_argument(
         "--confirm-betrayal-upstream-emitter-entry-mode-contract",
+        default=None,
+    )
+
+    betrayal_gate_ready_lane_packet_parser = subparsers.add_parser(
+        "betrayal-gate-ready-lane-packet",
+        parents=[parent],
+    )
+    betrayal_gate_ready_lane_packet_parser.add_argument("--record-packet", action="store_true")
+    betrayal_gate_ready_lane_packet_parser.add_argument(
+        "--confirm-betrayal-gate-ready-lane-packet",
         default=None,
     )
 

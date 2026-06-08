@@ -1,0 +1,620 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R234 Betrayal Gate-Ready Lane Packet
+
+BRANCH:
+r234-betrayal-gate-ready-lane-packet
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+The user clarified the intended direction:
+
+Betrayal should NOT be closed as passive context.
+Betrayal should be prepared until any betrayal lane that can be prepared is:
+- active in paper/shadow
+- mapped as a candidate lane
+- carrying requirements
+- blocked only by explicit gates
+- ready to open quickly once global tiny-live/live prerequisites allow it
+- never live-authorized early
+- never promoted by assumption
+
+Current operating context from R233:
+- Official protected tiny-live path remains BTCUSDT|8m|short|ladder_close_50_618
+- Official path remains 8/10
+- Required fresh captures: 10
+- Threshold met: false
+- Watcher likely running: true
+- Watcher stale: false
+- Fisherman running recent
+- Official lane action: KEEP_AS_OFFICIAL_AND_WAIT_FOR_10_OF_10
+- 8m long is near-threshold alternate at 6/10
+- Betrayal shadow is preserved
+- Betrayal is paper-only / shadow-only today
+- Betrayal is not live-authorized
+- Betrayal is not promoted
+- R233 recommended preserving betrayal shadow context
+
+Betrayal context preserved by R233:
+- BTCUSDT|222m|long|ladder_close_50_618
+  - source: weekend supervisor
+  - candidate: 222m aggregate
+  - win_rate_pct: 87.5
+  - paper-only context
+- BTCUSDT|88m|inverse|entry_unknown
+  - source: weekend supervisor
+  - candidate: 88m aggregate
+  - win_rate_pct: 63.33
+  - paper-only context
+- Active shadow rows across:
+  - 4m long/short
+  - 8m long/short
+  - 13m long/short
+  - 22m long
+  - 44m long
+  - 55m long/short
+  - 222m short
+- Many active shadow rows still have entry_unknown
+
+Prior betrayal phases showed:
+- R215 direction split resolver still had resolver-ready rows = 0
+- R216/R217 showed aggregate/source decomposition required entry_mode
+- R218 created registry/source identity manifest
+- R229 showed source propagation could not rescue most historical rows:
+  - missing_entry_mode_rows remained high
+  - missing_lane_key rows remained high
+  - resolver_ready_preview_rows remained 0
+- R230 created upstream emitter entry_mode contract:
+  - contract exists
+  - only partially adopted
+  - future rows can be improved but not all surfaces are complete
+- R233 kept betrayal preserved in paper priority map
+
+R234 must convert betrayal from vague shadow context into a gate-ready lane packet:
+- not live
+- not promoted
+- not closed
+- active as a prepared paper/shadow lane family
+- with every missing requirement explicitly listed
+- with precise next actions required to make betrayal auto-open later when global live gates allow
+
+CORE INTENT:
+Finish as much betrayal preparation as possible now, so that once the system reaches live/tiny-live readiness, betrayal lanes can be opened quickly through normal gates instead of needing fresh archaeology.
+
+This phase should make betrayal:
+- ACTIVE_SHADOW
+- GATE_PREPARED
+- REQUIREMENTS_KNOWN
+- LIVE_BLOCKED_BY_EXPLICIT_GATES
+not CLOSED_FOR_NOW.
+
+PURPOSE:
+Create a paper-only betrayal gate-ready lane packet that:
+1. Reads latest R233 capture priority rebalance.
+2. Reads latest R230 upstream emitter entry mode contract.
+3. Reads latest R229 entry mode source propagation.
+4. Reads latest R227 direction completion.
+5. Reads latest R225/R226 entry mode evidence/renormalization.
+6. Reads latest betrayal shadow outcomes.
+7. Reads latest weekend fisherman supervisor betrayal summaries.
+8. Builds a betrayal candidate lane registry packet.
+9. Classifies every betrayal candidate into:
+   - GATE_READY_SHADOW
+   - GATE_PREPARED_NEEDS_ENTRY_MODE
+   - GATE_PREPARED_NEEDS_LANE_KEY
+   - GATE_PREPARED_NEEDS_TRUE_INVERSE_OUTCOMES
+   - GATE_PREPARED_NEEDS_CONTRACT_ADOPTION
+   - RESEARCH_ONLY
+10. Defines live-opening requirements per lane.
+11. Defines what must be true before betrayal can be automatically opened by normal lane/live machinery.
+12. Produces a betrayal activation requirements checklist.
+13. Produces a backlog-free or minimal-backlog plan.
+14. Keeps official tiny-live lane unchanged.
+15. Keeps betrayal non-live today.
+16. Does not write configs.
+17. Does not call Binance/network.
+18. Does not place orders.
+19. Does not promote betrayal.
+20. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is gate-readiness preparation only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- infer funding readiness
+- infer live readiness
+- treat betrayal win rate as live eligibility
+- treat shadow/inverse context as approval
+- rewrite historical ledgers
+- append normalized source rows
+- fabricate entry_mode
+- fabricate lane_key
+- change official tiny-live lane
+- mutate fisherman/scheduler configs
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not promote betrayal.
+- Do not infer tiny-live readiness from betrayal.
+- Do not infer live readiness from betrayal.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/capture_priority_rebalance.py
+- src/app/hammer_radar/operator/betrayal_upstream_emitter_entry_mode_contract.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/betrayal_renormalize_with_entry_mode.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+- src/app/hammer_radar/operator/betrayal_source_identity_evidence_collector.py
+- src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/fisherman_watchdog_ledger_reconciliation.py
+- src/app/hammer_radar/operator/full_spectrum_lane_scoreboard.py
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/betrayal_upstream_emitter_entry_mode_contract.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_source_propagation.ndjson
+- logs/hammer_radar_forward/betrayal_direction_completion.ndjson
+- logs/hammer_radar_forward/betrayal_renormalize_with_entry_mode.ndjson
+- logs/hammer_radar_forward/betrayal_entry_mode_evidence_wiring.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_evidence_collector.ndjson
+- logs/hammer_radar_forward/betrayal_source_identity_normalizer.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_shadow_resolutions.ndjson
+- logs/hammer_radar_forward/betrayal_true_paper_outcomes.ndjson
+- logs/hammer_radar_forward/betrayal_paper_signals.ndjson
+- logs/hammer_radar_forward/weekend_paper_fisherman_supervisor.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R233_CAPTURE_PRIORITY_REBALANCE.md
+- docs/hammer_radar/live_readiness/R230_BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT.md
+- docs/hammer_radar/live_readiness/R229_BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION.md
+- docs/hammer_radar/live_readiness/R227_BETRAYAL_DIRECTION_COMPLETION.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- tests/hammer_radar/test_capture_priority_rebalance.py
+- tests/hammer_radar/test_betrayal_upstream_emitter_entry_mode_contract.py
+- tests/hammer_radar/test_betrayal_entry_mode_source_propagation.py
+- tests/hammer_radar/test_betrayal_direction_completion.py
+- tests/hammer_radar/test_lane_outcome_enrichment.py
+- tests/hammer_radar/test_full_spectrum_lane_scoreboard.py
+
+REUSE / EXTEND:
+Reuse R233 betrayal shadow context.
+Reuse R230 upstream contract summary.
+Reuse R229/R227 blocker summaries.
+Reuse existing betrayal helper readers if present.
+Do not duplicate ledger parsing where helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+GATE-READY DEFINITIONS:
+A betrayal lane can be considered GATE_READY_SHADOW only if:
+- it has candidate lane identity
+- symbol exists
+- timeframe exists
+- direction or inverse direction exists
+- paper/shadow evidence exists
+- live_authorized=false
+- promotion_allowed=false
+- required blockers are explicit
+
+A betrayal lane can be considered LIVE_GATE_PREPARED only if:
+- entry_mode exists and is registry-valid
+- lane_key exists
+- source identity exists
+- direction/inverse direction exists
+- true inverse or paper outcome evidence exists
+- risk contract requirements are listed
+- operator approval requirement is listed
+- global live/tiny-live gates requirement is listed
+
+A betrayal lane must NOT be considered live-ready unless:
+- global live execution gates are open
+- operator approval exists
+- risk contract exists
+- funding exists
+- true inverse/paper outcomes meet threshold
+- lane mode is explicitly enabled by future safe workflow
+- all safety gates pass
+
+This phase should never return live-ready=true.
+
+CANDIDATE CATEGORIES:
+- 222m aggregate / inverse betrayal
+- 88m inverse betrayal
+- active shadow rows from betrayal_shadow_outcomes
+- future-contract lanes from R230
+- unknown-entry shadow rows requiring entry_mode contract
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_gate_ready_lane_packet.py
+
+Expose:
+- build_betrayal_gate_ready_lane_packet
+- load_latest_capture_priority_rebalance
+- load_latest_betrayal_upstream_contract
+- load_latest_betrayal_entry_mode_source_propagation
+- load_latest_betrayal_direction_completion
+- load_latest_betrayal_shadow_outcomes
+- load_latest_weekend_fisherman_supervisor
+- load_latest_tiny_live_capture_count_sync
+- build_betrayal_candidate_lane_registry
+- classify_betrayal_gate_preparation_status
+- build_betrayal_lane_requirements
+- build_betrayal_activation_gate_checklist
+- build_betrayal_auto_open_readiness_packet
+- build_betrayal_remaining_work_plan
+- build_betrayal_focus_alignment_plan
+- build_betrayal_gate_ready_recommendations
+- classify_betrayal_gate_ready_packet_status
+- append_betrayal_gate_ready_lane_packet_record
+- load_betrayal_gate_ready_lane_packet_records
+- summarize_betrayal_gate_ready_lane_packet_records
+
+STATUS ENUM:
+- BETRAYAL_GATE_READY_LANE_PACKET_READY
+- BETRAYAL_GATE_READY_LANE_PACKET_REJECTED
+- BETRAYAL_GATE_READY_LANE_PACKET_RECORDED
+- BETRAYAL_GATE_READY_LANE_PACKET_BLOCKED
+- BETRAYAL_GATE_READY_LANE_PACKET_ERROR
+
+GATE PACKET STATUS ENUM:
+- BETRAYAL_SHADOW_GATE_PREPARED
+- BETRAYAL_ACTIVE_SHADOW_NEEDS_ENTRY_MODE
+- BETRAYAL_ACTIVE_SHADOW_NEEDS_CONTRACT_ADOPTION
+- BETRAYAL_WAITING_FOR_TRUE_INVERSE_OUTCOMES
+- BETRAYAL_WAITING_FOR_GLOBAL_10_OF_10
+- BETRAYAL_NOT_ENOUGH_DATA
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "packet_recorded": false,
+  "packet_id": null,
+  "record_packet_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "paper_only": true,
+    "live_authorized": false,
+    "betrayal_shadow_active": true,
+    "betrayal_gate_prepared": true,
+    "official_tiny_live_lane": "BTCUSDT|8m|short|ladder_close_50_618",
+    "official_tiny_live_lane_changed": false
+  },
+  "input_summary": {
+    "capture_priority_rebalance_found": true/false,
+    "betrayal_upstream_contract_found": true/false,
+    "betrayal_source_propagation_found": true/false,
+    "betrayal_direction_completion_found": true/false,
+    "betrayal_shadow_outcomes_found": true/false,
+    "weekend_fisherman_supervisor_found": true/false,
+    "tiny_live_capture_sync_found": true/false
+  },
+  "official_tiny_live_status": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "threshold_distance_remaining": ...,
+    "recommended_action": "WAIT_FOR_10_OF_10|RUN_R228_IF_10_OF_10"
+  },
+  "betrayal_candidate_lane_registry": [
+    {
+      "lane_key": "...",
+      "candidate": "...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction": "long|short|inverse|unknown",
+      "entry_mode": "...",
+      "source": "...",
+      "win_rate_pct": null,
+      "known_outcome_count": null,
+      "paper_signal_count": null,
+      "shadow_status": "ACTIVE_SHADOW|RESEARCH_ONLY|BLOCKED",
+      "gate_preparation_status": "GATE_READY_SHADOW|NEEDS_ENTRY_MODE|NEEDS_LANE_KEY|NEEDS_TRUE_INVERSE_OUTCOMES|NEEDS_CONTRACT_ADOPTION|RESEARCH_ONLY",
+      "live_authorized": false,
+      "promotion_allowed": false,
+      "why": "..."
+    }
+  ],
+  "betrayal_activation_gate_checklist": {
+    "global_requirements": [
+      "official protected tiny-live path reaches 10/10 or future approved lane threshold reaches 10/10",
+      "risk contract exists",
+      "operator approval exists",
+      "live execution enabled by explicit future workflow",
+      "kill switch policy satisfied",
+      "paper/live separation verified"
+    ],
+    "betrayal_specific_requirements": [
+      "entry_mode registry-valid for candidate lane",
+      "lane_key exists",
+      "source identity exists",
+      "direction/inverse direction complete",
+      "true inverse/paper outcomes meet threshold",
+      "future source emitter contract adopted for candidate source"
+    ],
+    "all_requirements_known": true/false,
+    "live_ready_today": false
+  },
+  "betrayal_auto_open_readiness_packet": {
+    "can_auto_open_today": false,
+    "can_wait_at_gate": true/false,
+    "auto_open_when": [
+      "global live gates open",
+      "candidate betrayal lane requirements pass",
+      "operator lane switch allows betrayal family",
+      "risk contract exists",
+      "no safety blocker active"
+    ],
+    "blocked_by": [...]
+  },
+  "betrayal_remaining_work_plan": {
+    "must_do_before_live_gate": [...],
+    "can_wait_until_after_10_of_10": [...],
+    "not_needed_now": [...],
+    "minimal_next_engineering_step": "..."
+  },
+  "focus_alignment_plan": {
+    "primary_focus": "WAIT_FOR_OFFICIAL_8M_SHORT_10_OF_10",
+    "secondary_watch": "8M_LONG_NEAR_THRESHOLD",
+    "betrayal_watch": "ACTIVE_GATE_PREPARED_SHADOW",
+    "next_if_10_of_10": "R228_TINY_LIVE_10_OF_10_READY_PACKET",
+    "next_if_still_8_of_10": "KEEP_FISHERMAN_RUNNING_OR_LIGHTWEIGHT_STATUS_CHECK"
+  },
+  "betrayal_gate_ready_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "KEEP_BETRAYAL_AT_GATE|WAIT_FOR_10_OF_10|RUN_R228_IF_10_OF_10|ADOPT_CONTRACT_FOR_BETRAYAL_SURFACES|...",
+      "future_phase": "R228|R235|NONE|...",
+      "why": "..."
+    }
+  ],
+  "gate_packet_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET|WAIT_FOR_10_OF_10",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- betrayal_gate_prepared_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_gate_ready_lane_packet.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL GATE READY LANE PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-gate-ready-lane-packet
+
+Args:
+- --record-packet
+- --confirm-betrayal-gate-ready-lane-packet <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet \
+  --record-packet \
+  --confirm-betrayal-gate-ready-lane-packet "I CONFIRM BETRAYAL GATE READY LANE PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet \
+  --record-packet \
+  --confirm-betrayal-gate-ready-lane-packet "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_gate_ready_lane_packet.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records packet only
+- betrayal context is active, not closed
+- gate-ready packet is produced
+- gate-ready does not imply live readiness
+- official tiny-live lane remains unchanged
+- R228 is recommended only if 10/10 threshold is met
+- if threshold remains below 10, recommended move is keep fisherman/wait
+- 222m and 88m betrayal context are preserved when present
+- missing entry_mode/lane_key remain blockers
+- auto_open readiness packet says can_auto_open_today=false
+- can_wait_at_gate can be true when requirements are known
+- normalized append is false
+- no betrayal promotion
+- no lane promotion
+- no fisherman config mutation
+- no scheduler config mutation
+- no env/config mutation
+- no paper outcome ledger rewrite
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R233/R232/R231/R230/R229/R227/fisherman tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet \
+  | jq '.status, .target_scope, .input_summary, .official_tiny_live_status, .betrayal_candidate_lane_registry, .betrayal_activation_gate_checklist, .betrayal_auto_open_readiness_packet, .betrayal_remaining_work_plan, .focus_alignment_plan, .betrayal_gate_ready_recommendations, .gate_packet_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet \
+  --record-packet \
+  --confirm-betrayal-gate-ready-lane-packet "I CONFIRM BETRAYAL GATE READY LANE PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .packet_recorded, .official_tiny_live_status, .betrayal_auto_open_readiness_packet, .focus_alignment_plan, .gate_packet_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-gate-ready-lane-packet \
+  --record-packet \
+  --confirm-betrayal-gate-ready-lane-packet "wrong" \
+  | jq '.status, .confirmation_valid, .packet_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R234_BETRAYAL_GATE_READY_LANE_PACKET.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R234.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R235_LIGHTWEIGHT_TINY_LIVE_WAIT_STATUS.md
+
+R235 should:
+- be a lightweight status-only phase
+- check official 8m short 10/10 threshold
+- check 8m long near-threshold status
+- check fisherman alive
+- check betrayal gate-ready packet status
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+REPORT:
+Files changed, tests, smoke, safety, betrayal gate packet, official tiny-live status, focus alignment plan, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
