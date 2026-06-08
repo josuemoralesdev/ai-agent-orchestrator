@@ -2816,6 +2816,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-upstream-emitter-entry-mode-contract":
+        from src.app.hammer_radar.operator.betrayal_upstream_emitter_entry_mode_contract import (
+            build_betrayal_upstream_emitter_entry_mode_contract,
+            format_betrayal_upstream_emitter_entry_mode_contract_json,
+        )
+
+        print(
+            format_betrayal_upstream_emitter_entry_mode_contract_json(
+                build_betrayal_upstream_emitter_entry_mode_contract(
+                    log_dir=args.log_dir,
+                    record_contract=args.record_contract,
+                    confirm_betrayal_upstream_emitter_entry_mode_contract=(
+                        args.confirm_betrayal_upstream_emitter_entry_mode_contract
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4450,6 +4467,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_entry_mode_source_propagation_parser.add_argument("--record-propagation", action="store_true")
     betrayal_entry_mode_source_propagation_parser.add_argument(
         "--confirm-betrayal-entry-mode-source-propagation",
+        default=None,
+    )
+
+    betrayal_upstream_emitter_entry_mode_contract_parser = subparsers.add_parser(
+        "betrayal-upstream-emitter-entry-mode-contract",
+        parents=[parent],
+    )
+    betrayal_upstream_emitter_entry_mode_contract_parser.add_argument("--record-contract", action="store_true")
+    betrayal_upstream_emitter_entry_mode_contract_parser.add_argument(
+        "--confirm-betrayal-upstream-emitter-entry-mode-contract",
         default=None,
     )
 

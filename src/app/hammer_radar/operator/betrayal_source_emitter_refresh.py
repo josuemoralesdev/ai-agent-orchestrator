@@ -18,6 +18,9 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.betrayal_event_tracker import build_betrayal_event_identity
+from src.app.hammer_radar.operator.betrayal_upstream_emitter_entry_mode_contract import (
+    CONTRACT_NAME as UPSTREAM_ENTRY_MODE_CONTRACT_NAME,
+)
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
 from src.app.hammer_radar.operator.registry_wiring_betrayal_source_family import (
@@ -363,6 +366,8 @@ def build_refreshed_betrayal_source_contract(*, registry_candidate_view: Mapping
             "lane direction alone is not enough unless source explicitly marks original/inverse direction.",
             "aggregate candidates must be decomposed before direction-specific rows can emit.",
         ],
+        "upstream_entry_mode_contract_helper": UPSTREAM_ENTRY_MODE_CONTRACT_NAME,
+        "future_rows_must_use_registry_contract_helper": True,
     }
 
 

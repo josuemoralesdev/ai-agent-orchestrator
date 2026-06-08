@@ -1,0 +1,520 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R230 Betrayal Upstream Emitter Entry Mode Contract
+
+BRANCH:
+r230-betrayal-upstream-emitter-entry-mode-contract
+
+PHASE CLASSIFICATION:
+Primary: WIRING / INTEGRATION
+Secondary: EXTENSION OF EXISTING CAPABILITY, DIAGNOSTIC / AUDIT
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+Tiny-live remains the north star, but BTCUSDT 8m short is still 8/10 and threshold is not met.
+
+Current tiny-live state:
+- BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=8
+- required_fresh_capture_count=10
+- threshold_met=false
+- watcher_likely_running=true
+- watcher_stale=false
+- fisherman_status=FISHERMAN_RUNNING_RECENT
+- ledger_mismatch_found=false
+- funding must wait
+- risk contract readiness must wait
+
+While waiting for 10/10, betrayal/reversal evidence remains priority.
+
+R229 Betrayal Entry Mode Source Propagation showed:
+- resolver_ready_preview_rows=0
+- rows_reviewed=1619
+- rows_with_entry_mode_before=35
+- rows_with_entry_mode_after=35
+- rows_with_lane_key_preview=34
+- rows_with_emitted_signal_id_preview=1612
+- missing_entry_mode_rows=1584
+- missing_lane_key_rows=1585
+- source_propagation_status=ENTRY_MODE_SOURCE_PROPAGATION_PARTIAL_PREVIEWS_AVAILABLE
+
+R229 proved:
+- downstream propagation cannot rescue most historical rows
+- entry_mode was not emitted upstream
+- lane_key cannot be built without registry-valid entry_mode
+- R224 append must remain blocked
+
+R230 must fix the upstream emitter/capture contract so future betrayal rows carry entry_mode and lane_key at creation time.
+
+PURPOSE:
+Create a paper-only upstream emitter contract and wiring layer that:
+1. Reads R229 source propagation output.
+2. Reads R218 strategy evidence registry.
+3. Identifies betrayal source/capture/emitter surfaces where future rows are born.
+4. Adds registry-backed helper functions for future betrayal rows to include:
+   - entry_mode
+   - lane_key
+   - source_signal_id
+   - source_signal_timestamp
+   - source_family
+   - original_direction
+   - inverse_direction
+   - emitted_direction
+5. Wires safe future-only contract usage into betrayal emitter surfaces where low-risk.
+6. Does not rewrite historical ledgers.
+7. Does not append normalized rows.
+8. Produces a contract readiness report showing which future surfaces can emit complete fields.
+9. Produces a compatibility report for existing rows versus future rows.
+10. Does not write configs.
+11. Does not call Binance/network.
+12. Does not place orders.
+13. Does not promote betrayal.
+14. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is future emitter contract wiring only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane config
+- set any lane tiny_live
+- write risk contract config
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote betrayal
+- promote signal origins
+- promote lanes
+- create live permission
+- fabricate historical entry_mode
+- rewrite historical ledgers
+- append normalized source rows
+- count future contract readiness as resolver-ready historical rows
+- infer tiny-live readiness
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate existing live/risk/lane configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not edit AGENTS.md.
+- Do not promote betrayal.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from emitter contract wiring.
+- Do not infer live readiness from emitter contract wiring.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/betrayal_entry_mode_source_propagation.py
+- src/app/hammer_radar/operator/betrayal_direction_completion.py
+- src/app/hammer_radar/operator/betrayal_renormalize_with_entry_mode.py
+- src/app/hammer_radar/operator/betrayal_entry_mode_evidence_wiring.py
+- src/app/hammer_radar/operator/betrayal_source_identity_evidence_collector.py
+- src/app/hammer_radar/operator/betrayal_source_identity_normalizer.py
+- src/app/hammer_radar/operator/betrayal_source_emitter_refresh.py
+- src/app/hammer_radar/operator/betrayal_source_signal_emitter.py if present
+- src/app/hammer_radar/operator/betrayal_event_tracker.py
+- src/app/hammer_radar/operator/betrayal_aggregate_decomposition.py
+- src/app/hammer_radar/operator/betrayal_direction_split_resolver.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_refresh.py
+- src/app/hammer_radar/operator/betrayal_integration_recheck.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/betrayal_entry_mode_source_propagation.ndjson
+- logs/hammer_radar_forward/betrayal_direction_completion.ndjson
+- logs/hammer_radar_forward/betrayal_renormalize_with_entry_mode.ndjson
+- logs/hammer_radar_forward/betrayal_source_emitter_refresh.ndjson
+- logs/hammer_radar_forward/betrayal_event_tracker.ndjson
+- logs/hammer_radar_forward/betrayal_aggregate_decomposition.ndjson
+- logs/hammer_radar_forward/betrayal_direction_split_resolver.ndjson
+- docs/hammer_radar/live_readiness/R229_BETRAYAL_ENTRY_MODE_SOURCE_PROPAGATION.md
+- docs/hammer_radar/live_readiness/R227_BETRAYAL_DIRECTION_COMPLETION.md
+- docs/hammer_radar/live_readiness/R218_STRATEGY_EVIDENCE_REGISTRY_SOURCE_IDENTITY_MANIFEST.md
+- tests/hammer_radar/test_betrayal_entry_mode_source_propagation.py
+- tests/hammer_radar/test_betrayal_direction_completion.py
+- tests/hammer_radar/test_betrayal_renormalize_with_entry_mode.py
+- tests/hammer_radar/test_strategy_evidence_registry.py
+
+REUSE / EXTEND:
+Reuse R218 registry entry mode manifest.
+Reuse R229 source propagation row shape.
+Reuse R227 direction field logic.
+Reuse R224A emitted_signal_id/lane_key preview helpers where safe.
+Reuse R212 event identity model if present.
+Do not duplicate registry philosophy.
+Do not mutate configs.
+Do not call Binance/network.
+
+CONTRACT RULES:
+The upstream betrayal source contract must require future rows to carry:
+- schema_version
+- source_family
+- candidate
+- symbol
+- timeframe
+- entry_mode
+- original_direction
+- inverse_direction
+- emitted_direction
+- source_identity
+- source_signal_id
+- source_signal_timestamp
+- emitted_signal_id
+- lane_key
+- betrayal_event_identity
+- betrayal_event_identity_hash
+- outcome_windows
+- paper_only=true
+- live_authorized=false
+- promotion_allowed=false
+
+entry_mode must:
+- exist in strategy evidence registry
+- not be unknown
+- not be entry_unknown
+- not be inferred from common default
+- not be inferred from candidate label
+- not be inferred from timeframe alone
+
+lane_key must be built only from:
+- symbol
+- timeframe
+- emitted_direction
+- entry_mode
+
+emitted_direction must equal inverse_direction for betrayal inverse rows.
+
+This phase may update future emitters to include these fields, but must not rewrite old ledgers.
+
+TARGET SURFACES:
+Refactor/audit with minimal surgical changes:
+- betrayal_source_emitter_refresh.py
+- betrayal_event_tracker.py
+- betrayal_aggregate_decomposition.py
+- betrayal_direction_split_resolver.py
+- full_spectrum_harvester_expansion.py only if it is a source for future betrayal rows and only with safe helper reuse
+
+Prefer creating a helper module used by future surfaces instead of scattering logic.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/betrayal_upstream_emitter_entry_mode_contract.py
+
+Expose:
+- build_betrayal_upstream_emitter_entry_mode_contract
+- load_latest_betrayal_entry_mode_source_propagation
+- load_latest_strategy_evidence_registry
+- get_betrayal_upstream_required_fields
+- get_registry_valid_entry_modes
+- validate_entry_mode_for_upstream_contract
+- build_betrayal_lane_key
+- build_betrayal_emitted_signal_id
+- build_betrayal_event_identity
+- build_betrayal_upstream_contract_row
+- validate_betrayal_upstream_contract_row
+- build_upstream_surface_inventory
+- build_future_emitter_contract_readiness_report
+- build_existing_row_compatibility_report
+- build_upstream_contract_gap_report
+- build_upstream_contract_recommendations
+- classify_betrayal_upstream_contract_status
+- append_betrayal_upstream_contract_record
+- load_betrayal_upstream_contract_records
+- summarize_betrayal_upstream_contract_records
+
+STATUS ENUM:
+- BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT_READY
+- BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT_REJECTED
+- BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT_RECORDED
+- BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT_BLOCKED
+- BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT_ERROR
+
+CONTRACT STATUS ENUM:
+- UPSTREAM_EMITTER_CONTRACT_READY_FOR_FUTURE_ROWS
+- UPSTREAM_EMITTER_CONTRACT_PARTIALLY_READY
+- UPSTREAM_EMITTER_CONTRACT_GAPS_REMAIN
+- UPSTREAM_EMITTER_CONTRACT_NOT_LIVE_AUTHORIZED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "contract_recorded": false,
+  "contract_id": null,
+  "record_contract_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "family": "betrayal",
+    "future_rows_only": true,
+    "paper_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "source_propagation_found": true/false,
+    "registry_found": true/false,
+    "registry_valid": true/false
+  },
+  "upstream_contract": {
+    "contract_name": "betrayal_upstream_emitter_entry_mode_contract_v1",
+    "future_rows_only": true,
+    "required_fields": [...],
+    "entry_mode_must_exist_in_registry": true,
+    "common_default_inference_allowed": false,
+    "candidate_label_inference_allowed": false,
+    "timeframe_only_inference_allowed": false,
+    "paper_only": true,
+    "live_authorized": false,
+    "promotion_allowed": false
+  },
+  "upstream_surface_inventory": [
+    {
+      "surface": "betrayal_source_emitter_refresh",
+      "path": "...",
+      "can_emit_entry_mode": true/false,
+      "can_emit_lane_key": true/false,
+      "can_emit_source_signal_id": true/false,
+      "can_emit_direction_fields": true/false,
+      "uses_registry_contract_helper": true/false,
+      "future_contract_ready": true/false,
+      "notes": [...]
+    }
+  ],
+  "future_emitter_contract_readiness_report": {
+    "surfaces_inspected": ...,
+    "surfaces_future_contract_ready": ...,
+    "surfaces_partially_ready": ...,
+    "surfaces_missing_entry_mode": ...,
+    "surfaces_missing_lane_key": ...,
+    "future_rows_can_be_born_complete": true/false
+  },
+  "existing_row_compatibility_report": {
+    "historical_rows_rewritten": false,
+    "historical_rows_still_missing_entry_mode": ...,
+    "historical_rows_still_missing_lane_key": ...,
+    "historical_resolver_ready_rows_created": 0,
+    "why": "Historical rows are not rewritten; future source rows must carry the contract."
+  },
+  "upstream_contract_gap_report": {
+    "future_contract_gaps_remaining": [...],
+    "historical_entry_mode_gap_remaining": true/false,
+    "historical_lane_key_gap_remaining": true/false,
+    "resolver_ready_preview_rows": 0,
+    "hard_live_blockers": [...]
+  },
+  "upstream_contract_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "RUN_FUTURE_BETRAYAL_EMITTER_WITH_CONTRACT|KEEP_CONTEXT_ONLY|CHECK_8M_CAPTURE_THRESHOLD|RUN_R231_FUTURE_CONTRACT_SMOKE|...",
+      "future_phase": "R231|R228|...",
+      "why": "..."
+    }
+  ],
+  "upstream_contract_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|CHECK_8M_CAPTURE_THRESHOLD|RUN_R231_FUTURE_BETRAYAL_CONTRACT_SMOKE|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- position_permission_created=false
+- future_contract_only=true
+- historical_rows_rewritten=false
+- normalized_rows_appended=false
+
+LEDGER:
+logs/hammer_radar_forward/betrayal_upstream_emitter_entry_mode_contract.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM BETRAYAL UPSTREAM EMITTER ENTRY MODE CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+betrayal-upstream-emitter-entry-mode-contract
+
+Args:
+- --record-contract
+- --confirm-betrayal-upstream-emitter-entry-mode-contract <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract \
+  --record-contract \
+  --confirm-betrayal-upstream-emitter-entry-mode-contract "I CONFIRM BETRAYAL UPSTREAM EMITTER ENTRY MODE CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract \
+  --record-contract \
+  --confirm-betrayal-upstream-emitter-entry-mode-contract "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_betrayal_upstream_emitter_entry_mode_contract.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records contract only
+- contract requires entry_mode and lane_key
+- entry_mode must exist in registry
+- rejects unknown/entry_unknown
+- refuses common default inference
+- refuses candidate label inference
+- builds lane_key only from symbol/timeframe/emitted_direction/entry_mode
+- emitted_direction must equal inverse_direction for inverse rows
+- historical rows are not rewritten
+- no normalized rows appended
+- all rows remain paper_only
+- live_authorized false
+- no betrayal promotion
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R229/R227/R226/R225/R224A/R218 tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract \
+  | jq '.status, .target_scope, .input_summary, .upstream_contract, .upstream_surface_inventory, .future_emitter_contract_readiness_report, .existing_row_compatibility_report, .upstream_contract_gap_report, .upstream_contract_recommendations, .upstream_contract_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract \
+  --record-contract \
+  --confirm-betrayal-upstream-emitter-entry-mode-contract "I CONFIRM BETRAYAL UPSTREAM EMITTER ENTRY MODE CONTRACT RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .contract_recorded, .future_emitter_contract_readiness_report, .upstream_contract_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  betrayal-upstream-emitter-entry-mode-contract \
+  --record-contract \
+  --confirm-betrayal-upstream-emitter-entry-mode-contract "wrong" \
+  | jq '.status, .confirmation_valid, .contract_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R230_BETRAYAL_UPSTREAM_EMITTER_ENTRY_MODE_CONTRACT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R230.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R231_FUTURE_BETRAYAL_CONTRACT_SMOKE.md
+
+R231 should:
+- generate or preview a synthetic/local future betrayal source row using the upstream contract helper
+- prove future rows can be born with entry_mode/lane_key/source identity/direction fields complete
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+REPORT:
+Files changed, tests, smoke, safety, future contract readiness, tiny-live count, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
