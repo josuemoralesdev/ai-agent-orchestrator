@@ -2748,6 +2748,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-renormalize-with-entry-mode":
+        from src.app.hammer_radar.operator.betrayal_renormalize_with_entry_mode import (
+            build_betrayal_renormalize_with_entry_mode,
+            format_betrayal_renormalize_with_entry_mode_json,
+        )
+
+        print(
+            format_betrayal_renormalize_with_entry_mode_json(
+                build_betrayal_renormalize_with_entry_mode(
+                    log_dir=args.log_dir,
+                    record_renormalization=args.record_renormalization,
+                    confirm_betrayal_renormalize_with_entry_mode=(
+                        args.confirm_betrayal_renormalize_with_entry_mode
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4345,6 +4362,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_entry_mode_evidence_wiring_parser.add_argument("--record-wiring", action="store_true")
     betrayal_entry_mode_evidence_wiring_parser.add_argument(
         "--confirm-betrayal-entry-mode-evidence-wiring",
+        default=None,
+    )
+
+    betrayal_renormalize_with_entry_mode_parser = subparsers.add_parser(
+        "betrayal-renormalize-with-entry-mode",
+        parents=[parent],
+    )
+    betrayal_renormalize_with_entry_mode_parser.add_argument("--record-renormalization", action="store_true")
+    betrayal_renormalize_with_entry_mode_parser.add_argument(
+        "--confirm-betrayal-renormalize-with-entry-mode",
         default=None,
     )
 
