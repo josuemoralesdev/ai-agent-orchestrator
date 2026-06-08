@@ -2910,6 +2910,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-paper-outcome-tracking-bridge":
+        from src.app.hammer_radar.operator.betrayal_paper_outcome_tracking_bridge import (
+            build_betrayal_paper_outcome_tracking_bridge,
+            format_betrayal_paper_outcome_tracking_bridge_json,
+        )
+
+        print(
+            format_betrayal_paper_outcome_tracking_bridge_json(
+                build_betrayal_paper_outcome_tracking_bridge(
+                    log_dir=args.log_dir,
+                    record_bridge=args.record_bridge,
+                    confirm_betrayal_paper_outcome_tracking_bridge=(
+                        args.confirm_betrayal_paper_outcome_tracking_bridge
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4595,6 +4612,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_signal_origin_integration_contract_parser.add_argument("--record-contract", action="store_true")
     betrayal_signal_origin_integration_contract_parser.add_argument(
         "--confirm-betrayal-signal-origin-integration-contract",
+        default=None,
+    )
+
+    betrayal_paper_outcome_tracking_bridge_parser = subparsers.add_parser(
+        "betrayal-paper-outcome-tracking-bridge",
+        parents=[parent],
+    )
+    betrayal_paper_outcome_tracking_bridge_parser.add_argument("--record-bridge", action="store_true")
+    betrayal_paper_outcome_tracking_bridge_parser.add_argument(
+        "--confirm-betrayal-paper-outcome-tracking-bridge",
         default=None,
     )
 
