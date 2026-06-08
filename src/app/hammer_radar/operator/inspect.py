@@ -2927,6 +2927,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-true-inverse-outcome-capture-bridge":
+        from src.app.hammer_radar.operator.betrayal_true_inverse_outcome_capture_bridge import (
+            build_betrayal_true_inverse_outcome_capture_bridge,
+            format_betrayal_true_inverse_outcome_capture_bridge_json,
+        )
+
+        print(
+            format_betrayal_true_inverse_outcome_capture_bridge_json(
+                build_betrayal_true_inverse_outcome_capture_bridge(
+                    log_dir=args.log_dir,
+                    record_capture_bridge=args.record_capture_bridge,
+                    confirm_betrayal_true_inverse_outcome_capture_bridge=(
+                        args.confirm_betrayal_true_inverse_outcome_capture_bridge
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4622,6 +4639,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_paper_outcome_tracking_bridge_parser.add_argument("--record-bridge", action="store_true")
     betrayal_paper_outcome_tracking_bridge_parser.add_argument(
         "--confirm-betrayal-paper-outcome-tracking-bridge",
+        default=None,
+    )
+
+    betrayal_true_inverse_outcome_capture_bridge_parser = subparsers.add_parser(
+        "betrayal-true-inverse-outcome-capture-bridge",
+        parents=[parent],
+    )
+    betrayal_true_inverse_outcome_capture_bridge_parser.add_argument("--record-capture-bridge", action="store_true")
+    betrayal_true_inverse_outcome_capture_bridge_parser.add_argument(
+        "--confirm-betrayal-true-inverse-outcome-capture-bridge",
         default=None,
     )
 
