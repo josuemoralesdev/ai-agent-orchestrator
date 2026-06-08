@@ -1745,6 +1745,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "full-spectrum-lane-scoreboard":
+        from src.app.hammer_radar.operator.full_spectrum_lane_scoreboard import (
+            build_full_spectrum_lane_scoreboard,
+            format_full_spectrum_lane_scoreboard_json,
+        )
+
+        print(
+            format_full_spectrum_lane_scoreboard_json(
+                build_full_spectrum_lane_scoreboard(
+                    log_dir=args.log_dir,
+                    record_scoreboard=args.record_scoreboard,
+                    confirm_full_spectrum_lane_scoreboard=args.confirm_full_spectrum_lane_scoreboard,
+                )
+            )
+        )
     elif args.command == "multi-lane-evidence-ranking":
         from src.app.hammer_radar.operator.multi_lane_evidence_ranking import (
             build_multi_lane_evidence_ranking,
@@ -3882,6 +3897,13 @@ def _build_parser() -> argparse.ArgumentParser:
     full_spectrum_harvester_parser.add_argument("--run-harvester-loop", action="store_true")
     full_spectrum_harvester_parser.add_argument("--record-harvest", action="store_true")
     full_spectrum_harvester_parser.add_argument("--confirm-full-spectrum-harvest", default=None)
+
+    full_spectrum_lane_scoreboard_parser = subparsers.add_parser(
+        "full-spectrum-lane-scoreboard",
+        parents=[parent],
+    )
+    full_spectrum_lane_scoreboard_parser.add_argument("--record-scoreboard", action="store_true")
+    full_spectrum_lane_scoreboard_parser.add_argument("--confirm-full-spectrum-lane-scoreboard", default=None)
 
     multi_lane_evidence_ranking_parser = subparsers.add_parser(
         "multi-lane-evidence-ranking",
