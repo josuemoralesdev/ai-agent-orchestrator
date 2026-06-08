@@ -2782,6 +2782,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-direction-completion":
+        from src.app.hammer_radar.operator.betrayal_direction_completion import (
+            build_betrayal_direction_completion,
+            format_betrayal_direction_completion_json,
+        )
+
+        print(
+            format_betrayal_direction_completion_json(
+                build_betrayal_direction_completion(
+                    log_dir=args.log_dir,
+                    record_completion=args.record_completion,
+                    confirm_betrayal_direction_completion=(
+                        args.confirm_betrayal_direction_completion
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4396,6 +4413,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_renormalize_with_entry_mode_parser.add_argument("--record-renormalization", action="store_true")
     betrayal_renormalize_with_entry_mode_parser.add_argument(
         "--confirm-betrayal-renormalize-with-entry-mode",
+        default=None,
+    )
+
+    betrayal_direction_completion_parser = subparsers.add_parser(
+        "betrayal-direction-completion",
+        parents=[parent],
+    )
+    betrayal_direction_completion_parser.add_argument("--record-completion", action="store_true")
+    betrayal_direction_completion_parser.add_argument(
+        "--confirm-betrayal-direction-completion",
         default=None,
     )
 
