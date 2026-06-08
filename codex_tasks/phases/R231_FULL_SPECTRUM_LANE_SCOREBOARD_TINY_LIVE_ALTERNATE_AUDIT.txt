@@ -1,0 +1,551 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R231 Full-Spectrum Lane Scoreboard / Tiny-Live Alternate Candidate Audit
+
+BRANCH:
+r231-full-spectrum-lane-scoreboard-tiny-live-alternate-audit
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+Tiny-live remains the north star.
+
+Current official tiny-live candidate:
+- BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=8
+- required_fresh_capture_count=10
+- threshold_met=false
+- watcher_likely_running=true
+- watcher_stale=false
+- fisherman_status=FISHERMAN_RUNNING_RECENT
+- ledger_mismatch_found=false
+- funding must wait
+- risk contract readiness must wait
+
+But recent manual inspection showed the system is fishing far more than 8m short.
+
+Full-spectrum capture/event lane counts from local output:
+- BTCUSDT|22m|short|ladder_close_50_618: 975
+- BTCUSDT|4h|long|ladder_close_50_618: 495
+- BTCUSDT|55m|short|ladder_close_50_618: 252
+- BTCUSDT|55m|long|ladder_close_50_618: 246
+- BTCUSDT|88m|short|ladder_close_50_618: 240
+- BTCUSDT|13m|short|ladder_close_50_618: 114
+- BTCUSDT|8m|long|ladder_close_50_618: 69
+- BTCUSDT|8m|short|ladder_close_50_618: 39
+- BTCUSDT|4m|short|ladder_close_50_618: 24
+- BTCUSDT|4m|long|ladder_close_50_618: 15
+- BTCUSDT|8m|short: 14 events / 8 unique signal ids
+- BTCUSDT|222m|long|ladder_close_50_618: 3
+
+Signal flow by timeframe/direction also showed:
+- 4m short: 3763
+- 4m long: 3700
+- 8m long: 1614
+- 8m short: 1482
+- 13m long: 1061
+- 13m short: 916
+- 22m long: 603
+- 22m short: 512
+- 44m long: 242
+- 88m long: 199
+- 55m short: 191
+- 44m short: 172
+- 55m long: 163
+- 88m short: 72
+- 4H long: 47
+- 222m short: 45
+- 222m long: 43
+- 666m long: 21
+- 444m short: 15
+- 4H short: 15
+- 444m long: 15
+- 13H long: 13
+- 888m short: 12
+- 888m long: 3
+- 13H short: 2
+- 666m short: 2
+
+This means:
+- the system is not bearish-only
+- longs are alive
+- 8m short remains the official tiny-live candidate but may not be the only strong candidate
+- we need a scoreboard before we keep assuming 8m short is the best lane
+
+R231 must build a full-spectrum lane scoreboard and tiny-live alternate candidate audit.
+
+PURPOSE:
+Create a paper-only full-spectrum lane scoreboard that:
+1. Reads full-spectrum harvest ledgers.
+2. Reads short paper evidence capture ledgers.
+3. Reads signal flow ledgers.
+4. Reads paper outcome ledgers where available.
+5. Reads existing strategy performance / promotion ledgers if present.
+6. Reads tiny-live capture-count sync for current official lane.
+7. Builds a lane-level scoreboard for all detected symbol/timeframe/direction/entry_mode combinations.
+8. Ranks lanes by:
+   - unique capture count
+   - latest capture freshness
+   - signal flow count
+   - paper outcome count
+   - win rate when available
+   - threshold distance
+   - tiny-live candidate readiness
+   - safety blockers
+9. Identifies alternate tiny-live candidates without changing lane mode.
+10. Keeps official tiny-live lane unchanged.
+11. Does not write configs.
+12. Does not call Binance/network.
+13. Does not place orders.
+14. Does not promote any lane.
+15. Does not authorize live.
+
+CRITICAL SAFETY:
+This phase is audit/scoreboard only.
+It must NOT:
+- call Binance
+- call network
+- place orders
+- create executable order payloads
+- write lane controls
+- write risk contracts
+- set any lane tiny_live
+- enable live execution
+- mutate env files
+- disable kill switch
+- promote lanes
+- promote signal origins
+- create live permission
+- infer funding readiness
+- infer live readiness
+- treat signal count as capture count
+- treat capture event count as unique validated captures
+- treat win rate alone as live eligibility
+- change official tiny-live lane
+
+NON-NEGOTIABLES:
+- Do not place orders.
+- Do not call Binance.
+- Do not call any network.
+- Do not call order/test-order/protective endpoints.
+- Do not transfer or withdraw.
+- Do not enable live trading.
+- Do not disable kill switch.
+- Do not print secrets.
+- Do not mutate env files.
+- Do not mutate configs.
+- Do not change lane modes.
+- Do not set any lane tiny_live.
+- Do not write risk contract config.
+- Do not promote any signal origin.
+- Do not promote any lane.
+- Do not infer tiny-live readiness from score alone.
+- Do not infer live readiness from score alone.
+- Do not run sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/fisherman_watchdog_ledger_reconciliation.py
+- src/app/hammer_radar/operator/weekend_paper_fisherman_supervisor.py
+- src/app/hammer_radar/operator/full_spectrum_harvester_expansion.py
+- src/app/hammer_radar/operator/pattern_lane_matrix_review.py
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/tiny_live_readiness_gap_recheck.py if present
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/inspect.py
+- logs/hammer_radar_forward/full_spectrum_harvester_expansion.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/multi_lane_paper_harvester.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/signals.ndjson
+- logs/hammer_radar_forward/multi_symbol_paper_scans.ndjson
+- logs/hammer_radar_forward/full_spectrum_paper_coverage_audit.ndjson
+- logs/hammer_radar_forward/paper_outcomes.ndjson
+- logs/hammer_radar_forward/outcomes.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- docs/hammer_radar/live_readiness/R208B_FISHERMAN_WATCHDOG_LEDGER_RECONCILIATION.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- tests/hammer_radar/test_fisherman_watchdog_ledger_reconciliation.py
+- tests/hammer_radar/test_full_spectrum_harvester_expansion.py
+- relevant strategy/performance/capture tests
+
+REUSE / EXTEND:
+Reuse existing capture-count helper logic where possible.
+Reuse existing full-spectrum harvester parsing if present.
+Reuse tiny-live gap/recheck helpers if present.
+Do not duplicate ledger parsing if an existing helper exists.
+Do not mutate configs.
+Do not call Binance/network.
+
+LANE KEY NORMALIZATION:
+Normalize lane identity as:
+symbol|timeframe|direction|entry_mode
+
+If entry_mode missing:
+- use "entry_unknown"
+- do not treat as tiny-live eligible
+
+If signal_id only has symbol|timeframe|direction|timestamp:
+- lane key may be symbol|timeframe|direction|entry_unknown
+- do not assume ladder_close_50_618
+
+COUNTING RULES:
+For each lane:
+- signal_flow_count = count of signal rows by symbol/timeframe/direction
+- capture_event_count = count of captured lane/event appearances
+- unique_capture_count = count of unique signal ids/captured signal ids only
+- latest_signal_at
+- latest_capture_at
+- latest_outcome_at
+- paper_outcome_count
+- known_outcome_count
+- win_count
+- loss_count
+- win_rate_pct if known outcomes > 0
+- outcome_unknown_count
+
+Do not use event count as unique capture count.
+Do not use signal count as capture count.
+Do not use win rate if known_outcome_count is zero.
+
+TINY-LIVE ALTERNATE SCORING:
+For each lane calculate:
+- threshold_required_count default 10
+- threshold_distance_remaining = max(0, 10 - unique_capture_count)
+- freshness_status:
+  - fresh if latest capture or signal is recent according to existing stale settings if available
+  - unknown if timestamp cannot be parsed
+- tiny_live_candidate_status:
+  - OFFICIAL_CANDIDATE
+  - ALTERNATE_WATCHLIST
+  - TOO_FEW_UNIQUE_CAPTURES
+  - OUTCOME_DATA_MISSING
+  - ENTRY_MODE_MISSING
+  - NOT_ELIGIBLE
+- live_authorized=false always
+- promotion_allowed=false always
+
+Do not mark any lane live-ready.
+Do not change official lane.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/full_spectrum_lane_scoreboard.py
+
+Expose:
+- build_full_spectrum_lane_scoreboard
+- load_full_spectrum_capture_records
+- load_short_capture_records
+- load_signal_flow_records
+- load_paper_outcome_records
+- load_tiny_live_capture_count_sync
+- normalize_lane_key
+- parse_signal_id_for_lane
+- extract_lane_events
+- build_lane_signal_counts
+- build_lane_capture_counts
+- build_lane_outcome_counts
+- build_lane_score_rows
+- rank_lane_score_rows
+- build_tiny_live_alternate_candidate_report
+- build_lane_scoreboard_gap_report
+- build_lane_scoreboard_recommendations
+- classify_full_spectrum_lane_scoreboard_status
+- append_full_spectrum_lane_scoreboard_record
+- load_full_spectrum_lane_scoreboard_records
+- summarize_full_spectrum_lane_scoreboard_records
+
+STATUS ENUM:
+- FULL_SPECTRUM_LANE_SCOREBOARD_READY
+- FULL_SPECTRUM_LANE_SCOREBOARD_REJECTED
+- FULL_SPECTRUM_LANE_SCOREBOARD_RECORDED
+- FULL_SPECTRUM_LANE_SCOREBOARD_BLOCKED
+- FULL_SPECTRUM_LANE_SCOREBOARD_ERROR
+
+SCOREBOARD STATUS ENUM:
+- LANE_SCOREBOARD_READY
+- OFFICIAL_TINY_LIVE_STILL_LEADING
+- ALTERNATE_CANDIDATES_FOUND
+- LANE_SCOREBOARD_DATA_GAPS_REMAIN
+- TINY_LIVE_THRESHOLD_MET
+- TINY_LIVE_THRESHOLD_NOT_MET
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "scoreboard_recorded": false,
+  "scoreboard_id": null,
+  "record_scoreboard_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "paper_only": true,
+    "live_authorized": false,
+    "official_tiny_live_lane": "BTCUSDT|8m|short|ladder_close_50_618"
+  },
+  "input_summary": {
+    "full_spectrum_records_found": true/false,
+    "short_capture_records_found": true/false,
+    "signal_flow_records_found": true/false,
+    "paper_outcome_records_found": true/false,
+    "tiny_live_capture_sync_found": true/false
+  },
+  "official_tiny_live_lane_status": {
+    "lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "threshold_distance_remaining": ...,
+    "watcher_likely_running": true/false,
+    "watcher_stale": true/false,
+    "funding_should_wait": true,
+    "risk_contract_should_wait": true
+  },
+  "lane_scoreboard_rows": [
+    {
+      "rank": 1,
+      "lane_key": "BTCUSDT|...",
+      "symbol": "BTCUSDT",
+      "timeframe": "...",
+      "direction": "long|short",
+      "entry_mode": "...",
+      "signal_flow_count": ...,
+      "capture_event_count": ...,
+      "unique_capture_count": ...,
+      "latest_signal_at": "...",
+      "latest_capture_at": "...",
+      "paper_outcome_count": ...,
+      "known_outcome_count": ...,
+      "win_count": ...,
+      "loss_count": ...,
+      "win_rate_pct": null,
+      "threshold_required_count": 10,
+      "threshold_distance_remaining": ...,
+      "freshness_status": "fresh|stale|unknown",
+      "tiny_live_candidate_status": "...",
+      "score_notes": [...],
+      "live_authorized": false,
+      "promotion_allowed": false
+    }
+  ],
+  "tiny_live_alternate_candidate_report": {
+    "official_lane_still_best": true/false,
+    "alternate_candidates_found": true/false,
+    "top_alternates": [...],
+    "why": "..."
+  },
+  "lane_scoreboard_gap_report": {
+    "lanes_missing_entry_mode": ...,
+    "lanes_missing_outcomes": ...,
+    "lanes_with_signal_flow_but_no_unique_captures": ...,
+    "lanes_near_threshold": [...],
+    "hard_live_blockers": [...]
+  },
+  "lane_scoreboard_recommendations": [
+    {
+      "priority": "HIGH|MEDIUM|LOW",
+      "recommended_action": "KEEP_8M_SHORT_AS_OFFICIAL|WATCH_ALTERNATE_LANE|RUN_R228_IF_10_OF_10|RUN_OUTCOME_ENRICHMENT|...",
+      "future_phase": "R228|R232|...",
+      "why": "..."
+    }
+  ],
+  "scoreboard_status": "...",
+  "recommended_next_operator_move": "KEEP_FISHERMAN_RUNNING|RUN_R228_TINY_LIVE_10_OF_10_READY_PACKET|WATCH_ALTERNATE_LANES|RUN_R232_LANE_OUTCOME_ENRICHMENT",
+  "recommended_next_engineering_move": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/full_spectrum_lane_scoreboard.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM FULL SPECTRUM LANE SCOREBOARD RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+full-spectrum-lane-scoreboard
+
+Args:
+- --record-scoreboard
+- --confirm-full-spectrum-lane-scoreboard <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard \
+  --record-scoreboard \
+  --confirm-full-spectrum-lane-scoreboard "I CONFIRM FULL SPECTRUM LANE SCOREBOARD RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard \
+  --record-scoreboard \
+  --confirm-full-spectrum-lane-scoreboard "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_full_spectrum_lane_scoreboard.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records scoreboard only
+- lane key normalization works
+- missing entry_mode becomes entry_unknown
+- signal count is not unique capture count
+- duplicate signal ids are deduped
+- non-official lanes are not promoted
+- official tiny-live lane remains unchanged
+- alternate candidates can be reported without promotion
+- threshold met only when unique_capture_count >= 10
+- win_rate null when no known outcomes
+- all lanes live_authorized false
+- all lanes promotion_allowed false
+- no env/config mutation
+- no destructive ledger rewrite
+- no Binance/network calls
+- no order/live/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related fisherman/full-spectrum/capture tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard \
+  | jq '.status, .target_scope, .input_summary, .official_tiny_live_lane_status, .lane_scoreboard_rows[0:50], .tiny_live_alternate_candidate_report, .lane_scoreboard_gap_report, .lane_scoreboard_recommendations, .scoreboard_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard \
+  --record-scoreboard \
+  --confirm-full-spectrum-lane-scoreboard "I CONFIRM FULL SPECTRUM LANE SCOREBOARD RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .scoreboard_recorded, .official_tiny_live_lane_status, .tiny_live_alternate_candidate_report, .scoreboard_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  full-spectrum-lane-scoreboard \
+  --record-scoreboard \
+  --confirm-full-spectrum-lane-scoreboard "wrong" \
+  | jq '.status, .confirmation_valid, .scoreboard_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+
+Tiny-live count check after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R231_FULL_SPECTRUM_LANE_SCOREBOARD_TINY_LIVE_ALTERNATE_AUDIT.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R231.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R232_LANE_OUTCOME_ENRICHMENT.md
+
+R232 should:
+- enrich top scoreboard lanes with paper outcomes, known win/loss counts, and promotion blockers
+- no config writes
+- no live execution
+- no Binance/network calls
+
+Ensure existing:
+codex_tasks/phases/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+REPORT:
+Files changed, tests, smoke, safety, official lane status, top alternate lanes, tiny-live count, next phase.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
