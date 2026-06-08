@@ -2893,6 +2893,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "betrayal-signal-origin-integration-contract":
+        from src.app.hammer_radar.operator.betrayal_signal_origin_integration_contract import (
+            build_betrayal_signal_origin_integration_contract,
+            format_betrayal_signal_origin_integration_contract_json,
+        )
+
+        print(
+            format_betrayal_signal_origin_integration_contract_json(
+                build_betrayal_signal_origin_integration_contract(
+                    log_dir=args.log_dir,
+                    record_contract=args.record_contract,
+                    confirm_betrayal_signal_origin_integration_contract=(
+                        args.confirm_betrayal_signal_origin_integration_contract
+                    ),
+                )
+            )
+        )
     elif args.command == "risk-contract-apply-packet-8m-short":
         from src.app.hammer_radar.operator.risk_contract_apply_packet_8m_short import (
             build_risk_contract_apply_packet_8m_short,
@@ -4568,6 +4585,16 @@ def _build_parser() -> argparse.ArgumentParser:
     betrayal_gate_ready_lane_packet_parser.add_argument("--record-packet", action="store_true")
     betrayal_gate_ready_lane_packet_parser.add_argument(
         "--confirm-betrayal-gate-ready-lane-packet",
+        default=None,
+    )
+
+    betrayal_signal_origin_integration_contract_parser = subparsers.add_parser(
+        "betrayal-signal-origin-integration-contract",
+        parents=[parent],
+    )
+    betrayal_signal_origin_integration_contract_parser.add_argument("--record-contract", action="store_true")
+    betrayal_signal_origin_integration_contract_parser.add_argument(
+        "--confirm-betrayal-signal-origin-integration-contract",
         default=None,
     )
 
