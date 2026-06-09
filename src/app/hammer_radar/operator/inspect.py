@@ -2520,6 +2520,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-risk-contract-preview":
+        from src.app.hammer_radar.operator.tiny_live_risk_contract_preview import (
+            build_tiny_live_risk_contract_preview,
+            format_tiny_live_risk_contract_preview_json,
+        )
+
+        print(
+            format_tiny_live_risk_contract_preview_json(
+                build_tiny_live_risk_contract_preview(
+                    log_dir=args.log_dir,
+                    record_risk_preview=args.record_risk_preview,
+                    confirm_tiny_live_risk_contract_preview=args.confirm_tiny_live_risk_contract_preview,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4455,6 +4470,16 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_10_of_10_ready_packet_parser.add_argument("--record-packet", action="store_true")
     tiny_live_10_of_10_ready_packet_parser.add_argument(
         "--confirm-tiny-live-10-of-10-ready-packet",
+        default=None,
+    )
+
+    tiny_live_risk_contract_preview_parser = subparsers.add_parser(
+        "tiny-live-risk-contract-preview",
+        parents=[parent],
+    )
+    tiny_live_risk_contract_preview_parser.add_argument("--record-risk-preview", action="store_true")
+    tiny_live_risk_contract_preview_parser.add_argument(
+        "--confirm-tiny-live-risk-contract-preview",
         default=None,
     )
 

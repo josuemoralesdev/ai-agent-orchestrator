@@ -1,0 +1,567 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R229 Tiny-Live Risk Contract Preview
+
+BRANCH:
+r229-tiny-live-risk-contract-preview
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R228 Tiny Live 10 of 10 Ready Packet succeeded and has been committed.
+
+Current R228 state:
+- status=TINY_LIVE_10_OF_10_READY_PACKET_READY
+- official lane: BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=10
+- required_fresh_capture_count=10
+- threshold_met=true
+- threshold_status=CAPTURE_THRESHOLD_MET
+- evidence_threshold_ready=true
+- fisherman_ready=true
+- operator_review_ready=true
+- risk_contract_ready=false
+- live_authorization_ready=false
+- live_execution_ready=false
+- order_ready=false
+- live_ready_today=false
+- ready_packet_overall_status=TINY_LIVE_10_OF_10_BLOCKED_BY_RISK_CONTRACT
+- recommended_next_operator_move=REVIEW_R228_PACKET
+- recommended_next_engineering_move=Create R229 tiny-live risk contract preview from this packet; preview only, no config writes or orders
+
+R229 must now produce a risk contract PREVIEW for the official tiny-live lane.
+This phase must NOT write the risk contract config.
+This phase must NOT enable live.
+This phase must NOT arm the lane.
+This phase must NOT create an executable order payload.
+This phase must NOT call Binance/network.
+
+CORE INTENT:
+Turn the R228 10/10 evidence packet into a tiny-live risk contract preview that an operator can review before any later explicit config-writing phase.
+
+This is still paper-only / preview-only / audit-only.
+
+The risk contract preview must define:
+- lane identity
+- capital size assumptions
+- max notional assumptions
+- leverage assumptions
+- stop/TP relationship
+- max loss estimate
+- kill switch requirements
+- allowed action boundaries
+- non-action boundaries
+- explicit next gate required before live
+
+This phase must keep all dangerous gates false.
+
+PURPOSE:
+Create a tiny-live risk contract preview module and inspect CLI that:
+1. Reads latest R228 tiny-live 10/10 ready packet.
+2. Confirms official lane remains BTCUSDT|8m|short|ladder_close_50_618.
+3. Confirms R228 evidence_ready=true.
+4. Confirms fisherman_ready=true.
+5. Confirms operator_review_ready=true.
+6. Builds a deterministic risk contract preview for the official tiny-live lane.
+7. Reads existing risk contract config if present only as context.
+8. Does not write any risk contract config.
+9. Separates preview from activation.
+10. Produces risk contract preview fields for operator review.
+11. Produces a gate matrix:
+    - evidence_ready=true
+    - fisherman_ready=true
+    - operator_review_ready=true
+    - risk_contract_preview_ready=true
+    - risk_contract_config_written=false
+    - live_authorization_ready=false
+    - live_execution_ready=false
+    - order_ready=false
+    - live_ready_today=false
+12. Produces recommended next engineering move.
+13. Produces recommended next operator move.
+14. Does not place orders.
+15. Does not call Binance/network.
+16. Does not mutate env/config.
+17. Does not promote any lane.
+
+CRITICAL SAFETY:
+This phase is risk contract PREVIEW ONLY.
+It must never write:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- lane controls
+- live flags
+- env files
+- scheduler configs
+- fisherman configs
+- order payloads
+
+It must never execute:
+- Binance order
+- Binance test order
+- transfer
+- withdraw
+- signed trading request
+- signed order request
+- live connector submit
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No executable payload.
+- No order payload.
+- No live authorization.
+- No live flag changes.
+- No kill switch disable.
+- No lane mode changes.
+- No tiny_live lane mode setting.
+- No risk contract config write.
+- No env write.
+- No config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/final_live_preflight.py if present
+- src/app/hammer_radar/operator/tiny_live* files if present
+- src/app/hammer_radar/operator/risk* files if present
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/capture_priority_rebalance.py
+- src/app/hammer_radar/operator/betrayal_ranking_feed_preview.py
+
+Inspect configs if present, but do not mutate:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers:
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+- logs/hammer_radar_forward/betrayal_ranking_feed_preview.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- existing risk/tiny-live docs if present
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+- tests/hammer_radar/test_*risk* if present
+- tests/hammer_radar/test_*live* if present
+- tests/hammer_radar/test_*tiny* if present
+- tests/hammer_radar/test_capture_priority_rebalance.py
+- tests/hammer_radar/test_lane_outcome_enrichment.py
+
+REUSE / EXTEND:
+Reuse R228 packet loader and fields.
+Reuse existing risk contract naming/shape if present.
+Reuse existing safety flags from R228 and R235-R238.
+Do not duplicate ledger parsing where helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+RISK CONTRACT PREVIEW RULES:
+A risk contract preview is ready only if:
+- latest R228 packet exists
+- R228 status is TINY_LIVE_10_OF_10_READY_PACKET_READY or RECORDED
+- official lane is BTCUSDT|8m|short|ladder_close_50_618
+- evidence_threshold_ready=true
+- fisherman_ready=true
+- operator_review_ready=true
+- risk_contract_ready=false in R228
+- live_authorization_ready=false in R228
+- order_ready=false in R228
+- no existing live authorization is active
+- no config mutation is attempted
+
+Risk contract preview must include:
+- contract_id
+- contract_version
+- official_lane_key
+- symbol
+- timeframe
+- direction
+- entry_mode
+- evidence_packet_reference
+- capital_mode="tiny_live_preview"
+- max_account_risk_usdt_preview
+- max_notional_usdt_preview
+- leverage_preview
+- max_loss_usdt_preview
+- stop_required=true
+- take_profit_required=true
+- kill_switch_required=true
+- operator_final_approval_required=true
+- config_write_required_later=true
+- live_authorization_required_later=true
+- order_payload_forbidden_now=true
+- binance_call_forbidden_now=true
+
+Use conservative defaults if no existing contract source is present:
+- proposed_tiny_live_margin_usdt=44
+- proposed_leverage=1 unless existing approved project convention clearly says otherwise
+- proposed_max_loss_usdt must be <= proposed_tiny_live_margin_usdt
+- proposed_max_loss_usdt should be explicitly labeled preview-only
+- proposed_max_notional_usdt = proposed_tiny_live_margin_usdt * proposed_leverage
+- never infer that these are approved
+- never write them to config
+
+If an existing approved risk contract is present:
+- read it as context
+- include it in existing_contract_context
+- do not mutate it
+- do not mark risk_contract_config_written=true
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "risk_preview_recorded": false,
+  "risk_preview_record_id": null,
+  "record_risk_preview_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "paper_only": true,
+    "risk_contract_preview_only": true,
+    "live_authorized": false
+  },
+  "input_summary": {
+    "r228_packet_found": true/false,
+    "r228_evidence_ready": true/false,
+    "r228_fisherman_ready": true/false,
+    "r228_operator_review_ready": true/false,
+    "existing_risk_contract_context_found": true/false,
+    "tiny_live_capture_sync_found": true/false
+  },
+  "r228_packet_summary": {
+    "fresh_capture_count": 10,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true,
+    "threshold_status": "CAPTURE_THRESHOLD_MET",
+    "official_lane_unchanged": true,
+    "ready_packet_overall_status": "...",
+    "blocked_by": [...]
+  },
+  "existing_contract_context": {
+    "context_found": true/false,
+    "config_path_checked": "configs/hammer_radar/tiny_live_risk_contracts.json",
+    "matching_contract_found": true/false,
+    "matching_contract_summary": null or {...},
+    "config_mutated": false
+  },
+  "risk_contract_preview": {
+    "contract_id": "...",
+    "contract_version": "tiny_live_risk_contract_preview_v1",
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "evidence_packet_reference": "...",
+    "capital_mode": "tiny_live_preview",
+    "proposed_tiny_live_margin_usdt": 44,
+    "proposed_leverage": 1,
+    "proposed_max_notional_usdt": 44,
+    "proposed_max_loss_usdt": ...,
+    "stop_required": true,
+    "take_profit_required": true,
+    "kill_switch_required": true,
+    "operator_final_approval_required": true,
+    "config_write_required_later": true,
+    "live_authorization_required_later": true,
+    "order_payload_forbidden_now": true,
+    "binance_call_forbidden_now": true,
+    "preview_only": true,
+    "approval_status": "NOT_APPROVED_PREVIEW_ONLY",
+    "notes": [...]
+  },
+  "risk_gate_matrix": {
+    "evidence_ready": true/false,
+    "fisherman_ready": true/false,
+    "operator_review_ready": true/false,
+    "risk_contract_preview_ready": true/false,
+    "risk_contract_config_written": false,
+    "risk_contract_approved": false,
+    "live_authorization_ready": false,
+    "live_execution_ready": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_review_packet": {
+    "operator_should_review_risk_preview": true/false,
+    "operator_should_write_config": false,
+    "operator_should_enable_live": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "REVIEW_R229_RISK_PREVIEW|WAIT|RECHECK_R228_PACKET",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not enable live",
+      "do not disable kill switch",
+      "do not write risk config from this preview"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "risk_preview_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+STATUS ENUM:
+- TINY_LIVE_RISK_CONTRACT_PREVIEW_READY
+- TINY_LIVE_RISK_CONTRACT_PREVIEW_REJECTED
+- TINY_LIVE_RISK_CONTRACT_PREVIEW_RECORDED
+- TINY_LIVE_RISK_CONTRACT_PREVIEW_BLOCKED
+- TINY_LIVE_RISK_CONTRACT_PREVIEW_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_RISK_PREVIEW_READY_CONFIG_WRITE_REQUIRED_LATER
+- TINY_LIVE_RISK_PREVIEW_BLOCKED_BY_R228_PACKET
+- TINY_LIVE_RISK_PREVIEW_BLOCKED_BY_EVIDENCE_GAP
+- TINY_LIVE_RISK_PREVIEW_BLOCKED_BY_FISHERMAN_STALE
+- TINY_LIVE_RISK_PREVIEW_NOT_APPROVED
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- paper_outcomes_appended=false
+- strategy_performance_appended=false
+- strategy_promotion_status_appended=false
+- ranking_scores_fabricated=false
+- win_rates_fabricated=false
+- promotion_eligibility_fabricated=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- live_execution_enabled=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- risk_contract_preview_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_risk_contract_preview.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE RISK CONTRACT PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+tiny-live-risk-contract-preview
+
+Args:
+- --record-risk-preview
+- --confirm-tiny-live-risk-contract-preview <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview \
+  --record-risk-preview \
+  --confirm-tiny-live-risk-contract-preview "I CONFIRM TINY LIVE RISK CONTRACT PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview \
+  --record-risk-preview \
+  --confirm-tiny-live-risk-contract-preview "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_risk_contract_preview.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records risk preview only
+- preview requires R228 packet
+- preview requires R228 evidence_ready
+- preview requires R228 fisherman_ready
+- preview keeps risk_contract_config_written false
+- preview keeps risk_contract_approved false
+- preview keeps live_authorization_ready false
+- preview keeps order_ready false
+- preview does not create order payload
+- preview does not write configs
+- preview does not mutate tiny_live_risk_contracts.json
+- preview does not mutate lane_controls.json
+- preview does not call Binance/network
+- preview keeps official lane unchanged
+- conservative defaults are preview-only and not approved
+- operator packet says review only
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R228/R238/R237/R236/R235/risk/live/tiny tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview \
+  | jq '.status, .target_scope, .input_summary, .r228_packet_summary, .existing_contract_context, .risk_contract_preview, .risk_gate_matrix, .operator_review_packet, .risk_preview_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview \
+  --record-risk-preview \
+  --confirm-tiny-live-risk-contract-preview "I CONFIRM TINY LIVE RISK CONTRACT PREVIEW RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .risk_preview_recorded, .risk_contract_preview, .risk_gate_matrix, .operator_review_packet, .risk_preview_overall_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-risk-contract-preview \
+  --record-risk-preview \
+  --confirm-tiny-live-risk-contract-preview "wrong" \
+  | jq '.status, .confirmation_valid, .risk_preview_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Final R228 packet sync:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  | jq '.status, .capture_threshold_recheck, .fisherman_health_recheck, .tiny_live_gate_matrix, .ready_packet_overall_status, .recommended_next_operator_move'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- risk_contract_preview
+- risk_gate_matrix
+- operator_review_packet
+- risk_preview_overall_status
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R229_TINY_LIVE_RISK_CONTRACT_PREVIEW.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R229.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE.md
+
+R230 should:
+- consume R229 risk preview
+- create a guarded config-write gate
+- require exact operator confirmation phrase
+- still no live execution
+- still no Binance/network calls
+- still no order placement
+- write only risk contract config if explicitly confirmed and tests prove bounded mutation
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
