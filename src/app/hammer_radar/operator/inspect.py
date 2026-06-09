@@ -2597,6 +2597,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-live-execution-enable-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_live_execution_enable_write_gate import (
+            build_tiny_live_live_execution_enable_write_gate,
+            format_tiny_live_live_execution_enable_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_live_execution_enable_write_gate_json(
+                build_tiny_live_live_execution_enable_write_gate(
+                    log_dir=args.log_dir,
+                    write_execution_enable=args.write_execution_enable,
+                    confirm_tiny_live_live_execution_enable_write=(
+                        args.confirm_tiny_live_live_execution_enable_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4585,6 +4602,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_live_execution_enable_preview_parser.add_argument(
         "--confirm-tiny-live-live-execution-enable-preview",
+        default=None,
+    )
+
+    tiny_live_live_execution_enable_write_gate_parser = subparsers.add_parser(
+        "tiny-live-live-execution-enable-write-gate",
+        parents=[parent],
+    )
+    tiny_live_live_execution_enable_write_gate_parser.add_argument("--write-execution-enable", action="store_true")
+    tiny_live_live_execution_enable_write_gate_parser.add_argument(
+        "--confirm-tiny-live-live-execution-enable-write",
         default=None,
     )
 
