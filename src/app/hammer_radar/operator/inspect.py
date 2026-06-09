@@ -2580,6 +2580,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-live-execution-enable-preview":
+        from src.app.hammer_radar.operator.tiny_live_live_execution_enable_preview import (
+            build_tiny_live_live_execution_enable_preview,
+            format_tiny_live_live_execution_enable_preview_json,
+        )
+
+        print(
+            format_tiny_live_live_execution_enable_preview_json(
+                build_tiny_live_live_execution_enable_preview(
+                    log_dir=args.log_dir,
+                    record_execution_enable_preview=args.record_execution_enable_preview,
+                    confirm_tiny_live_live_execution_enable_preview=(
+                        args.confirm_tiny_live_live_execution_enable_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4555,6 +4572,19 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_live_authorization_write_gate_parser.add_argument("--write-live-authorization", action="store_true")
     tiny_live_live_authorization_write_gate_parser.add_argument(
         "--confirm-tiny-live-live-authorization-write",
+        default=None,
+    )
+
+    tiny_live_live_execution_enable_preview_parser = subparsers.add_parser(
+        "tiny-live-live-execution-enable-preview",
+        parents=[parent],
+    )
+    tiny_live_live_execution_enable_preview_parser.add_argument(
+        "--record-execution-enable-preview",
+        action="store_true",
+    )
+    tiny_live_live_execution_enable_preview_parser.add_argument(
+        "--confirm-tiny-live-live-execution-enable-preview",
         default=None,
     )
 
