@@ -1,0 +1,557 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R228 Tiny Live 10 of 10 Ready Packet
+
+BRANCH:
+r228-tiny-live-10-of-10-ready-packet
+
+PHASE CLASSIFICATION:
+Primary: DIAGNOSTIC / AUDIT
+Secondary: WIRING / INTEGRATION, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+The official BTCUSDT 8m short tiny-live protected lane has reached the required 10/10 fresh paper capture threshold.
+
+Current fisherman/capture state:
+- official lane: BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count=10
+- required_fresh_capture_count=10
+- threshold_met=true
+- threshold_status=CAPTURE_THRESHOLD_MET
+- latest_captured_signal_id=BTCUSDT|8m|short|2026-06-09T03:03:59.999000+00:00
+- latest heartbeat age was recently ~7 seconds
+- watcher_likely_running=true
+- watcher_stale=false
+- recommended old path=RUN_R177_EVIDENCE_THRESHOLD_RECHECK
+
+Important naming reconciliation:
+Older capture sync recommends RUN_R177_EVIDENCE_THRESHOLD_RECHECK.
+This phase R228 is the current modern 10/10 ready packet path.
+R228 must consume/reconcile the old R177 threshold recheck recommendation without creating a new R177 branch.
+
+Track B context:
+R235-R238 made betrayal structurally complete for now.
+R238 status was BETRAYAL_TRACK_B_STRUCTURALLY_COMPLETE_WAITING_FOR_DATA.
+Track B must remain inactive/no-promotion/no-live in this phase.
+Do not reopen betrayal architecture here.
+
+CORE INTENT:
+Produce a paper-only, audit-only tiny-live 10/10 readiness packet for the official protected lane.
+
+This phase must:
+- verify the 10/10 threshold
+- verify all 10 capture identities
+- verify freshness and uniqueness
+- verify watcher/fisherman health
+- verify official lane has not changed
+- verify evidence quality using existing enriched/outcome/performance data
+- verify safety gates remain closed
+- verify no live authorization exists
+- verify no order payload exists
+- verify no Binance/network calls happen
+- produce a next-action packet for operator review
+
+This phase must NOT:
+- place orders
+- enable live
+- arm a lane
+- write risk contract config
+- write live config
+- call Binance
+- call network
+- change lane mode
+- disable kill switch
+- promote any lane
+- promote betrayal
+- mutate configs
+- mutate env
+- append normal paper outcomes
+- create executable payloads
+
+PURPOSE:
+Create a tiny-live 10/10 ready packet module and inspect CLI that:
+1. Reads official capture-count sync for BTCUSDT 8m short.
+2. Confirms fresh_capture_count >= 10.
+3. Confirms required_fresh_capture_count == 10.
+4. Confirms threshold_met=true.
+5. Confirms each official captured signal is unique.
+6. Confirms latest capture timestamp exists.
+7. Confirms watcher/fisherman heartbeat is fresh and not stale.
+8. Confirms official lane key remains BTCUSDT|8m|short|ladder_close_50_618.
+9. Reads R232/R233/R235-R238 context where useful.
+10. Produces an evidence threshold recheck section that supersedes older RUN_R177_EVIDENCE_THRESHOLD_RECHECK.
+11. Produces tiny-live readiness packet with all gates separated:
+    - evidence_ready
+    - fisherman_ready
+    - operator_review_ready
+    - risk_contract_ready
+    - live_execution_ready
+    - order_ready
+12. Keeps risk_contract_ready=false unless an existing approved risk contract is already present.
+13. Keeps live_execution_ready=false.
+14. Keeps order_ready=false.
+15. Keeps live_ready_today=false unless every explicit non-live gate is satisfied and live authorization exists, which should not happen in this phase.
+16. Produces recommended next engineering move.
+
+CRITICAL SAFETY:
+This phase is readiness packet only.
+It must never execute, arm, submit, sign, or create an order.
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No executable payload.
+- No order payload.
+- No live authorization.
+- No live flag changes.
+- No kill switch disable.
+- No lane mode changes.
+- No tiny_live lane mode setting.
+- No risk contract config write.
+- No env write.
+- No config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/capture_threshold_recovery_8m_short.py if present
+- src/app/hammer_radar/operator/fisherman_watchdog_ledger_reconciliation.py if present
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+- src/app/hammer_radar/operator/capture_priority_rebalance.py
+- src/app/hammer_radar/operator/betrayal_ranking_feed_preview.py
+- src/app/hammer_radar/operator/betrayal_true_inverse_outcome_capture_bridge.py
+- src/app/hammer_radar/operator/betrayal_paper_outcome_tracking_bridge.py
+- src/app/hammer_radar/operator/betrayal_signal_origin_integration_contract.py
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/final_live_preflight.py if present
+- src/app/hammer_radar/operator/tiny_live* files if present
+- src/app/hammer_radar/operator/risk* files if present
+
+Inspect ledgers:
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/capture_threshold_recovery_8m_short.ndjson
+- logs/hammer_radar_forward/fisherman_watchdog_ledger_reconciliation.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture.ndjson
+- logs/hammer_radar_forward/short_paper_evidence_capture_heartbeats.ndjson
+- logs/hammer_radar_forward/full_spectrum_harvester_heartbeats.ndjson
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/betrayal_ranking_feed_preview.ndjson
+- logs/hammer_radar_forward/betrayal_true_inverse_outcome_capture_bridge.ndjson
+- logs/hammer_radar_forward/betrayal_paper_outcome_tracking_bridge.ndjson
+- logs/hammer_radar_forward/betrayal_signal_origin_integration_contract.ndjson
+- logs/hammer_radar_forward/paper_outcomes.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- docs/hammer_radar/live_readiness/R238_BETRAYAL_RANKING_FEED_PREVIEW.md
+- docs/hammer_radar/live_readiness/R237_BETRAYAL_TRUE_INVERSE_OUTCOME_CAPTURE_BRIDGE.md
+- docs/hammer_radar/live_readiness/R236_BETRAYAL_PAPER_OUTCOME_TRACKING_BRIDGE.md
+- docs/hammer_radar/live_readiness/R235_BETRAYAL_SIGNAL_ORIGIN_INTEGRATION_CONTRACT.md
+- existing R228 draft/task if present
+
+Inspect tests:
+- tests/hammer_radar/test_betrayal_ranking_feed_preview.py
+- tests/hammer_radar/test_betrayal_true_inverse_outcome_capture_bridge.py
+- tests/hammer_radar/test_betrayal_paper_outcome_tracking_bridge.py
+- tests/hammer_radar/test_betrayal_signal_origin_integration_contract.py
+- tests/hammer_radar/test_lane_outcome_enrichment.py
+- tests/hammer_radar/test_capture_priority_rebalance.py
+- tests/hammer_radar/test_*tiny* if present
+- tests/hammer_radar/test_*live* if present
+- tests/hammer_radar/test_*risk* if present
+
+REUSE / EXTEND:
+Reuse existing capture sync logic.
+Reuse existing fisherman/watcher status logic.
+Reuse existing lane outcome enrichment if available.
+Reuse existing safety flag conventions from R235-R238.
+Reuse docs/index patterns.
+Do not duplicate ledger parsing where helpers exist.
+Do not mutate configs.
+Do not call Binance/network.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+
+Expose:
+- build_tiny_live_10_of_10_ready_packet
+- load_latest_capture_count_sync_8m_short
+- load_latest_fisherman_health_context
+- load_latest_lane_outcome_context
+- load_latest_capture_priority_context
+- load_latest_track_b_structural_context
+- normalize_official_capture_signal_ids
+- build_capture_threshold_recheck
+- build_fisherman_health_recheck
+- build_evidence_quality_recheck
+- build_tiny_live_gate_matrix
+- build_operator_ready_packet
+- build_tiny_live_10_of_10_recommendations
+- classify_tiny_live_10_of_10_packet_status
+- append_tiny_live_10_of_10_ready_packet_record
+- load_tiny_live_10_of_10_ready_packet_records
+- summarize_tiny_live_10_of_10_ready_packet_records
+
+STATUS ENUM:
+- TINY_LIVE_10_OF_10_READY_PACKET_READY
+- TINY_LIVE_10_OF_10_READY_PACKET_REJECTED
+- TINY_LIVE_10_OF_10_READY_PACKET_RECORDED
+- TINY_LIVE_10_OF_10_READY_PACKET_BLOCKED
+- TINY_LIVE_10_OF_10_READY_PACKET_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_10_OF_10_EVIDENCE_READY_OPERATOR_REVIEW_REQUIRED
+- TINY_LIVE_10_OF_10_BLOCKED_BY_RISK_CONTRACT
+- TINY_LIVE_10_OF_10_BLOCKED_BY_LIVE_AUTHORIZATION
+- TINY_LIVE_10_OF_10_BLOCKED_BY_FISHERMAN_STALE
+- TINY_LIVE_10_OF_10_BLOCKED_BY_EVIDENCE_GAP
+- TINY_LIVE_10_OF_10_NOT_MET
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+READINESS RULES:
+Evidence threshold is ready only if:
+- official_lane_key == BTCUSDT|8m|short|ladder_close_50_618
+- fresh_capture_count >= 10
+- required_fresh_capture_count == 10
+- threshold_met == true
+- threshold_status == CAPTURE_THRESHOLD_MET
+- there are at least 10 unique captured signal IDs
+- latest captured signal ID exists
+- latest captured signal timestamp exists
+- watcher_likely_running == true
+- watcher_stale == false
+
+Operator packet may be ready if evidence threshold is ready.
+Risk contract must remain not ready unless explicit approved risk contract exists.
+Live execution must remain not ready.
+Order must remain not ready.
+No order payload may be created.
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "packet_recorded": false,
+  "packet_record_id": null,
+  "record_packet_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "paper_only": true,
+    "live_authorized": false,
+    "tiny_live_ready_packet_only": true
+  },
+  "capture_threshold_recheck": {
+    "fresh_capture_count": ...,
+    "required_fresh_capture_count": 10,
+    "threshold_met": true/false,
+    "threshold_status": "...",
+    "unique_capture_count": ...,
+    "latest_captured_signal_id": "...",
+    "latest_capture_timestamp": "...",
+    "captured_signal_ids": [...],
+    "evidence_threshold_ready": true/false,
+    "old_recommendation_reconciled": "RUN_R177_EVIDENCE_THRESHOLD_RECHECK",
+    "modern_path": "R228_TINY_LIVE_10_OF_10_READY_PACKET"
+  },
+  "fisherman_health_recheck": {
+    "latest_heartbeat_found": true/false,
+    "heartbeat_age_seconds": ...,
+    "stale_after_seconds": ...,
+    "watcher_likely_running": true/false,
+    "watcher_stale": true/false,
+    "latest_heartbeat_status": "...",
+    "fisherman_ready": true/false
+  },
+  "evidence_quality_recheck": {
+    "lane_outcome_context_found": true/false,
+    "capture_priority_context_found": true/false,
+    "known_outcome_count": ...,
+    "win_rate_pct": ...,
+    "combined_watch_score": ...,
+    "quality_status": "READY|PARTIAL|MISSING|UNKNOWN",
+    "notes": [...]
+  },
+  "track_b_context": {
+    "track_b_structurally_complete_for_now": true/false,
+    "waiting_for_data_not_architecture": true/false,
+    "betrayal_live_authorized": false,
+    "betrayal_promoted": false,
+    "track_b_action_required_now": false
+  },
+  "tiny_live_gate_matrix": {
+    "evidence_ready": true/false,
+    "fisherman_ready": true/false,
+    "operator_review_ready": true/false,
+    "risk_contract_ready": false,
+    "live_authorization_ready": false,
+    "live_execution_ready": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_ready_packet": {
+    "packet_ready_for_operator_review": true/false,
+    "operator_should_review": true/false,
+    "operator_should_place_order": false,
+    "operator_should_enable_live": false,
+    "next_required_human_action": "REVIEW_R228_PACKET|WAIT|FIX_FISHERMAN|RECHECK_EVIDENCE",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not enable live",
+      "do not disable kill switch",
+      "do not fund based on this packet alone"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "ready_packet_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "write risk contract config",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- paper_outcomes_appended=false
+- strategy_performance_appended=false
+- strategy_promotion_status_appended=false
+- ranking_scores_fabricated=false
+- win_rates_fabricated=false
+- promotion_eligibility_fabricated=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- live_execution_enabled=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- tiny_live_ready_packet_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE 10 OF 10 READY PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL.
+
+CLI:
+Wire into inspect.py as:
+tiny-live-10-of-10-ready-packet
+
+Args:
+- --record-packet
+- --confirm-tiny-live-10-of-10-ready-packet <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  --record-packet \
+  --confirm-tiny-live-10-of-10-ready-packet "I CONFIRM TINY LIVE 10 OF 10 READY PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  --record-packet \
+  --confirm-tiny-live-10-of-10-ready-packet "wrong"
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+
+Test:
+- preview writes no record
+- wrong confirmation rejects
+- correct confirmation records packet only
+- status ready when official capture count is 10/10 and watcher fresh
+- status not ready when capture count below 10
+- status blocked when watcher stale
+- official lane key cannot change
+- old R177 recommendation is reconciled to R228 modern path
+- evidence_ready does not imply risk_contract_ready
+- evidence_ready does not imply live_authorization_ready
+- evidence_ready does not imply order_ready
+- live_ready_today remains false without explicit live authorization/risk contract
+- order payload is never created
+- no env/config mutation
+- no risk contract write
+- no lane promotion
+- no live authorization
+- no Binance/network calls
+- no betrayal promotion
+- Track B context remains passive
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R238/R237/R236/R235/R233/R232/live/risk/tiny tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  | jq '.status, .target_scope, .capture_threshold_recheck, .fisherman_health_recheck, .evidence_quality_recheck, .track_b_context, .tiny_live_gate_matrix, .operator_ready_packet, .ready_packet_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  --record-packet \
+  --confirm-tiny-live-10-of-10-ready-packet "I CONFIRM TINY LIVE 10 OF 10 READY PACKET RECORDING ONLY; NO CONFIG WRITE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .packet_recorded, .capture_threshold_recheck, .tiny_live_gate_matrix, .operator_ready_packet, .ready_packet_overall_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-10-of-10-ready-packet \
+  --record-packet \
+  --confirm-tiny-live-10-of-10-ready-packet "wrong" \
+  | jq '.status, .confirmation_valid, .packet_recorded, .safety'
+
+Config/env/feed unchanged:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Final tiny-live sync after smoke:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  capture-count-sync-8m-short \
+  | jq '.capture_count, .watcher_status, .threshold_status, .recommended_next_operator_move'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- capture_threshold_recheck
+- fisherman_health_recheck
+- tiny_live_gate_matrix
+- operator_ready_packet
+- ready_packet_overall_status
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R228 current modern status.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R229_TINY_LIVE_RISK_CONTRACT_PREVIEW.md
+
+R229 should:
+- consume R228 packet
+- create risk contract preview only
+- no config writes unless explicitly separated and confirmed in a later phase
+- no live execution
+- no Binance/network calls
+- no order placement
+- no lane mode change
+
+Also keep:
+codex_tasks/phases/R239_TRACK_B_LIGHTWEIGHT_STATUS_AND_WAIT.md
+but note it is postponed behind the tiny-live 10/10 gate path.
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.

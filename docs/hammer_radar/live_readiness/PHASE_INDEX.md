@@ -2,6 +2,12 @@
 
 This index maps the R101-R183 first-live readiness path. It is documentation only and does not change runtime trading behavior.
 
+## Current Modern Tiny-Live Gate Path
+
+- R228 Tiny Live 10 Of 10 Ready Packet is the current modern path for the official `BTCUSDT|8m|short|ladder_close_50_618` 10/10 paper-capture threshold. It consumes and reconciles the older `RUN_R177_EVIDENCE_THRESHOLD_RECHECK` recommendation without opening a new R177 branch. Primary command: `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-10-of-10-ready-packet`. Safety state: packet/review only; no config writes, Binance/network calls, live authorization, order payloads, lane mode changes, or promotions. Artifact: `docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md`.
+- R229 Tiny Live Risk Contract Preview is the next engineering move after an operator-review-ready R228 packet. It must preview only and must not write risk-contract config, enable live execution, call Binance/network, place orders, create order payloads, or change lane mode. Artifact: `codex_tasks/phases/R229_TINY_LIVE_RISK_CONTRACT_PREVIEW.md`.
+- R239 Track B Lightweight Status And Wait remains postponed behind the R228/R229 tiny-live gate path. Track B stays structurally complete for now, waiting for data, with no betrayal promotion or live action.
+
 | Phase | Status | Purpose | Primary Command | Safety State | Artifact / Doc Path | Agent Roles |
 |---|---|---|---|---|---|---|
 | R101 live readiness index | Complete | Repo-grounded index of live-readiness surfaces and blockers before tiny-live arming. | None; review document only. | BLOCKED; no live trading, no env changes, no orders. | `docs/hammer_radar/live_readiness/R101_LIVE_READINESS_INDEX.md` | index, security |
