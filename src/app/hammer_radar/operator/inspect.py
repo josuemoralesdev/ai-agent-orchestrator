@@ -2629,6 +2629,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-lane-arm-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_lane_arm_write_gate import (
+            build_tiny_live_lane_arm_write_gate,
+            format_tiny_live_lane_arm_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_lane_arm_write_gate_json(
+                build_tiny_live_lane_arm_write_gate(
+                    log_dir=args.log_dir,
+                    write_lane_arm=args.write_lane_arm,
+                    confirm_tiny_live_lane_arm_write=args.confirm_tiny_live_lane_arm_write,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4637,6 +4652,16 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_lane_arm_preview_parser.add_argument("--record-lane-arm-preview", action="store_true")
     tiny_live_lane_arm_preview_parser.add_argument(
         "--confirm-tiny-live-lane-arm-preview",
+        default=None,
+    )
+
+    tiny_live_lane_arm_write_gate_parser = subparsers.add_parser(
+        "tiny-live-lane-arm-write-gate",
+        parents=[parent],
+    )
+    tiny_live_lane_arm_write_gate_parser.add_argument("--write-lane-arm", action="store_true")
+    tiny_live_lane_arm_write_gate_parser.add_argument(
+        "--confirm-tiny-live-lane-arm-write",
         default=None,
     )
 
