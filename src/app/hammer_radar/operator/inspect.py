@@ -2505,6 +2505,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-10-of-10-ready-packet":
+        from src.app.hammer_radar.operator.tiny_live_10_of_10_ready_packet import (
+            build_tiny_live_10_of_10_ready_packet,
+            format_tiny_live_10_of_10_ready_packet_json,
+        )
+
+        print(
+            format_tiny_live_10_of_10_ready_packet_json(
+                build_tiny_live_10_of_10_ready_packet(
+                    log_dir=args.log_dir,
+                    record_packet=args.record_packet,
+                    confirm_tiny_live_10_of_10_ready_packet=args.confirm_tiny_live_10_of_10_ready_packet,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4432,6 +4447,16 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_count_sync_parser.add_argument("--lane-key", default="BTCUSDT|8m|short|ladder_close_50_618")
     capture_count_sync_parser.add_argument("--record-sync", action="store_true")
     capture_count_sync_parser.add_argument("--confirm-capture-count-sync", default=None)
+
+    tiny_live_10_of_10_ready_packet_parser = subparsers.add_parser(
+        "tiny-live-10-of-10-ready-packet",
+        parents=[parent],
+    )
+    tiny_live_10_of_10_ready_packet_parser.add_argument("--record-packet", action="store_true")
+    tiny_live_10_of_10_ready_packet_parser.add_argument(
+        "--confirm-tiny-live-10-of-10-ready-packet",
+        default=None,
+    )
 
     tiny_live_readiness_gap_recheck_parser = subparsers.add_parser(
         "tiny-live-readiness-gap-recheck",

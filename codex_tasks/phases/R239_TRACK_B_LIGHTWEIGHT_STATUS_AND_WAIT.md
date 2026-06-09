@@ -4,6 +4,8 @@
 
 Report lightweight status only while Track B waits for real betrayal true-inverse outcome data. R239 should summarize official tiny-live progress, alternate 8m long status, Track B structural completion, and betrayal waiting-for-data state.
 
+R239 is postponed behind the current tiny-live 10/10 gate path. Run R228 first, then R229 risk-contract preview if R228 is operator-review ready. Do not reopen betrayal architecture while the protected tiny-live lane packet path is active.
+
 ## Inputs
 
 - R238 betrayal ranking feed preview
