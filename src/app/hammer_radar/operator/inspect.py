@@ -2550,6 +2550,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-live-authorization-preview":
+        from src.app.hammer_radar.operator.tiny_live_live_authorization_preview import (
+            build_tiny_live_live_authorization_preview,
+            format_tiny_live_live_authorization_preview_json,
+        )
+
+        print(
+            format_tiny_live_live_authorization_preview_json(
+                build_tiny_live_live_authorization_preview(
+                    log_dir=args.log_dir,
+                    record_authorization_preview=args.record_authorization_preview,
+                    confirm_tiny_live_live_authorization_preview=args.confirm_tiny_live_live_authorization_preview,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4505,6 +4520,16 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_risk_contract_config_write_gate_parser.add_argument("--write-risk-config", action="store_true")
     tiny_live_risk_contract_config_write_gate_parser.add_argument(
         "--confirm-tiny-live-risk-contract-config-write",
+        default=None,
+    )
+
+    tiny_live_live_authorization_preview_parser = subparsers.add_parser(
+        "tiny-live-live-authorization-preview",
+        parents=[parent],
+    )
+    tiny_live_live_authorization_preview_parser.add_argument("--record-authorization-preview", action="store_true")
+    tiny_live_live_authorization_preview_parser.add_argument(
+        "--confirm-tiny-live-live-authorization-preview",
         default=None,
     )
 
