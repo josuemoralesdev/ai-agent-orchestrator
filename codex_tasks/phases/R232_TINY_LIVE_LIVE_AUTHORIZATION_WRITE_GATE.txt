@@ -1,0 +1,596 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R232 Tiny-Live Live Authorization Write Gate
+
+BRANCH:
+r232-tiny-live-live-authorization-write-gate
+
+PHASE CLASSIFICATION:
+Primary: CONTROLLED AUTHORIZATION WRITE GATE
+Secondary: WIRING / INTEGRATION, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: HIGH
+
+WHY THIS PHASE EXISTS:
+R231 Tiny-Live Live Authorization Preview succeeded and has been committed.
+
+Current path:
+- R228 confirmed official tiny-live 10/10 evidence packet.
+- R229 created tiny-live risk contract preview.
+- R230 wrote the tiny-live risk contract config under exact confirmation.
+- R231 produced live authorization preview only.
+- R232 must now create a guarded live authorization write gate.
+
+Current official lane:
+- BTCUSDT|8m|short|ladder_close_50_618
+
+Current R231 state:
+- status=TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW_READY
+- matching_risk_contract_found=true
+- matching_risk_contract_valid=true
+- risk_contract_config_ready=true
+- live_authorization_preview_ready=true
+- live_authorization_written=false
+- live_execution_ready=false
+- lane_armed=false
+- order_ready=false
+- live_ready_today=false
+- live_authorization_preview_overall_status=TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW_READY_FOR_FUTURE_GATE
+- recommended next engineering=Create R232 guarded live authorization write gate; still no live execution, Binance/network calls, orders, or lane arming.
+
+R232 may write a local live authorization record only when exact confirmation is provided.
+R232 must NOT enable live execution.
+R232 must NOT arm the lane.
+R232 must NOT place orders.
+R232 must NOT call Binance/network.
+R232 must NOT create executable payloads.
+
+CORE INTENT:
+Move from live authorization preview to a guarded live authorization write gate.
+
+This phase must:
+- preview the live authorization mutation before writing
+- reject wrong confirmation
+- write only the bounded live authorization record/config/ledger when exact confirmation is provided
+- keep live execution disabled
+- keep lane unarmed
+- keep order forbidden
+- keep Binance/network forbidden
+- keep kill switch enabled
+- produce post-write verification
+
+This phase is an authorization write gate only, not live execution.
+
+PURPOSE:
+Create a module and inspect CLI that:
+1. Reads latest R231 live authorization preview.
+2. Reads latest R230 risk contract config write gate.
+3. Reads current tiny-live risk contract config.
+4. Confirms official lane remains BTCUSDT|8m|short|ladder_close_50_618.
+5. Confirms R228 evidence remains ready.
+6. Confirms risk contract config exists and is valid.
+7. Builds the exact target live authorization object.
+8. Provides a preview without writing by default.
+9. Requires exact confirmation phrase to write authorization.
+10. Writes only the bounded live authorization artifact when confirmed.
+11. Does not modify lane controls.
+12. Does not enable live execution.
+13. Does not arm lane.
+14. Does not create order payload.
+15. Does not call Binance/network.
+16. Produces a post-write verification packet.
+17. Produces recommended next phase.
+
+CRITICAL SAFETY:
+This phase may write a local live authorization artifact only with exact confirmation.
+This phase must not enable actual trading.
+
+Allowed mutation only when exact confirmation phrase is provided:
+- A local authorization ledger or config entry for tiny-live authorization.
+- Prefer an append-only ledger:
+  logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson
+- If an existing live authorization config file already exists and is clearly used by the system, use its established bounded shape.
+- If no existing config file exists, DO NOT invent a live-enabled config. Record authorization as local audit/ledger only and mark live execution still disabled.
+
+Forbidden mutations:
+- .env
+- configs/hammer_radar/lane_controls.json
+- configs that enable live execution
+- configs that arm lane
+- scheduler/fisherman configs
+- order payload files
+- Binance/network state
+- paper/outcome/ranking ledgers except this phase audit ledger
+
+Never execute:
+- Binance order
+- Binance test order
+- transfer
+- withdraw
+- signed trading request
+- signed order request
+- live connector submit
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No executable payload.
+- No order payload.
+- No live execution enable.
+- No global live flag changes.
+- No kill switch disable.
+- No lane mode changes.
+- No tiny_live lane arming.
+- No env write.
+- No lane controls write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE AUTHORIZATION WRITE ONLY; NO LIVE ENABLE; NO ORDER; NO BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_live_authorization_preview.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_config_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_preview.py
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/final_live_preflight.py if present
+- src/app/hammer_radar/operator/tiny_live* files if present
+- src/app/hammer_radar/operator/risk* files if present
+- src/app/hammer_radar/operator/*authorization* files if present
+- src/app/hammer_radar/operator/strategy_evidence_registry.py
+- src/app/hammer_radar/operator/strategy_performance.py if present
+- src/app/hammer_radar/operator/strategy_promotion_status.py if present
+- src/app/hammer_radar/operator/capture_count_sync_8m_short.py if present
+- src/app/hammer_radar/operator/lane_outcome_enrichment.py
+
+Inspect configs:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers:
+- logs/hammer_radar_forward/tiny_live_live_authorization_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_config_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R231_TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW.md
+- docs/hammer_radar/live_readiness/R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R229_TINY_LIVE_RISK_CONTRACT_PREVIEW.md
+- docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- existing live/tiny/risk docs if present
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_live_authorization_preview.py
+- tests/hammer_radar/test_tiny_live_risk_contract_config_write_gate.py
+- tests/hammer_radar/test_tiny_live_risk_contract_preview.py
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+- tests/hammer_radar/test_*authorization* if present
+- tests/hammer_radar/test_*risk* if present
+- tests/hammer_radar/test_*live* if present
+- tests/hammer_radar/test_*tiny* if present
+
+REUSE / EXTEND:
+Reuse R231 preview loader and fields.
+Reuse R230 config validation.
+Reuse R228/R229 loaders.
+Reuse existing authorization conventions if present.
+Reuse existing safety flag conventions.
+Do not duplicate ledger parsing where helpers exist.
+Do not call Binance/network.
+Do not mutate configs unless an existing, safe authorization config pattern already exists.
+Prefer authorization ledger over enabling config.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_live_authorization_write_gate.py
+
+Expose:
+- build_tiny_live_live_authorization_write_gate
+- load_latest_tiny_live_live_authorization_preview
+- load_latest_tiny_live_risk_contract_config_write_gate
+- load_latest_tiny_live_10_of_10_ready_packet
+- load_tiny_live_risk_contract_config
+- build_live_authorization_object
+- validate_live_authorization_object
+- build_live_authorization_write_preview
+- write_live_authorization_if_confirmed
+- build_post_write_authorization_verification
+- build_live_authorization_write_gate_matrix
+- build_operator_authorization_write_review_packet
+- classify_tiny_live_live_authorization_write_status
+- append_tiny_live_live_authorization_write_gate_record
+- load_tiny_live_live_authorization_write_gate_records
+- summarize_tiny_live_live_authorization_write_gate_records
+
+STATUS ENUM:
+- TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE_READY
+- TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE_REJECTED
+- TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE_WRITTEN
+- TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE_BLOCKED
+- TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_AUTHORIZATION_WRITE_READY_FOR_CONFIRMATION
+- TINY_LIVE_AUTHORIZATION_WRITTEN_LIVE_EXECUTION_REQUIRED_LATER
+- TINY_LIVE_AUTHORIZATION_WRITE_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_AUTHORIZATION_WRITE_BLOCKED_BY_R231_PREVIEW
+- TINY_LIVE_AUTHORIZATION_WRITE_BLOCKED_BY_RISK_CONTRACT
+- TINY_LIVE_AUTHORIZATION_WRITE_BLOCKED_BY_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+LIVE AUTHORIZATION OBJECT SHAPE:
+{
+  "authorization_id": "r232_authorization_BTCUSDT_8m_short_ladder_close_50_618",
+  "authorization_version": "tiny_live_authorization_v1",
+  "created_by_phase": "R232_TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE",
+  "created_at": "...",
+  "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+  "symbol": "BTCUSDT",
+  "timeframe": "8m",
+  "direction": "short",
+  "entry_mode": "ladder_close_50_618",
+  "source_live_authorization_preview_id": "...",
+  "source_risk_contract_id": "r230_contract_BTCUSDT_8m_short_ladder_close_50_618",
+  "risk_contract_config_ready": true,
+  "evidence_ready": true,
+  "fisherman_ready": true,
+  "authorization_scope": "tiny_live_single_lane",
+  "authorization_status": "AUTHORIZED_NOT_ARMED_NOT_EXECUTABLE",
+  "live_authorized": true,
+  "live_execution_enabled": false,
+  "lane_armed": false,
+  "order_payload_allowed": false,
+  "binance_call_allowed": false,
+  "kill_switch_required": true,
+  "operator_final_approval_required": true,
+  "live_execution_enable_required_later": true,
+  "lane_arm_required_later": true,
+  "order_preflight_required_later": true,
+  "notes": [
+    "R232 writes authorization only; it does not enable live execution.",
+    "Lane arming, live execution enablement, order payload creation, and Binance/network calls remain forbidden.",
+    "A later phase must separately gate live execution enablement and lane arming."
+  ]
+}
+
+VALIDATION RULES:
+Authorization object valid only if:
+- official_lane_key is BTCUSDT|8m|short|ladder_close_50_618
+- symbol BTCUSDT
+- timeframe 8m
+- direction short
+- entry_mode ladder_close_50_618
+- risk_contract_config_ready=true
+- evidence_ready=true
+- fisherman_ready=true
+- live_authorized=true
+- live_execution_enabled=false
+- lane_armed=false
+- order_payload_allowed=false
+- binance_call_allowed=false
+- kill_switch_required=true
+- operator_final_approval_required=true
+- live_execution_enable_required_later=true
+- lane_arm_required_later=true
+- order_preflight_required_later=true
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "authorization_written": false,
+  "record_gate_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "authorization_write_gate_only": true,
+    "live_execution_enabled": false,
+    "lane_armed": false,
+    "order_payload_allowed": false
+  },
+  "input_summary": {
+    "r231_preview_found": true/false,
+    "r231_preview_ready": true/false,
+    "r230_risk_contract_config_found": true/false,
+    "risk_contract_valid": true/false,
+    "r228_evidence_ready": true/false,
+    "fisherman_ready": true/false
+  },
+  "authorization_write_preview": {
+    "would_write": true/false,
+    "write_requires_confirmation": true,
+    "target_authorization_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "bounded_mutation_only": true,
+    "authorization_artifact": "ledger_only|existing_authorization_config",
+    "proposed_authorization": {...}
+  },
+  "authorization_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": []
+  },
+  "post_write_verification": {
+    "authorization_written": true/false,
+    "matching_authorization_found": true/false,
+    "matching_authorization_valid": true/false,
+    "live_authorized": true/false,
+    "live_execution_enabled": false,
+    "lane_armed": false,
+    "order_payload_created": false,
+    "binance_call_allowed": false
+  },
+  "live_authorization_write_gate_matrix": {
+    "r231_preview_ready": true/false,
+    "risk_contract_config_ready": true/false,
+    "authorization_valid": true/false,
+    "authorization_write_confirmed": true/false,
+    "live_authorization_written": true/false,
+    "live_authorized": true/false,
+    "live_execution_enabled": false,
+    "lane_armed": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_authorization_write_review_packet": {
+    "operator_should_review_authorization_write": true/false,
+    "operator_confirmation_required": true,
+    "operator_should_enable_live": false,
+    "operator_should_arm_lane": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R232_AUTHORIZATION_WRITE|REVIEW_R232_RESULT|WAIT",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not enable live execution",
+      "do not disable kill switch",
+      "do not arm lane from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "authorization_write_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "global live flag arming",
+    "kill switch disable",
+    "set any lane tiny_live",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false unless existing safe authorization config is deliberately used
+- risk_contract_config_written=false
+- lane_config_written=false
+- lane_controls_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- live_config_written=false
+- live_authorization_written=true only when exact confirmation writes authorization artifact
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- paper_outcomes_appended=false
+- strategy_performance_appended=false
+- strategy_promotion_status_appended=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=true only when exact confirmation writes authorization artifact
+- live_execution_enabled=false
+- lane_armed=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- authorization_write_gate_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson
+
+CLI:
+Wire into inspect.py as:
+tiny-live-live-authorization-write-gate
+
+Args:
+- --write-live-authorization
+- --confirm-tiny-live-live-authorization-write <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate \
+  --write-live-authorization \
+  --confirm-tiny-live-live-authorization-write "wrong"
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate \
+  --write-live-authorization \
+  --confirm-tiny-live-live-authorization-write "I CONFIRM TINY LIVE AUTHORIZATION WRITE ONLY; NO LIVE ENABLE; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_live_authorization_write_gate.py
+
+Test:
+- preview writes no authorization
+- wrong confirmation rejects and writes no authorization
+- exact confirmation writes only authorization artifact
+- if ledger-only, append only tiny_live_live_authorization_write_gate.ndjson
+- live authorization object validates
+- authorization has live_authorized true but live_execution_enabled false
+- lane_armed remains false
+- order_payload_allowed remains false
+- binance_call_allowed remains false
+- order_payload_created remains false
+- live execution is not enabled
+- lane controls are not mutated
+- env is not mutated
+- risk contract config is not mutated
+- no Binance/network calls
+- no order/live execution/transfer/withdraw actions
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R231/R230/R229/R228/risk/live/tiny tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate \
+  | jq '.status, .target_scope, .input_summary, .authorization_write_preview, .authorization_validation, .post_write_verification, .live_authorization_write_gate_matrix, .operator_authorization_write_review_packet, .authorization_write_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate \
+  --write-live-authorization \
+  --confirm-tiny-live-live-authorization-write "wrong" \
+  | jq '.status, .confirmation_valid, .authorization_written, .live_authorization_write_gate_matrix, .safety'
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-write-gate \
+  --write-live-authorization \
+  --confirm-tiny-live-live-authorization-write "I CONFIRM TINY LIVE AUTHORIZATION WRITE ONLY; NO LIVE ENABLE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .authorization_written, .post_write_verification, .live_authorization_write_gate_matrix, .operator_authorization_write_review_packet, .authorization_write_overall_status, .safety'
+
+Config/env/feed mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected authorization artifact diff/status:
+git status --short logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson 2>/dev/null || true
+
+Final R231 preview sync:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-live-authorization-preview \
+  | jq '.status, .live_authorization_gate_matrix, .live_authorization_preview_overall_status'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- authorization_write_preview
+- authorization_validation
+- post_write_verification
+- live_authorization_write_gate_matrix
+- operator_authorization_write_review_packet
+- authorization_write_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R232_TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R232.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R233_TINY_LIVE_LIVE_EXECUTION_ENABLE_PREVIEW.md
+
+R233 should:
+- consume R232 authorization write gate
+- preview live execution enablement requirements
+- no live execution
+- no Binance/network calls
+- no order placement
+- no lane arming unless separately gated later
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not perform live trading actions.
+Only write authorization artifact if exact confirmation command is explicitly run.
