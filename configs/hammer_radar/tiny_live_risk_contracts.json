@@ -30,6 +30,45 @@
       "take_profit_distance_pct": 0.7,
       "take_profit_required": true,
       "timeframe": "13m"
+    },
+    {
+      "approval_status": "CONFIG_WRITTEN_NOT_LIVE_AUTHORIZED",
+      "approved": false,
+      "binance_call_forbidden_until_live_gate": true,
+      "capital_mode": "tiny_live",
+      "contract_id": "r230_contract_BTCUSDT_8m_short_ladder_close_50_618",
+      "contract_version": "tiny_live_risk_contract_v1",
+      "created_at": "2026-06-09T17:11:46.094295+00:00",
+      "created_by_phase": "R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE",
+      "direction": "short",
+      "enabled_for_preflight": false,
+      "entry_mode": "ladder_close_50_618",
+      "kill_switch_required": true,
+      "leverage": 1,
+      "live_authorization_required_later": true,
+      "live_authorized": false,
+      "live_execution_enabled": false,
+      "max_account_risk_usdt": 44,
+      "max_loss_usdt": 4.44,
+      "max_margin_usdt": 44,
+      "max_notional_usdt": 44,
+      "max_position_notional_usdt": 44,
+      "notes": [
+        "R230 writes only this local risk-contract config entry.",
+        "Live authorization, lane arming, order payload creation, and Binance/network calls remain forbidden.",
+        "A later phase must separately preview live authorization requirements before any live action."
+      ],
+      "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+      "operator_final_approval_required": true,
+      "order_payload_forbidden_until_live_gate": true,
+      "protective_stop_required": true,
+      "risk_reward_ratio": 2.0,
+      "source_preview_id": "r229_risk_preview_73097d0692ac4e348333d9cb3df1911e",
+      "stop_required": true,
+      "symbol": "BTCUSDT",
+      "take_profit_required": true,
+      "timeframe": "8m",
+      "tiny_live_margin_usdt": 44
     }
   ]
 }
