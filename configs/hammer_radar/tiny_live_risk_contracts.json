@@ -32,10 +32,11 @@
       "timeframe": "13m"
     },
     {
+      "adjustment_source_phase": "R243_TINY_LIVE_LEVERAGE_NOTIONAL_ADJUSTMENT_PREVIEW",
       "approval_status": "CONFIG_WRITTEN_NOT_LIVE_AUTHORIZED",
       "approved": false,
       "binance_call_forbidden_until_live_gate": true,
-      "capital_mode": "tiny_live",
+      "capital_mode": "tiny_live_margin_10x",
       "contract_id": "r230_contract_BTCUSDT_8m_short_ladder_close_50_618",
       "contract_version": "tiny_live_risk_contract_v1",
       "created_at": "2026-06-09T17:11:46.094295+00:00",
@@ -44,31 +45,36 @@
       "enabled_for_preflight": false,
       "entry_mode": "ladder_close_50_618",
       "kill_switch_required": true,
-      "leverage": 1,
+      "leverage": 10,
       "live_authorization_required_later": true,
       "live_authorized": false,
       "live_execution_enabled": false,
+      "margin_budget_usdt": 44,
       "max_account_risk_usdt": 44,
+      "max_loss_requires_review": true,
       "max_loss_usdt": 4.44,
       "max_margin_usdt": 44,
-      "max_notional_usdt": 44,
-      "max_position_notional_usdt": 44,
+      "max_notional_usdt": 440,
+      "max_position_notional_usdt": 440,
       "notes": [
-        "R230 writes only this local risk-contract config entry.",
-        "Live authorization, lane arming, order payload creation, and Binance/network calls remain forbidden.",
-        "A later phase must separately preview live authorization requirements before any live action."
+        "R244 updates the risk contract to model 44 USDT margin at 10x leverage.",
+        "Max notional becomes 440 USDT so BTCUSDT quantity clears Binance step size/min notional.",
+        "This config write does not enable live execution, create payloads, sign requests, or place orders."
       ],
       "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
       "operator_final_approval_required": true,
       "order_payload_forbidden_until_live_gate": true,
       "protective_stop_required": true,
       "risk_reward_ratio": 2.0,
+      "source_adjustment_preview_record_id": "r243_leverage_notional_adjustment_preview_f1ba05bbfb5748968a6175afb4f528f1",
       "source_preview_id": "r229_risk_preview_73097d0692ac4e348333d9cb3df1911e",
       "stop_required": true,
       "symbol": "BTCUSDT",
       "take_profit_required": true,
       "timeframe": "8m",
-      "tiny_live_margin_usdt": 44
+      "tiny_live_margin_usdt": 44,
+      "updated_at": "2026-06-10T22:50:47.960601+00:00",
+      "updated_by_phase": "R244_TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE"
     }
   ]
 }

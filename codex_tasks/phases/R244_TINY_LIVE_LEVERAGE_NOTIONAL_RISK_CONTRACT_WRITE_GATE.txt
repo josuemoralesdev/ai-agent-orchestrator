@@ -1,0 +1,600 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R244 Tiny-Live Leverage / Notional Risk Contract Write Gate
+
+BRANCH:
+r244-tiny-live-leverage-notional-risk-contract-write-gate
+
+PHASE CLASSIFICATION:
+Primary: CONTROLLED RISK CONTRACT WRITE GATE
+Secondary: RISK MODEL ADJUSTMENT, LIVE READINESS WIRING, DIAGNOSTIC / AUDIT
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R243 Tiny-Live Leverage / Notional Risk Contract Adjustment Preview succeeded and has been committed.
+
+R243 proved:
+- Current 1x / 44 USDT notional model is invalid for BTCUSDT at current price.
+- It rounds quantity to 0.0 because Binance BTCUSDT step_size is 0.001.
+- It fails min-notional after rounding.
+- The adjusted model clears Binance minimums:
+  - margin_budget_usdt=44
+  - leverage=10
+  - max_notional_usdt=440
+  - max_position_notional_usdt=440
+  - quantity_rounded around 0.007 BTC
+  - notional_after_rounding around 435 USDT
+  - min_notional_ok=true
+
+R244 must now create a guarded write gate that makes the adjusted risk contract official.
+
+Current official lane:
+- BTCUSDT|8m|short|ladder_close_50_618
+
+Current R243 adjusted model:
+- margin_budget_usdt=44
+- leverage=10
+- max_notional_usdt=440
+- max_position_notional_usdt=440
+- max_loss_usdt_existing=4.44
+- max_loss_requires_review=true
+- risk_contract_write_required_later=true
+
+R244 may write the adjusted risk contract only with exact confirmation.
+R244 must NOT place orders.
+R244 must NOT create executable payload.
+R244 must NOT sign anything.
+R244 must NOT call Binance/network.
+R244 must NOT mutate .env.
+R244 must NOT mutate lane_controls.json.
+R244 must NOT disable kill switch.
+
+CORE INTENT:
+Move from leverage/notional adjustment preview to a guarded adjusted risk contract write gate.
+
+This phase must:
+- preview the exact adjusted risk contract mutation before writing
+- reject wrong confirmation
+- write only the adjusted tiny-live risk contract config/artifact when exact confirmation is provided
+- preserve official lane identity
+- preserve kill-switch requirement
+- preserve operator final approval requirement
+- preserve order payload forbidden until later gates
+- preserve Binance calls forbidden until later gates
+- preserve no executable payload
+- preserve no signed request
+- preserve no order
+- produce post-write verification
+- produce next-phase recommendation for refreshed non-executable payload preview/write path using 10x model
+
+This phase is not executable payload creation.
+This phase is not signed request creation.
+This phase is not order placement.
+This phase is not Binance connectivity.
+This phase is not live connector submission.
+
+CRITICAL SAFETY:
+This phase may mutate:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+
+Only when exact confirmation phrase is provided.
+
+No other config mutation is allowed.
+
+Forbidden:
+- .env writes
+- lane_controls.json writes
+- scheduler/fisherman config writes
+- executable payload files
+- signed request files
+- Binance/network calls
+- paper/outcome/ranking ledgers except this phase audit ledger
+- any strategy promotion ledger
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No signed order request.
+- No executable payload.
+- No submit-ready payload.
+- No kill switch disable.
+- No global live flag changes.
+- No lane_controls.json write.
+- No env write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+Allowed write only after exact confirmation:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- logs/hammer_radar_forward/tiny_live_leverage_notional_risk_contract_write_gate.ndjson
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE LEVERAGE NOTIONAL RISK CONTRACT WRITE GATE ONLY; WRITE RISK CONFIG ONLY; NO ORDER; NO BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_leverage_notional_adjustment_preview.py
+- src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+- src/app/hammer_radar/operator/tiny_live_precision_and_mark_price_preview.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_preview.py
+- src/app/hammer_radar/operator/tiny_live_order_preflight_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_lane_arm_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_live_execution_enable_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_live_authorization_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_config_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_preview.py
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*risk* files
+- src/app/hammer_radar/operator/*contract* files
+- src/app/hammer_radar/operator/*notional* files
+- src/app/hammer_radar/operator/*leverage* files
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*order* files
+
+Inspect configs:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json read-only
+- configs/hammer_radar/*.json
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_leverage_notional_adjustment_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_order_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_lane_arm_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_config_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R243_TINY_LIVE_LEVERAGE_NOTIONAL_ADJUSTMENT_PREVIEW.md
+- docs/hammer_radar/live_readiness/R242_TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE.md
+- docs/hammer_radar/live_readiness/R241_TINY_LIVE_PRECISION_AND_MARK_PRICE_PREVIEW.md
+- docs/hammer_radar/live_readiness/R240_TINY_LIVE_ORDER_PAYLOAD_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_leverage_notional_adjustment_preview.py
+- tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+- tests/hammer_radar/test_tiny_live_order_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_risk_contract_config_write_gate.py
+- tests/hammer_radar/test_tiny_live_risk_contract_preview.py
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+- tests/hammer_radar/test_*risk* if present
+- tests/hammer_radar/test_*contract* if present
+- tests/hammer_radar/test_*notional* if present
+- tests/hammer_radar/test_*leverage* if present
+- tests/hammer_radar/test_*payload* if present
+
+REUSE / EXTEND:
+Reuse:
+- R243 adjustment preview loader and validation.
+- R242 read-only result loader.
+- R230 risk contract config loader/validation/write patterns.
+- R228 evidence loader.
+- Existing safety flag conventions.
+
+Do not call Binance/network.
+Do not mutate env.
+Do not mutate lane_controls.
+Do not create executable payloads.
+Do not sign requests.
+Do not place orders.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_leverage_notional_risk_contract_write_gate.py
+
+Expose:
+- build_tiny_live_leverage_notional_risk_contract_write_gate
+- load_latest_tiny_live_leverage_notional_adjustment_preview
+- load_latest_tiny_live_binance_readonly_precision_mark_price_gate
+- load_latest_tiny_live_risk_contract_config_write_gate
+- load_latest_tiny_live_10_of_10_ready_packet
+- load_tiny_live_risk_contract_config
+- build_adjusted_risk_contract
+- validate_adjusted_risk_contract
+- build_adjusted_risk_contract_write_preview
+- write_adjusted_risk_contract_if_confirmed
+- build_post_write_adjusted_risk_contract_verification
+- build_adjusted_risk_contract_write_gate_matrix
+- build_operator_adjusted_risk_contract_write_review_packet
+- classify_tiny_live_leverage_notional_risk_contract_write_status
+- append_tiny_live_leverage_notional_risk_contract_write_gate_record
+- load_tiny_live_leverage_notional_risk_contract_write_gate_records
+- summarize_tiny_live_leverage_notional_risk_contract_write_gate_records
+
+STATUS ENUM:
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE_READY
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE_REJECTED
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE_WRITTEN
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE_BLOCKED
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_READY_FOR_CONFIRMATION
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITTEN_PAYLOAD_REFRESH_REQUIRED
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_BLOCKED_BY_R243
+- TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_BLOCKED_BY_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+ADJUSTED RISK CONTRACT SHAPE:
+The contract must preserve existing required fields and add/update:
+
+{
+  "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+  "symbol": "BTCUSDT",
+  "timeframe": "8m",
+  "direction": "short",
+  "entry_mode": "ladder_close_50_618",
+  "capital_mode": "tiny_live_margin_10x",
+  "tiny_live_margin_usdt": 44,
+  "margin_budget_usdt": 44,
+  "leverage": 10,
+  "max_notional_usdt": 440,
+  "max_position_notional_usdt": 440,
+  "max_account_risk_usdt": 44,
+  "max_loss_usdt": 4.44,
+  "max_loss_requires_review": true,
+  "risk_reward_ratio": 2.0,
+  "stop_required": true,
+  "protective_stop_required": true,
+  "take_profit_required": true,
+  "kill_switch_required": true,
+  "operator_final_approval_required": true,
+  "live_authorized": false,
+  "live_execution_enabled": false,
+  "enabled_for_preflight": false,
+  "order_payload_forbidden_until_live_gate": true,
+  "binance_call_forbidden_until_live_gate": true,
+  "approval_status": "CONFIG_WRITTEN_NOT_LIVE_AUTHORIZED",
+  "adjustment_source_phase": "R243_TINY_LIVE_LEVERAGE_NOTIONAL_ADJUSTMENT_PREVIEW",
+  "updated_by_phase": "R244_TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE",
+  "notes": [
+    "R244 updates the risk contract to model 44 USDT margin at 10x leverage.",
+    "Max notional becomes 440 USDT so BTCUSDT quantity clears Binance step size/min notional.",
+    "This config write does not enable live execution, create payloads, sign requests, or place orders."
+  ]
+}
+
+VALIDATION RULES:
+Adjusted contract valid only if:
+- official_lane_key exactly BTCUSDT|8m|short|ladder_close_50_618
+- symbol BTCUSDT
+- timeframe 8m
+- direction short
+- entry_mode ladder_close_50_618
+- margin_budget_usdt == 44
+- tiny_live_margin_usdt == 44
+- leverage == 10
+- max_notional_usdt == 440
+- max_position_notional_usdt == 440
+- max_account_risk_usdt == 44
+- max_loss_usdt == 4.44
+- max_loss_requires_review == true
+- live_authorized == false
+- live_execution_enabled == false
+- enabled_for_preflight == false
+- order_payload_forbidden_until_live_gate == true
+- binance_call_forbidden_until_live_gate == true
+- kill_switch_required == true
+- operator_final_approval_required == true
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "risk_contract_written": false,
+  "write_risk_contract_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "direction": "short",
+    "risk_contract_write_gate_only": true,
+    "config_written": false,
+    "live_authorized": false,
+    "live_execution_enabled": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "input_summary": {
+    "r243_adjustment_preview_found": true/false,
+    "r243_adjustment_preview_ready": true/false,
+    "adjusted_model_clears_binance_minimums": true/false,
+    "r242_readonly_found": true/false,
+    "r242_readonly_valid": true/false,
+    "existing_risk_contract_found": true/false,
+    "existing_risk_contract_valid": true/false,
+    "r228_evidence_ready": true/false
+  },
+  "current_contract_summary": {
+    "leverage": 1,
+    "max_notional_usdt": 44,
+    "margin_budget_usdt": null,
+    "quantity_rounds_to_zero": true
+  },
+  "adjusted_contract_write_preview": {
+    "would_write": true/false,
+    "write_requires_confirmation": true,
+    "config_path": "configs/hammer_radar/tiny_live_risk_contracts.json",
+    "bounded_mutation_only": true,
+    "proposed_adjusted_contract": {...}
+  },
+  "adjusted_contract_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": []
+  },
+  "post_write_verification": {
+    "risk_contract_written": true/false,
+    "matching_adjusted_contract_found": true/false,
+    "matching_adjusted_contract_valid": true/false,
+    "leverage": 10/null,
+    "margin_budget_usdt": 44/null,
+    "max_notional_usdt": 440/null,
+    "live_authorized": false,
+    "live_execution_enabled": false,
+    "order_payload_created": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "risk_contract_write_gate_matrix": {
+    "r243_adjustment_preview_ready": true/false,
+    "adjusted_model_clears_binance_minimums": true/false,
+    "adjusted_contract_valid": true/false,
+    "risk_contract_write_confirmed": true/false,
+    "risk_contract_written": true/false,
+    "config_written": true/false,
+    "live_authorized": false,
+    "live_execution_enabled": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_risk_contract_write_review_packet": {
+    "operator_should_review_risk_contract_write": true/false,
+    "operator_confirmation_required": true,
+    "operator_should_create_executable_payload_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R244_RISK_CONTRACT_WRITE|REVIEW_R244_RESULT|WAIT",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not create executable payload",
+      "do not sign request",
+      "do not call Binance from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "risk_contract_write_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "executable order payload creation",
+    "signed order request",
+    "signed trading request",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=true only when exact confirmation writes risk config
+- risk_contract_config_written=true only when exact confirmation writes risk config
+- lane_controls_written=false
+- live_config_written=false
+- order_payload_written=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- submit_allowed=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=false
+- binance_mark_price_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+- risk_contract_write_gate_only=true
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_leverage_notional_risk_contract_write_gate.ndjson
+
+CLI:
+Wire into inspect.py as:
+tiny-live-leverage-notional-risk-contract-write-gate
+
+Args:
+- --write-risk-contract
+- --confirm-tiny-live-leverage-notional-risk-contract-write <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate \
+  --write-risk-contract \
+  --confirm-tiny-live-leverage-notional-risk-contract-write "wrong"
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate \
+  --write-risk-contract \
+  --confirm-tiny-live-leverage-notional-risk-contract-write "I CONFIRM TINY LIVE LEVERAGE NOTIONAL RISK CONTRACT WRITE GATE ONLY; WRITE RISK CONFIG ONLY; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_leverage_notional_risk_contract_write_gate.py
+
+Test:
+- preview writes no config
+- wrong confirmation rejects and writes no config
+- exact confirmation writes only risk contract config + audit ledger
+- adjusted contract validates
+- leverage becomes 10
+- margin_budget_usdt becomes 44
+- tiny_live_margin_usdt remains/equals 44
+- max_notional_usdt becomes 440
+- max_position_notional_usdt becomes 440
+- max_loss_requires_review true
+- live_authorized remains false
+- live_execution_enabled remains false
+- enabled_for_preflight remains false
+- order payload remains forbidden
+- Binance call remains forbidden
+- no env mutation
+- no lane_controls mutation
+- no executable payload
+- no signed request
+- no order
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R243/R242/R241/R240/R239/R238/R237/R236/R235/R234/R233/R232/R231/R230/R229/R228/risk/live/tiny/lane/order/preflight/payload/precision/notional/leverage tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate \
+  | jq '.status, .target_scope, .input_summary, .current_contract_summary, .adjusted_contract_write_preview, .adjusted_contract_validation, .post_write_verification, .risk_contract_write_gate_matrix, .operator_risk_contract_write_review_packet, .risk_contract_write_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate \
+  --write-risk-contract \
+  --confirm-tiny-live-leverage-notional-risk-contract-write "wrong" \
+  | jq '.status, .confirmation_valid, .risk_contract_written, .risk_contract_write_gate_matrix, .safety'
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-risk-contract-write-gate \
+  --write-risk-contract \
+  --confirm-tiny-live-leverage-notional-risk-contract-write "I CONFIRM TINY LIVE LEVERAGE NOTIONAL RISK CONTRACT WRITE GATE ONLY; WRITE RISK CONFIG ONLY; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .risk_contract_written, .post_write_verification, .risk_contract_write_gate_matrix, .operator_risk_contract_write_review_packet, .risk_contract_write_overall_status, .safety'
+
+Config/env/feed mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected risk contract diff:
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+
+Expected write artifact:
+git status --short logs/hammer_radar_forward/tiny_live_leverage_notional_risk_contract_write_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_leverage_notional_risk_contract_write_gate.ndjson 2>/dev/null || true
+
+Final R243 sync:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-leverage-notional-adjustment-preview \
+  | jq '.status, .adjustment_gate_matrix, .adjustment_preview_overall_status'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- current_contract_summary
+- adjusted_contract_write_preview
+- adjusted_contract_validation
+- post_write_verification
+- risk_contract_write_gate_matrix
+- operator_risk_contract_write_review_packet
+- risk_contract_write_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R244_TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R244.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R245_TINY_LIVE_ORDER_PAYLOAD_REFRESH_PREVIEW.md
+
+R245 should:
+- consume R244 adjusted risk contract
+- consume R242 read-only precision/mark-price
+- refresh non-executable payload preview using 10x / 440 USDT notional
+- no executable payload
+- no signed request
+- no order
+- no Binance order endpoint
+
+Aggressive mode:
+Complete in one pass.
+Only write risk contract config if exact confirmation command is explicitly run.
+Do not mutate env.
+Do not mutate lane_controls.
+Do not perform Binance/network calls.
+Do not create executable order payloads.
+Do not create signed requests.
+Do not perform live trading actions.
+Do not place orders.

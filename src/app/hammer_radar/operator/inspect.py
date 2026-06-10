@@ -2765,6 +2765,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-leverage-notional-risk-contract-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_leverage_notional_risk_contract_write_gate import (
+            build_tiny_live_leverage_notional_risk_contract_write_gate,
+            format_tiny_live_leverage_notional_risk_contract_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_leverage_notional_risk_contract_write_gate_json(
+                build_tiny_live_leverage_notional_risk_contract_write_gate(
+                    log_dir=args.log_dir,
+                    write_risk_contract=args.write_risk_contract,
+                    confirm_tiny_live_leverage_notional_risk_contract_write=(
+                        args.confirm_tiny_live_leverage_notional_risk_contract_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4868,6 +4885,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_leverage_notional_adjustment_preview_parser.add_argument(
         "--confirm-tiny-live-leverage-notional-adjustment-preview",
+        default=None,
+    )
+
+    tiny_live_leverage_notional_risk_contract_write_gate_parser = subparsers.add_parser(
+        "tiny-live-leverage-notional-risk-contract-write-gate",
+        parents=[parent],
+    )
+    tiny_live_leverage_notional_risk_contract_write_gate_parser.add_argument(
+        "--write-risk-contract",
+        action="store_true",
+    )
+    tiny_live_leverage_notional_risk_contract_write_gate_parser.add_argument(
+        "--confirm-tiny-live-leverage-notional-risk-contract-write",
         default=None,
     )
 
