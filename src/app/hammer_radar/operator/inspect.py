@@ -2644,6 +2644,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-order-preflight-preview":
+        from src.app.hammer_radar.operator.tiny_live_order_preflight_preview import (
+            build_tiny_live_order_preflight_preview,
+            format_tiny_live_order_preflight_preview_json,
+        )
+
+        print(
+            format_tiny_live_order_preflight_preview_json(
+                build_tiny_live_order_preflight_preview(
+                    log_dir=args.log_dir,
+                    record_order_preflight_preview=args.record_order_preflight_preview,
+                    confirm_tiny_live_order_preflight_preview=(
+                        args.confirm_tiny_live_order_preflight_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4662,6 +4679,19 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_lane_arm_write_gate_parser.add_argument("--write-lane-arm", action="store_true")
     tiny_live_lane_arm_write_gate_parser.add_argument(
         "--confirm-tiny-live-lane-arm-write",
+        default=None,
+    )
+
+    tiny_live_order_preflight_preview_parser = subparsers.add_parser(
+        "tiny-live-order-preflight-preview",
+        parents=[parent],
+    )
+    tiny_live_order_preflight_preview_parser.add_argument(
+        "--record-order-preflight-preview",
+        action="store_true",
+    )
+    tiny_live_order_preflight_preview_parser.add_argument(
+        "--confirm-tiny-live-order-preflight-preview",
         default=None,
     )
 
