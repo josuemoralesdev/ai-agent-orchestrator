@@ -2748,6 +2748,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-leverage-notional-adjustment-preview":
+        from src.app.hammer_radar.operator.tiny_live_leverage_notional_adjustment_preview import (
+            build_tiny_live_leverage_notional_adjustment_preview,
+            format_tiny_live_leverage_notional_adjustment_preview_json,
+        )
+
+        print(
+            format_tiny_live_leverage_notional_adjustment_preview_json(
+                build_tiny_live_leverage_notional_adjustment_preview(
+                    log_dir=args.log_dir,
+                    record_adjustment_preview=args.record_adjustment_preview,
+                    confirm_tiny_live_leverage_notional_adjustment_preview=(
+                        args.confirm_tiny_live_leverage_notional_adjustment_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4838,6 +4855,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_binance_readonly_precision_mark_price_gate_parser.add_argument(
         "--confirm-tiny-live-binance-readonly-fetch",
+        default=None,
+    )
+
+    tiny_live_leverage_notional_adjustment_preview_parser = subparsers.add_parser(
+        "tiny-live-leverage-notional-adjustment-preview",
+        parents=[parent],
+    )
+    tiny_live_leverage_notional_adjustment_preview_parser.add_argument(
+        "--record-adjustment-preview",
+        action="store_true",
+    )
+    tiny_live_leverage_notional_adjustment_preview_parser.add_argument(
+        "--confirm-tiny-live-leverage-notional-adjustment-preview",
         default=None,
     )
 
