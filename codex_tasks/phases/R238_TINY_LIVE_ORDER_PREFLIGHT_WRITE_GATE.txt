@@ -1,0 +1,666 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R238 Tiny-Live Order Preflight Write Gate
+
+BRANCH:
+r238-tiny-live-order-preflight-write-gate
+
+PHASE CLASSIFICATION:
+Primary: CONTROLLED ORDER PREFLIGHT WRITE GATE
+Secondary: LIVE READINESS WIRING, DIAGNOSTIC / AUDIT, EXTENSION OF EXISTING CAPABILITY
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R237 Tiny-Live Order Preflight Preview succeeded and has been committed.
+
+Current path:
+- R228 confirmed official tiny-live 10/10 evidence packet.
+- R230 wrote tiny-live risk contract config.
+- R232 wrote live authorization artifact only.
+- R234 wrote live execution enable artifact only.
+- R236 wrote lane-arm artifact only.
+- R237 previewed order preflight.
+- R238 must now create a guarded order-preflight write gate.
+
+Current official lane:
+- BTCUSDT|8m|short|ladder_close_50_618
+
+Current R237 state:
+- order preflight preview ready
+- evidence ready
+- fisherman ready
+- risk contract ready
+- live authorization artifact written
+- live execution enable artifact written
+- lane-arm artifact written
+- order_payload_allowed=false
+- order_payload_created=false
+- order_ready=false
+- live_ready_today=false
+- Binance/network forbidden
+- kill switch active
+- no signed request
+- no order placed
+
+R238 may write a local order-preflight artifact only when exact confirmation is provided.
+R238 must NOT create an order payload.
+R238 must NOT sign anything.
+R238 must NOT place orders.
+R238 must NOT call Binance/network.
+R238 must NOT mutate env/config.
+R238 must NOT disable kill switch.
+
+CORE INTENT:
+Move from order-preflight preview to a guarded order-preflight write gate.
+
+This phase must:
+- preview the exact order-preflight artifact before writing
+- reject wrong confirmation
+- write only a bounded order-preflight artifact when exact confirmation is provided
+- keep order payload forbidden
+- keep executable payload forbidden
+- keep signed request forbidden
+- keep Binance/network forbidden
+- keep order placement forbidden
+- keep kill switch active
+- produce post-write verification
+- produce next-phase recommendation for order-payload preview
+
+This phase is not order payload creation.
+This phase is not order placement.
+This phase is not Binance connectivity.
+This phase is not live connector submission.
+This phase is not signed request creation.
+
+CRITICAL SAFETY:
+This phase may write a local order-preflight artifact only with exact confirmation.
+
+Never create:
+- order payload
+- executable payload
+- signed order request
+- signed trading request
+
+Never execute:
+- Binance order
+- Binance test order
+- Binance account endpoint
+- Binance connectivity call
+- live connector submit
+- transfer
+- withdraw
+- any order endpoint
+
+Allowed mutation only when exact confirmation phrase is provided:
+- Append-only ledger:
+  logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson
+
+Forbidden mutations:
+- .env
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- scheduler/fisherman configs
+- order payload files
+- Binance/network state
+- paper/outcome/ranking ledgers except this phase audit ledger
+- any strategy promotion ledger
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No signed order request.
+- No executable payload.
+- No order payload.
+- No kill switch disable.
+- No global live flag changes.
+- No lane_controls.json write.
+- No env write.
+- No config write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE ORDER PREFLIGHT WRITE ONLY; NO ORDER PAYLOAD; NO ORDER; NO BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_order_preflight_preview.py
+- src/app/hammer_radar/operator/tiny_live_lane_arm_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_lane_arm_preview.py
+- src/app/hammer_radar/operator/tiny_live_live_execution_enable_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_live_authorization_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_config_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/live_arming_preflight.py if present
+- src/app/hammer_radar/operator/final_live_preflight.py if present
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*preflight* files
+- src/app/hammer_radar/operator/*payload* files if present
+- src/app/hammer_radar/operator/*lane* files
+- src/app/hammer_radar/operator/*live* files
+- src/app/hammer_radar/operator/*execution* files
+- src/app/hammer_radar/operator/*authorization* files
+- src/app/hammer_radar/operator/*risk* files
+
+Inspect configs read-only:
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers:
+- logs/hammer_radar_forward/tiny_live_order_preflight_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson if present
+- logs/hammer_radar_forward/tiny_live_lane_arm_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_live_execution_enable_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_config_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+- logs/hammer_radar_forward/capture_count_sync_8m_short.ndjson
+- logs/hammer_radar_forward/lane_outcome_enrichment.ndjson
+- logs/hammer_radar_forward/capture_priority_rebalance.ndjson
+- logs/hammer_radar_forward/strategy_performance.ndjson
+- logs/hammer_radar_forward/strategy_promotion_status.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R237_TINY_LIVE_ORDER_PREFLIGHT_PREVIEW.md
+- docs/hammer_radar/live_readiness/R236_TINY_LIVE_LANE_ARM_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R235_TINY_LIVE_LANE_ARM_PREVIEW.md
+- docs/hammer_radar/live_readiness/R234_TINY_LIVE_LIVE_EXECUTION_ENABLE_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R232_TINY_LIVE_LIVE_AUTHORIZATION_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- existing order/preflight/live/tiny/risk/lane docs
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_order_preflight_preview.py
+- tests/hammer_radar/test_tiny_live_lane_arm_write_gate.py
+- tests/hammer_radar/test_tiny_live_lane_arm_preview.py
+- tests/hammer_radar/test_tiny_live_live_execution_enable_write_gate.py
+- tests/hammer_radar/test_tiny_live_live_authorization_write_gate.py
+- tests/hammer_radar/test_tiny_live_risk_contract_config_write_gate.py
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+- tests/hammer_radar/test_*order* if present
+- tests/hammer_radar/test_*preflight* if present
+- tests/hammer_radar/test_*payload* if present
+- tests/hammer_radar/test_*lane* if present
+- tests/hammer_radar/test_*live* if present
+- tests/hammer_radar/test_*execution* if present
+- tests/hammer_radar/test_*authorization* if present
+- tests/hammer_radar/test_*risk* if present
+- tests/hammer_radar/test_*tiny* if present
+
+REUSE / EXTEND:
+Reuse R237 order preflight preview loader and fields.
+Reuse R236 lane-arm write gate loader and validation.
+Reuse R234 execution enable write gate loader and validation.
+Reuse R232 authorization write gate loader and validation.
+Reuse R230 risk config validation.
+Reuse R228 evidence packet loader.
+Reuse existing order/preflight helpers if present, but do not call Binance/network.
+Reuse existing safety flag conventions.
+Do not duplicate ledger parsing where helpers exist.
+Do not create order payloads.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_order_preflight_write_gate.py
+
+Expose:
+- build_tiny_live_order_preflight_write_gate
+- load_latest_tiny_live_order_preflight_preview
+- load_latest_tiny_live_lane_arm_write_gate
+- load_latest_tiny_live_live_execution_enable_write_gate
+- load_latest_tiny_live_live_authorization_write_gate
+- load_latest_tiny_live_risk_contract_config_write_gate
+- load_latest_tiny_live_10_of_10_ready_packet
+- load_tiny_live_risk_contract_config
+- load_lane_controls_readonly
+- build_order_preflight_object
+- validate_order_preflight_object
+- build_order_preflight_write_preview
+- write_order_preflight_if_confirmed
+- build_post_write_order_preflight_verification
+- build_order_preflight_write_gate_matrix
+- build_operator_order_preflight_write_review_packet
+- classify_tiny_live_order_preflight_write_status
+- append_tiny_live_order_preflight_write_gate_record
+- load_tiny_live_order_preflight_write_gate_records
+- summarize_tiny_live_order_preflight_write_gate_records
+
+STATUS ENUM:
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE_READY
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE_REJECTED
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE_WRITTEN
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE_BLOCKED
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_READY_FOR_CONFIRMATION
+- TINY_LIVE_ORDER_PREFLIGHT_WRITTEN_PAYLOAD_PREVIEW_REQUIRED_LATER
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_R237_PREVIEW
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_LANE_ARM
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_EXECUTION_ENABLE
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_AUTHORIZATION
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_RISK_CONTRACT
+- TINY_LIVE_ORDER_PREFLIGHT_WRITE_BLOCKED_BY_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+ORDER PREFLIGHT OBJECT SHAPE:
+{
+  "order_preflight_id": "r238_order_preflight_BTCUSDT_8m_short_ladder_close_50_618",
+  "order_preflight_version": "tiny_live_order_preflight_v1",
+  "created_by_phase": "R238_TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE",
+  "created_at": "...",
+  "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+  "symbol": "BTCUSDT",
+  "timeframe": "8m",
+  "direction": "short",
+  "entry_mode": "ladder_close_50_618",
+  "source_order_preflight_preview_id": "...",
+  "source_lane_arm_id": "r236_lane_arm_BTCUSDT_8m_short_ladder_close_50_618",
+  "source_execution_enable_id": "r234_execution_enable_BTCUSDT_8m_short_ladder_close_50_618",
+  "source_authorization_id": "r232_authorization_BTCUSDT_8m_short_ladder_close_50_618",
+  "source_risk_contract_id": "r230_contract_BTCUSDT_8m_short_ladder_close_50_618",
+  "risk_contract_config_ready": true,
+  "evidence_ready": true,
+  "fisherman_ready": true,
+  "live_authorized": true,
+  "live_execution_enabled": true,
+  "lane_armed": true,
+  "order_preflight_scope": "tiny_live_single_lane",
+  "order_preflight_status": "PREFLIGHT_WRITTEN_NO_PAYLOAD_NO_ORDER",
+  "order_preflight_written": true,
+  "order_payload_allowed": false,
+  "order_payload_created": false,
+  "executable_payload_created": false,
+  "signed_order_request_created": false,
+  "signed_trading_request_created": false,
+  "order_placed": false,
+  "binance_call_allowed": false,
+  "network_allowed": false,
+  "kill_switch_required": true,
+  "kill_switch_disabled": false,
+  "operator_final_approval_required": true,
+  "order_payload_preview_required_later": true,
+  "binance_connectivity_check_required_later": true,
+  "notes": [
+    "R238 writes order-preflight artifact only; it does not create an order payload.",
+    "Order payload creation, signed requests, order placement, and Binance/network calls remain forbidden.",
+    "A later phase must separately preview order payload creation."
+  ]
+}
+
+VALIDATION RULES:
+Order preflight object valid only if:
+- official_lane_key is BTCUSDT|8m|short|ladder_close_50_618
+- symbol BTCUSDT
+- timeframe 8m
+- direction short
+- entry_mode ladder_close_50_618
+- risk_contract_config_ready=true
+- evidence_ready=true
+- fisherman_ready=true
+- live_authorized=true
+- live_execution_enabled=true
+- lane_armed=true
+- order_preflight_written=true
+- order_payload_allowed=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- order_placed=false
+- binance_call_allowed=false
+- network_allowed=false
+- kill_switch_required=true
+- kill_switch_disabled=false
+- operator_final_approval_required=true
+- order_payload_preview_required_later=true
+- binance_connectivity_check_required_later=true
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "order_preflight_written": false,
+  "write_order_preflight_requested": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "entry_mode": "ladder_close_50_618",
+    "order_preflight_write_gate_only": true,
+    "live_authorized": true,
+    "live_execution_enabled": true,
+    "lane_armed": true,
+    "order_payload_allowed": false,
+    "order_payload_created": false,
+    "kill_switch_disabled": false
+  },
+  "input_summary": {
+    "r237_preview_found": true/false,
+    "r237_preview_ready": true/false,
+    "r236_lane_arm_found": true/false,
+    "r236_lane_arm_valid": true/false,
+    "r234_execution_enable_found": true/false,
+    "r234_execution_enable_valid": true/false,
+    "r232_authorization_found": true/false,
+    "r232_authorization_valid": true/false,
+    "r230_risk_contract_config_found": true/false,
+    "risk_contract_valid": true/false,
+    "r228_evidence_ready": true/false,
+    "fisherman_ready": true/false,
+    "order_payload_created": false
+  },
+  "order_preflight_write_preview": {
+    "would_write": true/false,
+    "write_requires_confirmation": true,
+    "target_order_preflight_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "bounded_mutation_only": true,
+    "order_preflight_artifact": "ledger_only",
+    "proposed_order_preflight": {...}
+  },
+  "order_preflight_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": []
+  },
+  "post_write_verification": {
+    "order_preflight_written": true/false,
+    "matching_order_preflight_found": true/false,
+    "matching_order_preflight_valid": true/false,
+    "live_authorized": true/false,
+    "live_execution_enabled": true/false,
+    "lane_armed": true/false,
+    "order_payload_allowed": false,
+    "order_payload_created": false,
+    "executable_payload_created": false,
+    "signed_order_request_created": false,
+    "signed_trading_request_created": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false,
+    "kill_switch_disabled": false
+  },
+  "order_preflight_write_gate_matrix": {
+    "r237_preview_ready": true/false,
+    "risk_contract_config_ready": true/false,
+    "authorization_valid": true/false,
+    "execution_enable_valid": true/false,
+    "lane_arm_valid": true/false,
+    "order_preflight_valid": true/false,
+    "order_preflight_write_confirmed": true/false,
+    "order_preflight_written": true/false,
+    "live_authorized": true/false,
+    "live_execution_enabled": true/false,
+    "lane_armed": true/false,
+    "order_payload_created": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_order_preflight_write_review_packet": {
+    "operator_should_review_order_preflight_write": true/false,
+    "operator_confirmation_required": true,
+    "operator_should_create_order_payload": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R238_ORDER_PREFLIGHT_WRITE|REVIEW_R238_RESULT|WAIT",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not create order payload",
+      "do not disable kill switch",
+      "do not call Binance from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "order_preflight_write_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "order payload creation",
+    "signed order request",
+    "signed trading request",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_config_written=false
+- lane_controls_written=false
+- fisherman_config_written=false
+- scheduler_config_written=false
+- live_config_written=false
+- live_authorization_written=false
+- live_execution_enable_written=false
+- lane_arm_written=false
+- order_preflight_written=true only when exact confirmation writes artifact
+- live_execution_enabled=false outside artifact interpretation
+- lane_armed=false outside artifact interpretation
+- order_payload_allowed=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- registry_config_written=false
+- scoring_config_written=false
+- matrix_config_written=false
+- ledger_rewritten=false
+- destructive_write=false
+- historical_ledger_rewritten=false
+- normalized_rows_appended=false
+- paper_outcome_ledger_rewritten=false
+- paper_outcomes_appended=false
+- strategy_performance_appended=false
+- strategy_promotion_status_appended=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- kill_switch_disabled=false
+- paper_live_separation_intact=true
+- live_authorization_created=false
+- signal_origin_promoted=false
+- lane_promoted=false
+- official_tiny_live_lane_changed=false
+- alternate_lane_promoted=false
+- betrayal_live_authorized=false
+- betrayal_promoted=false
+- order_preflight_write_gate_only=true
+- position_permission_created=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson
+
+CLI:
+Wire into inspect.py as:
+tiny-live-order-preflight-write-gate
+
+Args:
+- --write-order-preflight
+- --confirm-tiny-live-order-preflight-write <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate \
+  --write-order-preflight \
+  --confirm-tiny-live-order-preflight-write "wrong"
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate \
+  --write-order-preflight \
+  --confirm-tiny-live-order-preflight-write "I CONFIRM TINY LIVE ORDER PREFLIGHT WRITE ONLY; NO ORDER PAYLOAD; NO ORDER; NO BINANCE CALL."
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_order_preflight_write_gate.py
+
+Test:
+- preview writes no order-preflight artifact
+- wrong confirmation rejects and writes no artifact
+- exact confirmation writes only order-preflight artifact
+- if ledger-only, append only tiny_live_order_preflight_write_gate.ndjson
+- order-preflight object validates
+- order-preflight object has live_authorized true, live_execution_enabled true, lane_armed true
+- order_payload_allowed remains false
+- order_payload_created remains false
+- executable_payload_created remains false
+- signed_order_request_created remains false
+- signed_trading_request_created remains false
+- order_placed remains false
+- binance_call_allowed remains false
+- network_allowed remains false
+- kill_switch_disabled remains false
+- env is not mutated
+- risk contract config is not mutated
+- lane_controls is not mutated
+- no Binance/network calls
+- no order/live connector/transfer/withdraw actions
+- no order payload creation
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R237/R236/R235/R234/R233/R232/R231/R230/R229/R228/risk/live/tiny/lane/order/preflight tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate \
+  | jq '.status, .target_scope, .input_summary, .order_preflight_write_preview, .order_preflight_validation, .post_write_verification, .order_preflight_write_gate_matrix, .operator_order_preflight_write_review_packet, .order_preflight_write_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate \
+  --write-order-preflight \
+  --confirm-tiny-live-order-preflight-write "wrong" \
+  | jq '.status, .confirmation_valid, .order_preflight_written, .order_preflight_write_gate_matrix, .safety'
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-write-gate \
+  --write-order-preflight \
+  --confirm-tiny-live-order-preflight-write "I CONFIRM TINY LIVE ORDER PREFLIGHT WRITE ONLY; NO ORDER PAYLOAD; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .order_preflight_written, .post_write_verification, .order_preflight_write_gate_matrix, .operator_order_preflight_write_review_packet, .order_preflight_write_overall_status, .safety'
+
+Config/env/feed mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected order-preflight artifact:
+git status --short logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson 2>/dev/null || true
+
+Final R237 sync:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-order-preflight-preview \
+  | jq '.status, .order_preflight_gate_matrix, .order_preflight_preview_overall_status'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- order_preflight_write_preview
+- order_preflight_validation
+- post_write_verification
+- order_preflight_write_gate_matrix
+- operator_order_preflight_write_review_packet
+- order_preflight_write_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R238_TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R238.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R239_TINY_LIVE_ORDER_PAYLOAD_PREVIEW.md
+
+R239 should:
+- consume R238 order-preflight write gate
+- preview order payload creation
+- no Binance/network calls
+- no order placement
+- no executable order payload creation
+- no signed trading request
+- no signed order request
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform Binance/network calls.
+Do not create order payloads.
+Do not create signed requests.
+Do not perform live trading actions.
+Do not place orders.
+Only write order-preflight artifact if exact confirmation command is explicitly run.

@@ -2661,6 +2661,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-order-preflight-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_order_preflight_write_gate import (
+            build_tiny_live_order_preflight_write_gate,
+            format_tiny_live_order_preflight_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_order_preflight_write_gate_json(
+                build_tiny_live_order_preflight_write_gate(
+                    log_dir=args.log_dir,
+                    write_order_preflight=args.write_order_preflight,
+                    confirm_tiny_live_order_preflight_write=(
+                        args.confirm_tiny_live_order_preflight_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4692,6 +4709,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_order_preflight_preview_parser.add_argument(
         "--confirm-tiny-live-order-preflight-preview",
+        default=None,
+    )
+
+    tiny_live_order_preflight_write_gate_parser = subparsers.add_parser(
+        "tiny-live-order-preflight-write-gate",
+        parents=[parent],
+    )
+    tiny_live_order_preflight_write_gate_parser.add_argument("--write-order-preflight", action="store_true")
+    tiny_live_order_preflight_write_gate_parser.add_argument(
+        "--confirm-tiny-live-order-preflight-write",
         default=None,
     )
 
