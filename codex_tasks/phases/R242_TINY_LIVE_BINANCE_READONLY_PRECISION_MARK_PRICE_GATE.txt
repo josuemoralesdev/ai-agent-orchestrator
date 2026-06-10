@@ -1,0 +1,625 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R242 Tiny-Live Binance Read-Only Precision / Mark-Price Gate
+
+BRANCH:
+r242-tiny-live-binance-readonly-precision-mark-price-gate
+
+PHASE CLASSIFICATION:
+Primary: GUARDED READ-ONLY BINANCE DATA GATE
+Secondary: PRECISION / MARK PRICE, LIVE READINESS WIRING, DIAGNOSTIC / AUDIT
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R241 Tiny-Live Precision and Mark Price Preview succeeded and has been committed.
+
+Current path:
+- R228 confirmed official tiny-live 10/10 evidence packet.
+- R230 wrote tiny-live risk contract config.
+- R232 wrote live authorization artifact only.
+- R234 wrote live execution enable artifact only.
+- R236 wrote lane-arm artifact only.
+- R238 wrote order-preflight artifact only.
+- R240 wrote non-executable order payload artifact only.
+- R241 previewed precision and mark-price requirements.
+
+Current R241 state:
+- local BTCUSDT precision metadata found:
+  - step_size=0.001
+  - tick_size=0.1
+  - quantity_precision=3
+  - price_precision=1
+  - min_notional=5.0
+- local mark/candidate price missing
+- quantity_preview.can_compute=false
+- quantity_rounded=null
+- no Binance call
+- no network
+- no executable payload
+- no signed request
+- no order
+- recommended next engineering move:
+  Create R242 Tiny-Live Binance read-only precision/mark-price gate with explicit confirmation; no order endpoints, payloads, signatures, or orders.
+
+Current official lane:
+- BTCUSDT|8m|short|ladder_close_50_618
+
+CORE INTENT:
+Create a separately guarded read-only Binance data gate for BTCUSDT precision and mark price.
+
+R242 may perform read-only Binance public endpoint calls only when exact confirmation is provided.
+R242 must never call any order endpoint.
+R242 must never sign any request.
+R242 must never use API secrets.
+R242 must never create executable payloads.
+R242 must never place orders.
+
+Allowed read-only data only:
+- exchange info / symbol precision for BTCUSDT
+- mark price or ticker price for BTCUSDT
+
+No account/private endpoint.
+No signed endpoint.
+No order/test-order endpoint.
+
+PURPOSE:
+Create a tiny-live Binance read-only precision / mark-price gate module and inspect CLI that:
+1. Reads latest R241 precision/mark-price preview.
+2. Reads latest R240 non-executable order payload artifact.
+3. Reads latest R238 order-preflight artifact.
+4. Reads latest R236 lane-arm artifact.
+5. Reads latest R230 risk contract config write gate.
+6. Reads current configs/hammer_radar/tiny_live_risk_contracts.json.
+7. Reads R228 tiny-live evidence packet.
+8. Confirms official lane remains BTCUSDT|8m|short|ladder_close_50_618.
+9. Provides preview mode by default with no network call.
+10. Rejects wrong confirmation.
+11. On exact confirmation, performs only read-only Binance public data fetches for BTCUSDT.
+12. Records the fetched read-only precision and mark price result.
+13. Computes preview-only quantity using:
+    - notional_cap_usdt=44
+    - mark price
+    - step size
+    - min notional
+14. Keeps executable payload forbidden.
+15. Keeps signing forbidden.
+16. Keeps submit forbidden.
+17. Keeps order forbidden.
+18. Produces post-read verification.
+19. Produces recommended next phase: R243 executable payload preview or R243 quantity-application preview, depending on architecture.
+
+CRITICAL SAFETY:
+This is the first phase that may intentionally call Binance/network.
+
+Allowed only after exact confirmation phrase:
+- public read-only exchange info endpoint
+- public read-only mark price or ticker endpoint
+
+Forbidden always:
+- order endpoint
+- test order endpoint
+- account endpoint
+- position endpoint
+- leverage endpoint
+- margin endpoint
+- transfer endpoint
+- withdraw endpoint
+- signed endpoint
+- any endpoint requiring API secret/signature
+
+No payload executable creation.
+No order placement.
+No request signing.
+
+NON-NEGOTIABLES:
+- No Binance order calls.
+- No Binance test-order calls.
+- No signed trading request.
+- No signed order request.
+- No signed read-only request.
+- No account/private endpoint.
+- No order placement.
+- No test order placement.
+- No executable payload.
+- No submit-ready payload.
+- No kill switch disable.
+- No global live flag changes.
+- No lane_controls.json write.
+- No env write.
+- No config write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No secrets printed.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CONFIRMATION PHRASE:
+I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_precision_and_mark_price_preview.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_preview.py
+- src/app/hammer_radar/operator/tiny_live_order_preflight_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_lane_arm_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_live_execution_enable_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_live_authorization_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_risk_contract_config_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*binance* files if present
+- src/app/hammer_radar/operator/*exchange* files if present
+- src/app/hammer_radar/operator/*precision* files if present
+- src/app/hammer_radar/operator/*mark* files if present
+- src/app/hammer_radar/operator/*price* files if present
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*preflight* files
+- src/app/hammer_radar/operator/*live* files
+- src/app/hammer_radar/operator/*risk* files
+
+Inspect configs read-only:
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/*.json
+- any exchange-info / symbol precision config if present
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_precision_and_mark_price_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_order_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_order_payload_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_order_preflight_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_lane_arm_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_live_execution_enable_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_live_authorization_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_risk_contract_config_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+- logs/hammer_radar_forward/market_intelligence_snapshots.ndjson
+- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R241_TINY_LIVE_PRECISION_AND_MARK_PRICE_PREVIEW.md
+- docs/hammer_radar/live_readiness/R240_TINY_LIVE_ORDER_PAYLOAD_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R239_TINY_LIVE_ORDER_PAYLOAD_PREVIEW.md
+- docs/hammer_radar/live_readiness/R238_TINY_LIVE_ORDER_PREFLIGHT_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R236_TINY_LIVE_LANE_ARM_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R230_TINY_LIVE_RISK_CONTRACT_CONFIG_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+- existing Binance/read-only/order/payload docs if present
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_precision_and_mark_price_preview.py
+- tests/hammer_radar/test_tiny_live_order_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_order_payload_preview.py
+- tests/hammer_radar/test_tiny_live_order_preflight_write_gate.py
+- tests/hammer_radar/test_tiny_live_lane_arm_write_gate.py
+- tests/hammer_radar/test_tiny_live_risk_contract_config_write_gate.py
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+- tests/hammer_radar/test_*binance* if present
+- tests/hammer_radar/test_*readonly* if present
+- tests/hammer_radar/test_*precision* if present
+- tests/hammer_radar/test_*mark* if present
+- tests/hammer_radar/test_*price* if present
+- tests/hammer_radar/test_*order* if present
+- tests/hammer_radar/test_*payload* if present
+
+REUSE / EXTEND:
+Reuse R241 precision preview loader and validation.
+Reuse R240 payload write gate loader and validation.
+Reuse R238 order preflight write gate loader and validation.
+Reuse R230 risk config validation.
+Reuse R228 evidence packet loader.
+Reuse any existing safe Binance public/read-only client if present.
+If no safe read-only client exists, implement minimal public GET wrapper with hardcoded allowed endpoints and tests mocking it.
+Do not use secrets.
+Do not sign.
+Do not call private endpoints.
+Do not call order endpoints.
+Do not create executable payloads.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+
+Expose:
+- build_tiny_live_binance_readonly_precision_mark_price_gate
+- load_latest_tiny_live_precision_and_mark_price_preview
+- load_latest_tiny_live_order_payload_write_gate
+- load_latest_tiny_live_order_preflight_write_gate
+- load_latest_tiny_live_lane_arm_write_gate
+- load_latest_tiny_live_risk_contract_config_write_gate
+- load_latest_tiny_live_10_of_10_ready_packet
+- build_readonly_request_plan
+- validate_readonly_request_plan
+- fetch_binance_public_exchange_info_for_symbol
+- fetch_binance_public_mark_price_for_symbol
+- parse_symbol_precision_from_exchange_info
+- parse_mark_price_snapshot
+- build_quantity_preview_from_readonly_data
+- validate_readonly_precision_mark_price_result
+- build_binance_readonly_gate_matrix
+- build_operator_binance_readonly_review_packet
+- classify_tiny_live_binance_readonly_precision_mark_price_status
+- append_tiny_live_binance_readonly_precision_mark_price_record
+- load_tiny_live_binance_readonly_precision_mark_price_records
+- summarize_tiny_live_binance_readonly_precision_mark_price_records
+
+STATUS ENUM:
+- TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_READY
+- TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_REJECTED
+- TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_FETCHED
+- TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_BLOCKED
+- TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_BINANCE_READONLY_READY_FOR_CONFIRMATION
+- TINY_LIVE_BINANCE_READONLY_FETCHED_QUANTITY_PREVIEW_READY
+- TINY_LIVE_BINANCE_READONLY_FETCHED_QUANTITY_PREVIEW_BLOCKED
+- TINY_LIVE_BINANCE_READONLY_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_BINANCE_READONLY_BLOCKED_BY_R241_PREVIEW
+- TINY_LIVE_BINANCE_READONLY_BLOCKED_BY_PAYLOAD
+- TINY_LIVE_BINANCE_READONLY_BLOCKED_BY_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+ALLOWED PUBLIC READ-ONLY ENDPOINTS:
+Use Binance Futures public endpoints only:
+- GET /fapi/v1/exchangeInfo
+- GET /fapi/v1/premiumIndex?symbol=BTCUSDT
+or safe equivalent already present in repo.
+
+Forbidden:
+- POST anything
+- DELETE anything
+- PUT anything
+- /fapi/v1/order
+- /fapi/v1/batchOrders
+- /fapi/v1/leverage
+- /fapi/v2/account
+- /fapi/v3/account
+- any endpoint requiring timestamp/signature
+- any endpoint requiring API key/secret
+
+IMPLEMENTATION RULES:
+Preview mode:
+- no network call
+- output would_call_readonly_endpoints=true
+- requires exact confirmation
+
+Rejected mode:
+- no network call
+- no record
+
+Confirmed mode:
+- call only allowed public read-only endpoints
+- record precision and mark price snapshot
+- compute quantity preview:
+  quantity_raw = notional_cap_usdt / mark_price
+  quantity_rounded = floor_to_step(quantity_raw, step_size)
+  notional_after_rounding = quantity_rounded * mark_price
+  min_notional_ok = notional_after_rounding >= min_notional
+- do not create executable payload
+- do not sign
+- do not submit
+- do not mutate config
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "readonly_fetch_requested": false,
+  "readonly_fetch_performed": false,
+  "confirmation_valid": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "direction": "short",
+    "binance_readonly_gate_only": true,
+    "public_endpoints_only": true,
+    "order_endpoint_allowed": false,
+    "private_endpoint_allowed": false,
+    "signed_request_allowed": false,
+    "order_placed": false
+  },
+  "input_summary": {
+    "r241_preview_found": true/false,
+    "r241_preview_ready": true/false,
+    "r240_payload_found": true/false,
+    "r240_payload_valid": true/false,
+    "risk_contract_valid": true/false,
+    "evidence_ready": true/false
+  },
+  "readonly_request_plan": {
+    "would_call_network": true/false,
+    "requires_confirmation": true,
+    "allowed_endpoints": [...],
+    "forbidden_endpoints": [...],
+    "uses_api_key": false,
+    "uses_api_secret": false,
+    "requires_signature": false,
+    "method_allowlist": ["GET"],
+    "symbol": "BTCUSDT"
+  },
+  "readonly_request_plan_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": []
+  },
+  "binance_readonly_result": {
+    "fetched": true/false,
+    "exchange_info_endpoint_called": true/false,
+    "mark_price_endpoint_called": true/false,
+    "order_endpoint_called": false,
+    "account_endpoint_called": false,
+    "signed_request_created": false,
+    "network_allowed": true/false,
+    "precision_snapshot": {
+      "found": true/false,
+      "symbol": "BTCUSDT",
+      "quantity_precision": null,
+      "step_size": null,
+      "price_precision": null,
+      "tick_size": null,
+      "min_notional": null,
+      "source": "binance_public_exchangeInfo|null"
+    },
+    "mark_price_snapshot": {
+      "found": true/false,
+      "symbol": "BTCUSDT",
+      "mark_price": null,
+      "timestamp": null,
+      "source": "binance_public_premiumIndex|null"
+    }
+  },
+  "quantity_preview": {
+    "can_compute": true/false,
+    "quantity_raw": null,
+    "quantity_rounded": null,
+    "notional_after_rounding": null,
+    "min_notional_ok": null,
+    "blocked_by": []
+  },
+  "binance_readonly_gate_matrix": {
+    "r241_preview_ready": true/false,
+    "payload_artifact_ready": true/false,
+    "readonly_plan_valid": true/false,
+    "readonly_fetch_confirmed": true/false,
+    "readonly_fetch_performed": true/false,
+    "precision_snapshot_found": true/false,
+    "mark_price_found": true/false,
+    "quantity_preview_ready": true/false,
+    "executable_payload_created": false,
+    "signed_order_request_created": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": [...]
+  },
+  "operator_binance_readonly_review_packet": {
+    "operator_should_review_readonly_plan": true/false,
+    "operator_confirmation_required": true,
+    "operator_should_create_executable_payload_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R242_BINANCE_READONLY_FETCH|REVIEW_R242_RESULT|WAIT",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not call order endpoint",
+      "do not sign request",
+      "do not create executable payload"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "binance_readonly_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "executable order payload creation",
+    "signed order request",
+    "signed trading request",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- order_payload_written=false
+- order_payload_created=false
+- executable_payload_created=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- submit_allowed=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=true only when exact confirmation fetches
+- binance_mark_price_endpoint_called=true only when exact confirmation fetches
+- network_allowed=true only when exact confirmation fetches allowed public endpoints
+- private_endpoint_called=false
+- api_key_used=false
+- api_secret_used=false
+- signature_created=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+- binance_readonly_gate_only=true
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson
+
+CLI:
+Wire into inspect.py as:
+tiny-live-binance-readonly-precision-mark-price-gate
+
+Args:
+- --fetch-binance-readonly
+- --confirm-tiny-live-binance-readonly-fetch <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate \
+  --fetch-binance-readonly \
+  --confirm-tiny-live-binance-readonly-fetch "wrong"
+
+Fetch:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate \
+  --fetch-binance-readonly \
+  --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+
+Tests must mock network:
+- preview makes no network call
+- wrong confirmation makes no network call
+- exact confirmation calls only allowed GET public endpoints in mocked client
+- rejects any forbidden endpoint
+- rejects any non-GET method
+- rejects any signed/private/account/order endpoint
+- parses exchange info precision
+- parses mark price
+- computes quantity preview using step size and mark price
+- min_notional_ok true/false tested
+- no executable payload
+- no signed request
+- no order placement
+- no env/config mutation
+- CLI exists
+
+VALIDATION:
+Run py_compile for new module and inspect.py.
+Run focused test.
+Run related R241/R240/R239/R238/R237/R236/R235/R234/R233/R232/R231/R230/R229/R228/risk/live/tiny/lane/order/preflight/payload/precision/binance tests.
+Run full tests/hammer_radar.
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate \
+  | jq '.status, .target_scope, .input_summary, .readonly_request_plan, .readonly_request_plan_validation, .binance_readonly_result, .quantity_preview, .binance_readonly_gate_matrix, .operator_binance_readonly_review_packet, .binance_readonly_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate \
+  --fetch-binance-readonly \
+  --confirm-tiny-live-binance-readonly-fetch "wrong" \
+  | jq '.status, .confirmation_valid, .readonly_fetch_performed, .binance_readonly_result, .safety'
+
+Fetch:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-binance-readonly-precision-mark-price-gate \
+  --fetch-binance-readonly \
+  --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+  | jq '.status, .confirmation_valid, .readonly_fetch_performed, .binance_readonly_result, .quantity_preview, .binance_readonly_gate_matrix, .operator_binance_readonly_review_packet, .binance_readonly_overall_status, .safety'
+
+Config/env/feed mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected read-only artifact:
+git status --short logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson 2>/dev/null || true
+
+Final R241 sync:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-precision-and-mark-price-preview \
+  | jq '.status, .precision_mark_price_gate_matrix, .precision_mark_price_preview_overall_status'
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- readonly_request_plan
+- binance_readonly_result
+- quantity_preview
+- binance_readonly_gate_matrix
+- operator_binance_readonly_review_packet
+- binance_readonly_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R242_TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE.md
+
+UPDATE:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md with R242.
+
+FUTURE TASKS:
+Create:
+codex_tasks/phases/R243_TINY_LIVE_EXECUTABLE_PAYLOAD_PREVIEW.md
+
+R243 should:
+- consume R242 read-only precision/mark-price result
+- preview executable payload requirements
+- no signing
+- no Binance order endpoint
+- no order placement
+- no submit
+- no private endpoint
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config.
+Do not perform order/private/signed Binance calls.
+Only perform read-only public Binance calls if exact confirmation command is explicitly run.
+Do not create executable order payloads.
+Do not create signed requests.
+Do not perform live trading actions.
+Do not place orders.
