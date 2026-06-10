@@ -2712,6 +2712,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-precision-and-mark-price-preview":
+        from src.app.hammer_radar.operator.tiny_live_precision_and_mark_price_preview import (
+            build_tiny_live_precision_and_mark_price_preview,
+            format_tiny_live_precision_and_mark_price_preview_json,
+        )
+
+        print(
+            format_tiny_live_precision_and_mark_price_preview_json(
+                build_tiny_live_precision_and_mark_price_preview(
+                    log_dir=args.log_dir,
+                    record_precision_mark_price_preview=(
+                        args.record_precision_mark_price_preview
+                    ),
+                    confirm_tiny_live_precision_mark_price_preview=(
+                        args.confirm_tiny_live_precision_mark_price_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4776,6 +4795,19 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_order_payload_write_gate_parser.add_argument("--write-order-payload", action="store_true")
     tiny_live_order_payload_write_gate_parser.add_argument(
         "--confirm-tiny-live-order-payload-write",
+        default=None,
+    )
+
+    tiny_live_precision_mark_price_preview_parser = subparsers.add_parser(
+        "tiny-live-precision-and-mark-price-preview",
+        parents=[parent],
+    )
+    tiny_live_precision_mark_price_preview_parser.add_argument(
+        "--record-precision-mark-price-preview",
+        action="store_true",
+    )
+    tiny_live_precision_mark_price_preview_parser.add_argument(
+        "--confirm-tiny-live-precision-mark-price-preview",
         default=None,
     )
 
