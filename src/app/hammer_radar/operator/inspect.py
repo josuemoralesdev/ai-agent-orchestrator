@@ -2731,6 +2731,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-binance-readonly-precision-mark-price-gate":
+        from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_price_gate import (
+            build_tiny_live_binance_readonly_precision_mark_price_gate,
+            format_tiny_live_binance_readonly_precision_mark_price_gate_json,
+        )
+
+        print(
+            format_tiny_live_binance_readonly_precision_mark_price_gate_json(
+                build_tiny_live_binance_readonly_precision_mark_price_gate(
+                    log_dir=args.log_dir,
+                    fetch_binance_readonly=args.fetch_binance_readonly,
+                    confirm_tiny_live_binance_readonly_fetch=(
+                        args.confirm_tiny_live_binance_readonly_fetch
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4808,6 +4825,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_precision_mark_price_preview_parser.add_argument(
         "--confirm-tiny-live-precision-mark-price-preview",
+        default=None,
+    )
+
+    tiny_live_binance_readonly_precision_mark_price_gate_parser = subparsers.add_parser(
+        "tiny-live-binance-readonly-precision-mark-price-gate",
+        parents=[parent],
+    )
+    tiny_live_binance_readonly_precision_mark_price_gate_parser.add_argument(
+        "--fetch-binance-readonly",
+        action="store_true",
+    )
+    tiny_live_binance_readonly_precision_mark_price_gate_parser.add_argument(
+        "--confirm-tiny-live-binance-readonly-fetch",
         default=None,
     )
 
