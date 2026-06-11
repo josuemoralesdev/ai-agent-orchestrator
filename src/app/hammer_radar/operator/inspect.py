@@ -2833,6 +2833,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-stop-take-profit-source-gate":
+        from src.app.hammer_radar.operator.tiny_live_stop_take_profit_source_gate import (
+            build_tiny_live_stop_take_profit_source_gate,
+            format_tiny_live_stop_take_profit_source_gate_json,
+        )
+
+        print(
+            format_tiny_live_stop_take_profit_source_gate_json(
+                build_tiny_live_stop_take_profit_source_gate(
+                    log_dir=args.log_dir,
+                    write_stop_take_profit_source=args.write_stop_take_profit_source,
+                    confirm_tiny_live_stop_take_profit_source=(
+                        args.confirm_tiny_live_stop_take_profit_source
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4988,6 +5005,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_executable_payload_preview_parser.add_argument(
         "--confirm-tiny-live-executable-payload-preview",
+        default=None,
+    )
+
+    tiny_live_stop_take_profit_source_gate_parser = subparsers.add_parser(
+        "tiny-live-stop-take-profit-source-gate",
+        parents=[parent],
+    )
+    tiny_live_stop_take_profit_source_gate_parser.add_argument(
+        "--write-stop-take-profit-source",
+        action="store_true",
+    )
+    tiny_live_stop_take_profit_source_gate_parser.add_argument(
+        "--confirm-tiny-live-stop-take-profit-source",
         default=None,
     )
 
