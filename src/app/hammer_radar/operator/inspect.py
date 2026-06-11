@@ -2843,9 +2843,11 @@ def main() -> int:
             format_tiny_live_stop_take_profit_source_gate_json(
                 build_tiny_live_stop_take_profit_source_gate(
                     log_dir=args.log_dir,
-                    write_stop_take_profit_source=args.write_stop_take_profit_source,
-                    confirm_tiny_live_stop_take_profit_source=(
-                        args.confirm_tiny_live_stop_take_profit_source
+                    record_stop_take_profit_source_preview=(
+                        args.record_stop_take_profit_source_preview
+                    ),
+                    confirm_tiny_live_stop_take_profit_source_preview=(
+                        args.confirm_tiny_live_stop_take_profit_source_preview
                     ),
                 )
             )
@@ -5013,11 +5015,11 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     tiny_live_stop_take_profit_source_gate_parser.add_argument(
-        "--write-stop-take-profit-source",
+        "--record-stop-take-profit-source-preview",
         action="store_true",
     )
     tiny_live_stop_take_profit_source_gate_parser.add_argument(
-        "--confirm-tiny-live-stop-take-profit-source",
+        "--confirm-tiny-live-stop-take-profit-source-preview",
         default=None,
     )
 
