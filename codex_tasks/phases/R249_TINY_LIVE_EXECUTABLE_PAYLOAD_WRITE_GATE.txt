@@ -1,0 +1,672 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R249 Tiny-Live Executable Payload Write Gate
+
+BRANCH:
+r249-tiny-live-executable-payload-write-gate
+
+PHASE CLASSIFICATION:
+Primary: CONTROLLED EXECUTABLE PAYLOAD ARTIFACT WRITE GATE
+Secondary: LIVE READINESS WIRING, STOP/TAKE-PROFIT INTEGRATION, AUDIT / SAFETY GATE
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R248 Tiny-Live Stop / Take-Profit Source Gate has been committed.
+
+R248 produced a valid local stop/take-profit source artifact for the official tiny-live lane:
+- official_lane_key=BTCUSDT|8m|short|ladder_close_50_618
+- direction=short
+- reference_price=62210.3
+- quantity=0.007
+- stop_price=62844.6
+- take_profit_price=60941.7
+- estimated_loss_at_stop_usdt approximately 4.4401
+- estimated_reward_at_take_profit_usdt approximately 8.8802
+- risk_reward_ratio=2.0
+- stop side BUY reduce_only
+- take-profit side BUY reduce_only
+- executable_payload_created=false
+- signed_order_request_created=false
+- order_placed=false
+- binance_call_allowed=false
+- network_allowed=false
+
+R247 already previewed an executable payload path.
+R246 wrote refreshed non-executable payload artifact using the official 10x / 440 USDT risk model.
+R244 made the 10x risk model official.
+
+R249 must now write an executable payload artifact only after exact confirmation.
+
+This phase is NOT signing.
+This phase is NOT submit.
+This phase is NOT Binance connectivity.
+This phase is NOT order placement.
+This phase is NOT live connector execution.
+
+CORE INTENT:
+Create a guarded write gate that builds and writes a local executable payload artifact from:
+- R248 stop/take-profit source artifact
+- R247 executable payload preview
+- R246 refreshed payload write gate
+- R244 adjusted risk contract
+- R242 precision/mark-price reference
+- R236 lane arm artifact
+- R228 evidence packet
+
+The output artifact must be executable-shaped, but still:
+- signed=false
+- submit_allowed=false
+- binance_call_allowed=false
+- network_allowed=false
+- order_placed=false
+- requires future signature gate
+- requires future submit gate
+- requires future readonly mark-price refresh before submit
+
+This phase must clearly separate:
+1. local executable payload artifact creation
+2. signed request creation
+3. order submit
+
+Only #1 is allowed here.
+
+OFFICIAL LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT OFFICIAL RISK MODEL:
+- capital_mode=tiny_live_margin_10x
+- margin_budget_usdt=44
+- tiny_live_margin_usdt=44
+- leverage=10
+- max_notional_usdt=440
+- max_position_notional_usdt=440
+- max_loss_usdt=4.44
+- max_loss_requires_review=true
+- live_authorized=false unless artifact-only gates say otherwise
+- live_execution_enabled=false unless artifact-only gates say otherwise
+- enabled_for_preflight=false
+- operator_final_approval_required=true
+- kill_switch_required=true
+
+IMPORTANT:
+Existing config may still keep live_authorized/live_execution_enabled false.
+Previous artifact gates R232/R234/R236 carry artifact-level authorization/enabled/armed states.
+Do not mutate those.
+For payload artifact write, preserve clear blocker fields:
+- submit_allowed=false
+- signed_order_request_created=false
+- order_placed=false
+- binance_call_allowed=false
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No signed trading request.
+- No signed order request.
+- No submit-ready request.
+- No private endpoint.
+- No API key usage.
+- No secrets printed.
+- No kill switch disable.
+- No global live flag changes.
+- No lane_controls.json write.
+- No .env write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+ALLOWED WRITE ONLY AFTER EXACT CONFIRMATION:
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+
+OPTIONAL if existing project pattern prefers separate artifact file:
+- logs/hammer_radar_forward/tiny_live_executable_order_payload.ndjson
+
+But if adding a separate artifact file, tests must prove:
+- artifact_only=true
+- signed=false
+- submit_allowed=false
+- order_placed=false
+- binance_call_allowed=false
+- network_allowed=false
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE EXECUTABLE PAYLOAD WRITE GATE ONLY; WRITE LOCAL PAYLOAD ARTIFACT ONLY; NO SIGNATURE; NO ORDER; NO BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_stop_take_profit_source_gate.py
+- src/app/hammer_radar/operator/tiny_live_executable_payload_preview.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_refresh_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_refresh_preview.py
+- src/app/hammer_radar/operator/tiny_live_leverage_notional_risk_contract_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+- src/app/hammer_radar/operator/tiny_live_order_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_order_preflight_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_lane_arm_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_10_of_10_ready_packet.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*stop* files
+- src/app/hammer_radar/operator/*take* files
+- src/app/hammer_radar/operator/*risk* files
+- src/app/hammer_radar/operator/*precision* files
+
+Inspect configs read-only:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_order_payload_refresh_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_order_payload_refresh_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_leverage_notional_risk_contract_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_lane_arm_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_10_of_10_ready_packet.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R248_TINY_LIVE_STOP_TAKE_PROFIT_SOURCE_GATE.md
+- docs/hammer_radar/live_readiness/R247_TINY_LIVE_EXECUTABLE_PAYLOAD_PREVIEW.md
+- docs/hammer_radar/live_readiness/R246_TINY_LIVE_ORDER_PAYLOAD_REFRESH_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R245_TINY_LIVE_ORDER_PAYLOAD_REFRESH_PREVIEW.md
+- docs/hammer_radar/live_readiness/R244_TINY_LIVE_LEVERAGE_NOTIONAL_RISK_CONTRACT_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R242_TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_preview.py
+- tests/hammer_radar/test_tiny_live_order_payload_refresh_write_gate.py
+- tests/hammer_radar/test_tiny_live_order_payload_refresh_preview.py
+- tests/hammer_radar/test_tiny_live_leverage_notional_risk_contract_write_gate.py
+- tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+- tests/hammer_radar/test_*payload* if present
+- tests/hammer_radar/test_*order* if present
+- tests/hammer_radar/test_*stop* if present
+- tests/hammer_radar/test_*take* if present
+
+REUSE / EXTEND:
+Reuse:
+- R248 stop/take-profit source loader and validation.
+- R247 executable payload preview loader and validation.
+- R246 refreshed payload write loader.
+- R244 adjusted risk contract loader.
+- Existing safety flag conventions.
+- Existing NDJSON append helpers, if present.
+
+Do not duplicate loader logic if a helper exists.
+Do not create parallel incompatible schemas.
+Do not call Binance/network.
+Do not sign.
+Do not place orders.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+
+Expose:
+- build_tiny_live_executable_payload_write_gate
+- load_latest_tiny_live_stop_take_profit_source_gate
+- load_latest_tiny_live_executable_payload_preview
+- load_latest_tiny_live_order_payload_refresh_write_gate
+- load_latest_tiny_live_leverage_notional_risk_contract_write_gate
+- load_latest_tiny_live_binance_readonly_precision_mark_price_gate
+- load_adjusted_tiny_live_risk_contract
+- build_executable_payload_artifact_preview
+- build_executable_payload_artifact
+- validate_executable_payload_artifact
+- write_executable_payload_artifact_if_confirmed
+- build_post_write_executable_payload_verification
+- build_executable_payload_write_gate_matrix
+- build_operator_executable_payload_write_packet
+- classify_tiny_live_executable_payload_write_gate_status
+- append_tiny_live_executable_payload_write_gate_record
+- load_tiny_live_executable_payload_write_gate_records
+- summarize_tiny_live_executable_payload_write_gate_records
+
+CLI:
+Wire into inspect.py as:
+tiny-live-executable-payload-write-gate
+
+Args:
+- --write-executable-payload
+- --confirm-tiny-live-executable-payload-write <phrase>
+
+Preview command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate
+
+Rejected command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate \
+  --write-executable-payload \
+  --confirm-tiny-live-executable-payload-write "wrong"
+
+Write command:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate \
+  --write-executable-payload \
+  --confirm-tiny-live-executable-payload-write "I CONFIRM TINY LIVE EXECUTABLE PAYLOAD WRITE GATE ONLY; WRITE LOCAL PAYLOAD ARTIFACT ONLY; NO SIGNATURE; NO ORDER; NO BINANCE CALL."
+
+STATUS ENUM:
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_READY
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_REJECTED
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_WRITTEN
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_BLOCKED
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_READY_FOR_CONFIRMATION
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITTEN_SIGNATURE_GATE_REQUIRED
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_BLOCKED_BY_R248
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_BLOCKED_BY_R247
+- TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_BLOCKED_BY_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+EXECUTABLE PAYLOAD ARTIFACT SHAPE:
+{
+  "executable_payload_id": "...",
+  "artifact_only": true,
+  "created_by_phase": "R249_TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE",
+  "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+  "exchange": "binance_futures",
+  "symbol": "BTCUSDT",
+  "timeframe": "8m",
+  "direction": "short",
+  "entry_mode": "ladder_close_50_618",
+
+  "main_order": {
+    "symbol": "BTCUSDT",
+    "side": "SELL",
+    "type": "MARKET",
+    "quantity": 0.007,
+    "reduceOnly": false,
+    "positionSide": "BOTH|SHORT|null"
+  },
+
+  "stop_order": {
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "type": "STOP_MARKET",
+    "stopPrice": 62844.6,
+    "quantity": 0.007,
+    "reduceOnly": true,
+    "workingType": "MARK_PRICE"
+  },
+
+  "take_profit_order": {
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "type": "TAKE_PROFIT_MARKET",
+    "stopPrice": 60941.7,
+    "quantity": 0.007,
+    "reduceOnly": true,
+    "workingType": "MARK_PRICE"
+  },
+
+  "risk": {
+    "margin_budget_usdt": 44,
+    "leverage": 10,
+    "max_notional_usdt": 440,
+    "notional_after_rounding": 435.4721,
+    "max_loss_usdt": 4.44,
+    "estimated_loss_at_stop_usdt": 4.4401,
+    "estimated_reward_at_take_profit_usdt": 8.8802,
+    "risk_reward_ratio": 2.0,
+    "max_loss_requires_review": true
+  },
+
+  "source_refs": {
+    "r248_stop_take_profit_source_gate_record_id": "...",
+    "r247_executable_payload_preview_record_id": "...",
+    "r246_payload_refresh_write_gate_record_id": "...",
+    "r244_risk_contract_record_id": "...",
+    "r242_readonly_record_id": "..."
+  },
+
+  "controls": {
+    "signed": false,
+    "submit_allowed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false,
+    "requires_signature_gate": true,
+    "requires_submit_gate": true,
+    "requires_future_readonly_mark_price_refresh_before_submit": true,
+    "requires_operator_final_submit_confirmation": true,
+    "kill_switch_required": true
+  },
+
+  "safety": {
+    "executable_payload_created": true,
+    "signed_order_request_created": false,
+    "signed_trading_request_created": false,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_order_endpoint_called": false,
+    "network_allowed": false
+  }
+}
+
+VALIDATION RULES:
+Artifact valid only if:
+- official_lane_key exactly BTCUSDT|8m|short|ladder_close_50_618
+- symbol BTCUSDT
+- direction short
+- main_order.side SELL
+- main_order.type MARKET
+- main_order.quantity > 0
+- stop_order.side BUY
+- stop_order.type STOP_MARKET
+- stop_order.reduceOnly true
+- stop_order.stopPrice > reference/entry price if reference available
+- take_profit_order.side BUY
+- take_profit_order.type TAKE_PROFIT_MARKET
+- take_profit_order.reduceOnly true
+- take_profit_order.stopPrice < reference/entry price if reference available
+- quantity matches R246/R248 quantity
+- risk.leverage == 10
+- risk.margin_budget_usdt == 44
+- risk.max_notional_usdt == 440
+- risk.max_loss_usdt == 4.44
+- risk.estimated_loss_at_stop_usdt <= max_loss_usdt + tick/rounding tolerance
+- controls.signed == false
+- controls.submit_allowed == false
+- controls.binance_call_allowed == false
+- controls.network_allowed == false
+- safety.signed_order_request_created == false
+- safety.order_placed == false
+- safety.binance_order_endpoint_called == false
+- safety.network_allowed == false
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "write_executable_payload_requested": false,
+  "confirmation_valid": false,
+  "executable_payload_written": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "executable_payload_write_gate_only": true,
+    "signed_order_request_created": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "input_summary": {
+    "r248_stop_take_profit_source_found": true/false,
+    "r248_stop_take_profit_source_valid": true/false,
+    "r247_executable_payload_preview_found": true/false,
+    "r247_executable_payload_preview_valid": true/false,
+    "r246_payload_refresh_write_found": true/false,
+    "r246_payload_refresh_write_valid": true/false,
+    "r244_adjusted_contract_found": true/false,
+    "r244_adjusted_contract_valid": true/false,
+    "r242_readonly_found": true/false,
+    "r242_readonly_valid": true/false
+  },
+  "payload_artifact_preview": {
+    "would_write": true/false,
+    "write_requires_confirmation": true,
+    "artifact_only": true,
+    "signed": false,
+    "submit_allowed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false,
+    "proposed_executable_payload_artifact": {...}
+  },
+  "payload_artifact_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": []
+  },
+  "post_write_verification": {
+    "executable_payload_written": true/false,
+    "matching_executable_payload_found": true/false,
+    "matching_executable_payload_valid": true/false,
+    "signed": false,
+    "submit_allowed": false,
+    "signed_order_request_created": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "executable_payload_write_gate_matrix": {
+    "r248_stop_take_profit_source_ready": true/false,
+    "r247_executable_payload_preview_ready": true/false,
+    "r246_payload_refresh_write_ready": true/false,
+    "payload_artifact_valid": true/false,
+    "write_confirmed": true/false,
+    "executable_payload_written": true/false,
+    "signature_gate_required": true,
+    "submit_gate_required": true,
+    "signed_order_request_created": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": []
+  },
+  "operator_executable_payload_write_packet": {
+    "operator_should_review_executable_payload_artifact": true/false,
+    "operator_should_sign_now": false,
+    "operator_should_submit_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R249_EXECUTABLE_PAYLOAD_WRITE|REVIEW_R249_RESULT|WAIT|FIX_BLOCKER",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not sign request",
+      "do not call Binance from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "executable_payload_write_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "signed order request",
+    "signed trading request",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- executable_payload_write_gate_only=true
+- executable_payload_written=true only after exact confirmation writes local artifact
+- executable_payload_created=true only after exact confirmation writes local artifact
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- signed_readonly_request_created=false
+- submit_allowed=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=false
+- binance_mark_price_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_shown=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+
+Only append to the ledger if exact confirmation phrase is provided.
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+
+Tests must cover:
+- CLI command exists and returns JSON
+- preview writes no ledger
+- wrong confirmation rejects
+- exact confirmation writes local executable payload artifact only
+- artifact validates official lane
+- artifact main order is SELL MARKET quantity 0.007
+- stop order is BUY STOP_MARKET reduceOnly true
+- take profit order is BUY TAKE_PROFIT_MARKET reduceOnly true
+- stop price above entry/reference for short
+- take profit price below entry/reference for short
+- risk fields use margin 44 / leverage 10 / max notional 440
+- estimated stop loss does not exceed tolerance
+- signed=false
+- submit_allowed=false
+- signed_order_request_created=false
+- order_placed=false
+- no Binance/network calls
+- no env/config/lane_controls mutation
+- R248 blocker if stop/take-profit source missing
+- R247 blocker if executable preview missing
+- R246 blocker if payload refresh write missing
+
+VALIDATION:
+Run py_compile:
+- src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+- src/app/hammer_radar/operator/inspect.py
+
+Run focused test:
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+
+Run related tests:
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_preview.py
+- tests/hammer_radar/test_tiny_live_order_payload_refresh_write_gate.py
+- tests/hammer_radar/test_tiny_live_order_payload_refresh_preview.py
+- tests/hammer_radar/test_tiny_live_leverage_notional_risk_contract_write_gate.py
+- tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+- tests/hammer_radar/test_tiny_live_order_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_order_preflight_write_gate.py
+- tests/hammer_radar/test_tiny_live_lane_arm_write_gate.py
+- tests/hammer_radar/test_tiny_live_10_of_10_ready_packet.py
+
+Run full:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate \
+  | jq '.status, .target_scope, .input_summary, .payload_artifact_preview, .payload_artifact_validation, .post_write_verification, .executable_payload_write_gate_matrix, .operator_executable_payload_write_packet, .executable_payload_write_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate \
+  --write-executable-payload \
+  --confirm-tiny-live-executable-payload-write "wrong" \
+  | jq '.status, .confirmation_valid, .executable_payload_written, .safety'
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-executable-payload-write-gate \
+  --write-executable-payload \
+  --confirm-tiny-live-executable-payload-write "I CONFIRM TINY LIVE EXECUTABLE PAYLOAD WRITE GATE ONLY; WRITE LOCAL PAYLOAD ARTIFACT ONLY; NO SIGNATURE; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .executable_payload_written, .post_write_verification, .executable_payload_write_gate_matrix, .operator_executable_payload_write_packet, .executable_payload_write_overall_status, .safety'
+
+Mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected artifact:
+git status --short logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson 2>/dev/null || true
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- input_summary
+- payload_artifact_preview
+- payload_artifact_validation
+- post_write_verification
+- executable_payload_write_gate_matrix
+- operator_executable_payload_write_packet
+- executable_payload_write_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R249_TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE.md
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R250_TINY_LIVE_SIGNATURE_GATE_PREVIEW.md
+
+R250 should:
+- consume R249 executable payload artifact
+- preview local signed request construction only
+- do not write signed request
+- do not call Binance
+- do not submit order
+- do not place order
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config/lane controls.
+Do not perform Binance/network calls.
+Do not create signed requests.
+Do not submit.
+Do not place orders.
+Only write executable payload artifact if exact confirmation command is explicitly run.

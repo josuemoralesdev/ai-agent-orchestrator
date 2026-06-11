@@ -2852,6 +2852,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-executable-payload-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_executable_payload_write_gate import (
+            build_tiny_live_executable_payload_write_gate,
+            format_tiny_live_executable_payload_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_executable_payload_write_gate_json(
+                build_tiny_live_executable_payload_write_gate(
+                    log_dir=args.log_dir,
+                    write_executable_payload=args.write_executable_payload,
+                    confirm_tiny_live_executable_payload_write=(
+                        args.confirm_tiny_live_executable_payload_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5020,6 +5037,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_stop_take_profit_source_gate_parser.add_argument(
         "--confirm-tiny-live-stop-take-profit-source-preview",
+        default=None,
+    )
+
+    tiny_live_executable_payload_write_gate_parser = subparsers.add_parser(
+        "tiny-live-executable-payload-write-gate",
+        parents=[parent],
+    )
+    tiny_live_executable_payload_write_gate_parser.add_argument(
+        "--write-executable-payload",
+        action="store_true",
+    )
+    tiny_live_executable_payload_write_gate_parser.add_argument(
+        "--confirm-tiny-live-executable-payload-write",
         default=None,
     )
 
