@@ -2869,6 +2869,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-signature-gate-preview":
+        from src.app.hammer_radar.operator.tiny_live_signature_gate_preview import (
+            build_tiny_live_signature_gate_preview,
+            format_tiny_live_signature_gate_preview_json,
+        )
+
+        print(
+            format_tiny_live_signature_gate_preview_json(
+                build_tiny_live_signature_gate_preview(
+                    log_dir=args.log_dir,
+                    record_signature_gate_preview=args.record_signature_gate_preview,
+                    confirm_tiny_live_signature_gate_preview=(
+                        args.confirm_tiny_live_signature_gate_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5050,6 +5067,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_executable_payload_write_gate_parser.add_argument(
         "--confirm-tiny-live-executable-payload-write",
+        default=None,
+    )
+
+    tiny_live_signature_gate_preview_parser = subparsers.add_parser(
+        "tiny-live-signature-gate-preview",
+        parents=[parent],
+    )
+    tiny_live_signature_gate_preview_parser.add_argument(
+        "--record-signature-gate-preview",
+        action="store_true",
+    )
+    tiny_live_signature_gate_preview_parser.add_argument(
+        "--confirm-tiny-live-signature-gate-preview",
         default=None,
     )
 
