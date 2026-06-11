@@ -2886,6 +2886,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-signed-request-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_signed_request_write_gate import (
+            build_tiny_live_signed_request_write_gate,
+            format_tiny_live_signed_request_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_signed_request_write_gate_json(
+                build_tiny_live_signed_request_write_gate(
+                    log_dir=args.log_dir,
+                    write_signed_request=args.write_signed_request,
+                    confirm_tiny_live_signed_request_write=(
+                        args.confirm_tiny_live_signed_request_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5080,6 +5097,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_signature_gate_preview_parser.add_argument(
         "--confirm-tiny-live-signature-gate-preview",
+        default=None,
+    )
+
+    tiny_live_signed_request_write_gate_parser = subparsers.add_parser(
+        "tiny-live-signed-request-write-gate",
+        parents=[parent],
+    )
+    tiny_live_signed_request_write_gate_parser.add_argument(
+        "--write-signed-request",
+        action="store_true",
+    )
+    tiny_live_signed_request_write_gate_parser.add_argument(
+        "--confirm-tiny-live-signed-request-write",
         default=None,
     )
 
