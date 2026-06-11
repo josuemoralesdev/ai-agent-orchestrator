@@ -2799,6 +2799,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-order-payload-refresh-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_order_payload_refresh_write_gate import (
+            build_tiny_live_order_payload_refresh_write_gate,
+            format_tiny_live_order_payload_refresh_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_order_payload_refresh_write_gate_json(
+                build_tiny_live_order_payload_refresh_write_gate(
+                    log_dir=args.log_dir,
+                    write_payload_refresh=args.write_payload_refresh,
+                    confirm_tiny_live_order_payload_refresh_write=(
+                        args.confirm_tiny_live_order_payload_refresh_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -4928,6 +4945,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_order_payload_refresh_preview_parser.add_argument(
         "--confirm-tiny-live-order-payload-refresh-preview",
+        default=None,
+    )
+
+    tiny_live_order_payload_refresh_write_gate_parser = subparsers.add_parser(
+        "tiny-live-order-payload-refresh-write-gate",
+        parents=[parent],
+    )
+    tiny_live_order_payload_refresh_write_gate_parser.add_argument(
+        "--write-payload-refresh",
+        action="store_true",
+    )
+    tiny_live_order_payload_refresh_write_gate_parser.add_argument(
+        "--confirm-tiny-live-order-payload-refresh-write",
         default=None,
     )
 
