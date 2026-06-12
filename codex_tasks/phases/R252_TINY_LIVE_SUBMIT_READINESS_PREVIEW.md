@@ -2,7 +2,7 @@
 
 ## Intent
 
-Consume the latest R251/R251C signed request artifact plus R251D runtime credential source readiness and preview whether a future submit gate could be prepared for the official lane:
+Consume the latest R251/R251E runtime-source signed request artifact plus R251D runtime credential source readiness and preview whether a future submit gate could be prepared for the official lane:
 
 `BTCUSDT|8m|short|ladder_close_50_618`
 
@@ -13,8 +13,9 @@ R252 is preview only. It must inspect local artifacts and produce a submit-readi
 ## Required Inputs
 
 - Latest R251 signed request artifact in `logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson`.
-- Latest R251C wrapper drill record in `logs/hammer_radar_forward/tiny_live_signed_request_with_credentials_drill.ndjson`.
+- Latest R251E wrapper write-gate record in `logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson`.
 - Latest R251D runtime credential source drill record in `logs/hammer_radar_forward/tiny_live_runtime_credential_source_drill.ndjson`.
+- R251C may be accepted only as prior historical evidence; R251E is the preferred runtime-source artifact path.
 - Official lane remains `BTCUSDT|8m|short|ladder_close_50_618`.
 
 ## Required Preview Checks

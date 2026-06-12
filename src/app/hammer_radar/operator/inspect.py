@@ -2960,6 +2960,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-signed-request-runtime-source-write-gate":
+        from src.app.hammer_radar.operator.tiny_live_signed_request_runtime_source_write_gate import (
+            build_tiny_live_signed_request_runtime_source_write_gate,
+            format_tiny_live_signed_request_runtime_source_write_gate_json,
+        )
+
+        print(
+            format_tiny_live_signed_request_runtime_source_write_gate_json(
+                build_tiny_live_signed_request_runtime_source_write_gate(
+                    log_dir=args.log_dir,
+                    write_signed_request_runtime_source=(
+                        args.write_signed_request_runtime_source
+                    ),
+                    confirm_tiny_live_signed_request_runtime_source_write=(
+                        args.confirm_tiny_live_signed_request_runtime_source_write
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5206,6 +5225,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_runtime_credential_source_drill_parser.add_argument(
         "--confirm-tiny-live-runtime-credential-source-drill",
+        default=None,
+    )
+
+    tiny_live_signed_request_runtime_source_write_gate_parser = subparsers.add_parser(
+        "tiny-live-signed-request-runtime-source-write-gate",
+        parents=[parent],
+    )
+    tiny_live_signed_request_runtime_source_write_gate_parser.add_argument(
+        "--write-signed-request-runtime-source",
+        action="store_true",
+    )
+    tiny_live_signed_request_runtime_source_write_gate_parser.add_argument(
+        "--confirm-tiny-live-signed-request-runtime-source-write",
         default=None,
     )
 
