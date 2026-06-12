@@ -2979,6 +2979,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-submit-readiness-preview":
+        from src.app.hammer_radar.operator.tiny_live_submit_readiness_preview import (
+            build_tiny_live_submit_readiness_preview,
+            format_tiny_live_submit_readiness_preview_json,
+        )
+
+        print(
+            format_tiny_live_submit_readiness_preview_json(
+                build_tiny_live_submit_readiness_preview(
+                    log_dir=args.log_dir,
+                    record_submit_readiness_preview=(
+                        args.record_submit_readiness_preview
+                    ),
+                    confirm_tiny_live_submit_readiness_preview=(
+                        args.confirm_tiny_live_submit_readiness_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5238,6 +5257,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_signed_request_runtime_source_write_gate_parser.add_argument(
         "--confirm-tiny-live-signed-request-runtime-source-write",
+        default=None,
+    )
+
+    tiny_live_submit_readiness_preview_parser = subparsers.add_parser(
+        "tiny-live-submit-readiness-preview",
+        parents=[parent],
+    )
+    tiny_live_submit_readiness_preview_parser.add_argument(
+        "--record-submit-readiness-preview",
+        action="store_true",
+    )
+    tiny_live_submit_readiness_preview_parser.add_argument(
+        "--confirm-tiny-live-submit-readiness-preview",
         default=None,
     )
 
