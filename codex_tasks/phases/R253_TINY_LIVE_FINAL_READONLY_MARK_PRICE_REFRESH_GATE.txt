@@ -1,0 +1,640 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R253 Tiny-Live Final Readonly Mark Price Refresh Gate
+
+BRANCH:
+r253-tiny-live-final-readonly-mark-price-refresh-gate
+
+PHASE CLASSIFICATION:
+Primary: FINAL PUBLIC READONLY MARKET REFRESH GATE
+Secondary: PRE-SUBMIT SAFETY, SIGNED REQUEST STALENESS AUDIT, RISK RECONCILIATION
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R252 Tiny-Live Submit Readiness Preview has been committed.
+
+R252 confirmed:
+- runtime-source signed request artifact exists
+- signed request artifact is structurally valid
+- signed_requests_count=3
+- main/stop/take-profit requests are signed
+- submit_allowed=false
+- order_placed=false
+- binance_call_allowed=false
+- network_allowed=false
+- final_readonly_refresh_required=true
+
+R252 explicitly requires a future final public read-only refresh before any submit gate because:
+- signed request and stop/take-profit source depend on older R242 reference mark price
+- R242 reference price was around 62210.3
+- stop price was 62844.6
+- take-profit price was 60941.7
+- quantity was 0.007
+- estimated loss at stop was about 4.4401 USDT
+- estimated reward at take profit was about 8.8802 USDT
+
+R253 must perform a final public read-only Binance refresh and compare fresh market context against the signed artifact context.
+
+This phase may call ONLY public read-only Binance endpoints:
+- GET /fapi/v1/exchangeInfo
+- GET /fapi/v1/premiumIndex?symbol=BTCUSDT
+
+This phase must NOT:
+- call order endpoint
+- call test order endpoint
+- call account/private endpoint
+- use API keys
+- read secrets
+- sign
+- submit
+- place order
+- mutate env/config/lane controls
+
+CORE INTENT:
+Create a final read-only mark price refresh gate that:
+1. Reads latest R252 submit readiness preview.
+2. Reads latest R251E runtime-source signed request artifact.
+3. Reads latest R251 signed request artifact.
+4. Reads latest R249 executable payload artifact.
+5. Reads latest R248 stop/take-profit source artifact.
+6. Performs final public read-only Binance refresh using allowed endpoints only.
+7. Extracts fresh:
+   - mark_price
+   - tick_size
+   - step_size
+   - min_notional
+   - price_precision
+   - quantity_precision
+8. Recomputes:
+   - quantity step validity for signed quantity 0.007
+   - notional_after_rounding at fresh mark price
+   - min_notional_ok
+   - short stop direction validity
+   - short take-profit direction validity
+   - distance from fresh mark to stop/take-profit
+   - max loss preview based on signed stop and quantity
+   - rough drift from signed artifact reference price
+9. Decides whether signed request must be regenerated before submit.
+10. Keeps submit blocked.
+11. Produces future R254 submit gate preview task.
+
+This phase is not submit.
+This phase is not signed request write.
+This phase is not order placement.
+
+OFFICIAL LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT SIGNED REQUEST CONTEXT:
+Expected from latest signed artifact:
+- symbol=BTCUSDT
+- direction=short
+- main order SELL MARKET quantity 0.007
+- stop order BUY STOP_MARKET reduceOnly true stopPrice 62844.6
+- take-profit order BUY TAKE_PROFIT_MARKET reduceOnly true stopPrice 60941.7
+- reference price around 62210.3
+- submit_allowed=false
+- network_allowed=false
+- order_placed=false
+
+ALLOWED BINANCE ENDPOINTS:
+- GET /fapi/v1/exchangeInfo
+- GET /fapi/v1/premiumIndex?symbol=BTCUSDT
+
+FORBIDDEN BINANCE ENDPOINTS:
+- POST /fapi/v1/order
+- POST /fapi/v1/batchOrders
+- GET /fapi/v1/order
+- DELETE /fapi/v1/order
+- POST /fapi/v1/leverage
+- GET /fapi/v2/account
+- GET /fapi/v3/account
+- any signed/private endpoint
+- any endpoint requiring API key/secret
+
+NON-NEGOTIABLES:
+- No order endpoint.
+- No test order endpoint.
+- No account endpoint.
+- No private endpoint.
+- No signed endpoint.
+- No Binance submit.
+- No network except allowed public readonly endpoints.
+- No API key loading.
+- No API secret loading.
+- No secrets printed.
+- No HMAC signature creation.
+- No signed request write.
+- No submit-ready request with submit_allowed=true.
+- No order placement.
+- No .env write.
+- No external env file write.
+- No lane_controls.json write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No kill switch disable.
+- No global live flag changes.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE FINAL READONLY MARK PRICE REFRESH ONLY; NO SUBMIT; NO ORDER; NO PRIVATE BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_submit_readiness_preview.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_runtime_source_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_stop_take_profit_source_gate.py
+- src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+- src/app/hammer_radar/operator/tiny_live_precision_and_mark_price_preview.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*readonly* files
+- src/app/hammer_radar/operator/*binance* files
+- src/app/hammer_radar/operator/*submit* files
+- src/app/hammer_radar/operator/*signed* files
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*risk* files
+
+Inspect configs read-only:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_submit_readiness_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R252_TINY_LIVE_SUBMIT_READINESS_PREVIEW.md
+- docs/hammer_radar/live_readiness/R251E_TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R251D_TINY_LIVE_RUNTIME_CREDENTIAL_SOURCE_DRILL.md
+- docs/hammer_radar/live_readiness/R251_TINY_LIVE_SIGNED_REQUEST_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R249_TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R248_TINY_LIVE_STOP_TAKE_PROFIT_SOURCE_GATE.md
+- docs/hammer_radar/live_readiness/R242_TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_*readonly* if present
+- tests/hammer_radar/test_*binance* if present
+- tests/hammer_radar/test_*submit* if present
+- tests/hammer_radar/test_*signed* if present
+- tests/hammer_radar/test_*order* if present
+
+REUSE / EXTEND:
+Reuse:
+- R242 public read-only Binance fetch pattern and safety endpoint allowlist.
+- R252 submit readiness loader.
+- R251E runtime-source signed artifact loader/validation.
+- R249 executable payload validation.
+- R248 stop/take-profit validation.
+- Existing safety conventions.
+- Existing NDJSON append helpers.
+
+Do not duplicate incompatible schemas.
+Do not call Binance private/network endpoints.
+Do not submit.
+Do not sign.
+Do not place order.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_final_readonly_mark_price_refresh_gate.py
+
+Expose:
+- build_tiny_live_final_readonly_mark_price_refresh_gate
+- load_latest_tiny_live_submit_readiness_preview
+- load_latest_tiny_live_signed_request_runtime_source_write_gate
+- load_latest_tiny_live_signed_request_write_gate
+- load_latest_tiny_live_executable_payload_write_gate
+- load_latest_tiny_live_stop_take_profit_source_gate
+- load_latest_tiny_live_binance_readonly_precision_mark_price_gate
+- build_allowed_public_readonly_request_plan
+- fetch_final_readonly_exchange_info
+- fetch_final_readonly_mark_price
+- extract_btcusdt_precision_snapshot
+- extract_final_mark_price_snapshot
+- validate_final_readonly_endpoint_safety
+- build_fresh_market_context_summary
+- compare_fresh_context_to_signed_artifact
+- validate_signed_quantity_against_fresh_precision
+- validate_signed_stop_take_profit_against_fresh_mark
+- build_signed_request_regeneration_decision
+- build_final_readonly_refresh_gate_matrix
+- build_operator_final_readonly_refresh_packet
+- classify_tiny_live_final_readonly_mark_price_refresh_gate_status
+- append_tiny_live_final_readonly_mark_price_refresh_gate_record
+- load_tiny_live_final_readonly_mark_price_refresh_gate_records
+- summarize_tiny_live_final_readonly_mark_price_refresh_gate_records
+
+CLI:
+Wire into inspect.py as:
+tiny-live-final-readonly-mark-price-refresh-gate
+
+Args:
+- --fetch-final-readonly-market
+- --confirm-tiny-live-final-readonly-refresh <phrase>
+
+Preview/no network:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate
+
+Fetch:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate \
+  --fetch-final-readonly-market \
+  --confirm-tiny-live-final-readonly-refresh "I CONFIRM TINY LIVE FINAL READONLY MARK PRICE REFRESH ONLY; NO SUBMIT; NO ORDER; NO PRIVATE BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate \
+  --fetch-final-readonly-market \
+  --confirm-tiny-live-final-readonly-refresh "wrong"
+
+STATUS ENUM:
+- TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE_READY
+- TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE_REJECTED
+- TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE_FETCHED
+- TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE_BLOCKED
+- TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_FINAL_READONLY_REFRESH_READY_FOR_CONFIRMATION
+- TINY_LIVE_FINAL_READONLY_REFRESH_FETCHED_REGENERATE_SIGNED_REQUEST_REQUIRED
+- TINY_LIVE_FINAL_READONLY_REFRESH_FETCHED_READY_FOR_SUBMIT_GATE_PREVIEW
+- TINY_LIVE_FINAL_READONLY_REFRESH_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_FINAL_READONLY_REFRESH_BLOCKED_BY_ENDPOINT_SAFETY
+- TINY_LIVE_FINAL_READONLY_REFRESH_BLOCKED_BY_SIGNED_ARTIFACT
+- TINY_LIVE_FINAL_READONLY_REFRESH_BLOCKED_BY_MARKET_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "fetch_final_readonly_market_requested": false,
+  "confirmation_valid": false,
+  "final_readonly_market_fetched": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "final_readonly_refresh_gate_only": true,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_order_endpoint_called": false,
+    "private_binance_endpoint_called": false,
+    "network_allowed": false
+  },
+  "input_summary": {
+    "r252_submit_readiness_found": true/false,
+    "r252_submit_readiness_valid": true/false,
+    "r251e_runtime_signed_request_found": true/false,
+    "r251e_runtime_signed_request_valid": true/false,
+    "r251_signed_request_found": true/false,
+    "r251_signed_request_valid": true/false,
+    "r249_executable_payload_found": true/false,
+    "r249_executable_payload_valid": true/false,
+    "r248_stop_take_profit_source_found": true/false,
+    "r248_stop_take_profit_source_valid": true/false
+  },
+  "allowed_public_readonly_request_plan": {
+    "preview_only": true/false,
+    "allowed_endpoints": [
+      "GET /fapi/v1/exchangeInfo",
+      "GET /fapi/v1/premiumIndex?symbol=BTCUSDT"
+    ],
+    "forbidden_endpoints": [
+      "POST /fapi/v1/order",
+      "GET /fapi/v2/account",
+      "private/signed endpoints"
+    ],
+    "network_allowed": true/false,
+    "requires_confirmation": true
+  },
+  "endpoint_safety_validation": {
+    "valid": true/false,
+    "errors": [],
+    "warnings": [],
+    "exchange_info_endpoint_allowed": true/false,
+    "mark_price_endpoint_allowed": true/false,
+    "order_endpoint_called": false,
+    "account_endpoint_called": false,
+    "private_endpoint_called": false,
+    "signed_endpoint_called": false
+  },
+  "fresh_market_context_summary": {
+    "fetched": true/false,
+    "mark_price": null,
+    "min_notional": null,
+    "tick_size": null,
+    "step_size": null,
+    "price_precision": null,
+    "quantity_precision": null,
+    "source": "binance_public_readonly_final_refresh"
+  },
+  "signed_artifact_context_summary": {
+    "reference_price": 62210.3,
+    "quantity": 0.007,
+    "stop_price": 62844.6,
+    "take_profit_price": 60941.7,
+    "side": "SELL",
+    "signed_requests_count": 3
+  },
+  "fresh_vs_signed_context_comparison": {
+    "can_compare": true/false,
+    "reference_price": null,
+    "fresh_mark_price": null,
+    "absolute_mark_drift": null,
+    "mark_drift_pct": null,
+    "quantity_step_valid": null,
+    "notional_after_rounding_at_fresh_mark": null,
+    "min_notional_ok": null,
+    "short_stop_still_above_fresh_mark": null,
+    "short_take_profit_still_below_fresh_mark": null,
+    "estimated_loss_at_stop_from_fresh_mark": null,
+    "estimated_reward_at_take_profit_from_fresh_mark": null
+  },
+  "signed_request_regeneration_decision": {
+    "must_regenerate_signed_request_before_submit": true/false/null,
+    "reason": "...",
+    "blocking_reasons": [],
+    "submit_gate_preview_allowed_next": true/false
+  },
+  "final_readonly_refresh_gate_matrix": {
+    "r252_submit_readiness_ready": true/false,
+    "signed_artifact_ready": true/false,
+    "endpoint_safety_valid": true/false,
+    "final_readonly_fetch_confirmed": true/false,
+    "fresh_market_context_ready": true/false,
+    "fresh_context_compatible_with_signed_artifact": true/false/null,
+    "must_regenerate_signed_request": true/false/null,
+    "submit_allowed": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": []
+  },
+  "operator_final_readonly_refresh_packet": {
+    "operator_should_review_fresh_market_context": true/false,
+    "operator_should_regenerate_signed_request": true/false,
+    "operator_should_continue_to_submit_gate_preview": true/false,
+    "operator_should_submit_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R253_FINAL_READONLY_REFRESH|REGENERATE_SIGNED_REQUEST|CONTINUE_TO_R254_SUBMIT_GATE_PREVIEW|WAIT|FIX_BLOCKER",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not submit",
+      "do not call Binance order endpoint from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "final_readonly_refresh_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- external_env_file_written=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- final_readonly_refresh_gate_only=true
+- hmac_signature_created=false
+- signed_request_written=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- submit_allowed=false
+- submit_attempted=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_exchange_info_endpoint_called=true only after exact confirmation/fetch
+- binance_mark_price_endpoint_called=true only after exact confirmation/fetch
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- private_binance_endpoint_called=false
+- signed_binance_endpoint_called=false
+- network_allowed=true only after exact confirmation/fetch for public readonly endpoints
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_read=false
+- secrets_shown=false
+- secrets_persisted=false
+- secret_values_in_output=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson
+
+Only append under exact confirmation phrase and successful public read-only fetch.
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+
+Tests must cover:
+- CLI exists and returns JSON
+- preview makes no network call
+- preview writes no ledger
+- wrong confirmation rejects and makes no network call
+- exact confirmation can use monkeypatched public readonly fetchers
+- only allowed endpoints are called
+- order endpoint false
+- account endpoint false
+- private endpoint false
+- signed endpoint false
+- no secrets read
+- no signing
+- no submit
+- no order
+- validates fresh mark context
+- detects quantity step valid
+- detects min_notional valid
+- detects short stop/TP direction validity
+- decides regenerate when fresh mark invalidates stop/tp direction or risk
+- decides continue when fresh context is compatible
+- no env/config/lane_controls mutation
+- no secret values in output
+
+VALIDATION:
+Run py_compile:
+- src/app/hammer_radar/operator/tiny_live_final_readonly_mark_price_refresh_gate.py
+- src/app/hammer_radar/operator/inspect.py
+
+Run focused test:
+- tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+
+Run related tests:
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_binance_readonly_precision_mark_price_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+
+Run full:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate \
+  | jq '.status, .target_scope, .input_summary, .allowed_public_readonly_request_plan, .endpoint_safety_validation, .fresh_market_context_summary, .signed_artifact_context_summary, .fresh_vs_signed_context_comparison, .signed_request_regeneration_decision, .final_readonly_refresh_gate_matrix, .operator_final_readonly_refresh_packet, .final_readonly_refresh_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate \
+  --fetch-final-readonly-market \
+  --confirm-tiny-live-final-readonly-refresh "wrong" \
+  | jq '.status, .confirmation_valid, .final_readonly_market_fetched, .endpoint_safety_validation, .safety'
+
+Fetch:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-readonly-mark-price-refresh-gate \
+  --fetch-final-readonly-market \
+  --confirm-tiny-live-final-readonly-refresh "I CONFIRM TINY LIVE FINAL READONLY MARK PRICE REFRESH ONLY; NO SUBMIT; NO ORDER; NO PRIVATE BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .final_readonly_market_fetched, .fresh_market_context_summary, .fresh_vs_signed_context_comparison, .signed_request_regeneration_decision, .final_readonly_refresh_gate_matrix, .operator_final_readonly_refresh_packet, .final_readonly_refresh_overall_status, .safety'
+
+Secret leak check:
+PYTHONPATH=. .venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path("logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson")
+raw = path.read_text() if path.exists() else ""
+
+external = Path("/home/josue/.config/hammer-radar/binance-signing.env")
+values = []
+if external.exists():
+    for line in external.read_text().splitlines():
+        if line.startswith("BINANCE_API_KEY=") or line.startswith("BINANCE_API_SECRET="):
+            _, value = line.split("=", 1)
+            if value:
+                values.append(value.strip())
+
+for key in ("BINANCE_API_KEY", "BINANCE_API_SECRET"):
+    value = os.environ.get(key)
+    if value:
+        values.append(value)
+
+for value in values:
+    if value and value in raw:
+        raise SystemExit("SECRET_LEAK_DETECTED")
+
+print("NO_SECRET_VALUES_FOUND")
+PY
+
+Mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected artifact:
+git status --short logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson 2>/dev/null || true
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- input_summary
+- endpoint_safety_validation
+- fresh_market_context_summary
+- signed_artifact_context_summary
+- fresh_vs_signed_context_comparison
+- signed_request_regeneration_decision
+- final_readonly_refresh_gate_matrix
+- operator_final_readonly_refresh_packet
+- final_readonly_refresh_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R253_TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE.md
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R254_TINY_LIVE_SUBMIT_GATE_PREVIEW.md
+
+R254 should:
+- consume R253 final readonly refresh
+- if compatible, preview final submit gate only
+- no Binance order call
+- no submit
+- no order
+- prepare the exact future submit confirmation phrase
+- keep submit_allowed=false until a separate final write/submit gate
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config/lane controls.
+Do not write external secret files.
+Do not print secrets.
+Do not sign.
+Only call allowed public read-only Binance endpoints after exact confirmation.
+Do not call order/private/signed endpoints.
+Do not submit.
+Do not place orders.
+Only record final readonly refresh if exact confirmation and endpoint safety validation pass.
