@@ -1,0 +1,574 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R251E Tiny-Live Signed Request Runtime Source Write Gate
+
+BRANCH:
+r251e-tiny-live-signed-request-runtime-source-write-gate
+
+PHASE CLASSIFICATION:
+Primary: CONTROLLED SIGNED REQUEST ARTIFACT WRITE GATE
+Secondary: RUNTIME CREDENTIAL SOURCE INTEGRATION, SECRET-HANDLING SAFETY, PRE-SUBMIT READINESS
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R251D Tiny-Live Runtime Credential Source Drill has been committed.
+
+R251D introduced safe runtime credential source detection:
+- process env vars:
+  - BINANCE_API_KEY
+  - BINANCE_API_SECRET
+- external env file outside Git:
+  - /home/josue/.config/hammer-radar/binance-signing.env
+- override env var:
+  - HAMMER_BINANCE_SIGNING_ENV_FILE
+
+The operator has now created the external credential file outside the repo.
+
+R251C proved that signed request artifact writing works when credentials are available in the shell, but exported shell credentials disappear after SSH/session breaks.
+
+R251E must now create a signed request write gate that uses the R251D runtime credential source resolver, especially the external env file, so the operator does not need to export credentials each time.
+
+This phase may write a signed request artifact only after exact confirmation and only if runtime credentials are available from a safe source.
+
+This phase must NOT call Binance.
+This phase must NOT submit.
+This phase must NOT place an order.
+This phase must NOT print secrets.
+This phase must NOT persist secrets.
+This phase must NOT mutate env/config/lane controls.
+
+OFFICIAL LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT STATE:
+- R249 executable payload artifact exists.
+- R250 signature preview exists.
+- R251 signed request write gate exists.
+- R251B credential presence drill exists.
+- R251C signed request artifact exists from temporary shell credentials.
+- R251D runtime credential source drill exists.
+- External credential file has been created manually outside Git:
+  /home/josue/.config/hammer-radar/binance-signing.env
+
+CORE INTENT:
+Create a signed request write gate that:
+1. Reads latest R251D runtime credential source drill / runtime credential resolver.
+2. Resolves credentials from:
+   - process environment first, or
+   - external env file outside Git.
+3. Validates external credential file is:
+   - absolute path
+   - outside repo
+   - regular file
+   - preferably mode 0600
+   - contains BINANCE_API_KEY and BINANCE_API_SECRET
+4. Uses credential values only in memory.
+5. Reuses R251 signed request generation logic where possible.
+6. Writes local signed request artifact only after exact confirmation.
+7. Validates:
+   - 3 signed requests exist
+   - signatures are 64 hex chars
+   - raw API key not persisted
+   - raw API secret not persisted
+   - submit_allowed=false
+   - binance_call_allowed=false
+   - network_allowed=false
+   - order_placed=false
+8. Produces future R252 submit readiness preview task.
+
+This phase is signed request artifact creation only.
+This phase is not submit.
+This phase is not Binance connectivity.
+This phase is not order placement.
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order placement.
+- No test order placement.
+- No submit-ready request with submit_allowed=true.
+- No private endpoint call.
+- No API key printed.
+- No API secret printed.
+- No secrets in stdout.
+- No secrets in stderr.
+- No secrets in logs.
+- No secrets in artifacts.
+- No .env write.
+- No external env file write.
+- No lane_controls.json write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No kill switch disable.
+- No global live flag changes.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+ALLOWED ONLY AFTER EXACT CONFIRMATION:
+- Read credential values in memory from:
+  - process env, or
+  - /home/josue/.config/hammer-radar/binance-signing.env, or
+  - HAMMER_BINANCE_SIGNING_ENV_FILE if set and valid.
+- HMAC sign local canonical query strings in memory.
+- Write local signed request artifact ledger:
+  logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- Write R251E wrapper audit ledger:
+  logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson
+
+FORBIDDEN EVEN AFTER CONFIRMATION:
+- Binance calls
+- network calls
+- submit
+- order placement
+- printing secrets
+- persisting secrets
+- setting submit_allowed=true
+- writing or modifying the external credential file
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE SIGNED REQUEST RUNTIME SOURCE WRITE GATE ONLY; WRITE LOCAL SIGNED REQUEST ARTIFACT ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_runtime_credential_source_drill.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_with_credentials_drill.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_signing_credential_presence_drill.py
+- src/app/hammer_radar/operator/tiny_live_signature_gate_preview.py
+- src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*credential* files
+- src/app/hammer_radar/operator/*secret* files
+- src/app/hammer_radar/operator/*signed* files
+- src/app/hammer_radar/operator/*signature* files
+- src/app/hammer_radar/operator/*submit* files
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*binance* files
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_runtime_credential_source_drill.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_with_credentials_drill.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_signature_gate_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R251D_TINY_LIVE_RUNTIME_CREDENTIAL_SOURCE_DRILL.md
+- docs/hammer_radar/live_readiness/R251C_TINY_LIVE_SIGNED_REQUEST_WRITE_WITH_CREDENTIALS_DRILL.md
+- docs/hammer_radar/live_readiness/R251_TINY_LIVE_SIGNED_REQUEST_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R250_TINY_LIVE_SIGNATURE_GATE_PREVIEW.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_runtime_credential_source_drill.py
+- tests/hammer_radar/test_tiny_live_signed_request_with_credentials_drill.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_signature_gate_preview.py
+- tests/hammer_radar/test_*credential* if present
+- tests/hammer_radar/test_*secret* if present
+- tests/hammer_radar/test_*signed* if present
+- tests/hammer_radar/test_*submit* if present
+
+REUSE / EXTEND:
+Reuse:
+- R251D runtime credential resolver.
+- R251 signed request write gate signing logic.
+- R251C secret validation logic.
+- Existing safety conventions.
+- Existing NDJSON append helpers.
+
+Do not duplicate incompatible signing logic.
+Do not call Binance/network.
+Do not submit.
+Do not place order.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_signed_request_runtime_source_write_gate.py
+
+Expose:
+- build_tiny_live_signed_request_runtime_source_write_gate
+- load_latest_tiny_live_runtime_credential_source_drill
+- load_latest_tiny_live_signed_request_write_gate
+- validate_runtime_credential_source_ready
+- resolve_runtime_signing_credentials_for_confirmed_write
+- build_r251e_signed_request_write_plan
+- invoke_r251_signed_request_artifact_write_with_runtime_source
+- validate_r251e_signed_request_artifact
+- validate_no_secret_values_in_artifact
+- build_r251e_post_write_verification
+- build_r251e_gate_matrix
+- build_operator_r251e_packet
+- classify_tiny_live_signed_request_runtime_source_write_gate_status
+- append_tiny_live_signed_request_runtime_source_write_gate_record
+- load_tiny_live_signed_request_runtime_source_write_gate_records
+- summarize_tiny_live_signed_request_runtime_source_write_gate_records
+
+CLI:
+Wire into inspect.py as:
+tiny-live-signed-request-runtime-source-write-gate
+
+Args:
+- --write-signed-request-runtime-source
+- --confirm-tiny-live-signed-request-runtime-source-write <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate \
+  --write-signed-request-runtime-source \
+  --confirm-tiny-live-signed-request-runtime-source-write "wrong"
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate \
+  --write-signed-request-runtime-source \
+  --confirm-tiny-live-signed-request-runtime-source-write "I CONFIRM TINY LIVE SIGNED REQUEST RUNTIME SOURCE WRITE GATE ONLY; WRITE LOCAL SIGNED REQUEST ARTIFACT ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+
+STATUS ENUM:
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE_READY
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE_REJECTED
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE_WRITTEN
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE_BLOCKED
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_READY_FOR_CONFIRMATION
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITTEN_SUBMIT_READINESS_REQUIRED
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_BLOCKED_BY_CREDENTIAL_SOURCE
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_BLOCKED_BY_R251
+- TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_BLOCKED_BY_SECRET_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "write_signed_request_runtime_source_requested": false,
+  "confirmation_valid": false,
+  "signed_request_written": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "signed_request_runtime_source_write_gate_only": true,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "runtime_credential_source_context": {
+    "credential_source_ready": true/false,
+    "source_type": "process_env|external_env_file|none",
+    "external_file_path": "/home/josue/.config/hammer-radar/binance-signing.env|null",
+    "external_file_permission_ok": true/false/null,
+    "credentials_present": true/false,
+    "api_key_hint": "<PRESENT_REDACTED>|null",
+    "api_secret_hint": "<PRESENT_REDACTED>|null",
+    "secrets_shown": false,
+    "secrets_persisted": false
+  },
+  "signed_request_write_plan": {
+    "would_write": true/false,
+    "write_requires_confirmation": true,
+    "uses_r251_write_gate": true,
+    "uses_runtime_credential_source": true,
+    "requires_credentials": true,
+    "submit_allowed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "signed_request_artifact_summary": {
+    "signed_request_written": true/false,
+    "signed_requests_count": 0/3,
+    "main_order_signature_present": true/false,
+    "stop_order_signature_present": true/false,
+    "take_profit_order_signature_present": true/false,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false
+  },
+  "secret_validation": {
+    "valid": true/false,
+    "raw_api_key_found_in_artifacts": false,
+    "raw_api_secret_found_in_artifacts": false,
+    "secret_values_in_output": false,
+    "errors": [],
+    "warnings": []
+  },
+  "post_write_verification": {
+    "signed_request_written": true/false,
+    "matching_signed_request_found": true/false,
+    "matching_signed_request_valid": true/false,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_call_allowed": false,
+    "network_allowed": false,
+    "secrets_shown": false,
+    "secrets_persisted": false
+  },
+  "r251e_gate_matrix": {
+    "runtime_credential_source_ready": true/false,
+    "r251_write_gate_available": true/false,
+    "write_confirmed": true/false,
+    "signed_request_written": true/false,
+    "secret_validation_passed": true/false,
+    "submit_gate_required": true,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": []
+  },
+  "operator_r251e_packet": {
+    "operator_should_review_signed_request_artifact": true/false,
+    "operator_should_submit_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R251E_SIGNED_REQUEST_RUNTIME_SOURCE|REVIEW_R251E_RESULT|WAIT|FIX_BLOCKER",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not submit",
+      "do not call Binance from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "r251e_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- external_env_file_written=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- signed_request_runtime_source_write_gate_only=true
+- hmac_signature_created=true only after exact confirmation
+- signed_request_written=true only after exact confirmation
+- signed_order_request_created=true only after exact confirmation
+- signed_trading_request_created=true only after exact confirmation
+- submit_allowed=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=false
+- binance_mark_price_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_shown=false
+- secrets_persisted=false
+- secret_values_in_output=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+
+LEDGERS:
+R251 signed request ledger:
+logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+
+R251E runtime-source wrapper audit ledger:
+logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson
+
+Only append under exact confirmation phrase and credentials present.
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+
+Tests must cover:
+- CLI exists and returns JSON
+- preview writes no ledger
+- preview does not sign
+- wrong confirmation rejects
+- missing runtime source blocks
+- external env file source with monkeypatched tmp file works
+- external env file inside repo blocks
+- external env file bad permissions warns/blocks per implemented policy
+- exact confirmation with monkeypatched external env file writes signed request artifact only
+- signed request artifact has 3 signed requests
+- signatures are 64 hex chars
+- no raw API key in artifacts
+- no raw API secret in artifacts
+- no raw secrets in output
+- submit_allowed=false
+- order_placed=false
+- binance_order_endpoint_called=false
+- network_allowed=false
+- no env/config/lane_controls mutation
+- no external env file write
+
+VALIDATION:
+Run py_compile:
+- src/app/hammer_radar/operator/tiny_live_signed_request_runtime_source_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_runtime_credential_source_drill.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_write_gate.py
+- src/app/hammer_radar/operator/inspect.py
+
+Run focused test:
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+
+Run related tests:
+- tests/hammer_radar/test_tiny_live_runtime_credential_source_drill.py
+- tests/hammer_radar/test_tiny_live_signed_request_with_credentials_drill.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_signing_credential_presence_drill.py
+
+Run full:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate \
+  | jq '.status, .target_scope, .runtime_credential_source_context, .signed_request_write_plan, .signed_request_artifact_summary, .secret_validation, .post_write_verification, .r251e_gate_matrix, .operator_r251e_packet, .r251e_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate \
+  --write-signed-request-runtime-source \
+  --confirm-tiny-live-signed-request-runtime-source-write "wrong" \
+  | jq '.status, .confirmation_valid, .signed_request_written, .r251e_gate_matrix, .safety'
+
+Write:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-signed-request-runtime-source-write-gate \
+  --write-signed-request-runtime-source \
+  --confirm-tiny-live-signed-request-runtime-source-write "I CONFIRM TINY LIVE SIGNED REQUEST RUNTIME SOURCE WRITE GATE ONLY; WRITE LOCAL SIGNED REQUEST ARTIFACT ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .confirmation_valid, .signed_request_written, .signed_request_artifact_summary, .secret_validation, .post_write_verification, .r251e_gate_matrix, .operator_r251e_packet, .r251e_overall_status, .safety'
+
+Secret leak check:
+PYTHONPATH=. .venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+paths = [
+    Path("logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson"),
+    Path("logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson"),
+]
+raw = "\n".join(path.read_text() for path in paths if path.exists())
+
+external = Path("/home/josue/.config/hammer-radar/binance-signing.env")
+values = []
+if external.exists():
+    for line in external.read_text().splitlines():
+        if line.startswith("BINANCE_API_KEY=") or line.startswith("BINANCE_API_SECRET="):
+            _, value = line.split("=", 1)
+            if value:
+                values.append(value.strip())
+
+for key in ("BINANCE_API_KEY", "BINANCE_API_SECRET"):
+    value = os.environ.get(key)
+    if value:
+        values.append(value)
+
+for value in values:
+    if value and value in raw:
+        raise SystemExit("SECRET_LEAK_DETECTED")
+print("NO_SECRET_VALUES_FOUND")
+PY
+
+Mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected artifacts:
+git status --short logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson || true
+git status --short logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson 2>/dev/null || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson 2>/dev/null || true
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- runtime_credential_source_context
+- signed_request_artifact_summary
+- secret_validation
+- post_write_verification
+- r251e_gate_matrix
+- operator_r251e_packet
+- r251e_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R251E_TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE.md
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create/update:
+codex_tasks/phases/R252_TINY_LIVE_SUBMIT_READINESS_PREVIEW.md
+
+R252 should:
+- consume runtime-source signed request artifact
+- consume runtime credential source readiness
+- preview submit readiness only
+- require future readonly mark price refresh before submit
+- no Binance call
+- no submit
+- no order
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config/lane controls.
+Do not write external secret files.
+Do not print secrets.
+Do not persist secrets.
+Do not call Binance/network.
+Do not submit.
+Do not place orders.
+Only write signed request artifacts if exact confirmation and runtime credential source is ready.
