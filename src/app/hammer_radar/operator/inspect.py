@@ -3034,6 +3034,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-submit-gate-preview":
+        from src.app.hammer_radar.operator.tiny_live_submit_gate_preview import (
+            build_tiny_live_submit_gate_preview,
+            format_tiny_live_submit_gate_preview_json,
+        )
+
+        print(
+            format_tiny_live_submit_gate_preview_json(
+                build_tiny_live_submit_gate_preview(
+                    log_dir=args.log_dir,
+                    record_submit_gate_preview=args.record_submit_gate_preview,
+                    confirm_tiny_live_submit_gate_preview=(
+                        args.confirm_tiny_live_submit_gate_preview
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5332,6 +5349,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_fresh_context_signed_request_regeneration_gate_parser.add_argument(
         "--confirm-tiny-live-fresh-context-regeneration",
+        default=None,
+    )
+
+    tiny_live_submit_gate_preview_parser = subparsers.add_parser(
+        "tiny-live-submit-gate-preview",
+        parents=[parent],
+    )
+    tiny_live_submit_gate_preview_parser.add_argument(
+        "--record-submit-gate-preview",
+        action="store_true",
+    )
+    tiny_live_submit_gate_preview_parser.add_argument(
+        "--confirm-tiny-live-submit-gate-preview",
         default=None,
     )
 

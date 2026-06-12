@@ -1,0 +1,670 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R254 Tiny-Live Submit Gate Preview
+
+BRANCH:
+r254-tiny-live-submit-gate-preview
+
+PHASE CLASSIFICATION:
+Primary: FINAL SUBMIT GATE PREVIEW
+Secondary: FRESH SIGNED REQUEST AUDIT, HUMAN AUTHORIZATION DESIGN, NO-SUBMIT SAFETY
+Duplicate risk: EXTREME
+
+WHY THIS PHASE EXISTS:
+R253B Tiny-Live Fresh Context Signed Request Regeneration Gate has been committed.
+
+R253B regenerated the previously stale short setup using fresh R253 public-readonly market context.
+
+R253B result:
+- reference_price: 63675.0
+- quantity: 0.007
+- stop_price: 64309.3
+- take_profit_price: 62406.4
+- estimated loss at stop: about 4.4401 USDT
+- estimated reward at take profit: about 8.8802 USDT
+- risk/reward: about 2.0
+- fresh signed request artifact written: true
+- signed_requests_count: 3
+- main/stop/take-profit signatures present
+- submit_allowed: false
+- order_placed: false
+- binance_order_endpoint_called: false
+- network_allowed: false
+
+R254 must preview the final submit gate only.
+
+This phase must NOT submit.
+This phase must NOT call Binance.
+This phase must NOT call order endpoints.
+This phase must NOT place an order.
+This phase must NOT create a new signature.
+This phase must NOT read secrets.
+This phase must NOT mutate env/config/lane controls.
+This phase must NOT set submit_allowed=true.
+
+R254 should answer:
+- Is the fresh R253B signed request structurally ready for a future submit gate?
+- Is the operator packet complete?
+- What exact future submit confirmation phrase should be required?
+- What must the future R255 actual submit gate enforce?
+
+This is the final preview before any actual tiny-live submit implementation.
+
+OFFICIAL LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+CURRENT FRESH SIGNED REQUEST CONTEXT:
+Expected latest R253B artifacts:
+- main order: SELL MARKET quantity 0.007
+- stop order: BUY STOP_MARKET reduceOnly true stopPrice 64309.3 workingType MARK_PRICE
+- take-profit order: BUY TAKE_PROFIT_MARKET reduceOnly true stopPrice 62406.4 workingType MARK_PRICE
+- reference price: 63675.0
+- submit_allowed=false
+- network_allowed=false
+- order_placed=false
+- binance_order_endpoint_called=false
+
+CORE INTENT:
+Create a submit gate preview that:
+1. Reads latest R253B fresh-context regeneration artifact.
+2. Reads latest R253B signed request artifact.
+3. Reads latest R253B executable payload artifact.
+4. Reads latest R253B stop/take-profit source artifact.
+5. Reads latest R253 final readonly refresh artifact.
+6. Reads latest R252 submit readiness preview artifact.
+7. Validates:
+   - fresh signed artifact exists
+   - signed_requests_count=3
+   - all three signatures are present
+   - signatures are 64 hex chars
+   - main order is SELL MARKET quantity 0.007
+   - stop order is BUY STOP_MARKET reduceOnly true stopPrice 64309.3 or latest R253B stop
+   - take-profit order is BUY TAKE_PROFIT_MARKET reduceOnly true stopPrice 62406.4 or latest R253B TP
+   - submit_allowed=false
+   - network_allowed=false
+   - order_placed=false
+   - no Binance order endpoint called
+   - no secrets present
+8. Builds a final submit gate preview packet.
+9. Builds exact future confirmation phrase for R255 actual tiny-live submit gate.
+10. Keeps submit blocked.
+11. Produces R255 actual submit gate task as a separate phase.
+
+This phase is preview only.
+This phase is not submit.
+This phase is not order placement.
+
+NON-NEGOTIABLES:
+- No Binance calls.
+- No network calls.
+- No order endpoint.
+- No test order endpoint.
+- No account/private endpoint.
+- No signed/private endpoint.
+- No submit.
+- No order placement.
+- No HMAC signature creation.
+- No signed request write.
+- No API key loading.
+- No API secret loading.
+- No secrets printed.
+- No secrets persisted.
+- No .env write.
+- No external env file write.
+- No lane_controls.json write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No kill switch disable.
+- No global live flag changes.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No submit_allowed=true.
+- No network_allowed=true.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+ALLOWED:
+- Read local ledgers/configs.
+- Validate fresh R253B signed request artifact.
+- Validate fresh executable payload artifact.
+- Validate fresh stop/TP source artifact.
+- Build submit gate preview.
+- Append R254 preview ledger only under exact confirmation phrase.
+
+FORBIDDEN:
+- Binance/network calls
+- submit
+- order placement
+- signing
+- reading secrets
+- writing signed requests
+- setting submit_allowed=true
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE SUBMIT GATE PREVIEW RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL.
+
+FUTURE R255 SUBMIT CONFIRMATION PHRASE:
+R254 must produce, but not execute, a future confirmation phrase similar to:
+
+I CONFIRM TINY LIVE BTCUSDT 8M SHORT SUBMIT ONLY; PLACE EXACTLY THREE BINANCE FUTURES ORDERS FROM LATEST R253B SIGNED REQUEST; MAIN SELL MARKET 0.007 BTC; STOP BUY STOP_MARKET REDUCE_ONLY; TAKE_PROFIT BUY TAKE_PROFIT_MARKET REDUCE_ONLY; NO OTHER ORDERS.
+
+Do not use this phrase in R254 for any action.
+It is only metadata for R255 planning.
+R255 must still separately verify balances, current mark price, stale timestamp, signed request age, endpoint safety, idempotency, dedupe, kill-switch state, and order placement semantics.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_fresh_context_signed_request_regeneration_gate.py
+- src/app/hammer_radar/operator/tiny_live_final_readonly_mark_price_refresh_gate.py
+- src/app/hammer_radar/operator/tiny_live_submit_readiness_preview.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_runtime_source_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_stop_take_profit_source_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*submit* files
+- src/app/hammer_radar/operator/*signed* files
+- src/app/hammer_radar/operator/*order* files
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*risk* files
+- src/app/hammer_radar/operator/*readonly* files
+- src/app/hammer_radar/operator/*credential* files
+
+Inspect configs read-only:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_submit_readiness_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R253B_TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE.md
+- docs/hammer_radar/live_readiness/R253_TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE.md
+- docs/hammer_radar/live_readiness/R252_TINY_LIVE_SUBMIT_READINESS_PREVIEW.md
+- docs/hammer_radar/live_readiness/R251E_TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R249_TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R248_TINY_LIVE_STOP_TAKE_PROFIT_SOURCE_GATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_fresh_context_signed_request_regeneration_gate.py
+- tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_*submit* if present
+- tests/hammer_radar/test_*order* if present
+- tests/hammer_radar/test_*signed* if present
+- tests/hammer_radar/test_*payload* if present
+
+REUSE / EXTEND:
+Reuse:
+- R253B fresh regeneration loader and summary.
+- R251/R253B signed request validation patterns.
+- R252 submit readiness matrix conventions.
+- Existing safety conventions.
+- Existing NDJSON append helpers.
+
+Do not duplicate incompatible schemas.
+Do not submit.
+Do not sign.
+Do not call Binance.
+Do not place order.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_submit_gate_preview.py
+
+Expose:
+- build_tiny_live_submit_gate_preview
+- load_latest_tiny_live_fresh_context_signed_request_regeneration_gate
+- load_latest_tiny_live_signed_request_write_gate
+- load_latest_tiny_live_executable_payload_write_gate
+- load_latest_tiny_live_stop_take_profit_source_gate
+- load_latest_tiny_live_final_readonly_mark_price_refresh_gate
+- load_latest_tiny_live_submit_readiness_preview
+- validate_latest_fresh_signed_request_for_submit_gate_preview
+- validate_submit_order_triplet_shape
+- validate_submit_controls_remain_disabled
+- build_submit_gate_order_triplet_preview
+- build_future_submit_confirmation_phrase
+- build_r255_submit_gate_requirements
+- build_submit_gate_preview_matrix
+- build_operator_submit_gate_preview_packet
+- classify_tiny_live_submit_gate_preview_status
+- append_tiny_live_submit_gate_preview_record
+- load_tiny_live_submit_gate_preview_records
+- summarize_tiny_live_submit_gate_preview_records
+
+CLI:
+Wire into inspect.py as:
+tiny-live-submit-gate-preview
+
+Args:
+- --record-submit-gate-preview
+- --confirm-tiny-live-submit-gate-preview <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview \
+  --record-submit-gate-preview \
+  --confirm-tiny-live-submit-gate-preview "I CONFIRM TINY LIVE SUBMIT GATE PREVIEW RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview \
+  --record-submit-gate-preview \
+  --confirm-tiny-live-submit-gate-preview "wrong"
+
+STATUS ENUM:
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_READY
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_RECORDED
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_REJECTED
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_BLOCKED
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_READY_FOR_RECORDING
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_RECORDED_R255_SUBMIT_GATE_REQUIRED
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_BLOCKED_BY_MISSING_R253B_REGENERATION
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_BLOCKED_BY_INVALID_SIGNED_REQUEST
+- TINY_LIVE_SUBMIT_GATE_PREVIEW_BLOCKED_BY_SUBMIT_CONTROL
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "record_submit_gate_preview_requested": false,
+  "confirmation_valid": false,
+  "submit_gate_preview_recorded": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "submit_gate_preview_only": true,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_order_endpoint_called": false,
+    "network_allowed": false
+  },
+  "input_summary": {
+    "r253b_fresh_regeneration_found": true/false,
+    "r253b_fresh_regeneration_valid": true/false,
+    "r253b_signed_request_found": true/false,
+    "r253b_signed_request_valid": true/false,
+    "r253b_payload_found": true/false,
+    "r253b_payload_valid": true/false,
+    "r253b_stop_take_profit_found": true/false,
+    "r253b_stop_take_profit_valid": true/false,
+    "r253_final_readonly_found": true/false,
+    "r252_submit_readiness_found": true/false
+  },
+  "fresh_signed_request_summary": {
+    "created_by_phase": "R253B_TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE",
+    "signed_requests_count": 3,
+    "main_order_signature_present": true/false,
+    "stop_order_signature_present": true/false,
+    "take_profit_order_signature_present": true/false,
+    "all_signatures_64_hex": true/false,
+    "submit_allowed": false,
+    "order_placed": false,
+    "network_allowed": false,
+    "binance_order_endpoint_called": false
+  },
+  "submit_order_triplet_preview": {
+    "main_order": {
+      "method": "POST",
+      "endpoint": "/fapi/v1/order",
+      "side": "SELL",
+      "type": "MARKET",
+      "quantity": 0.007,
+      "submit_in_this_phase": false
+    },
+    "stop_order": {
+      "method": "POST",
+      "endpoint": "/fapi/v1/order",
+      "side": "BUY",
+      "type": "STOP_MARKET",
+      "quantity": 0.007,
+      "stopPrice": 64309.3,
+      "reduceOnly": true,
+      "workingType": "MARK_PRICE",
+      "submit_in_this_phase": false
+    },
+    "take_profit_order": {
+      "method": "POST",
+      "endpoint": "/fapi/v1/order",
+      "side": "BUY",
+      "type": "TAKE_PROFIT_MARKET",
+      "quantity": 0.007,
+      "stopPrice": 62406.4,
+      "reduceOnly": true,
+      "workingType": "MARK_PRICE",
+      "submit_in_this_phase": false
+    },
+    "valid": true/false
+  },
+  "submit_control_summary": {
+    "submit_allowed": false,
+    "network_allowed": false,
+    "order_placed": false,
+    "requires_operator_final_submit_confirmation": true,
+    "requires_r255_submit_gate": true,
+    "requires_idempotency_guard": true,
+    "requires_order_endpoint_allowlist": true,
+    "requires_post_submit_reconciliation": true,
+    "requires_kill_switch_check": true
+  },
+  "future_submit_confirmation_phrase": "...",
+  "r255_submit_gate_requirements": {
+    "must_verify_before_submit": [
+      "fresh R253B signed request is latest",
+      "signed request age within allowed window",
+      "timestamp freshness or regeneration",
+      "runtime credential source ready",
+      "kill switch state allows tiny live",
+      "order endpoint allowlist exactly /fapi/v1/order",
+      "exactly three orders intended",
+      "main order then stop then take-profit sequence",
+      "idempotency/dedupe no prior live order for same signal",
+      "post-submit reconciliation plan exists",
+      "max loss and notional within tiny-live contract",
+      "operator exact R255 confirmation"
+    ],
+    "must_remain_false_until_r255": [
+      "submit_allowed",
+      "order_placed",
+      "binance_order_endpoint_called",
+      "network_allowed"
+    ]
+  },
+  "submit_gate_preview_matrix": {
+    "fresh_regeneration_ready": true/false,
+    "fresh_signed_request_valid": true/false,
+    "submit_order_triplet_valid": true/false,
+    "submit_controls_disabled": true/false,
+    "future_submit_phrase_ready": true/false,
+    "record_confirmed": true/false,
+    "recorded": true/false,
+    "submit_allowed": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": []
+  },
+  "operator_submit_gate_preview_packet": {
+    "operator_should_review_submit_gate_preview": true/false,
+    "operator_should_continue_to_r255_actual_submit_gate": true/false,
+    "operator_should_submit_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "REVIEW_R254_SUBMIT_GATE_PREVIEW|CONTINUE_TO_R255_ACTUAL_SUBMIT_GATE|WAIT|FIX_BLOCKER",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not submit",
+      "do not call Binance order endpoint from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "submit_gate_preview_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- external_env_file_written=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- submit_gate_preview_only=true
+- hmac_signature_created=false
+- signed_request_written=false
+- signed_order_request_created=false
+- signed_trading_request_created=false
+- submit_allowed=false
+- submit_attempted=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=false
+- binance_mark_price_endpoint_called=false
+- private_binance_endpoint_called=false
+- signed_binance_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_read=false
+- secrets_shown=false
+- secrets_persisted=false
+- secret_values_in_output=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+
+LEDGER:
+logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson
+
+Only append under exact confirmation phrase.
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_submit_gate_preview.py
+
+Tests must cover:
+- CLI exists and returns JSON
+- preview writes no ledger
+- preview makes no network call
+- preview does not sign
+- wrong confirmation rejects
+- exact confirmation records preview only
+- loads latest R253B fresh regeneration
+- blocks if R253B fresh regeneration missing
+- blocks if R253B signed request invalid
+- validates signed_requests_count=3
+- validates all signatures are 64 hex
+- validates submit order triplet shape
+- validates main SELL MARKET quantity 0.007
+- validates stop BUY STOP_MARKET reduceOnly
+- validates TP BUY TAKE_PROFIT_MARKET reduceOnly
+- validates submit_allowed=false
+- validates network_allowed=false
+- validates order_placed=false
+- validates binance_order_endpoint_called=false
+- validates future R255 confirmation phrase exists
+- no HMAC signature creation
+- no signed request write
+- no Binance/network calls
+- no submit
+- no order
+- no env/config/lane_controls mutation
+- no secrets in output
+
+VALIDATION:
+Run py_compile:
+- src/app/hammer_radar/operator/tiny_live_submit_gate_preview.py
+- src/app/hammer_radar/operator/inspect.py
+
+Run focused test:
+- tests/hammer_radar/test_tiny_live_submit_gate_preview.py
+
+Run related tests:
+- tests/hammer_radar/test_tiny_live_fresh_context_signed_request_regeneration_gate.py
+- tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+
+Run full:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview \
+  | jq '.status, .target_scope, .input_summary, .fresh_signed_request_summary, .submit_order_triplet_preview, .submit_control_summary, .future_submit_confirmation_phrase, .r255_submit_gate_requirements, .submit_gate_preview_matrix, .operator_submit_gate_preview_packet, .submit_gate_preview_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Record:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview \
+  --record-submit-gate-preview \
+  --confirm-tiny-live-submit-gate-preview "I CONFIRM TINY LIVE SUBMIT GATE PREVIEW RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL." \
+  | jq '.status, .submit_gate_preview_recorded, .submit_gate_preview_matrix, .operator_submit_gate_preview_packet, .submit_gate_preview_overall_status, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-submit-gate-preview \
+  --record-submit-gate-preview \
+  --confirm-tiny-live-submit-gate-preview "wrong" \
+  | jq '.status, .confirmation_valid, .submit_gate_preview_recorded, .safety'
+
+Secret leak check:
+PYTHONPATH=. .venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path("logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson")
+raw = path.read_text() if path.exists() else ""
+
+external = Path("/home/josue/.config/hammer-radar/binance-signing.env")
+values = []
+if external.exists():
+    for line in external.read_text().splitlines():
+        if line.startswith("BINANCE_API_KEY=") or line.startswith("BINANCE_API_SECRET="):
+            _, value = line.split("=", 1)
+            if value:
+                values.append(value.strip())
+
+for key in ("BINANCE_API_KEY", "BINANCE_API_SECRET"):
+    value = os.environ.get(key)
+    if value:
+        values.append(value)
+
+for value in values:
+    if value and value in raw:
+        raise SystemExit("SECRET_LEAK_DETECTED")
+
+print("NO_SECRET_VALUES_FOUND")
+PY
+
+Mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected artifact:
+git status --short logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson 2>/dev/null || true
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- input_summary
+- fresh_signed_request_summary
+- submit_order_triplet_preview
+- submit_control_summary
+- future_submit_confirmation_phrase
+- r255_submit_gate_requirements
+- submit_gate_preview_matrix
+- operator_submit_gate_preview_packet
+- submit_gate_preview_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R254_TINY_LIVE_SUBMIT_GATE_PREVIEW.md
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create:
+codex_tasks/phases/R255_TINY_LIVE_ACTUAL_SUBMIT_GATE.md
+
+R255 should:
+- be the first actual submit gate implementation
+- require exact operator confirmation
+- require latest R254 preview
+- require latest R253B signed request
+- require idempotency/dedupe
+- require stale timestamp validation or regeneration
+- require order endpoint allowlist
+- require kill-switch check
+- require post-submit reconciliation
+- place exactly three Binance Futures orders only if all gates pass
+- never place extra orders
+- record live execution ledger
+- provide abort/reconcile instructions
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config/lane controls.
+Do not write external secret files.
+Do not print secrets.
+Do not persist secrets.
+Do not sign.
+Do not call Binance/network.
+Do not submit.
+Do not place orders.
+Only record submit gate preview if exact confirmation command is explicitly run.
