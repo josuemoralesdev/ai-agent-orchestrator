@@ -1,54 +1,52 @@
 # R254 Tiny-Live Submit Gate Preview
 
-## Phase Intent
+## Intent
 
-Consume the latest R253 final read-only refresh result and preview the final tiny-live submit gate only.
+Consume the R253B fresh-context regenerated signed request and the R253 final read-only refresh, then preview the final submit gate only.
 
-R254 is not submit, not order placement, and not a signed request write.
+R254 must not submit, place orders, call Binance order/test-order/private/account/signed endpoints, mutate env/config/lane controls, disable the kill switch, or set `submit_allowed=true`.
 
-## Required Inputs
+## Inputs
 
-- Latest R253 final read-only mark-price refresh gate record
-- Latest R252 submit readiness preview
-- Latest R251E runtime-source signed request artifact
-- Latest R251 signed request artifact
-- Latest R249 executable payload artifact
-- Latest R248 stop/take-profit source artifact
+- `logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson`
+- `logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson`
+- `logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson`
+- `logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson`
+- `logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson`
+- `configs/hammer_radar/tiny_live_risk_contracts.json` read-only
+- `configs/hammer_radar/lane_controls.json` read-only
 
-## Required Behavior
+## Required Conditions
 
-- If R253 says fresh market context is compatible with the signed artifact, preview the final submit-gate requirements.
-- If R253 says the signed request must be regenerated, block and instruct the operator to regenerate before submit preview.
-- Keep `submit_allowed=false`.
-- Keep `order_placed=false`.
-- Do not call Binance order endpoints.
-- Do not call Binance test-order endpoints.
-- Do not call Binance private/account/signed endpoints.
-- Do not submit.
-- Do not place orders.
-- Do not sign.
-- Do not write signed requests.
-- Do not read or print secrets.
-- Do not mutate env/config/lane controls.
-- Do not disable the kill switch.
-- Preserve the official lane: `BTCUSDT|8m|short|ladder_close_50_618`.
+- Latest R253B exists and is written.
+- Latest R253B signed request artifact has three signed requests.
+- All signatures are 64 hex characters.
+- R253B secret validation passed.
+- R253 final read-only refresh exists.
+- R253 required signed request regeneration.
+- R253B regenerated reference context matches the latest recorded R253 fresh mark context.
+- `submit_allowed=false`.
+- `order_placed=false`.
+- `binance_order_endpoint_called=false`.
+- `network_allowed=false`.
 
 ## Output
 
-The preview should include:
+R254 should output a preview packet with:
 
-- R253 compatibility summary
-- signed artifact submit-control summary
-- final submit-gate blocker matrix
-- exact future submit confirmation phrase for a separate final write/submit gate
+- regenerated signed request readiness
+- R253/R253B context reconciliation
+- final submit blockers
+- exact future submit confirmation phrase for a later separate final submit/write gate
 - explicit non-actions:
+  - do not submit
   - do not place order
-  - do not submit from R254
-  - do not call Binance order endpoint from R254
+  - do not call Binance order endpoint
+  - do not disable kill switch
 
 ## Safety
 
-R254 must report:
+Preserve:
 
 - `submit_allowed=false`
 - `submit_attempted=false`
@@ -61,26 +59,11 @@ R254 must report:
 - `private_binance_endpoint_called=false`
 - `signed_binance_endpoint_called=false`
 - `network_allowed=false`
-- `hmac_signature_created=false`
-- `signed_request_written=false`
-- `secrets_read=false`
 - `secrets_shown=false`
+- `secrets_persisted=false`
 - `secret_values_in_output=false`
 - `paper_live_separation_intact=true`
-- `official_tiny_live_lane_changed=false`
 
-## Validation
+## Non-Goal
 
-Add focused tests for:
-
-- CLI exists and returns JSON
-- R253 compatible path allows submit-gate preview only
-- R253 regenerate-required path blocks
-- missing R253 blocks
-- no network calls
-- no order/test-order/account/private/signed endpoints
-- no signing
-- no submit
-- no order placement
-- no env/config/lane-control mutation
-- no secret values in output
+R254 is not a submit phase. It must only preview the final submit gate and prepare a future exact confirmation phrase for a later bounded submit/write phase.

@@ -1,0 +1,674 @@
+You are in repo:
+/home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Follow:
+- AGENTS.md
+- codex_tasks/CODEX_RULES.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+PHASE:
+R253B Tiny-Live Fresh Context Signed Request Regeneration Gate
+
+BRANCH:
+r253b-tiny-live-fresh-context-signed-request-regeneration-gate
+
+PHASE CLASSIFICATION:
+Primary: SIGNED REQUEST REGENERATION GATE
+Secondary: FRESH MARKET CONTEXT RECONCILIATION, STOP/TP REBUILD, PRE-SUBMIT SAFETY
+Duplicate risk: VERY HIGH
+
+WHY THIS PHASE EXISTS:
+R253 Tiny-Live Final Readonly Mark Price Refresh Gate has been committed.
+
+R253 performed allowed public read-only Binance refresh:
+- exchangeInfo endpoint called: true
+- mark price endpoint called: true
+- order endpoint called: false
+- private endpoint called: false
+- signed endpoint called: false
+- submit attempted: false
+- order placed: false
+
+R253 result:
+- fresh mark price was materially above the older signed reference price.
+- old reference price: around 62210.3
+- fresh mark price: around 63675 to 63892
+- old short stop price: 62844.6
+- short_stop_still_above_fresh_mark: false
+- must_regenerate_signed_request_before_submit: true
+- submit_gate_preview_allowed_next: false
+
+That means the old signed request artifact must NOT proceed to R254.
+The stop is no longer a valid short stop relative to fresh mark context.
+
+R253B must regenerate the local stop/TP source, executable payload, and signed request artifact using the latest R253 fresh public-readonly context.
+
+This phase may sign locally using the external runtime credential source, but must NOT submit, must NOT call Binance order/private endpoints, and must NOT place an order.
+
+CORE INTENT:
+Create a fresh-context regeneration gate that:
+1. Reads latest R253 final readonly refresh artifact.
+2. Confirms R253 required regeneration.
+3. Reads official lane and tiny-live risk contract.
+4. Uses latest fresh mark price from R253 as the new reference context.
+5. Rebuilds stop/take-profit source for the official short lane:
+   - stop above fresh mark
+   - take profit below fresh mark
+   - quantity 0.007 unless risk/precision says invalid
+   - max loss around 4.44 USDT
+   - RR target around 2.0
+6. Rebuilds executable payload:
+   - main order SELL MARKET quantity 0.007
+   - stop order BUY STOP_MARKET reduceOnly true
+   - take-profit order BUY TAKE_PROFIT_MARKET reduceOnly true
+   - submit_allowed=false
+   - network_allowed=false
+   - order_placed=false
+7. Regenerates signed request artifact using runtime credential source:
+   - external env file preferred:
+     /home/josue/.config/hammer-radar/binance-signing.env
+   - credentials only in memory
+   - no secret persistence
+   - no secret printing
+8. Validates new signed artifact:
+   - 3 signed requests
+   - signatures are 64 hex
+   - no raw API key in artifacts
+   - no raw API secret in artifacts
+   - submit_allowed=false
+   - order_placed=false
+   - binance_order_endpoint_called=false
+   - network_allowed=false
+9. Records a wrapper audit ledger.
+10. Produces R254 submit gate preview task if regeneration succeeds.
+
+This phase is regeneration only.
+This phase is not submit.
+This phase is not order placement.
+
+OFFICIAL LANE:
+BTCUSDT|8m|short|ladder_close_50_618
+
+FRESH CONTEXT SOURCE:
+logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson
+
+R253 REQUIRED CONDITION:
+latest R253 should have:
+- must_regenerate_signed_request_before_submit=true
+- fresh_context_compatible_with_signed_artifact=false
+- submit_gate_preview_allowed_next=false
+- submit_allowed=false
+- order_placed=false
+
+RISK MODEL:
+Use existing official tiny live risk contract. Expected:
+- margin budget: 44 USDT
+- leverage: 10x
+- max notional: 440 USDT
+- max loss: about 4.44 USDT
+- quantity: 0.007 BTC unless validation requires blocking
+
+Do not silently change risk contract.
+
+EXPECTED NEW SHORT STOP/TP LOGIC:
+Using fresh mark price from R253:
+- reference_price = fresh mark price
+- stop_price must be above reference_price
+- take_profit_price must be below reference_price
+- estimated loss at stop should be within/near max_loss_usdt
+- reward should target about 2x risk if existing R248 logic supports this
+- respect tick size
+- respect quantity step
+- respect min notional
+- respect official lane direction=short
+
+If the existing stop/TP source builder already has formulas, reuse them.
+Do not invent a conflicting formula if a canonical function already exists.
+
+NON-NEGOTIABLES:
+- No Binance order endpoint.
+- No Binance test order endpoint.
+- No Binance account/private endpoint.
+- No Binance signed/private endpoint.
+- No network calls from this phase unless existing code accidentally tries to do so, which must be blocked.
+- No public Binance refresh in this phase. Use R253 recorded fresh context.
+- No submit.
+- No order placement.
+- No submit_allowed=true.
+- No API key printing.
+- No API secret printing.
+- No secrets in stdout.
+- No secrets in stderr.
+- No secrets in logs.
+- No secrets in artifacts.
+- No .env write.
+- No external env file write.
+- No lane_controls.json write.
+- No risk contract config write.
+- No scheduler/fisherman config write.
+- No kill switch disable.
+- No global live flag changes.
+- No paper_outcomes append.
+- No strategy performance append.
+- No strategy promotion status append.
+- No betrayal promotion.
+- No alternate lane promotion.
+- No official lane change.
+- No sudo.
+- Do not commit.
+- Do not merge.
+- Do not tag.
+- Do not touch or stage AGENTS.md.
+
+ALLOWED ONLY AFTER EXACT CONFIRMATION:
+- Read runtime credential source from external file or process env.
+- Read credential values in memory only.
+- Rebuild local stop/TP source artifact.
+- Rebuild local executable payload artifact.
+- HMAC sign local canonical query strings in memory.
+- Append local signed request artifact.
+- Append R253B wrapper audit artifact.
+
+FORBIDDEN EVEN AFTER CONFIRMATION:
+- Binance order/private/account/test-order endpoint calls
+- submit
+- real order placement
+- setting submit_allowed=true
+- printing/persisting secrets
+- modifying external credential file
+- modifying risk/lane config
+
+CONFIRMATION PHRASE:
+I CONFIRM TINY LIVE FRESH CONTEXT SIGNED REQUEST REGENERATION ONLY; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL.
+
+CAPABILITY SCAN FIRST:
+Inspect:
+- src/app/hammer_radar/operator/tiny_live_final_readonly_mark_price_refresh_gate.py
+- src/app/hammer_radar/operator/tiny_live_submit_readiness_preview.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_runtime_source_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_runtime_credential_source_drill.py
+- src/app/hammer_radar/operator/tiny_live_signed_request_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_executable_payload_write_gate.py
+- src/app/hammer_radar/operator/tiny_live_stop_take_profit_source_gate.py
+- src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+- src/app/hammer_radar/operator/inspect.py
+- src/app/hammer_radar/operator/*readonly* files
+- src/app/hammer_radar/operator/*regenerat* files if present
+- src/app/hammer_radar/operator/*signed* files
+- src/app/hammer_radar/operator/*signature* files
+- src/app/hammer_radar/operator/*credential* files
+- src/app/hammer_radar/operator/*payload* files
+- src/app/hammer_radar/operator/*stop* files
+- src/app/hammer_radar/operator/*risk* files
+- src/app/hammer_radar/operator/*submit* files
+- src/app/hammer_radar/operator/*order* files
+
+Inspect configs read-only:
+- configs/hammer_radar/tiny_live_risk_contracts.json
+- configs/hammer_radar/lane_controls.json
+- configs/hammer_radar/*.json
+
+Inspect ledgers/logs:
+- logs/hammer_radar_forward/tiny_live_final_readonly_mark_price_refresh_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_submit_readiness_preview.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_runtime_source_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson
+
+Inspect docs:
+- docs/hammer_radar/live_readiness/R253_TINY_LIVE_FINAL_READONLY_MARK_PRICE_REFRESH_GATE.md
+- docs/hammer_radar/live_readiness/R252_TINY_LIVE_SUBMIT_READINESS_PREVIEW.md
+- docs/hammer_radar/live_readiness/R251E_TINY_LIVE_SIGNED_REQUEST_RUNTIME_SOURCE_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R251D_TINY_LIVE_RUNTIME_CREDENTIAL_SOURCE_DRILL.md
+- docs/hammer_radar/live_readiness/R249_TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE.md
+- docs/hammer_radar/live_readiness/R248_TINY_LIVE_STOP_TAKE_PROFIT_SOURCE_GATE.md
+- docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Inspect tests:
+- tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_*regenerat* if present
+- tests/hammer_radar/test_*signed* if present
+- tests/hammer_radar/test_*payload* if present
+- tests/hammer_radar/test_*stop* if present
+- tests/hammer_radar/test_*submit* if present
+
+REUSE / EXTEND:
+Reuse existing:
+- R253 final readonly artifact loader and comparison.
+- R248 stop/take-profit source logic if canonical.
+- R249 executable payload logic if canonical.
+- R251 signed request writer/signing validation.
+- R251E runtime credential source resolver and secret validation.
+- Existing NDJSON append helpers and safety conventions.
+
+Do not duplicate incompatible schemas.
+Do not make Binance calls.
+Do not submit.
+Do not place order.
+
+REQUIRED MODULE:
+Create:
+src/app/hammer_radar/operator/tiny_live_fresh_context_signed_request_regeneration_gate.py
+
+Expose:
+- build_tiny_live_fresh_context_signed_request_regeneration_gate
+- load_latest_tiny_live_final_readonly_mark_price_refresh_gate
+- load_latest_tiny_live_submit_readiness_preview
+- load_latest_tiny_live_signed_request_runtime_source_write_gate
+- load_latest_tiny_live_stop_take_profit_source_gate
+- load_latest_tiny_live_executable_payload_write_gate
+- validate_r253_regeneration_required
+- extract_fresh_reference_context_for_regeneration
+- build_fresh_stop_take_profit_source
+- validate_fresh_stop_take_profit_source
+- build_fresh_executable_payload
+- validate_fresh_executable_payload
+- resolve_runtime_signing_credentials_for_fresh_regeneration
+- write_fresh_signed_request_artifact
+- validate_fresh_signed_request_artifact
+- validate_no_secret_values_in_fresh_regeneration_artifacts
+- build_fresh_regeneration_summary
+- build_fresh_regeneration_gate_matrix
+- build_operator_fresh_regeneration_packet
+- classify_tiny_live_fresh_context_signed_request_regeneration_gate_status
+- append_tiny_live_fresh_context_signed_request_regeneration_gate_record
+- load_tiny_live_fresh_context_signed_request_regeneration_gate_records
+- summarize_tiny_live_fresh_context_signed_request_regeneration_gate_records
+
+CLI:
+Wire into inspect.py as:
+tiny-live-fresh-context-signed-request-regeneration-gate
+
+Args:
+- --regenerate-fresh-context-signed-request
+- --confirm-tiny-live-fresh-context-regeneration <phrase>
+
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate \
+  --regenerate-fresh-context-signed-request \
+  --confirm-tiny-live-fresh-context-regeneration "wrong"
+
+Regenerate:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate \
+  --regenerate-fresh-context-signed-request \
+  --confirm-tiny-live-fresh-context-regeneration "I CONFIRM TINY LIVE FRESH CONTEXT SIGNED REQUEST REGENERATION ONLY; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL."
+
+STATUS ENUM:
+- TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_READY
+- TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_REJECTED
+- TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_WRITTEN
+- TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_BLOCKED
+- TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_ERROR
+
+OVERALL STATUS ENUM:
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_READY_FOR_CONFIRMATION
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_WRITTEN_R254_PREVIEW_REQUIRED
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_REJECTED_BAD_CONFIRMATION
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_BLOCKED_BY_R253
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_BLOCKED_BY_RISK_VALIDATION
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_BLOCKED_BY_CREDENTIAL_SOURCE
+- TINY_LIVE_FRESH_CONTEXT_REGENERATION_BLOCKED_BY_SECRET_VALIDATION
+- UNKNOWN_NEEDS_MANUAL_REVIEW
+
+OUTPUT MUST INCLUDE:
+{
+  "status": "...",
+  "generated_at": "...",
+  "regenerate_fresh_context_signed_request_requested": false,
+  "confirmation_valid": false,
+  "fresh_context_regeneration_written": false,
+  "target_scope": {
+    "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+    "symbol": "BTCUSDT",
+    "timeframe": "8m",
+    "direction": "short",
+    "fresh_context_signed_request_regeneration_only": true,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_order_endpoint_called": false,
+    "network_allowed": false
+  },
+  "input_summary": {
+    "r253_final_readonly_found": true/false,
+    "r253_regeneration_required": true/false,
+    "r253_fresh_market_context_ready": true/false,
+    "r252_submit_readiness_found": true/false,
+    "r251e_runtime_signed_request_found": true/false,
+    "old_signed_artifact_stale": true/false
+  },
+  "fresh_reference_context": {
+    "reference_price": null,
+    "fresh_mark_price_source_phase": "R253",
+    "tick_size": null,
+    "step_size": null,
+    "min_notional": null,
+    "price_precision": null,
+    "quantity_precision": null
+  },
+  "fresh_stop_take_profit_source": {
+    "source_written": true/false,
+    "symbol": "BTCUSDT",
+    "direction": "short",
+    "quantity": 0.007,
+    "reference_price": null,
+    "stop_price": null,
+    "take_profit_price": null,
+    "estimated_loss_at_stop_usdt": null,
+    "estimated_reward_at_take_profit_usdt": null,
+    "risk_reward_ratio": null,
+    "max_loss_usdt": null,
+    "valid": true/false
+  },
+  "fresh_executable_payload_summary": {
+    "payload_written": true/false,
+    "main_order_side": "SELL",
+    "main_order_type": "MARKET",
+    "quantity": 0.007,
+    "stop_order_side": "BUY",
+    "stop_order_type": "STOP_MARKET",
+    "take_profit_order_side": "BUY",
+    "take_profit_order_type": "TAKE_PROFIT_MARKET",
+    "reduce_only": true,
+    "submit_allowed": false,
+    "network_allowed": false,
+    "order_placed": false,
+    "valid": true/false
+  },
+  "fresh_signed_request_artifact_summary": {
+    "signed_request_written": true/false,
+    "signed_requests_count": 0/3,
+    "main_order_signature_present": true/false,
+    "stop_order_signature_present": true/false,
+    "take_profit_order_signature_present": true/false,
+    "submit_allowed": false,
+    "order_placed": false,
+    "binance_order_endpoint_called": false,
+    "network_allowed": false
+  },
+  "secret_validation": {
+    "valid": true/false,
+    "raw_api_key_found_in_artifacts": false,
+    "raw_api_secret_found_in_artifacts": false,
+    "secret_values_in_output": false,
+    "errors": [],
+    "warnings": []
+  },
+  "fresh_regeneration_gate_matrix": {
+    "r253_regeneration_required": true/false,
+    "fresh_reference_context_ready": true/false,
+    "fresh_stop_take_profit_valid": true/false,
+    "fresh_payload_valid": true/false,
+    "runtime_credential_source_ready": true/false,
+    "write_confirmed": true/false,
+    "fresh_signed_request_written": true/false,
+    "secret_validation_passed": true/false,
+    "submit_allowed": false,
+    "order_ready": false,
+    "live_ready_today": false,
+    "blocked_by": []
+  },
+  "operator_fresh_regeneration_packet": {
+    "operator_should_review_fresh_regenerated_artifacts": true/false,
+    "operator_should_continue_to_r254_submit_gate_preview": true/false,
+    "operator_should_submit_now": false,
+    "operator_should_place_order": false,
+    "next_required_human_action": "CONFIRM_R253B_REGENERATION|REVIEW_R253B_RESULT|CONTINUE_TO_R254_SUBMIT_GATE_PREVIEW|WAIT|FIX_BLOCKER",
+    "explicit_non_actions": [
+      "do not place order",
+      "do not submit",
+      "do not call Binance order endpoint from this phase"
+    ]
+  },
+  "recommended_next_operator_move": "...",
+  "recommended_next_engineering_move": "...",
+  "fresh_regeneration_overall_status": "...",
+  "do_not_run_yet": [
+    "live-connector-submit",
+    "any order endpoint",
+    "kill switch disable",
+    "transfer",
+    "withdraw",
+    "betrayal live promotion"
+  ],
+  "safety": {...}
+}
+
+SAFETY OBJECT MUST INCLUDE:
+- env_written=false
+- env_mutated=false
+- external_env_file_written=false
+- config_written=false
+- risk_contract_config_written=false
+- lane_controls_written=false
+- live_config_written=false
+- fresh_context_signed_request_regeneration_only=true
+- hmac_signature_created=true only after exact confirmation
+- signed_request_written=true only after exact confirmation
+- signed_order_request_created=true only after exact confirmation
+- signed_trading_request_created=true only after exact confirmation
+- submit_allowed=false
+- submit_attempted=false
+- order_placed=false
+- real_order_placed=false
+- execution_attempted=false
+- binance_order_endpoint_called=false
+- binance_test_order_endpoint_called=false
+- binance_account_endpoint_called=false
+- binance_exchange_info_endpoint_called=false
+- binance_mark_price_endpoint_called=false
+- private_binance_endpoint_called=false
+- signed_binance_endpoint_called=false
+- network_allowed=false
+- transfer_endpoint_called=false
+- withdraw_endpoint_called=false
+- kill_switch_disabled=false
+- secrets_shown=false
+- secrets_persisted=false
+- secret_values_in_output=false
+- global_live_flags_changed=false
+- paper_live_separation_intact=true
+- official_tiny_live_lane_changed=false
+
+LEDGERS:
+Append only after exact confirmation:
+- logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson
+- logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson
+
+Each new record must show it was created by R253B/fresh context regeneration.
+
+TESTS:
+Create:
+tests/hammer_radar/test_tiny_live_fresh_context_signed_request_regeneration_gate.py
+
+Tests must cover:
+- CLI exists and returns JSON
+- preview writes no ledger
+- preview does not sign
+- wrong confirmation rejects
+- blocks if latest R253 does not require regeneration
+- blocks if R253 fresh context missing
+- builds fresh short stop above fresh mark
+- builds fresh short take profit below fresh mark
+- quantity step valid
+- min notional valid
+- estimated loss at stop within max loss tolerance
+- executable payload has SELL MARKET main order
+- stop/take-profit are BUY reduceOnly exits
+- exact confirmation with monkeypatched credential source writes fresh signed artifact
+- signed request artifact has 3 signatures
+- signatures are 64 hex chars
+- no raw API key in artifacts
+- no raw API secret in artifacts
+- no secrets in output
+- submit_allowed=false
+- order_placed=false
+- binance_order_endpoint_called=false
+- network_allowed=false
+- no env/config/lane_controls mutation
+
+VALIDATION:
+Run py_compile:
+- src/app/hammer_radar/operator/tiny_live_fresh_context_signed_request_regeneration_gate.py
+- src/app/hammer_radar/operator/inspect.py
+
+Run focused test:
+- tests/hammer_radar/test_tiny_live_fresh_context_signed_request_regeneration_gate.py
+
+Run related tests:
+- tests/hammer_radar/test_tiny_live_final_readonly_mark_price_refresh_gate.py
+- tests/hammer_radar/test_tiny_live_submit_readiness_preview.py
+- tests/hammer_radar/test_tiny_live_signed_request_runtime_source_write_gate.py
+- tests/hammer_radar/test_tiny_live_signed_request_write_gate.py
+- tests/hammer_radar/test_tiny_live_stop_take_profit_source_gate.py
+- tests/hammer_radar/test_tiny_live_executable_payload_write_gate.py
+
+Run full:
+PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar
+
+SMOKE:
+Preview:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate \
+  | jq '.status, .target_scope, .input_summary, .fresh_reference_context, .fresh_stop_take_profit_source, .fresh_executable_payload_summary, .fresh_signed_request_artifact_summary, .secret_validation, .fresh_regeneration_gate_matrix, .operator_fresh_regeneration_packet, .fresh_regeneration_overall_status, .recommended_next_operator_move, .recommended_next_engineering_move, .do_not_run_yet, .safety'
+
+Rejected:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate \
+  --regenerate-fresh-context-signed-request \
+  --confirm-tiny-live-fresh-context-regeneration "wrong" \
+  | jq '.status, .confirmation_valid, .fresh_context_regeneration_written, .fresh_regeneration_gate_matrix, .safety'
+
+Regenerate:
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-context-signed-request-regeneration-gate \
+  --regenerate-fresh-context-signed-request \
+  --confirm-tiny-live-fresh-context-regeneration "I CONFIRM TINY LIVE FRESH CONTEXT SIGNED REQUEST REGENERATION ONLY; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+  | jq '.status, .confirmation_valid, .fresh_context_regeneration_written, .fresh_reference_context, .fresh_stop_take_profit_source, .fresh_executable_payload_summary, .fresh_signed_request_artifact_summary, .secret_validation, .fresh_regeneration_gate_matrix, .operator_fresh_regeneration_packet, .fresh_regeneration_overall_status, .safety'
+
+Secret leak check:
+PYTHONPATH=. .venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+paths = [
+    Path("logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson"),
+    Path("logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson"),
+    Path("logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson"),
+    Path("logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson"),
+]
+raw = "\n".join(path.read_text() for path in paths if path.exists())
+
+external = Path("/home/josue/.config/hammer-radar/binance-signing.env")
+values = []
+if external.exists():
+    for line in external.read_text().splitlines():
+        if line.startswith("BINANCE_API_KEY=") or line.startswith("BINANCE_API_SECRET="):
+            _, value = line.split("=", 1)
+            if value:
+                values.append(value.strip())
+
+for key in ("BINANCE_API_KEY", "BINANCE_API_SECRET"):
+    value = os.environ.get(key)
+    if value:
+        values.append(value)
+
+for value in values:
+    if value and value in raw:
+        raise SystemExit("SECRET_LEAK_DETECTED")
+
+print("NO_SECRET_VALUES_FOUND")
+PY
+
+Mutation check:
+git diff -- .env || true
+git diff -- configs/hammer_radar/tiny_live_risk_contracts.json || true
+git diff -- configs/hammer_radar/lane_controls.json || true
+git diff -- logs/hammer_radar_forward/candles_BTCUSDT_8m.ndjson || true
+git diff -- logs/hammer_radar_forward/paper_outcomes.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_performance.ndjson || true
+git diff -- logs/hammer_radar_forward/strategy_promotion_status.ndjson || true
+
+Expected artifacts:
+git status --short logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson || true
+git status --short logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson || true
+git status --short logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson || true
+git status --short logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson || true
+
+tail -n 3 logs/hammer_radar_forward/tiny_live_stop_take_profit_source_gate.ndjson 2>/dev/null || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_executable_payload_write_gate.ndjson 2>/dev/null || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson 2>/dev/null || true
+tail -n 3 logs/hammer_radar_forward/tiny_live_fresh_context_signed_request_regeneration_gate.ndjson 2>/dev/null || true
+
+FINAL PHASE REPORT REQUIRED:
+At the end, report:
+- phase status
+- files changed
+- tests run
+- smoke status
+- safety status
+- input_summary
+- fresh_reference_context
+- fresh_stop_take_profit_source
+- fresh_executable_payload_summary
+- fresh_signed_request_artifact_summary
+- secret_validation
+- fresh_regeneration_gate_matrix
+- operator_fresh_regeneration_packet
+- fresh_regeneration_overall_status
+- exact files mutated
+- recommended next operator move
+- recommended next engineering move
+- do not commit
+
+DOCS:
+Create:
+docs/hammer_radar/live_readiness/R253B_TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE.md
+
+Update:
+docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+FUTURE TASK:
+Create/update:
+codex_tasks/phases/R254_TINY_LIVE_SUBMIT_GATE_PREVIEW.md
+
+R254 should:
+- consume R253B regenerated signed request
+- consume R253 final readonly refresh
+- preview final submit gate only
+- no Binance order call
+- no submit
+- no order
+- prepare exact future submit confirmation phrase
+- keep submit_allowed=false until a separate final submit/write gate
+
+Aggressive mode:
+Complete in one pass.
+Do not mutate env/config/lane controls.
+Do not write external secret files.
+Do not print secrets.
+Do not persist secrets.
+Do not call Binance/network.
+Do not submit.
+Do not place orders.
+Only regenerate local artifacts if exact confirmation and validations pass.
