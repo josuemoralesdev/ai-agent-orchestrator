@@ -2,7 +2,7 @@
 
 ## Intent
 
-Consume the latest R251/R251C signed request artifact and preview whether a future submit gate could be prepared for the official lane:
+Consume the latest R251/R251C signed request artifact plus R251D runtime credential source readiness and preview whether a future submit gate could be prepared for the official lane:
 
 `BTCUSDT|8m|short|ladder_close_50_618`
 
@@ -14,6 +14,7 @@ R252 is preview only. It must inspect local artifacts and produce a submit-readi
 
 - Latest R251 signed request artifact in `logs/hammer_radar_forward/tiny_live_signed_request_write_gate.ndjson`.
 - Latest R251C wrapper drill record in `logs/hammer_radar_forward/tiny_live_signed_request_with_credentials_drill.ndjson`.
+- Latest R251D runtime credential source drill record in `logs/hammer_radar_forward/tiny_live_runtime_credential_source_drill.ndjson`.
 - Official lane remains `BTCUSDT|8m|short|ladder_close_50_618`.
 
 ## Required Preview Checks
@@ -25,6 +26,7 @@ R252 is preview only. It must inspect local artifacts and produce a submit-readi
 - `binance_call_allowed=false`.
 - `order_placed=false`.
 - Raw API key and raw API secret are absent from artifacts.
+- Runtime credential source readiness exists for future signing/submission drill reuse, without printing or persisting credential values.
 - A future read-only mark-price refresh is required before any submit gate.
 - A future final human submit confirmation is required.
 
