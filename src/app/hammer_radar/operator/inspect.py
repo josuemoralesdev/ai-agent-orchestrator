@@ -2941,6 +2941,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-runtime-credential-source-drill":
+        from src.app.hammer_radar.operator.tiny_live_runtime_credential_source_drill import (
+            build_tiny_live_runtime_credential_source_drill,
+            format_tiny_live_runtime_credential_source_drill_json,
+        )
+
+        print(
+            format_tiny_live_runtime_credential_source_drill_json(
+                build_tiny_live_runtime_credential_source_drill(
+                    log_dir=args.log_dir,
+                    record_runtime_credential_source_drill=(
+                        args.record_runtime_credential_source_drill
+                    ),
+                    confirm_tiny_live_runtime_credential_source_drill=(
+                        args.confirm_tiny_live_runtime_credential_source_drill
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5174,6 +5193,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_signed_request_with_credentials_drill_parser.add_argument(
         "--confirm-tiny-live-signed-request-with-credentials",
+        default=None,
+    )
+
+    tiny_live_runtime_credential_source_drill_parser = subparsers.add_parser(
+        "tiny-live-runtime-credential-source-drill",
+        parents=[parent],
+    )
+    tiny_live_runtime_credential_source_drill_parser.add_argument(
+        "--record-runtime-credential-source-drill",
+        action="store_true",
+    )
+    tiny_live_runtime_credential_source_drill_parser.add_argument(
+        "--confirm-tiny-live-runtime-credential-source-drill",
         default=None,
     )
 
