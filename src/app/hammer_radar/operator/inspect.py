@@ -2998,6 +2998,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-final-readonly-mark-price-refresh-gate":
+        from src.app.hammer_radar.operator.tiny_live_final_readonly_mark_price_refresh_gate import (
+            build_tiny_live_final_readonly_mark_price_refresh_gate,
+            format_tiny_live_final_readonly_mark_price_refresh_gate_json,
+        )
+
+        print(
+            format_tiny_live_final_readonly_mark_price_refresh_gate_json(
+                build_tiny_live_final_readonly_mark_price_refresh_gate(
+                    log_dir=args.log_dir,
+                    fetch_final_readonly_market=args.fetch_final_readonly_market,
+                    confirm_tiny_live_final_readonly_refresh=(
+                        args.confirm_tiny_live_final_readonly_refresh
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5270,6 +5287,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_submit_readiness_preview_parser.add_argument(
         "--confirm-tiny-live-submit-readiness-preview",
+        default=None,
+    )
+
+    tiny_live_final_readonly_mark_price_refresh_gate_parser = subparsers.add_parser(
+        "tiny-live-final-readonly-mark-price-refresh-gate",
+        parents=[parent],
+    )
+    tiny_live_final_readonly_mark_price_refresh_gate_parser.add_argument(
+        "--fetch-final-readonly-market",
+        action="store_true",
+    )
+    tiny_live_final_readonly_mark_price_refresh_gate_parser.add_argument(
+        "--confirm-tiny-live-final-readonly-refresh",
         default=None,
     )
 
