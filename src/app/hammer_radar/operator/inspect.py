@@ -3051,6 +3051,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-actual-submit-gate":
+        from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import (
+            build_tiny_live_actual_submit_gate,
+            format_tiny_live_actual_submit_gate_json,
+        )
+
+        print(
+            format_tiny_live_actual_submit_gate_json(
+                build_tiny_live_actual_submit_gate(
+                    log_dir=args.log_dir,
+                    dry_run_actual_submit_gate=args.dry_run_actual_submit_gate,
+                    record_actual_submit_gate_preview=args.record_actual_submit_gate_preview,
+                    confirm_tiny_live_actual_submit_gate_preview=(
+                        args.confirm_tiny_live_actual_submit_gate_preview
+                    ),
+                    execute_actual_submit=args.execute_actual_submit,
+                    confirm_tiny_live_actual_submit=args.confirm_tiny_live_actual_submit,
+                    allow_real_binance_order_endpoint=args.allow_real_binance_order_endpoint,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5363,6 +5384,35 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_submit_gate_preview_parser.add_argument(
         "--confirm-tiny-live-submit-gate-preview",
         default=None,
+    )
+
+    tiny_live_actual_submit_gate_parser = subparsers.add_parser(
+        "tiny-live-actual-submit-gate",
+        parents=[parent],
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--dry-run-actual-submit-gate",
+        action="store_true",
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--record-actual-submit-gate-preview",
+        action="store_true",
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--confirm-tiny-live-actual-submit-gate-preview",
+        default=None,
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--execute-actual-submit",
+        action="store_true",
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--confirm-tiny-live-actual-submit",
+        default=None,
+    )
+    tiny_live_actual_submit_gate_parser.add_argument(
+        "--allow-real-binance-order-endpoint",
+        action="store_true",
     )
 
     tiny_live_readiness_gap_recheck_parser = subparsers.add_parser(
