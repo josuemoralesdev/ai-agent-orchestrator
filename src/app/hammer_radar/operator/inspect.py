@@ -3015,6 +3015,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-fresh-context-signed-request-regeneration-gate":
+        from src.app.hammer_radar.operator.tiny_live_fresh_context_signed_request_regeneration_gate import (
+            build_tiny_live_fresh_context_signed_request_regeneration_gate,
+            format_tiny_live_fresh_context_signed_request_regeneration_gate_json,
+        )
+
+        print(
+            format_tiny_live_fresh_context_signed_request_regeneration_gate_json(
+                build_tiny_live_fresh_context_signed_request_regeneration_gate(
+                    log_dir=args.log_dir,
+                    regenerate_fresh_context_signed_request=(
+                        args.regenerate_fresh_context_signed_request
+                    ),
+                    confirm_tiny_live_fresh_context_regeneration=(
+                        args.confirm_tiny_live_fresh_context_regeneration
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5300,6 +5319,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_final_readonly_mark_price_refresh_gate_parser.add_argument(
         "--confirm-tiny-live-final-readonly-refresh",
+        default=None,
+    )
+
+    tiny_live_fresh_context_signed_request_regeneration_gate_parser = subparsers.add_parser(
+        "tiny-live-fresh-context-signed-request-regeneration-gate",
+        parents=[parent],
+    )
+    tiny_live_fresh_context_signed_request_regeneration_gate_parser.add_argument(
+        "--regenerate-fresh-context-signed-request",
+        action="store_true",
+    )
+    tiny_live_fresh_context_signed_request_regeneration_gate_parser.add_argument(
+        "--confirm-tiny-live-fresh-context-regeneration",
         default=None,
     )
 
