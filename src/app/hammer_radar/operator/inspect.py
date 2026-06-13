@@ -3072,6 +3072,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-operator-real-submit-runbook":
+        from src.app.hammer_radar.operator.tiny_live_operator_real_submit_runbook import (
+            build_tiny_live_operator_real_submit_runbook,
+            format_tiny_live_operator_real_submit_runbook_json,
+        )
+
+        print(
+            format_tiny_live_operator_real_submit_runbook_json(
+                build_tiny_live_operator_real_submit_runbook(
+                    log_dir=args.log_dir,
+                    record_operator_real_submit_runbook=args.record_operator_real_submit_runbook,
+                    confirm_tiny_live_operator_runbook=args.confirm_tiny_live_operator_runbook,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5413,6 +5428,19 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_actual_submit_gate_parser.add_argument(
         "--allow-real-binance-order-endpoint",
         action="store_true",
+    )
+
+    tiny_live_operator_real_submit_runbook_parser = subparsers.add_parser(
+        "tiny-live-operator-real-submit-runbook",
+        parents=[parent],
+    )
+    tiny_live_operator_real_submit_runbook_parser.add_argument(
+        "--record-operator-real-submit-runbook",
+        action="store_true",
+    )
+    tiny_live_operator_real_submit_runbook_parser.add_argument(
+        "--confirm-tiny-live-operator-runbook",
+        default=None,
     )
 
     tiny_live_readiness_gap_recheck_parser = subparsers.add_parser(
