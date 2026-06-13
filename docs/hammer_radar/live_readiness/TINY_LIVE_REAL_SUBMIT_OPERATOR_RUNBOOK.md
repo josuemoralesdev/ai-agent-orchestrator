@@ -102,6 +102,34 @@ stale, run a fresh cycle before any later manual submit decision. If lane
 controls or live execution remain off, the operator must review and arm them
 manually outside Codex before any later manual submit decision.
 
+## R259 Fresh Cycle Checkpoint
+
+R259 coordinates the required fresh cycle after R258. It does not run R253,
+R253B, R254, R255, or R258 automatically. It does not call Binance, sign,
+regenerate signed requests, submit, place orders, or arm live controls.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-cycle-checkpoint
+```
+
+Record the fresh-cycle checkpoint only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-cycle-checkpoint \
+  --record-fresh-cycle-checkpoint \
+  --confirm-tiny-live-fresh-cycle-checkpoint "I CONFIRM TINY LIVE FRESH CYCLE CHECKPOINT RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+```
+
+R259 must report `operator_should_submit_now=false`. When R253/R253B/R255 are
+stale relative to R258, it should point first to R253 final readonly refresh,
+then R253B regeneration, R254 preview, R255 dry preview, and R258 re-check.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator

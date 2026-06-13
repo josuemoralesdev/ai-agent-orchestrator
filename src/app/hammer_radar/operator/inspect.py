@@ -3123,6 +3123,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-fresh-cycle-checkpoint":
+        from src.app.hammer_radar.operator.tiny_live_fresh_cycle_checkpoint import (
+            build_tiny_live_fresh_cycle_checkpoint,
+            format_tiny_live_fresh_cycle_checkpoint_json,
+        )
+
+        print(
+            format_tiny_live_fresh_cycle_checkpoint_json(
+                build_tiny_live_fresh_cycle_checkpoint(
+                    log_dir=args.log_dir,
+                    record_fresh_cycle_checkpoint=args.record_fresh_cycle_checkpoint,
+                    confirm_tiny_live_fresh_cycle_checkpoint=(
+                        args.confirm_tiny_live_fresh_cycle_checkpoint
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5502,6 +5519,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_manual_submit_checkpoint_parser.add_argument(
         "--confirm-tiny-live-manual-submit-checkpoint",
+        default=None,
+    )
+
+    tiny_live_fresh_cycle_checkpoint_parser = subparsers.add_parser(
+        "tiny-live-fresh-cycle-checkpoint",
+        parents=[parent],
+    )
+    tiny_live_fresh_cycle_checkpoint_parser.add_argument(
+        "--record-fresh-cycle-checkpoint",
+        action="store_true",
+    )
+    tiny_live_fresh_cycle_checkpoint_parser.add_argument(
+        "--confirm-tiny-live-fresh-cycle-checkpoint",
         default=None,
     )
 
