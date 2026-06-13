@@ -3087,6 +3087,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-final-pre-submit-arming-drill":
+        from src.app.hammer_radar.operator.tiny_live_final_pre_submit_arming_drill import (
+            build_tiny_live_final_pre_submit_arming_drill,
+            format_tiny_live_final_pre_submit_arming_drill_json,
+        )
+
+        print(
+            format_tiny_live_final_pre_submit_arming_drill_json(
+                build_tiny_live_final_pre_submit_arming_drill(
+                    log_dir=args.log_dir,
+                    record_final_pre_submit_arming_drill=(
+                        args.record_final_pre_submit_arming_drill
+                    ),
+                    confirm_tiny_live_final_pre_submit_arming_drill=(
+                        args.confirm_tiny_live_final_pre_submit_arming_drill
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5440,6 +5459,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_operator_real_submit_runbook_parser.add_argument(
         "--confirm-tiny-live-operator-runbook",
+        default=None,
+    )
+
+    tiny_live_final_pre_submit_arming_drill_parser = subparsers.add_parser(
+        "tiny-live-final-pre-submit-arming-drill",
+        parents=[parent],
+    )
+    tiny_live_final_pre_submit_arming_drill_parser.add_argument(
+        "--record-final-pre-submit-arming-drill",
+        action="store_true",
+    )
+    tiny_live_final_pre_submit_arming_drill_parser.add_argument(
+        "--confirm-tiny-live-final-pre-submit-arming-drill",
         default=None,
     )
 

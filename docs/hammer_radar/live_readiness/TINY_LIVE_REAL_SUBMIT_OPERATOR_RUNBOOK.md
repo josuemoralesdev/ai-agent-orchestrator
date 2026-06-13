@@ -44,6 +44,35 @@ PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
   --confirm-tiny-live-operator-runbook "I CONFIRM TINY LIVE OPERATOR RUNBOOK RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
 ```
 
+## R257 Final Pre-Submit Arming Drill
+
+R257 is the final drill packet before any manual submit checkpoint. It does not
+arm live controls, regenerate signed requests, call Binance, submit, or place
+orders.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-pre-submit-arming-drill
+```
+
+Record the final drill packet only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-final-pre-submit-arming-drill \
+  --record-final-pre-submit-arming-drill \
+  --confirm-tiny-live-final-pre-submit-arming-drill "I CONFIRM TINY LIVE FINAL PRE-SUBMIT ARMING DRILL RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+```
+
+R257 must report `operator_should_submit_now=false`. If the signed request is
+stale, regenerate before any further checkpoint. If lane controls or live
+execution remain off, the operator must arm them manually outside Codex before
+any later manual submit decision.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
