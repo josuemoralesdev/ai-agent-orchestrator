@@ -3106,6 +3106,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-manual-submit-checkpoint":
+        from src.app.hammer_radar.operator.tiny_live_manual_submit_checkpoint import (
+            build_tiny_live_manual_submit_checkpoint,
+            format_tiny_live_manual_submit_checkpoint_json,
+        )
+
+        print(
+            format_tiny_live_manual_submit_checkpoint_json(
+                build_tiny_live_manual_submit_checkpoint(
+                    log_dir=args.log_dir,
+                    record_manual_submit_checkpoint=args.record_manual_submit_checkpoint,
+                    confirm_tiny_live_manual_submit_checkpoint=(
+                        args.confirm_tiny_live_manual_submit_checkpoint
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5472,6 +5489,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_final_pre_submit_arming_drill_parser.add_argument(
         "--confirm-tiny-live-final-pre-submit-arming-drill",
+        default=None,
+    )
+
+    tiny_live_manual_submit_checkpoint_parser = subparsers.add_parser(
+        "tiny-live-manual-submit-checkpoint",
+        parents=[parent],
+    )
+    tiny_live_manual_submit_checkpoint_parser.add_argument(
+        "--record-manual-submit-checkpoint",
+        action="store_true",
+    )
+    tiny_live_manual_submit_checkpoint_parser.add_argument(
+        "--confirm-tiny-live-manual-submit-checkpoint",
         default=None,
     )
 

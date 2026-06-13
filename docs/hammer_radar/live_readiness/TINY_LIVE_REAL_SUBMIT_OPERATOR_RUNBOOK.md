@@ -73,6 +73,35 @@ stale, regenerate before any further checkpoint. If lane controls or live
 execution remain off, the operator must arm them manually outside Codex before
 any later manual submit decision.
 
+## R258 Manual Submit Checkpoint
+
+R258 is the final manual checkpoint packet before a later fresh-cycle checkpoint.
+It does not arm live controls, regenerate signed requests, sign, call Binance,
+submit, or place orders.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-manual-submit-checkpoint
+```
+
+Record the manual checkpoint only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-manual-submit-checkpoint \
+  --record-manual-submit-checkpoint \
+  --confirm-tiny-live-manual-submit-checkpoint "I CONFIRM TINY LIVE MANUAL SUBMIT CHECKPOINT RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+```
+
+R258 must report `operator_should_submit_now=false`. If the signed request is
+stale, run a fresh cycle before any later manual submit decision. If lane
+controls or live execution remain off, the operator must review and arm them
+manually outside Codex before any later manual submit decision.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
