@@ -130,6 +130,37 @@ R259 must report `operator_should_submit_now=false`. When R253/R253B/R255 are
 stale relative to R258, it should point first to R253 final readonly refresh,
 then R253B regeneration, R254 preview, R255 dry preview, and R258 re-check.
 
+## R260 Fresh Cycle One-Shot Orchestrator
+
+R260 compresses the required fresh-cycle sequence into one exact-confirmed
+orchestration command. It may run R253 public readonly refresh, R253B local
+signed-request regeneration, R254 preview recording, R255 dry-preview recording,
+and R258 re-check recording. It must not submit, call Binance order/account
+endpoints, place orders, arm live controls, or mutate lane/risk/env config.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-cycle-one-shot
+```
+
+Run and record the one-shot fresh cycle only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-fresh-cycle-one-shot \
+  --run-fresh-cycle-one-shot \
+  --record-fresh-cycle-one-shot \
+  --confirm-tiny-live-fresh-cycle-one-shot "I CONFIRM TINY LIVE FRESH CYCLE ONE-SHOT ORCHESTRATION ONLY; REFRESH READONLY MARKET, REGENERATE LOCAL SIGNED REQUEST, RECORD PREVIEWS; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL."
+```
+
+R260 must report `operator_should_submit_now=false`. If the one-shot succeeds,
+the next step is live-control review / R261 UI arming, not real submit from
+R260.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
