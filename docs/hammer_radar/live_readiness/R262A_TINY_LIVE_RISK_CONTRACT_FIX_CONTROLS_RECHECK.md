@@ -68,6 +68,10 @@ If the current dry-preview triplet still exceeds those limits, R262A reports
 authorized fresh-cycle/regeneration phase. R262A itself must not regenerate,
 sign, submit, or call Binance.
 
+R262B is that authorized regeneration layer. It keeps the same resolved risk
+limits, adds percentage wallet fields, and regenerates quantity to fit under the
+existing `440 USDT` max notional instead of raising the fixed limit.
+
 ## API
 
 - `GET /tiny-live/risk-contract/review`
@@ -89,8 +93,9 @@ the R261 lane-control writer and can update only:
 
 `configs/hammer_radar/lane_controls.json`
 
-## R262 Handoff
+## R262B / R263 Handoff
 
-R262 final submit console must require R262A risk contract recheck valid,
-R261/R262A controls armed, R260 fresh cycle valid, the latest signed triplet
-shown with freshness, and no auto-submit by default.
+If R262A reports `unsafe_limits`, R262B must run before any final console. R263
+final submit console must require R262B risk contract fit valid, R261 controls
+armed after the R262B review, the latest regenerated signed triplet shown with
+freshness and quantity, and no auto-submit by default.

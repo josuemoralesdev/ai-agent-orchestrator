@@ -3200,6 +3200,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-percentage-risk-contract-fit":
+        from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regeneration import (
+            build_tiny_live_percentage_risk_contract_fit_regeneration,
+            format_tiny_live_percentage_risk_contract_fit_regeneration_json,
+        )
+
+        print(
+            format_tiny_live_percentage_risk_contract_fit_regeneration_json(
+                build_tiny_live_percentage_risk_contract_fit_regeneration(
+                    log_dir=args.log_dir,
+                    run_contract_fit_regeneration=args.run_contract_fit_regeneration,
+                    record_contract_fit_regeneration=args.record_contract_fit_regeneration,
+                    confirm_contract_fit_regeneration=args.confirm_contract_fit_regeneration,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5675,6 +5691,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_risk_contract_fix_parser.add_argument(
         "--reason",
+        default=None,
+    )
+
+    tiny_live_percentage_risk_contract_fit_parser = subparsers.add_parser(
+        "tiny-live-percentage-risk-contract-fit",
+        parents=[parent],
+    )
+    tiny_live_percentage_risk_contract_fit_parser.add_argument(
+        "--run-contract-fit-regeneration",
+        action="store_true",
+    )
+    tiny_live_percentage_risk_contract_fit_parser.add_argument(
+        "--record-contract-fit-regeneration",
+        action="store_true",
+    )
+    tiny_live_percentage_risk_contract_fit_parser.add_argument(
+        "--confirm-contract-fit-regeneration",
         default=None,
     )
 

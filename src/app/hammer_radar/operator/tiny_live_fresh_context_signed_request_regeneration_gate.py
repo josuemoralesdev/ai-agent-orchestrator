@@ -14,7 +14,7 @@ import os
 import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR, ROUND_HALF_UP
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -475,11 +475,19 @@ def build_fresh_stop_take_profit_source(
     generated_at = now or datetime.now(UTC)
     symbol, timeframe, direction, entry_mode = _lane_parts(official_lane_key)
     reference = _number(fresh_reference_context.get("reference_price"))
-    quantity = 0.007
+    quantity_plan = compute_fresh_contract_fit_quantity(
+        reference_price=reference,
+        max_notional_usdt=risk_contract.get("max_notional_usdt")
+        or risk_contract.get("max_position_notional_usdt"),
+        step_size=fresh_reference_context.get("step_size"),
+        min_notional=fresh_reference_context.get("min_notional"),
+        default_quantity=risk_contract.get("target_quantity") or 0.007,
+    )
+    quantity = _number(quantity_plan.get("quantity")) or 0.0
     max_loss = _number(risk_contract.get("max_loss_usdt")) or 4.44
     rr = _number(risk_contract.get("risk_reward_ratio")) or 2.0
     tick = _number(fresh_reference_context.get("tick_size")) or 0.1
-    risk_distance = max_loss / quantity
+    risk_distance = max_loss / quantity if quantity else 0.0
     raw_stop = (reference + risk_distance) if reference is not None else None
     raw_tp = (reference - (risk_distance * rr)) if reference is not None else None
     stop = _round_price(raw_stop, tick)
@@ -502,6 +510,7 @@ def build_fresh_stop_take_profit_source(
             "direction": direction,
             "entry_mode": entry_mode,
             "quantity": quantity,
+            "quantity_sizing_plan": quantity_plan,
             "reference_price": reference,
             "entry_reference_price": reference,
             "price_risk_distance": risk_distance,
@@ -585,7 +594,7 @@ def validate_fresh_stop_take_profit_source(source: Mapping[str, Any]) -> dict[st
         errors.append("min_notional_invalid")
     max_notional = _number((source.get("risk_contract") or {}).get("max_notional_usdt")) if isinstance(source.get("risk_contract"), Mapping) else None
     if max_notional is not None and notional is not None and notional > max_notional:
-        warnings.append("notional_after_rounding_exceeds_contract_max_notional")
+        errors.append("notional_after_rounding_exceeds_contract_max_notional")
     tolerance = max(0.01, (_number(source.get("tick_size")) or 0.1) * (quantity or 0))
     if loss is None or max_loss is None or loss > max_loss + tolerance:
         errors.append("estimated_loss_at_stop_usdt_exceeds_tolerance")
@@ -695,7 +704,7 @@ def validate_fresh_executable_payload(payload: Mapping[str, Any]) -> dict[str, A
     quantity = _number(main.get("quantity"))
     if main.get("side") != "SELL" or main.get("type") != "MARKET":
         errors.append("main_order_shape_invalid")
-    if quantity != 0.007:
+    if quantity is None or quantity <= 0:
         errors.append("quantity_invalid")
     if stop.get("side") != "BUY" or stop.get("type") != "STOP_MARKET" or stop.get("reduceOnly") is not True:
         errors.append("stop_order_shape_invalid")
@@ -714,6 +723,63 @@ def validate_fresh_executable_payload(payload: Mapping[str, Any]) -> dict[str, A
         if safety.get(key) is not False:
             errors.append(f"safety_{key}_invalid")
     return {"valid": not errors, "errors": _dedupe(errors), "warnings": []}
+
+
+def compute_fresh_contract_fit_quantity(
+    *,
+    reference_price: Any,
+    max_notional_usdt: Any,
+    step_size: Any,
+    min_notional: Any,
+    default_quantity: Any = 0.007,
+) -> dict[str, Any]:
+    reference = _decimal(reference_price)
+    max_notional = _decimal(max_notional_usdt)
+    step = _decimal(step_size) or Decimal("0.001")
+    min_notional_dec = _decimal(min_notional) or Decimal("5")
+    default_qty = _decimal(default_quantity) or Decimal("0.007")
+    blockers: list[str] = []
+    if reference is None or reference <= 0:
+        blockers.append("reference_price_invalid")
+    if max_notional is None or max_notional <= 0:
+        blockers.append("max_notional_invalid")
+    if step <= 0:
+        blockers.append("step_size_invalid")
+    if blockers:
+        return {
+            "quantity": None,
+            "default_quantity": _float(default_qty),
+            "max_notional_usdt": _float(max_notional),
+            "candidate_notional_usdt": None,
+            "fits_max_notional": False,
+            "fits_binance_step_size": False,
+            "fits_binance_min_notional": False,
+            "blocked_by": blockers,
+        }
+    max_qty_by_notional = (max_notional / reference).quantize(step, rounding=ROUND_FLOOR)
+    default_stepped = (default_qty / step).to_integral_value(rounding=ROUND_FLOOR) * step
+    quantity = min(default_stepped, max_qty_by_notional)
+    notional = reference * quantity
+    return {
+        "quantity": _float(quantity),
+        "default_quantity": _float(default_qty),
+        "max_quantity_by_notional": _float(max_qty_by_notional),
+        "quantity_reduced_to_fit_contract": bool(quantity < default_stepped),
+        "max_notional_usdt": _float(max_notional),
+        "candidate_notional_usdt": _float(notional.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)),
+        "fits_max_notional": bool(notional <= max_notional),
+        "fits_binance_step_size": bool(quantity > 0 and (quantity % step) == 0),
+        "fits_binance_min_notional": bool(notional >= min_notional_dec),
+        "blocked_by": [] if quantity > 0 and notional <= max_notional and notional >= min_notional_dec else [
+            reason
+            for reason, blocked in (
+                ("quantity_zero_after_contract_fit", quantity <= 0),
+                ("notional_exceeds_max_notional", notional > max_notional),
+                ("notional_below_min_notional", notional < min_notional_dec),
+            )
+            if blocked
+        ],
+    }
 
 
 def resolve_runtime_signing_credentials_for_fresh_regeneration(
@@ -1286,7 +1352,8 @@ def _stop_summary(source: Mapping[str, Any], validation: Mapping[str, Any], writ
         "source_written": bool(written),
         "symbol": source.get("symbol") or "BTCUSDT",
         "direction": source.get("direction") or "short",
-        "quantity": _number(source.get("quantity")) or 0.007,
+        "quantity": _number(source.get("quantity")),
+        "quantity_sizing_plan": source.get("quantity_sizing_plan") if isinstance(source.get("quantity_sizing_plan"), Mapping) else {},
         "reference_price": source.get("reference_price"),
         "stop_price": source.get("stop_price"),
         "take_profit_price": source.get("take_profit_price"),
@@ -1306,7 +1373,7 @@ def _payload_summary(payload: Mapping[str, Any], validation: Mapping[str, Any], 
         "payload_written": bool(written),
         "main_order_side": main.get("side") or "SELL",
         "main_order_type": main.get("type") or "MARKET",
-        "quantity": _number(main.get("quantity")) or 0.007,
+        "quantity": _number(main.get("quantity")),
         "stop_order_side": stop.get("side") or "BUY",
         "stop_order_type": stop.get("type") or "STOP_MARKET",
         "take_profit_order_side": tp.get("side") or "BUY",

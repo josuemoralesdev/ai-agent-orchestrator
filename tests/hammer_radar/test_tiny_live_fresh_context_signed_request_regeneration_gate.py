@@ -145,7 +145,9 @@ def test_builds_fresh_short_stop_take_profit_and_payload(tmp_path: Path, monkeyp
     stop = payload["fresh_stop_take_profit_source"]
     executable = payload["fresh_executable_payload_summary"]
     assert context["reference_price"] == 63675.0
-    assert stop["quantity"] == 0.007
+    assert stop["quantity"] == 0.006
+    assert stop["quantity_sizing_plan"]["quantity_reduced_to_fit_contract"] is True
+    assert stop["quantity_sizing_plan"]["candidate_notional_usdt"] <= 440
     assert stop["stop_price"] > context["reference_price"]
     assert stop["take_profit_price"] < context["reference_price"]
     assert stop["valid"] is True

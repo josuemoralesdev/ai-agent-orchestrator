@@ -217,19 +217,19 @@ def test_validates_submit_order_triplet_shape_and_controls(tmp_path: Path, monke
         "endpoint": "/fapi/v1/order",
         "side": "SELL",
         "type": "MARKET",
-        "quantity": 0.007,
+        "quantity": 0.006,
         "submit_in_this_phase": False,
     }
     assert triplet["stop_order"]["side"] == "BUY"
     assert triplet["stop_order"]["type"] == "STOP_MARKET"
-    assert triplet["stop_order"]["quantity"] == 0.007
-    assert triplet["stop_order"]["stopPrice"] == 64309.3
+    assert triplet["stop_order"]["quantity"] == 0.006
+    assert triplet["stop_order"]["stopPrice"] == 64415.0
     assert triplet["stop_order"]["reduceOnly"] is True
     assert triplet["stop_order"]["workingType"] == "MARK_PRICE"
     assert triplet["take_profit_order"]["side"] == "BUY"
     assert triplet["take_profit_order"]["type"] == "TAKE_PROFIT_MARKET"
-    assert triplet["take_profit_order"]["quantity"] == 0.007
-    assert triplet["take_profit_order"]["stopPrice"] == 62406.4
+    assert triplet["take_profit_order"]["quantity"] == 0.006
+    assert triplet["take_profit_order"]["stopPrice"] == 62195.0
     assert triplet["take_profit_order"]["reduceOnly"] is True
     assert triplet["take_profit_order"]["workingType"] == "MARK_PRICE"
 
