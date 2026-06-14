@@ -437,13 +437,16 @@ def validate_submit_order_triplet_shape(
         errors.append("main_order_endpoint_invalid")
     if main.get("side") != "SELL" or main.get("type") != "MARKET":
         errors.append("main_order_shape_invalid")
-    if _number(main.get("quantity")) != 0.007:
+    main_qty = _number(main.get("quantity"))
+    stop_qty = _number(stop.get("quantity"))
+    tp_qty = _number(tp.get("quantity"))
+    if main_qty is None or main_qty <= 0:
         errors.append("main_order_quantity_invalid")
     if stop.get("side") != "BUY" or stop.get("type") != "STOP_MARKET":
         errors.append("stop_order_shape_invalid")
     if stop.get("reduceOnly") is not True or stop.get("workingType") != "MARK_PRICE":
         errors.append("stop_order_reduce_only_or_working_type_invalid")
-    if _number(stop.get("quantity")) != 0.007:
+    if stop_qty != main_qty:
         errors.append("stop_order_quantity_invalid")
     if _number(stop.get("stopPrice")) != _number((stop_take_profit_source or {}).get("stop_price")):
         errors.append("stop_order_stop_price_not_latest_r253b")
@@ -451,7 +454,7 @@ def validate_submit_order_triplet_shape(
         errors.append("take_profit_order_shape_invalid")
     if tp.get("reduceOnly") is not True or tp.get("workingType") != "MARK_PRICE":
         errors.append("take_profit_order_reduce_only_or_working_type_invalid")
-    if _number(tp.get("quantity")) != 0.007:
+    if tp_qty != main_qty:
         errors.append("take_profit_order_quantity_invalid")
     if _number(tp.get("stopPrice")) != _number((stop_take_profit_source or {}).get("take_profit_price")):
         errors.append("take_profit_order_stop_price_not_latest_r253b")

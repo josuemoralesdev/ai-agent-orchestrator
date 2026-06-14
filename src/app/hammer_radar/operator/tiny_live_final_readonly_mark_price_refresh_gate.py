@@ -633,6 +633,8 @@ def compare_fresh_context_to_signed_artifact(
     drift = mark - reference
     drift_pct = (drift / reference * Decimal("100")) if reference and reference > 0 else None
     min_ok = bool(min_notional is not None and notional >= min_notional)
+    max_notional = Decimal("440")
+    notional_within_contract = bool(notional <= max_notional)
     return _sanitize(
         {
             "can_compare": True,
@@ -642,6 +644,8 @@ def compare_fresh_context_to_signed_artifact(
             "mark_drift_pct": _round_decimal(drift_pct, 4),
             "quantity_step_valid": quantity_validation["quantity_step_valid"],
             "notional_after_rounding_at_fresh_mark": _round_decimal(notional, 4),
+            "max_tiny_live_notional_usdt": _float(max_notional),
+            "notional_within_tiny_live_contract": notional_within_contract,
             "min_notional_ok": min_ok,
             "short_stop_still_above_fresh_mark": direction_validation["short_stop_still_above_fresh_mark"],
             "short_take_profit_still_below_fresh_mark": direction_validation[
@@ -730,6 +734,7 @@ def build_signed_request_regeneration_decision(
     for key in (
         "quantity_step_valid",
         "min_notional_ok",
+        "notional_within_tiny_live_contract",
         "short_stop_still_above_fresh_mark",
         "short_take_profit_still_below_fresh_mark",
     ):
@@ -1004,6 +1009,8 @@ def _empty_comparison(*, can_compare: bool = False) -> dict[str, Any]:
         "mark_drift_pct": None,
         "quantity_step_valid": None,
         "notional_after_rounding_at_fresh_mark": None,
+        "max_tiny_live_notional_usdt": None,
+        "notional_within_tiny_live_contract": None,
         "min_notional_ok": None,
         "short_stop_still_above_fresh_mark": None,
         "short_take_profit_still_below_fresh_mark": None,

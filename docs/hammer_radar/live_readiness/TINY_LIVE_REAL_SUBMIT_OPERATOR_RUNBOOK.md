@@ -15,11 +15,12 @@ place orders while preparing or recording this runbook.
 3. Run R254 submit gate preview.
 4. Run R255 actual submit gate dry preview immediately before any manual submit.
 5. Confirm lane/tiny-live controls are intentionally armed.
-6. Confirm R262A risk-contract recheck is valid.
+6. Confirm R262B percentage risk-contract fit is valid when R262A reported
+   `unsafe_limits`.
 7. Confirm kill-switch does not block.
 8. Confirm no duplicate live submit exists for the idempotency key.
 9. Confirm exact order triplet:
-   - main `SELL MARKET 0.007`
+   - main `SELL MARKET <latest R262B/R253B regenerated quantity>`
    - stop `BUY STOP_MARKET reduceOnly true`
    - take-profit `BUY TAKE_PROFIT_MARKET reduceOnly true`
 10. Review the post-submit reconciliation checklist.
@@ -216,13 +217,42 @@ If R262A reports `root_cause=unsafe_limits`, do not arm controls and do not open
 R262 as submit-ready. A later authorized fresh cycle must produce a triplet that
 is inside the same or stricter risk contract.
 
+## R262B Percentage Risk Contract Fit
+
+R262B converts the tiny-live contract to an equivalent percentage wallet model
+and regenerates the signed triplet so quantity fits the resolved contract. The
+current resolved limits remain `88 USDT` isolated wallet, `44 USDT` position
+margin, `10x` leverage, `440 USDT` max notional, and `4.44 USDT` max loss.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-percentage-risk-contract-fit
+```
+
+Run and record:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-percentage-risk-contract-fit \
+  --run-contract-fit-regeneration \
+  --record-contract-fit-regeneration \
+  --confirm-contract-fit-regeneration "I CONFIRM TINY LIVE PERCENTAGE RISK CONTRACT FIT REGENERATION ONLY; 88 USDT ISOLATED WALLET, 44 USDT POSITION MARGIN, 10X LEVERAGE, KEEP RISK SAME OR STRICTER; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL."
+```
+
+R262B does not arm controls and does not submit. If valid, the next operator
+move is R261 controls arming review, followed by R263 final console review.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
 only after the checklist is complete:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-gate --execute-actual-submit --allow-real-binance-order-endpoint --confirm-tiny-live-actual-submit "I CONFIRM TINY LIVE BTCUSDT 8M SHORT SUBMIT ONLY; PLACE EXACTLY THREE BINANCE FUTURES ORDERS FROM LATEST R253B SIGNED REQUEST; MAIN SELL MARKET 0.007 BTC; STOP BUY STOP_MARKET REDUCE_ONLY; TAKE_PROFIT BUY TAKE_PROFIT_MARKET REDUCE_ONLY; NO OTHER ORDERS."
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-gate --execute-actual-submit --allow-real-binance-order-endpoint --confirm-tiny-live-actual-submit "<R263 must render the exact phrase with the latest regenerated quantity; do not reuse the old 0.007 BTC phrase if R262B resized the triplet.>"
 ```
 
 ## Reconciliation
