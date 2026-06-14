@@ -87,6 +87,9 @@ from src.app.hammer_radar.operator.lane_control_cockpit import (
 from src.app.hammer_radar.operator.tiny_live_controls_arming import (
     build_tiny_live_controls_review,
 )
+from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
+    build_tiny_live_risk_contract_diagnostic,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -739,6 +742,18 @@ class TinyLiveControlsArmRequest(BaseModel):
     reason: str | None = None
 
 
+class TinyLiveRiskContractDiagnosticRecordRequest(BaseModel):
+    confirm_risk_contract_diagnostic: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
+class TinyLiveRiskContractFixApplyRequest(BaseModel):
+    confirm_risk_contract_fix: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
 class OperatorApprovalCockpitIntentRequest(BaseModel):
     candidate_id: str = Field(min_length=1)
     intent: Literal["APPROVE", "REJECT", "WAIT"]
@@ -804,6 +819,33 @@ def tiny_live_controls_arm(request: TinyLiveControlsArmRequest) -> dict:
         log_dir=get_log_dir(use_env=True),
         arm_tiny_live_controls=True,
         confirm_arm_tiny_live_controls=request.confirm_arm_tiny_live_controls,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.get("/tiny-live/risk-contract/review")
+def tiny_live_risk_contract_review() -> dict:
+    return build_tiny_live_risk_contract_diagnostic(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/risk-contract/fix/record")
+def tiny_live_risk_contract_fix_record(request: TinyLiveRiskContractDiagnosticRecordRequest) -> dict:
+    return build_tiny_live_risk_contract_diagnostic(
+        log_dir=get_log_dir(use_env=True),
+        record_risk_contract_diagnostic=True,
+        confirm_risk_contract_diagnostic=request.confirm_risk_contract_diagnostic,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.post("/tiny-live/risk-contract/fix/apply")
+def tiny_live_risk_contract_fix_apply(request: TinyLiveRiskContractFixApplyRequest) -> dict:
+    return build_tiny_live_risk_contract_diagnostic(
+        log_dir=get_log_dir(use_env=True),
+        apply_risk_contract_fix=True,
+        confirm_risk_contract_fix=request.confirm_risk_contract_fix,
         operator_id=request.operator_id,
         reason=request.reason,
     )
@@ -3181,6 +3223,8 @@ def _operator_ui_html() -> str:
       </div>
       <p><strong>Current blockers:</strong> <span id="tlcBlockers">loading</span></p>
       <p><strong>Risk contract reasons:</strong> <span id="tlcRiskReasons">loading</span></p>
+      <p><strong>Risk contract root cause:</strong> <span id="tlcRiskRootCause">loading</span></p>
+      <p><strong>Risk contract fix status:</strong> <span id="tlcRiskFixStatus">loading</span></p>
       <p class="muted">submit forbidden from this screen.</p>
       <div class="button-row">
         <input id="tlcReviewPhrase" class="notes" type="text" placeholder="Review confirmation phrase">
@@ -3697,8 +3741,11 @@ async function refreshAll() {
 async function loadTinyLiveControls() {
   const res = await fetch('/tiny-live/controls/review');
   const data = await res.json();
+  const riskRes = await fetch('/tiny-live/risk-contract/review');
+  const riskData = await riskRes.json();
   const controls = data.controls_state || {};
   const risk = data.risk_contract_state || {};
+  const riskDiagnostic = riskData.risk_contract_diagnostic || {};
   const fresh = data.freshness_state || {};
   const packet = data.controls_review_packet || {};
   const matrix = data.controls_arming_matrix || {};
@@ -3712,6 +3759,8 @@ async function loadTinyLiveControls() {
   setBool('tlcForbidden', packet.submit_still_forbidden !== false);
   document.getElementById('tlcBlockers').textContent = (matrix.blocked_by || []).join(', ') || 'none';
   document.getElementById('tlcRiskReasons').textContent = (risk.risk_contract_invalid_reasons || []).join(', ') || 'none';
+  document.getElementById('tlcRiskRootCause').textContent = riskDiagnostic.root_cause || 'unknown';
+  document.getElementById('tlcRiskFixStatus').textContent = riskData.risk_contract_fix_overall_status || 'unknown';
   document.getElementById('tinyLiveControls').className = 'tiny-live-controls ' + (packet.next_required_step === 'R262_FINAL_SUBMIT_CONSOLE' ? 'ready' : 'blocked');
   document.getElementById('tlcRaw').textContent = JSON.stringify({
     status: data.status,

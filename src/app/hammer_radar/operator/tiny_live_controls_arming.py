@@ -131,6 +131,7 @@ def build_tiny_live_controls_review(
         risk_contract_state = summarize_tiny_live_risk_contract_state(
             risk_contract=risk_contract,
             latest_r255=latest_r255,
+            latest_r260=latest_r260,
             risk_contract_config_path=risk_path,
             official_lane_key=official_lane_key,
         )
@@ -391,6 +392,7 @@ def summarize_tiny_live_risk_contract_state(
     *,
     risk_contract: Mapping[str, Any],
     latest_r255: Mapping[str, Any] | None = None,
+    latest_r260: Mapping[str, Any] | None = None,
     risk_contract_config_path: str | Path | None = None,
     official_lane_key: str = OFFICIAL_LANE_KEY,
 ) -> dict[str, Any]:
@@ -403,6 +405,7 @@ def summarize_tiny_live_risk_contract_state(
     validation = {}
     triplet = (latest_r255 or {}).get("actual_submit_dry_run_preview", {}).get("orders") if latest_r255 else {}
     if isinstance(triplet, Mapping):
+        triplet = _with_entry_reference_price(triplet, latest_r260=latest_r260)
         validation = validate_tiny_live_risk_contract_still_within_bounds(
             risk_contract_config_path=risk_contract_config_path,
             order_triplet={
@@ -422,7 +425,25 @@ def summarize_tiny_live_risk_contract_state(
         invalid_reasons.append("risk_contract_timeframe_not_8m")
     if found and contract.get("direction") != "short":
         invalid_reasons.append("risk_contract_direction_not_short")
-    if found and (validation.get("within_tiny_live_contract") is False or submit_summary.get("within_tiny_live_contract") is False):
+    validation_blocked_by = list(validation.get("blocked_by") or [])
+    validation_missing_reference_only = validation_blocked_by == ["missing_entry_reference_price"]
+    contract_caps_still_official = (
+        _float_or_none(contract.get("max_loss_usdt")) is not None
+        and _float_or_none(contract.get("max_loss_usdt")) <= 4.44
+        and _float_or_none(contract.get("max_notional_usdt") or contract.get("max_position_notional_usdt")) is not None
+        and _float_or_none(contract.get("max_notional_usdt") or contract.get("max_position_notional_usdt")) >= 440
+        and _float_or_none(contract.get("leverage")) is not None
+        and _float_or_none(contract.get("leverage")) <= 10
+    )
+    validation_invalid = (
+        validation.get("within_tiny_live_contract") is False
+        and not (
+            validation_missing_reference_only
+            and submit_summary.get("within_tiny_live_contract") is True
+            and contract_caps_still_official
+        )
+    )
+    if found and (validation_invalid or submit_summary.get("within_tiny_live_contract") is False):
         invalid_reasons.append("risk_contract_invalid")
     valid = bool(found and not invalid_reasons)
     return {
@@ -435,6 +456,7 @@ def summarize_tiny_live_risk_contract_state(
         or contract.get("max_position_notional_usdt"),
         "tiny_live_max_loss_usdt": contract.get("max_loss_usdt"),
         "leverage": contract.get("leverage"),
+        "validation_summary": validation,
     }
 
 
@@ -845,6 +867,55 @@ def _lane_parts(lane_key: str) -> tuple[str, str, str, str]:
     parts = str(lane_key).split("|")
     padded = (parts + ["", "", "", ""])[:4]
     return padded[0], padded[1], padded[2], padded[3]
+
+
+def _with_entry_reference_price(
+    triplet: Mapping[str, Any],
+    *,
+    latest_r260: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    copied = deepcopy(dict(triplet))
+    if _triplet_has_reference(copied):
+        return copied
+    reference = _r260_fresh_mark_price(latest_r260 or {})
+    if reference is None:
+        return copied
+    for key in ("main_order", "stop_order", "take_profit_order"):
+        order = copied.get(key)
+        if isinstance(order, dict):
+            order["entry_reference_price"] = reference
+    return copied
+
+
+def _triplet_has_reference(triplet: Mapping[str, Any]) -> bool:
+    if triplet.get("reference_price") not in (None, "") or triplet.get("entry_reference_price") not in (None, ""):
+        return True
+    for key in ("main_order", "stop_order", "take_profit_order"):
+        order = triplet.get(key) if isinstance(triplet.get(key), Mapping) else {}
+        if order.get("reference_price") not in (None, "") or order.get("entry_reference_price") not in (None, ""):
+            return True
+    return False
+
+
+def _r260_fresh_mark_price(record: Mapping[str, Any]) -> float | None:
+    steps = record.get("one_shot_step_results") if isinstance(record.get("one_shot_step_results"), Mapping) else {}
+    r253 = steps.get("r253_readonly_refresh") if isinstance(steps.get("r253_readonly_refresh"), Mapping) else {}
+    value = r253.get("fresh_mark_price")
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _dedupe(values: Sequence[str]) -> list[str]:

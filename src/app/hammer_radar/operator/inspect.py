@@ -3179,6 +3179,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-risk-contract-fix":
+        from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
+            build_tiny_live_risk_contract_diagnostic,
+            format_tiny_live_risk_contract_fix_json,
+        )
+
+        print(
+            format_tiny_live_risk_contract_fix_json(
+                build_tiny_live_risk_contract_diagnostic(
+                    log_dir=args.log_dir,
+                    record_risk_contract_diagnostic=args.record_risk_contract_diagnostic,
+                    confirm_risk_contract_diagnostic=args.confirm_risk_contract_diagnostic,
+                    apply_risk_contract_fix=args.apply_risk_contract_fix,
+                    confirm_risk_contract_fix=args.confirm_risk_contract_fix,
+                    arm_controls_after_fix=args.arm_controls_after_fix,
+                    confirm_arm_tiny_live_controls=args.confirm_arm_tiny_live_controls,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5616,6 +5637,43 @@ def _build_parser() -> argparse.ArgumentParser:
         default="local_operator",
     )
     tiny_live_controls_arming_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+
+    tiny_live_risk_contract_fix_parser = subparsers.add_parser(
+        "tiny-live-risk-contract-fix",
+        parents=[parent],
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--record-risk-contract-diagnostic",
+        action="store_true",
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--confirm-risk-contract-diagnostic",
+        default=None,
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--apply-risk-contract-fix",
+        action="store_true",
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--confirm-risk-contract-fix",
+        default=None,
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--arm-controls-after-fix",
+        action="store_true",
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--confirm-arm-tiny-live-controls",
+        default=None,
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_risk_contract_fix_parser.add_argument(
         "--reason",
         default=None,
     )

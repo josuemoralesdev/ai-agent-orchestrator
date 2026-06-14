@@ -15,14 +15,15 @@ place orders while preparing or recording this runbook.
 3. Run R254 submit gate preview.
 4. Run R255 actual submit gate dry preview immediately before any manual submit.
 5. Confirm lane/tiny-live controls are intentionally armed.
-6. Confirm kill-switch does not block.
-7. Confirm no duplicate live submit exists for the idempotency key.
-8. Confirm exact order triplet:
+6. Confirm R262A risk-contract recheck is valid.
+7. Confirm kill-switch does not block.
+8. Confirm no duplicate live submit exists for the idempotency key.
+9. Confirm exact order triplet:
    - main `SELL MARKET 0.007`
    - stop `BUY STOP_MARKET reduceOnly true`
    - take-profit `BUY TAKE_PROFIT_MARKET reduceOnly true`
-9. Review the post-submit reconciliation checklist.
-10. Review partial-success and abort handling before any manual command paste.
+10. Review the post-submit reconciliation checklist.
+11. Review partial-success and abort handling before any manual command paste.
 
 ## R256 Packet Command
 
@@ -203,6 +204,17 @@ R261 must report `submit_still_forbidden=true` and
 `operator_should_submit_now=false`. If the risk contract remains invalid, fix
 that blocker before arming. If R261 arms controls successfully, the next step is
 R262 final submit console, not real submit from R261.
+
+## R262A Tiny-Live Risk Contract Fix And Controls Recheck
+
+R262A diagnoses the R261 risk-contract blocker, records
+`tiny_live_risk_contract_fix.ndjson`, and reuses R261 controls arming only when
+the risk contract recheck is valid. It must not submit, sign, regenerate signed
+requests, call Binance/network, place orders, or loosen risk limits.
+
+If R262A reports `root_cause=unsafe_limits`, do not arm controls and do not open
+R262 as submit-ready. A later authorized fresh cycle must produce a triplet that
+is inside the same or stricter risk contract.
 
 ## R255 Manual Submit Template
 
