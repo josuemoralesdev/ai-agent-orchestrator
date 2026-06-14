@@ -74,9 +74,14 @@ R261 always reports `submit_allowed=false`, `order_placed=false`,
 If the risk contract is invalid, arming is blocked and the UI/API/CLI surface
 keeps the next required step at `FIX_RISK_CONTRACT`.
 
+R262A adds the follow-up diagnostic/fix surface for this blocker. R261 keeps
+using local R255/R260 dry-preview evidence for validation and does not treat
+controls arming as submit permission.
+
 ## R262 Handoff
 
 After controls are armed and blockers are clear, the next engineering step is
-R262 final submit console. R262 must consume the R261 arming result, show the
-final signed triplet and freshness age, show all blockers, and present the exact
-manual submit command without auto-submit by default.
+R262 final submit console. R262 must consume the R262A risk-contract recheck and
+the R261/R262A arming result, show the final signed triplet and freshness age,
+show all blockers, and present the exact manual submit command without
+auto-submit by default.

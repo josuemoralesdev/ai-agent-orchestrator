@@ -505,6 +505,10 @@ def build_submit_gate_order_triplet_preview(
         "take_profit_order": executable_payload_artifact.get("take_profit_order") if isinstance(executable_payload_artifact.get("take_profit_order"), Mapping) else {},
     }
     triplet: dict[str, Any] = {}
+    reference_price = _number(
+        executable_payload_artifact.get("reference_price")
+        or executable_payload_artifact.get("entry_reference_price")
+    )
     for key in ("main_order", "stop_order", "take_profit_order"):
         signed = signed_requests.get(key) if isinstance(signed_requests.get(key), Mapping) else {}
         parsed = _parse_query_string(str(signed.get("query_string_without_signature") or ""))
@@ -523,6 +527,7 @@ def build_submit_gate_order_triplet_preview(
             triplet[key]["stopPrice"] = _number(parsed.get("stopPrice") or fallback.get("stopPrice"))
             triplet[key]["reduceOnly"] = _bool(parsed.get("reduceOnly"), fallback.get("reduceOnly"))
             triplet[key]["workingType"] = parsed.get("workingType") or fallback.get("workingType")
+    triplet["entry_reference_price"] = reference_price
     triplet["valid"] = False
     return triplet
 

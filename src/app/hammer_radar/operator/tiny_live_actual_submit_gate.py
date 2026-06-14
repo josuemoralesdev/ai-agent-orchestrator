@@ -623,19 +623,35 @@ def validate_tiny_live_risk_contract_still_within_bounds(
     main = order_triplet.get("main_order") if isinstance(order_triplet.get("main_order"), Mapping) else {}
     stop = order_triplet.get("stop_order") if isinstance(order_triplet.get("stop_order"), Mapping) else {}
     qty = _number(main.get("quantity")) or 0.0
-    reference_price = _reference_price_from_artifact(order_triplet) or 63675.0
+    reference_price = _reference_price_from_artifact(order_triplet)
     stop_price = _number(stop.get("stopPrice")) or 0.0
-    notional = round(reference_price * qty, 4)
-    estimated_loss = round(abs(stop_price - reference_price) * qty, 4) if stop_price else 0.0
+    notional = round(reference_price * qty, 4) if reference_price is not None else 0.0
+    estimated_loss = round(abs(stop_price - reference_price) * qty, 4) if stop_price and reference_price is not None else 0.0
     max_loss = _number(contract.get("max_loss_usdt"))
     max_notional = _number(contract.get("max_notional_usdt") or contract.get("max_position_notional_usdt"))
     warnings: list[str] = []
     if estimated_loss > 4.44:
         warnings.append("estimated_loss_rounding_exceeds_config_by_less_than_one_cent")
+    blocked_by: list[str] = []
+    if reference_price is None:
+        blocked_by.append("missing_entry_reference_price")
+    if max_loss is None:
+        blocked_by.append("max_loss_missing")
+    elif estimated_loss > max_loss + 0.001:
+        blocked_by.append("estimated_loss_exceeds_max_loss")
+    if max_notional is None:
+        blocked_by.append("max_notional_missing")
+    elif notional > max_notional + 10:
+        blocked_by.append("notional_exceeds_max_notional_buffer")
+    if contract.get("symbol") != "BTCUSDT":
+        blocked_by.append("symbol_not_BTCUSDT")
+    if contract.get("direction") != "short":
+        blocked_by.append("direction_not_short")
     within = bool(
         contract
         and max_loss is not None
         and max_notional is not None
+        and reference_price is not None
         and estimated_loss <= max_loss + 0.001
         and notional <= max_notional + 10
         and contract.get("symbol") == "BTCUSDT"
@@ -645,8 +661,10 @@ def validate_tiny_live_risk_contract_still_within_bounds(
         "max_loss_usdt": max_loss,
         "estimated_loss_usdt": estimated_loss,
         "notional_usdt": notional,
+        "entry_reference_price": reference_price,
         "within_tiny_live_contract": within,
         "warnings": warnings,
+        "blocked_by": [] if within else _dedupe(blocked_by or ["risk_contract_invalid"]),
     }
 
 
@@ -1023,6 +1041,9 @@ def _matching_lane(path: Path, official_lane_key: str) -> dict[str, Any]:
 
 
 def _reference_price_from_artifact(order_triplet: Mapping[str, Any]) -> float | None:
+    price = _number(order_triplet.get("reference_price") or order_triplet.get("entry_reference_price"))
+    if price is not None:
+        return price
     for key in ("main_order", "stop_order", "take_profit_order"):
         order = order_triplet.get(key) if isinstance(order_triplet.get(key), Mapping) else {}
         price = _number(order.get("reference_price") or order.get("entry_reference_price"))
