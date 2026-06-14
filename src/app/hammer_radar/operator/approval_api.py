@@ -84,6 +84,9 @@ from src.app.hammer_radar.operator.lane_control_cockpit import (
     build_lane_control_cockpit_state,
     render_lane_control_cockpit_html,
 )
+from src.app.hammer_radar.operator.tiny_live_controls_arming import (
+    build_tiny_live_controls_review,
+)
 from src.app.hammer_radar.operator.live_safety import (
     build_current_live_safety,
     evaluate_live_safety,
@@ -724,6 +727,18 @@ class BinanceProtectiveRequest(BaseModel):
     use_mock_adapter: bool = False
 
 
+class TinyLiveControlsReviewRecordRequest(BaseModel):
+    confirm_tiny_live_controls_review: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
+class TinyLiveControlsArmRequest(BaseModel):
+    confirm_arm_tiny_live_controls: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
 class OperatorApprovalCockpitIntentRequest(BaseModel):
     candidate_id: str = Field(min_length=1)
     intent: Literal["APPROVE", "REJECT", "WAIT"]
@@ -765,6 +780,33 @@ def operator_lane_cockpit_state(
     lane_key: str = "BTCUSDT|13m|long|ladder_close_50_618",
 ) -> dict:
     return build_lane_control_cockpit_state(lane_key=lane_key, log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/controls/review")
+def tiny_live_controls_review() -> dict:
+    return build_tiny_live_controls_review(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/controls/review/record")
+def tiny_live_controls_review_record(request: TinyLiveControlsReviewRecordRequest) -> dict:
+    return build_tiny_live_controls_review(
+        log_dir=get_log_dir(use_env=True),
+        record_controls_review=True,
+        confirm_tiny_live_controls_review=request.confirm_tiny_live_controls_review,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.post("/tiny-live/controls/arm")
+def tiny_live_controls_arm(request: TinyLiveControlsArmRequest) -> dict:
+    return build_tiny_live_controls_review(
+        log_dir=get_log_dir(use_env=True),
+        arm_tiny_live_controls=True,
+        confirm_arm_tiny_live_controls=request.confirm_arm_tiny_live_controls,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
 
 
 @app.post("/operator/approval-cockpit/intent")
@@ -3070,7 +3112,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .tiny-live-controls, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -3123,6 +3165,33 @@ def _operator_ui_html() -> str:
         <div><div class="label">Archive</div><div id="archive" class="value">loading</div></div>
         <div><div class="label">Generated</div><div id="generated" class="value">loading</div></div>
       </div>
+    </section>
+
+    <h2>Tiny Live Controls</h2>
+    <section id="tinyLiveControls" class="tiny-live-controls blocked">
+      <div class="grid">
+        <div><div class="label">official lane</div><div id="tlcLane" class="value mono">BTCUSDT|8m|short|ladder_close_50_618</div></div>
+        <div><div class="label">fresh cycle valid</div><div id="tlcFresh" class="value">loading</div></div>
+        <div><div class="label">risk contract valid</div><div id="tlcRisk" class="value">loading</div></div>
+        <div><div class="label">live execution enabled</div><div id="tlcLive" class="value danger">false</div></div>
+        <div><div class="label">official lane allowed</div><div id="tlcLaneAllowed" class="value">loading</div></div>
+        <div><div class="label">kill switch allows tiny-live</div><div id="tlcKill" class="value">loading</div></div>
+        <div><div class="label">next required step</div><div id="tlcNext" class="value">loading</div></div>
+        <div><div class="label">submit forbidden</div><div id="tlcForbidden" class="value danger">true</div></div>
+      </div>
+      <p><strong>Current blockers:</strong> <span id="tlcBlockers">loading</span></p>
+      <p><strong>Risk contract reasons:</strong> <span id="tlcRiskReasons">loading</span></p>
+      <p class="muted">submit forbidden from this screen.</p>
+      <div class="button-row">
+        <input id="tlcReviewPhrase" class="notes" type="text" placeholder="Review confirmation phrase">
+        <button onclick="recordTinyLiveControlsReview()">Record Controls Review</button>
+      </div>
+      <div class="button-row">
+        <input id="tlcArmPhrase" class="notes" type="text" placeholder="Arming confirmation phrase">
+        <input id="tlcArmReason" class="notes" type="text" placeholder="Reason">
+        <button onclick="armTinyLiveControls()">Arm Controls Only</button>
+      </div>
+      <pre id="tlcRaw">loading</pre>
     </section>
 
     <h2>Friday Readiness</h2>
@@ -3592,8 +3661,15 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function setBool(id, value) {
+  const node = document.getElementById(id);
+  node.textContent = String(Boolean(value));
+  node.className = "value " + (value ? "safe" : "danger");
+}
+
 async function refreshAll() {
   await loadHealth();
+  await loadTinyLiveControls();
   await loadReadiness();
   await loadTradeTicket();
   await loadExchangeDryRun();
@@ -3616,6 +3692,60 @@ async function refreshAll() {
   await loadPaperExecutions();
   await loadCandidates();
   await loadDecisions();
+}
+
+async function loadTinyLiveControls() {
+  const res = await fetch('/tiny-live/controls/review');
+  const data = await res.json();
+  const controls = data.controls_state || {};
+  const risk = data.risk_contract_state || {};
+  const fresh = data.freshness_state || {};
+  const packet = data.controls_review_packet || {};
+  const matrix = data.controls_arming_matrix || {};
+  document.getElementById('tlcLane').textContent = data.target_scope?.official_lane_key || 'BTCUSDT|8m|short|ladder_close_50_618';
+  setBool('tlcFresh', fresh.fresh_cycle_valid);
+  setBool('tlcRisk', risk.risk_contract_valid);
+  setBool('tlcLive', controls.live_execution_enabled);
+  setBool('tlcLaneAllowed', controls.official_lane_allowed);
+  setBool('tlcKill', controls.kill_switch_allows_tiny_live);
+  document.getElementById('tlcNext').textContent = packet.next_required_step || 'UNKNOWN';
+  setBool('tlcForbidden', packet.submit_still_forbidden !== false);
+  document.getElementById('tlcBlockers').textContent = (matrix.blocked_by || []).join(', ') || 'none';
+  document.getElementById('tlcRiskReasons').textContent = (risk.risk_contract_invalid_reasons || []).join(', ') || 'none';
+  document.getElementById('tinyLiveControls').className = 'tiny-live-controls ' + (packet.next_required_step === 'R262_FINAL_SUBMIT_CONSOLE' ? 'ready' : 'blocked');
+  document.getElementById('tlcRaw').textContent = JSON.stringify({
+    status: data.status,
+    overall: data.controls_arming_overall_status,
+    recommended_next_operator_move: data.recommended_next_operator_move,
+    safety: data.safety
+  }, null, 2);
+}
+
+async function recordTinyLiveControlsReview() {
+  const phrase = document.getElementById('tlcReviewPhrase').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/controls/review/record', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_tiny_live_controls_review: phrase, operator_id: operatorId})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveControls();
+}
+
+async function armTinyLiveControls() {
+  const phrase = document.getElementById('tlcArmPhrase').value;
+  const reason = document.getElementById('tlcArmReason').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/controls/arm', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_arm_tiny_live_controls: phrase, operator_id: operatorId, reason})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveControls();
 }
 
 async function loadHealth() {
