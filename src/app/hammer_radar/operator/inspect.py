@@ -3140,6 +3140,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-fresh-cycle-one-shot":
+        from src.app.hammer_radar.operator.tiny_live_fresh_cycle_one_shot_orchestrator import (
+            build_tiny_live_fresh_cycle_one_shot_orchestrator,
+            format_tiny_live_fresh_cycle_one_shot_orchestrator_json,
+        )
+
+        print(
+            format_tiny_live_fresh_cycle_one_shot_orchestrator_json(
+                build_tiny_live_fresh_cycle_one_shot_orchestrator(
+                    log_dir=args.log_dir,
+                    run_fresh_cycle_one_shot=args.run_fresh_cycle_one_shot,
+                    record_fresh_cycle_one_shot=args.record_fresh_cycle_one_shot,
+                    confirm_tiny_live_fresh_cycle_one_shot=(
+                        args.confirm_tiny_live_fresh_cycle_one_shot
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5532,6 +5550,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_fresh_cycle_checkpoint_parser.add_argument(
         "--confirm-tiny-live-fresh-cycle-checkpoint",
+        default=None,
+    )
+
+    tiny_live_fresh_cycle_one_shot_parser = subparsers.add_parser(
+        "tiny-live-fresh-cycle-one-shot",
+        parents=[parent],
+    )
+    tiny_live_fresh_cycle_one_shot_parser.add_argument(
+        "--run-fresh-cycle-one-shot",
+        action="store_true",
+    )
+    tiny_live_fresh_cycle_one_shot_parser.add_argument(
+        "--record-fresh-cycle-one-shot",
+        action="store_true",
+    )
+    tiny_live_fresh_cycle_one_shot_parser.add_argument(
+        "--confirm-tiny-live-fresh-cycle-one-shot",
         default=None,
     )
 
