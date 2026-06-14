@@ -3158,6 +3158,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-controls-arming":
+        from src.app.hammer_radar.operator.tiny_live_controls_arming import (
+            build_tiny_live_controls_review,
+            format_tiny_live_controls_arming_json,
+        )
+
+        print(
+            format_tiny_live_controls_arming_json(
+                build_tiny_live_controls_review(
+                    log_dir=args.log_dir,
+                    record_controls_review=args.record_controls_review,
+                    confirm_tiny_live_controls_review=(
+                        args.confirm_tiny_live_controls_review
+                    ),
+                    arm_tiny_live_controls=args.arm_tiny_live_controls,
+                    confirm_arm_tiny_live_controls=args.confirm_arm_tiny_live_controls,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-readiness-gap-recheck":
         from src.app.hammer_radar.operator.tiny_live_readiness_gap_recheck import (
             build_tiny_live_readiness_gap_recheck,
@@ -5567,6 +5588,35 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_fresh_cycle_one_shot_parser.add_argument(
         "--confirm-tiny-live-fresh-cycle-one-shot",
+        default=None,
+    )
+
+    tiny_live_controls_arming_parser = subparsers.add_parser(
+        "tiny-live-controls-arming",
+        parents=[parent],
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--record-controls-review",
+        action="store_true",
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--confirm-tiny-live-controls-review",
+        default=None,
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--arm-tiny-live-controls",
+        action="store_true",
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--confirm-arm-tiny-live-controls",
+        default=None,
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_controls_arming_parser.add_argument(
+        "--reason",
         default=None,
     )
 

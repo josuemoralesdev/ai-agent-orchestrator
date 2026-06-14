@@ -161,6 +161,49 @@ R260 must report `operator_should_submit_now=false`. If the one-shot succeeds,
 the next step is live-control review / R261 UI arming, not real submit from
 R260.
 
+## R261 Tiny-Live Controls Arming UI And API
+
+R261 reviews R260/R255 freshness, lane controls, live execution state, kill
+switch state, and the official lane risk contract. It may record review intent,
+and it may arm only the official lane controls row after the exact arming
+confirmation. It must not submit, sign, regenerate signed requests, call
+Binance, place orders, update risk contracts, or disable a global kill switch.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-controls-arming
+```
+
+Record controls review only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-controls-arming \
+  --record-controls-review \
+  --confirm-tiny-live-controls-review "I CONFIRM TINY LIVE CONTROLS REVIEW RECORDING ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+```
+
+Arm official lane controls only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-controls-arming \
+  --arm-tiny-live-controls \
+  --confirm-arm-tiny-live-controls "I CONFIRM ARM TINY LIVE CONTROLS FOR BTCUSDT 8M SHORT ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL." \
+  --operator-id local_operator \
+  --reason "R260 fresh cycle valid; preparing for R262 final submit console."
+```
+
+R261 must report `submit_still_forbidden=true` and
+`operator_should_submit_now=false`. If the risk contract remains invalid, fix
+that blocker before arming. If R261 arms controls successfully, the next step is
+R262 final submit console, not real submit from R261.
+
 ## R255 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
