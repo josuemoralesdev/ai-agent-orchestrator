@@ -36,6 +36,9 @@ from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
 TRADE_TICKETS_FILENAME = "trade_tickets.ndjson"
 PAPER_EXECUTION_ENABLED = False
 PAPER_ORDER_PLACED = False
+SUBMIT_ATTEMPTED = False
+BINANCE_ORDER_ENDPOINT_CALLED = False
+REAL_ORDER_PLACED = False
 DEFAULT_MAX_RISK_USD = 5.0
 DEFAULT_FRESH_MINUTES = 30
 MIN_SCORE = 90
@@ -52,10 +55,15 @@ def build_trade_ticket(
     fresh_minutes: int = DEFAULT_FRESH_MINUTES,
     log_dir: str | Path | None = None,
     risk_contract_config_path: str | Path | None = None,
+    use_active_tiny_live_contract: bool = True,
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     created_at = datetime.now(UTC)
-    contract_limits = _active_tiny_live_contract_limits(risk_contract_config_path=risk_contract_config_path)
+    contract_limits = (
+        _active_tiny_live_contract_limits(risk_contract_config_path=risk_contract_config_path)
+        if use_active_tiny_live_contract
+        else {}
+    )
     resolved_max_position_usd = _resolve_max_position_usd(max_position_usd, contract_limits=contract_limits)
     resolved_max_leverage = _resolve_max_leverage(max_leverage, contract_limits=contract_limits)
     readiness = build_readiness_payload(log_dir=resolved_log_dir)
@@ -77,8 +85,6 @@ def build_trade_ticket(
     )
     checks: list[LiveCandidateCheck] = list(snapshot["checks"])
     selected = _select_candidate(checks, signal_id=signal_id)
-    max_position_was_explicit = max_position_usd is not None
-    max_leverage_was_explicit = max_leverage is not None
 
     blockers = list(readiness.get("blockers") or [])
     if selected is None:
@@ -96,19 +102,9 @@ def build_trade_ticket(
             risk_contract=contract_limits,
         )
 
-    candidate_contract_limits = (
-        contract_limits if _candidate_matches_active_contract(selected, contract_limits=contract_limits) else {}
-    )
-    ticket_max_position_usd = (
-        resolved_max_position_usd
-        if candidate_contract_limits or max_position_was_explicit
-        else float(PROTOCOL["max_position_usd"])
-    )
-    ticket_max_leverage = (
-        resolved_max_leverage
-        if candidate_contract_limits or max_leverage_was_explicit
-        else float(PROTOCOL["max_leverage"])
-    )
+    candidate_contract_limits = contract_limits if contract_limits.get("risk_contract_valid") else {}
+    ticket_max_position_usd = resolved_max_position_usd
+    ticket_max_leverage = resolved_max_leverage
     candidate_blockers = _candidate_blockers(
         selected,
         allow_short=allow_short,
@@ -352,7 +348,9 @@ def _ticket_from_check(
         "max_position_usd": float(max_position_usd),
         "active_contract_mode": risk_contract.get("tiny_live_contract_mode"),
         "active_contract_leverage": risk_contract.get("leverage"),
+        "active_contract_max_notional_usdt": risk_contract.get("max_position_notional_usdt"),
         "active_contract_max_position_notional_usdt": risk_contract.get("max_position_notional_usdt"),
+        "active_contract_margin_budget_usdt": risk_contract.get("derived_margin_budget_usdt"),
         "suggested_position_usd": suggested_position_usd,
         "suggested_leverage": _suggested_ticket_leverage(max_leverage, contract_limits=candidate_contract_limits),
         "margin_mode": "isolated",
@@ -367,6 +365,9 @@ def _ticket_from_check(
         "operator_required_action": _operator_required_action(ticket_status),
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "real_order_placed": REAL_ORDER_PLACED,
         "risk_contract": risk_contract,
         "ticket_status": ticket_status,
     }
@@ -397,7 +398,9 @@ def _blocked_ticket(
         "max_position_usd": float(max_position_usd),
         "active_contract_mode": risk_contract.get("tiny_live_contract_mode"),
         "active_contract_leverage": risk_contract.get("leverage"),
+        "active_contract_max_notional_usdt": risk_contract.get("max_position_notional_usdt"),
         "active_contract_max_position_notional_usdt": risk_contract.get("max_position_notional_usdt"),
+        "active_contract_margin_budget_usdt": risk_contract.get("derived_margin_budget_usdt"),
         "suggested_position_usd": None,
         "suggested_leverage": None,
         "margin_mode": "isolated",
@@ -412,6 +415,9 @@ def _blocked_ticket(
         "operator_required_action": _operator_required_action("BLOCKED"),
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "real_order_placed": REAL_ORDER_PLACED,
         "risk_contract": risk_contract,
         "ticket_status": "BLOCKED",
     }
@@ -484,6 +490,7 @@ def _active_tiny_live_contract_limits(
     summary = build_tiny_live_risk_contract_validation_summary(risk_contract=loaded)
     max_position_notional = summary.get("max_position_notional_usdt")
     leverage = summary.get("leverage")
+    derived_margin_budget = summary.get("derived_margin_budget_usdt")
     return {
         "found": bool(loaded.get("found")),
         "path": str(loaded.get("path") or path),
@@ -492,10 +499,12 @@ def _active_tiny_live_contract_limits(
         "risk_contract_valid": bool(summary.get("risk_contract_valid")),
         "tiny_live_contract_mode": summary.get("tiny_live_contract_mode"),
         "max_position_notional_usdt": max_position_notional,
+        "max_notional_usdt": max_position_notional,
         "max_position_usd": max_position_notional,
         "suggested_leverage": leverage,
         "leverage": leverage,
-        "derived_margin_budget_usdt": summary.get("derived_margin_budget_usdt"),
+        "derived_margin_budget_usdt": derived_margin_budget,
+        "margin_budget_usdt": derived_margin_budget,
         "max_loss_usdt": summary.get("max_loss_usdt"),
         "blocked_by": list(summary.get("blocked_by") or []),
         "contract_symbol": contract.get("symbol"),
@@ -507,11 +516,13 @@ def _active_tiny_live_contract_limits(
 
 
 def _resolve_max_position_usd(value: float | None, *, contract_limits: dict[str, Any]) -> float:
-    if value is not None:
-        return float(value)
     contract_cap = contract_limits.get("max_position_usd")
     if contract_limits.get("risk_contract_valid") and contract_cap is not None:
+        if value is not None:
+            return min(float(value), float(contract_cap))
         return float(contract_cap)
+    if value is not None:
+        return float(value)
     return float(PROTOCOL["max_position_usd"])
 
 
@@ -526,22 +537,6 @@ def _resolve_max_leverage(value: float | None, *, contract_limits: dict[str, Any
     ):
         return float(contract_leverage)
     return float(PROTOCOL["max_leverage"])
-
-
-def _candidate_matches_active_contract(
-    check: LiveCandidateCheck,
-    *,
-    contract_limits: dict[str, Any],
-) -> bool:
-    if not contract_limits.get("risk_contract_valid"):
-        return False
-    signal = check.candidate.signal
-    return (
-        signal.symbol == contract_limits.get("contract_symbol")
-        and signal.timeframe == contract_limits.get("contract_timeframe")
-        and signal.direction == contract_limits.get("contract_direction")
-        and str(contract_limits.get("contract_entry_mode") or "") == "ladder_close_50_618"
-    )
 
 
 def _expected_reward_pct(entry: float | None, take_profit: float | None) -> float | None:

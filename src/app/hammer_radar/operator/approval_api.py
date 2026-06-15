@@ -780,6 +780,7 @@ class TinyLiveActualSubmitExecuteRequest(BaseModel):
 class TinyLiveJitLaunchPacketRunRequest(BaseModel):
     confirm_jit_launch_prep: str = Field(min_length=1)
     record_jit_launch_packet: bool = True
+    confirm_final_manual_submit_unlock: str | None = None
     operator_id: str = "local_operator"
     reason: str | None = None
 
@@ -939,6 +940,7 @@ def tiny_live_jit_launch_packet_run(request: TinyLiveJitLaunchPacketRunRequest) 
         run_jit_launch_prep=True,
         record_jit_launch_packet=request.record_jit_launch_packet,
         confirm_jit_launch_prep=request.confirm_jit_launch_prep,
+        confirm_final_manual_submit_unlock=request.confirm_final_manual_submit_unlock,
         operator_id=request.operator_id,
         reason=request.reason,
     )

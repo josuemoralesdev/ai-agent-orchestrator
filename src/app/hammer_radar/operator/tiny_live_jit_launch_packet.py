@@ -46,6 +46,12 @@ JIT_LAUNCH_PREP_CONFIRMATION_PHRASE = (
     "ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; "
     "NO BINANCE ORDER CALL."
 )
+R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE = (
+    "I CONFIRM R268 TINY LIVE FINAL MANUAL SUBMIT UNLOCK PACKET ONLY; "
+    "EXPOSE MANUAL COMMAND ONLY IF R262B R263 R264 IDEMPOTENCY FRESHNESS "
+    "AND 80 USDT 10X CONTRACT GATES ARE CLEAN; CODEX MUST NOT SUBMIT; "
+    "NO ORDER; NO BINANCE ORDER CALL."
+)
 
 TINY_LIVE_JIT_LAUNCH_PACKET_READY = "TINY_LIVE_JIT_LAUNCH_PACKET_READY"
 TINY_LIVE_JIT_LAUNCH_PACKET_RECORDED = "TINY_LIVE_JIT_LAUNCH_PACKET_RECORDED"
@@ -88,6 +94,7 @@ def build_tiny_live_jit_launch_packet(
     run_jit_launch_prep: bool = False,
     record_jit_launch_packet: bool = False,
     confirm_jit_launch_prep: str | None = None,
+    confirm_final_manual_submit_unlock: str | None = None,
     operator_id: str = "local_operator",
     reason: str | None = None,
     official_lane_key: str = OFFICIAL_LANE_KEY,
@@ -98,6 +105,9 @@ def build_tiny_live_jit_launch_packet(
     risk_path = Path(risk_contract_config_path) if risk_contract_config_path is not None else RISK_CONTRACT_CONFIG_PATH
     lane_path = Path(lane_controls_path) if lane_controls_path is not None else LANE_CONTROLS_PATH
     confirmation_valid = confirm_jit_launch_prep == JIT_LAUNCH_PREP_CONFIRMATION_PHRASE
+    final_manual_unlock_confirmation_valid = (
+        confirm_final_manual_submit_unlock == R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
+    )
     symbol, timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
     try:
         steps = _empty_jit_step_results()
@@ -151,7 +161,10 @@ def build_tiny_live_jit_launch_packet(
             overall = TINY_LIVE_JIT_READY_FOR_CONFIRMATION
 
         validation = locals().get("validation") or validate_jit_launch_packet(jit_step_results=steps)
-        final_command = build_final_live_submit_command_packet(jit_validation=validation)
+        final_command = build_final_live_submit_command_packet(
+            jit_validation=validation,
+            final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
+        )
         go_no_go = _go_no_go_packet(jit_validation=validation, final_command=final_command)
         matrix = _launch_matrix(jit_validation=validation, final_command=final_command)
         payload = _sanitize(
@@ -161,6 +174,12 @@ def build_tiny_live_jit_launch_packet(
                 "run_jit_launch_prep_requested": bool(run_jit_launch_prep),
                 "record_jit_launch_packet_requested": bool(record_jit_launch_packet),
                 "confirmation_valid": bool(confirmation_valid),
+                "final_manual_submit_unlock_confirmation_valid": bool(
+                    final_manual_unlock_confirmation_valid
+                ),
+                "final_manual_submit_unlock_confirmation_phrase": (
+                    R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
+                ),
                 "jit_launch_packet_recorded": False,
                 "operator_intent": {
                     "operator_id": str(operator_id or "local_operator"),
@@ -383,6 +402,38 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
     r263 = jit_step_results.get("r263_runtime_arming") if isinstance(jit_step_results.get("r263_runtime_arming"), Mapping) else {}
     r264 = jit_step_results.get("r264_dry_preview") if isinstance(jit_step_results.get("r264_dry_preview"), Mapping) else {}
     blocked: list[str] = []
+    risk_interpretation = (
+        r264.get("risk_contract_interpretation")
+        if isinstance(r264.get("risk_contract_interpretation"), Mapping)
+        else r262b.get("risk_contract_interpretation")
+        if isinstance(r262b.get("risk_contract_interpretation"), Mapping)
+        else {}
+    )
+    r262b_risk_interpretation = (
+        r262b.get("risk_contract_interpretation")
+        if isinstance(r262b.get("risk_contract_interpretation"), Mapping)
+        else {}
+    )
+    r264_risk_interpretation = (
+        r264.get("risk_contract_interpretation")
+        if isinstance(r264.get("risk_contract_interpretation"), Mapping)
+        else {}
+    )
+    contract_mode = risk_interpretation.get("tiny_live_contract_mode")
+    max_notional = _float_or_none(risk_interpretation.get("max_position_notional_usdt"))
+    leverage = _float_or_none(risk_interpretation.get("leverage"))
+    candidate_notional = _float_or_none(
+        r264.get("candidate_notional_usdt") or r262b.get("candidate_notional_usdt")
+    )
+    candidate_qty = _float_or_none(r264.get("candidate_qty") or r262b.get("candidate_qty"))
+    exchange_minimum_cleared = (
+        risk_interpretation.get("clears_exchange_minimum") is True
+        or r262b_risk_interpretation.get("clears_exchange_minimum") is True
+        or r264_risk_interpretation.get("clears_exchange_minimum") is True
+        or risk_interpretation.get("fits_binance_min_notional") is True
+        or r264.get("exchange_minimum_cleared") is True
+        or r262b.get("exchange_minimum_cleared") is True
+    )
     if r262b.get("attempted") and r262b.get("succeeded") is not True:
         blocked.extend(str(item) for item in r262b.get("blocked_by") or ["r262b_contract_fit_refresh_failed"])
     if r263.get("attempted") and r263.get("succeeded") is not True:
@@ -391,6 +442,21 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
         blocked.extend(str(item) for item in r264.get("blocked_by") or ["r264_dry_preview_failed"])
     if r264.get("prior_live_submit_found") is True:
         blocked.append("prior_live_submit_exists")
+    if r262b.get("attempted") or r264.get("attempted"):
+        if contract_mode != "explicit_notional_cap_with_leverage":
+            blocked.append("contract_mode_not_explicit_notional_cap_with_leverage")
+        if max_notional != 80.0:
+            blocked.append("max_position_notional_not_80")
+        if leverage != 10.0:
+            blocked.append("leverage_not_10")
+        if candidate_notional is None:
+            blocked.append("candidate_notional_missing")
+        elif candidate_notional > 80.0:
+            blocked.append("candidate_notional_exceeds_80")
+        if candidate_qty is None or candidate_qty <= 0:
+            blocked.append("candidate_quantity_invalid")
+        if exchange_minimum_cleared is not True:
+            blocked.append("exchange_minimum_not_cleared")
     valid = bool(
         r262b.get("succeeded") is True
         and r263.get("succeeded") is True
@@ -404,35 +470,144 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
         and r264.get("signed_triplet_fresh") is True
         and r264.get("risk_contract_valid") is True
         and r264.get("controls_armed") is True
+        and contract_mode == "explicit_notional_cap_with_leverage"
+        and max_notional == 80.0
+        and leverage == 10.0
+        and candidate_notional is not None
+        and candidate_notional <= 80.0
+        and candidate_qty is not None
+        and candidate_qty > 0
+        and exchange_minimum_cleared is True
     )
     return {
         "valid": valid,
         "blocked_by": _dedupe(blocked),
+        "contract_mode": contract_mode,
+        "max_position_notional_usdt": max_notional,
+        "leverage": leverage,
+        "candidate_notional_usdt": candidate_notional,
+        "candidate_qty": candidate_qty,
+        "candidate_notional_within_cap": bool(candidate_notional is not None and candidate_notional <= 80.0),
+        "candidate_quantity_valid": bool(candidate_qty is not None and candidate_qty > 0),
+        "exchange_minimum_cleared": bool(exchange_minimum_cleared),
         "r262b_valid": r262b.get("succeeded") is True and r262b.get("risk_contract_valid") is True,
         "r263_armed": r263.get("succeeded") is True and r263.get("controls_armed") is True,
         "r264_dry_preview_valid": r264.get("succeeded") is True and r264.get("pre_submit_valid") is True,
         "signed_triplet_fresh": r264.get("signed_triplet_fresh") is True,
         "risk_contract_valid": r264.get("risk_contract_valid") is True and r262b.get("risk_contract_valid") is True,
-        "risk_contract_interpretation": r264.get("risk_contract_interpretation") or r262b.get("risk_contract_interpretation") or {},
+        "risk_contract_interpretation": risk_interpretation,
         "idempotency_clean": r264.get("idempotency_clean") is True,
         "exact_three_orders": r264.get("exact_three_orders") is True,
+        "main_order_valid": r264.get("main_order_valid") is True,
+        "stop_order_valid": r264.get("stop_order_valid") is True,
+        "take_profit_order_valid": r264.get("take_profit_order_valid") is True,
+        "reduce_only_exits": r264.get("reduce_only_exits") is True,
         "no_live_submit_performed": True,
+        "order_placed": False,
+        "real_order_placed": False,
+        "submit_attempted": False,
+        "binance_order_endpoint_called": False,
+        "binance_test_order_endpoint_called": False,
+        "secrets_shown": False,
+        "transfer_endpoint_called": False,
+        "withdraw_endpoint_called": False,
+        "private_account_endpoint_called": False,
     }
 
 
-def build_final_live_submit_command_packet(*, jit_validation: Mapping[str, Any]) -> dict[str, Any]:
+def build_final_live_submit_command_packet(
+    *,
+    jit_validation: Mapping[str, Any],
+    final_manual_unlock_confirmation_valid: bool = False,
+) -> dict[str, Any]:
+    gate = validate_final_manual_submit_unlock_gate(
+        jit_validation=jit_validation,
+        final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
+    )
+    command = _manual_live_submit_command() if gate["valid"] else ""
     return {
-        "available": False,
+        "available": bool(gate["valid"]),
         "must_be_run_manually_by_operator": True,
         "do_not_run_from_codex": True,
-        "command": "",
+        "manual_only": True,
+        "submit_allowed_from_codex": False,
+        "command": command,
         "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE,
-        "unavailable_reason": "R267 keeps final live submit command unavailable; packet is diagnostic/readiness only.",
+        "unlock_confirmation_phrase": R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        "unlock_confirmation_valid": bool(final_manual_unlock_confirmation_valid),
+        "unavailable_reason": "" if gate["valid"] else "; ".join(gate["blocked_by"]),
+        "gate_validation": gate,
         "expected_orders": {
             "main": "SELL MARKET quantity must remain within 80 USDT notional cap",
             "stop": "BUY STOP_MARKET REDUCE_ONLY",
             "take_profit": "BUY TAKE_PROFIT_MARKET REDUCE_ONLY",
         },
+        "allowed_endpoint": "/fapi/v1/order",
+        "forbidden_endpoints": [
+            "/fapi/v1/order/test",
+            "/fapi/v1/account",
+            "transfer",
+            "withdraw",
+        ],
+    }
+
+
+def validate_final_manual_submit_unlock_gate(
+    *,
+    jit_validation: Mapping[str, Any],
+    final_manual_unlock_confirmation_valid: bool,
+) -> dict[str, Any]:
+    required = {
+        "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
+        "jit_validation_clean": jit_validation.get("valid") is True,
+        "contract_mode_explicit_notional_cap_with_leverage": (
+            jit_validation.get("contract_mode") == "explicit_notional_cap_with_leverage"
+        ),
+        "max_position_notional_80": _float_or_none(jit_validation.get("max_position_notional_usdt")) == 80.0,
+        "leverage_10": _float_or_none(jit_validation.get("leverage")) == 10.0,
+        "candidate_notional_lte_80": jit_validation.get("candidate_notional_within_cap") is True,
+        "candidate_quantity_valid_nonzero": jit_validation.get("candidate_quantity_valid") is True,
+        "exchange_minimum_cleared": jit_validation.get("exchange_minimum_cleared") is True,
+        "r262b_contract_fit_valid": jit_validation.get("r262b_valid") is True,
+        "r263_controls_armed": jit_validation.get("r263_armed") is True,
+        "r264_dry_preview_valid": jit_validation.get("r264_dry_preview_valid") is True,
+        "exact_three_orders": jit_validation.get("exact_three_orders") is True,
+        "main_order_valid": jit_validation.get("main_order_valid") is True,
+        "stop_order_reduce_only_valid": (
+            jit_validation.get("stop_order_valid") is True
+            and jit_validation.get("reduce_only_exits") is True
+        ),
+        "take_profit_order_reduce_only_valid": (
+            jit_validation.get("take_profit_order_valid") is True
+            and jit_validation.get("reduce_only_exits") is True
+        ),
+        "signed_triplet_fresh": jit_validation.get("signed_triplet_fresh") is True,
+        "idempotency_clean": jit_validation.get("idempotency_clean") is True,
+        "no_prior_live_submit": jit_validation.get("idempotency_clean") is True,
+        "no_live_submit_performed": jit_validation.get("no_live_submit_performed") is True,
+        "no_order_placed": jit_validation.get("order_placed") is not True
+        and jit_validation.get("real_order_placed") is not True,
+        "no_submit_attempted": jit_validation.get("submit_attempted") is not True,
+        "no_binance_order_endpoint_called": jit_validation.get("binance_order_endpoint_called") is not True,
+        "no_binance_test_order_endpoint_called": (
+            jit_validation.get("binance_test_order_endpoint_called") is not True
+        ),
+        "no_secrets_shown": jit_validation.get("secrets_shown") is not True,
+        "no_transfer_withdraw_private_account_endpoints": (
+            jit_validation.get("transfer_endpoint_called") is not True
+            and jit_validation.get("withdraw_endpoint_called") is not True
+            and jit_validation.get("private_account_endpoint_called") is not True
+        ),
+    }
+    blocked = [name for name, passed in required.items() if not passed]
+    blocked.extend(str(item) for item in jit_validation.get("blocked_by") or [])
+    return {
+        "valid": not blocked,
+        "manual_only": True,
+        "must_be_run_manually_by_operator": True,
+        "do_not_run_from_codex": True,
+        "required_gates": required,
+        "blocked_by": _dedupe(blocked),
     }
 
 
@@ -577,7 +752,7 @@ def _go_no_go_packet(*, jit_validation: Mapping[str, Any], final_command: Mappin
     else:
         next_step = "FIX_BLOCKER"
     return {
-        "go_for_manual_live_submit_command": False,
+        "go_for_manual_live_submit_command": final_command.get("available") is True,
         "operator_should_submit_now": False,
         "next_required_step": next_step,
     }
@@ -591,6 +766,8 @@ def _launch_matrix(*, jit_validation: Mapping[str, Any], final_command: Mapping[
         "dry_preview_clean": jit_validation.get("r264_dry_preview_valid") is True
         and jit_validation.get("idempotency_clean") is True,
         "manual_command_available": final_command.get("available") is True,
+        "manual_only": True,
+        "do_not_run_from_codex": True,
         "submit_allowed": False,
         "order_placed": False,
         "blocked_by": list(jit_validation.get("blocked_by") or []),
@@ -617,7 +794,7 @@ def _recommended_next_engineering_move(go_no_go: Mapping[str, Any], validation: 
     if go_no_go.get("next_required_step") == "MANUAL_LIVE_COMMAND":
         return "No engineering move; keep Codex out of the real submit path."
     if go_no_go.get("next_required_step") == "FINAL_COMMAND_UNAVAILABLE_R267":
-        return "Do not add or expose a final submit command in R267."
+        return "Keep diagnostic mode blocked; expose a manual command only through the exact R268 unlock phrase and clean gates."
     if validation.get("blocked_by"):
         return "Inspect the child R262B/R263/R264 blocker without loosening risk or bypassing gates."
     return "Keep R264B in preview until the operator supplies the exact prep phrase."
@@ -667,6 +844,16 @@ def _safety_from_steps(steps: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _manual_live_submit_command() -> str:
+    return (
+        "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+        "--log-dir logs/hammer_radar_forward tiny-live-actual-submit-reconcile "
+        "--execute-actual-live-submit --allow-binance-order-endpoint "
+        f'--confirm-actual-live-submit "{LIVE_SUBMIT_CONFIRMATION_PHRASE}" '
+        '--operator-id local_operator --reason "R268 operator manual submit after clean unlock packet."'
+    )
+
+
 def _lane_parts(lane_key: str) -> tuple[str, str, str, str]:
     parts = str(lane_key).split("|")
     padded = [*parts, "", "", "", ""]
@@ -681,6 +868,15 @@ def _dedupe(items: Sequence[str]) -> list[str]:
             seen.add(str(item))
             result.append(str(item))
     return result
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _sanitize(value: Any) -> Any:

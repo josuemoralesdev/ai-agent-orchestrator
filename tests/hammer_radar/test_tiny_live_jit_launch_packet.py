@@ -103,9 +103,53 @@ def test_successful_jit_packet_keeps_final_manual_command_unavailable(tmp_path: 
     assert command["must_be_run_manually_by_operator"] is True
     assert command["do_not_run_from_codex"] is True
     assert command["command"] == ""
-    assert command["unavailable_reason"].startswith("R267 keeps final live submit command unavailable")
+    assert "unlock_confirmation_exact" in command["unavailable_reason"]
     assert r264b.LIVE_SUBMIT_CONFIRMATION_PHRASE in command["confirmation_phrase"]
     assert "80 USDT notional cap" in command["expected_orders"]["main"]
+
+
+def test_final_command_unavailable_without_exact_r268_unlock_confirmation(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch)
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock="wrong",
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert command["available"] is False
+    assert command["unlock_confirmation_valid"] is False
+    assert "unlock_confirmation_exact" in command["gate_validation"]["blocked_by"]
+    _assert_no_submit_safety(payload)
+
+
+def test_final_command_available_only_manual_packet_when_all_gates_clean(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch)
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert command["available"] is True
+    assert command["manual_only"] is True
+    assert command["must_be_run_manually_by_operator"] is True
+    assert command["do_not_run_from_codex"] is True
+    assert command["submit_allowed_from_codex"] is False
+    assert payload["jit_go_no_go_packet"]["go_for_manual_live_submit_command"] is True
+    assert payload["jit_go_no_go_packet"]["operator_should_submit_now"] is False
+    assert payload["target_scope"]["submit_allowed"] is False
+    assert "--execute-actual-live-submit" in command["command"]
+    assert "--allow-binance-order-endpoint" in command["command"]
+    assert command["command"].count("/fapi/v1/order") == 0
+    assert command["allowed_endpoint"] == "/fapi/v1/order"
+    assert len(command["expected_orders"]) == 3
+    _assert_no_submit_safety(payload)
 
 
 def test_no_binance_order_private_or_account_calls_and_no_actual_submit(tmp_path: Path, monkeypatch) -> None:
@@ -130,6 +174,23 @@ def test_stale_signed_triplet_after_r262b_blocks(tmp_path: Path, monkeypatch) ->
     payload = _run_exact(tmp_path)
     assert payload["status"] == r264b.TINY_LIVE_JIT_LAUNCH_PACKET_BLOCKED
     assert payload["jit_validation"]["signed_triplet_fresh"] is False
+    assert payload["final_live_submit_command_packet"]["available"] is False
+
+
+def test_final_command_unavailable_if_notional_exceeds_80(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok(candidate_notional=81.0))
+    monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
+    monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok(candidate_notional=81.0))
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    assert payload["jit_validation"]["candidate_notional_within_cap"] is False
+    assert "candidate_notional_exceeds_80" in payload["jit_validation"]["blocked_by"]
     assert payload["final_live_submit_command_packet"]["available"] is False
 
 
@@ -242,14 +303,16 @@ def _patch_success(monkeypatch) -> None:
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok())
 
 
-def _r262b_ok() -> dict:
+def _r262b_ok(*, candidate_notional: float = 64.0) -> dict:
     return {
         "attempted": True,
         "succeeded": True,
         "risk_contract_valid": True,
         "signed_triplet_fresh": True,
         "candidate_qty": 0.006,
-        "candidate_notional_usdt": 64.0,
+        "candidate_notional_usdt": candidate_notional,
+        "exchange_minimum_cleared": True,
+        "risk_contract_interpretation": _risk_interpretation(candidate_notional=candidate_notional),
         "blocked_by": [],
         "safety": {
             "risk_contract_config_written": True,
@@ -286,7 +349,12 @@ def _r263_blocked() -> dict:
     }
 
 
-def _r264_ok(*, signed_triplet_fresh: bool = True, idempotency_clean: bool = True) -> dict:
+def _r264_ok(
+    *,
+    signed_triplet_fresh: bool = True,
+    idempotency_clean: bool = True,
+    candidate_notional: float = 64.0,
+) -> dict:
     return {
         "attempted": True,
         "succeeded": signed_triplet_fresh and idempotency_clean,
@@ -294,6 +362,9 @@ def _r264_ok(*, signed_triplet_fresh: bool = True, idempotency_clean: bool = Tru
         "pre_submit_valid": signed_triplet_fresh and idempotency_clean,
         "idempotency_clean": idempotency_clean,
         "blocked_by": [] if signed_triplet_fresh and idempotency_clean else ["signed_triplet_stale" if not signed_triplet_fresh else "prior_live_submit_exists"],
+        "candidate_qty": 0.006,
+        "candidate_notional_usdt": candidate_notional,
+        "exchange_minimum_cleared": True,
         "exact_three_orders": True,
         "main_order_valid": True,
         "stop_order_valid": True,
@@ -301,9 +372,25 @@ def _r264_ok(*, signed_triplet_fresh: bool = True, idempotency_clean: bool = Tru
         "reduce_only_exits": True,
         "signed_triplet_fresh": signed_triplet_fresh,
         "risk_contract_valid": True,
+        "risk_contract_interpretation": _risk_interpretation(candidate_notional=candidate_notional),
         "controls_armed": True,
         "experimental_lane_acceptance_recorded": True,
         "prior_live_submit_found": not idempotency_clean,
+    }
+
+
+def _risk_interpretation(*, candidate_notional: float = 64.0) -> dict:
+    return {
+        "valid": candidate_notional <= 80.0,
+        "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
+        "max_position_notional_usdt": 80.0,
+        "configured_max_position_notional_usdt": 80.0,
+        "leverage": 10.0,
+        "derived_margin_budget_usdt": 8.0,
+        "candidate_qty": 0.006,
+        "candidate_notional_usdt": candidate_notional,
+        "clears_exchange_minimum": True,
+        "blocked_by": [] if candidate_notional <= 80.0 else ["candidate_notional_exceeds_position_notional_cap"],
     }
 
 

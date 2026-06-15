@@ -1,0 +1,125 @@
+# R268B — Final Trade Ticket Alignment With R267 10x / 80 USDT Tiny Live Contract
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: WIRING / SAFETY HARDENING
+  Secondary: DIAGNOSTIC, OPERATOR UI CONSISTENCY
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R267/R268 final console is correctly aligned:
+    - tiny_live_contract_mode: explicit_notional_cap_with_leverage
+    - max_position_notional_usdt: 80.0
+    - leverage: 10.0
+    - derived margin budget: 8.0
+    - risk_contract_valid=true
+    - R264 dry preview valid=true
+    - final_command_available=false
+  But /trade-ticket still reports:
+    - ticket_status=PROPOSED
+    - max_position_usd=44.0
+    - suggested_position_usd=44.0
+    - suggested_leverage=2.0
+  This is an unsafe operator-facing mismatch before first tiny live.
+
+Hard goal:
+  Make /trade-ticket use the active shared R267/R268 risk contract for BTCUSDT tiny live:
+    - max_position_usd must be 80.0
+    - suggested_position_usd must never exceed 80.0
+    - suggested_leverage must be 10.0 when the active tiny-live contract is valid and a ticket is proposed
+    - active contract fields should be exposed clearly if feasible:
+        active_contract_mode
+        active_contract_leverage
+        active_contract_max_notional_usdt
+        active_contract_margin_budget_usdt
+  Keep all live execution blocked unless existing gates explicitly permit it later.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switch.
+  - Do NOT make final live submit command available.
+  - Do NOT mutate external env files.
+  - Keep order_placed=false, submit_attempted=false, binance_order_endpoint_called=false, real_order_placed=false.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/test_approval_api.py
+    - tests/hammer_radar touching trade_ticket if present
+
+Implementation:
+  1. Trade ticket cap:
+     - Replace stale hardcoded protocol defaults 44/2x when active tiny-live contract exists and is valid.
+     - Use the shared tiny_live_risk_contract_validation helper.
+     - For BTCUSDT 8m short ladder_close_50_618, active cap must resolve to:
+         max_position_usd=80.0
+         suggested_leverage=10.0
+     - Do not let suggested_position_usd exceed 80.0.
+
+  2. Ticket status:
+     - If a valid current candidate exists, ticket may remain PROPOSED.
+     - If no fresh candidate exists, ticket must remain BLOCKED.
+     - In either case, active contract cap must show 80, not 44.
+
+  3. UI/API clarity:
+     - Add fields if safe:
+         active_contract_mode
+         active_contract_leverage
+         active_contract_max_notional_usdt
+         active_contract_margin_budget_usdt
+     - Preserve backward-compatible fields.
+
+  4. Tests:
+     - Add/update tests proving:
+         /trade-ticket proposed state uses 80/10x active contract.
+         /trade-ticket blocked state still surfaces 80/10x active contract.
+         suggested_position_usd <= 80.0.
+         no live execution is enabled.
+         no order is placed.
+         no Binance order endpoint is called.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "trade_ticket or approval_api or tiny_live"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    max_position_usd,
+    suggested_position_usd,
+    suggested_leverage,
+    active_contract_mode,
+    active_contract_leverage,
+    active_contract_max_notional_usdt,
+    active_contract_margin_budget_usdt,
+    blockers,
+    live_execution_enabled,
+    order_placed
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    risk_contract_interpretation,
+    latest_r264_dry_preview,
+    final_command_available,
+    safety
+  }'
+
+Report:
+  - files changed
+  - why trade-ticket was still using 44/2x
+  - new trade-ticket values
+  - tests/smokes
+  - safety confirmation

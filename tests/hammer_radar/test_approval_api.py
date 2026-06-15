@@ -82,9 +82,9 @@ class ApprovalApiTestCase(unittest.TestCase):
             self.assertIn("Track Betrayal Shadows", html)
             self.assertIn("does not affect readiness", html)
             self.assertIn("This does not affect trade tickets", html)
-            self.assertIn("44 USDT", html)
-            self.assertIn("2x preferred", html)
-            self.assertIn("3x max", html)
+            self.assertIn("80 USDT max notional", html)
+            self.assertIn("10x visible leverage", html)
+            self.assertIn("8 USDT derived margin", html)
             self.assertIn("isolated margin", html)
             self.assertIn("Recent Decisions", html)
             self.assertIn("Watch", html)
@@ -778,17 +778,24 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual(80.0, payload["max_position_usd"])
         self.assertEqual("explicit_notional_cap_with_leverage", payload["active_contract_mode"])
         self.assertEqual(10.0, payload["active_contract_leverage"])
+        self.assertEqual(80.0, payload["active_contract_max_notional_usdt"])
+        self.assertEqual(8.0, payload["active_contract_margin_budget_usdt"])
         self.assertIsNone(payload["suggested_leverage"])
         self.assertEqual(80.0, payload["risk_contract"]["max_position_usd"])
         self.assertEqual(10.0, payload["risk_contract"]["suggested_leverage"])
         self.assertTrue(payload["risk_contract"]["risk_contract_valid"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["submit_attempted"])
+        self.assertFalse(payload["binance_order_endpoint_called"])
+        self.assertFalse(payload["real_order_placed"])
 
     def test_trade_ticket_returns_proposed_with_fresh_eligible_candidate(self) -> None:
+        risk_path = self._write_r267_risk_contract()
         archive.append_signal(self._eligible_signal(signal_id="eligible|ticket"), log_dir=self.log_dir)
 
-        response = self.client.get("/trade-ticket")
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path):
+            response = self.client.get("/trade-ticket")
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
@@ -800,11 +807,20 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual(100.0, payload["entry"])
         self.assertEqual(95.0, payload["stop"])
         self.assertEqual(105.0, payload["take_profit"])
-        self.assertEqual(44.0, payload["suggested_position_usd"])
-        self.assertEqual(2.0, payload["suggested_leverage"])
+        self.assertEqual(80.0, payload["max_position_usd"])
+        self.assertEqual(80.0, payload["suggested_position_usd"])
+        self.assertLessEqual(payload["suggested_position_usd"], 80.0)
+        self.assertEqual(10.0, payload["suggested_leverage"])
+        self.assertEqual("explicit_notional_cap_with_leverage", payload["active_contract_mode"])
+        self.assertEqual(10.0, payload["active_contract_leverage"])
+        self.assertEqual(80.0, payload["active_contract_max_notional_usdt"])
+        self.assertEqual(8.0, payload["active_contract_margin_budget_usdt"])
         self.assertEqual("isolated", payload["margin_mode"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["submit_attempted"])
+        self.assertFalse(payload["binance_order_endpoint_called"])
+        self.assertFalse(payload["real_order_placed"])
 
     def test_trade_ticket_short_r267_candidate_uses_contract_cap_and_leverage(self) -> None:
         risk_path = self._write_r267_risk_contract()
@@ -827,11 +843,19 @@ class ApprovalApiTestCase(unittest.TestCase):
         payload = response.json()
         self.assertEqual(80.0, payload["max_position_usd"])
         self.assertEqual(80.0, payload["suggested_position_usd"])
+        self.assertLessEqual(payload["suggested_position_usd"], 80.0)
         self.assertEqual(10.0, payload["suggested_leverage"])
+        self.assertEqual("explicit_notional_cap_with_leverage", payload["active_contract_mode"])
+        self.assertEqual(10.0, payload["active_contract_leverage"])
+        self.assertEqual(80.0, payload["active_contract_max_notional_usdt"])
+        self.assertEqual(8.0, payload["active_contract_margin_budget_usdt"])
         self.assertEqual(80.0, payload["risk_contract"]["max_position_usd"])
         self.assertTrue(payload["risk_contract"]["risk_contract_valid"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["submit_attempted"])
+        self.assertFalse(payload["binance_order_endpoint_called"])
+        self.assertFalse(payload["real_order_placed"])
 
     def test_trade_ticket_respects_max_position_usd_cap(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|position-cap"), log_dir=self.log_dir)
@@ -844,7 +868,11 @@ class ApprovalApiTestCase(unittest.TestCase):
     def test_trade_ticket_respects_max_leverage_cap(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|leverage-cap"), log_dir=self.log_dir)
 
-        response = self.client.get("/trade-ticket?max_leverage=1")
+        with patch(
+            "src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            self.log_dir / "missing_risk_contracts.json",
+        ):
+            response = self.client.get("/trade-ticket?max_leverage=1")
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(1.0, response.json()["suggested_leverage"])

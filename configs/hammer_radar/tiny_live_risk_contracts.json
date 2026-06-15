@@ -91,7 +91,7 @@
       "timeframe": "8m",
       "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
       "tiny_live_margin_usdt": 8.0,
-      "updated_at": "2026-06-15T18:00:02.116360+00:00",
+      "updated_at": "2026-06-15T18:32:31.323512+00:00",
       "updated_by_phase": "R267_BTCUSDT_10X_80_NOTIONAL_TINY_LIVE_CONTRACT_APPLY_GATE",
       "uses_percentage_model": true
     }

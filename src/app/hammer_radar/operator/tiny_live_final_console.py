@@ -151,6 +151,10 @@ def build_tiny_live_final_console(
             log_dir=resolved_log_dir,
             official_lane_key=official_lane_key,
         )
+        latest_jit_launch_packet = load_latest_jit_launch_packet_summary(
+            log_dir=resolved_log_dir,
+            official_lane_key=official_lane_key,
+        )
         exchange_minimum_decision_packet = build_final_console_exchange_minimum_decision_packet(
             log_dir=resolved_log_dir,
             risk_contract=risk_contract,
@@ -318,6 +322,7 @@ def build_tiny_live_final_console(
                 "signed_triplet_panel": signed_triplet_panel,
                 "controls_panel": controls_panel,
                 "latest_r264_dry_preview": latest_r264_dry_preview,
+                "latest_jit_launch_packet": latest_jit_launch_packet,
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
@@ -327,7 +332,18 @@ def build_tiny_live_final_console(
                 "final_console_matrix": matrix,
                 "operator_access": build_final_console_operator_access(),
                 "trade_ticket_status": "BLOCKED" if readiness_snapshot.get("readiness_status") != "READY" else "CHECK_REQUIRED",
-                "final_command_available": False,
+                "final_live_submit_command_packet": latest_jit_launch_packet.get(
+                    "final_live_submit_command_packet"
+                )
+                if isinstance(latest_jit_launch_packet.get("final_live_submit_command_packet"), Mapping)
+                else {
+                    "available": False,
+                    "must_be_run_manually_by_operator": True,
+                    "do_not_run_from_codex": True,
+                    "command": "",
+                    "unavailable_reason": "no_r268_jit_unlock_packet_recorded",
+                },
+                "final_command_available": latest_jit_launch_packet.get("final_command_available") is True,
                 "submit_allowed": False,
                 "submit_attempted": False,
                 "order_placed": False,
@@ -446,6 +462,49 @@ def load_latest_r264_dry_preview_summary(
         "risk_contract_valid": pre.get("risk_contract_valid") is True,
         "blocked_by": list(pre.get("blocked_by") or []),
         "actual_submit_preview_recorded": record.get("actual_submit_preview_recorded") is True,
+        "order_placed": False,
+        "binance_order_endpoint_called": False,
+    }
+
+
+def load_latest_jit_launch_packet_summary(
+    *, log_dir: str | Path | None = None, official_lane_key: str = OFFICIAL_LANE_KEY
+) -> dict[str, Any]:
+    record = _latest_file_record(Path(get_log_dir(log_dir, use_env=True)) / "tiny_live_jit_launch_packet.ndjson")
+    if not record or _record_lane(record) != official_lane_key:
+        return {
+            "found": False,
+            "valid": False,
+            "final_command_available": False,
+            "blocked_by": ["r268_jit_unlock_packet_missing"],
+            "order_placed": False,
+            "binance_order_endpoint_called": False,
+        }
+    validation = record.get("jit_validation") if isinstance(record.get("jit_validation"), Mapping) else {}
+    command = (
+        record.get("final_live_submit_command_packet")
+        if isinstance(record.get("final_live_submit_command_packet"), Mapping)
+        else {}
+    )
+    gate = command.get("gate_validation") if isinstance(command.get("gate_validation"), Mapping) else {}
+    return {
+        "found": True,
+        "valid": validation.get("valid") is True,
+        "status": record.get("status"),
+        "overall_status": record.get("jit_launch_overall_status"),
+        "final_command_available": command.get("available") is True,
+        "final_live_submit_command_packet": command,
+        "unlock_confirmation_valid": command.get("unlock_confirmation_valid") is True,
+        "manual_only": command.get("manual_only") is True,
+        "do_not_run_from_codex": command.get("do_not_run_from_codex") is True,
+        "blocked_by": list(gate.get("blocked_by") or validation.get("blocked_by") or []),
+        "r262b_valid": validation.get("r262b_valid") is True,
+        "r263_armed": validation.get("r263_armed") is True,
+        "r264_dry_preview_valid": validation.get("r264_dry_preview_valid") is True,
+        "signed_triplet_fresh": validation.get("signed_triplet_fresh") is True,
+        "idempotency_clean": validation.get("idempotency_clean") is True,
+        "candidate_qty": validation.get("candidate_qty"),
+        "candidate_notional_usdt": validation.get("candidate_notional_usdt"),
         "order_placed": False,
         "binance_order_endpoint_called": False,
     }
@@ -997,10 +1056,13 @@ def render_tiny_live_final_console_html() -> str:
       const risk = data.risk_contract_interpretation || {};
       const r262b = data.contract_fit_panel || {};
       const r264 = data.latest_r264_dry_preview || {};
+      const jit = data.latest_jit_launch_packet || {};
+      const command = data.final_live_submit_command_packet || {};
       const exchange = data.exchange_minimum_decision_packet || {};
       const go = data.final_console_go_no_go_packet || {};
       const blockers = [...(risk.blocked_by || []), ...(readiness.readiness_blockers || []), ...(lane.warnings || [])];
       if (exchange.block_reason) blockers.unshift(exchange.block_reason);
+      if (command.unavailable_reason) blockers.unshift(command.unavailable_reason);
       document.getElementById('copyExchangeCommand').onclick = () => copyText(exchange.safe_next_command || 'curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .exchange_minimum_decision_packet');
       document.getElementById('summary').innerHTML = [
         row('go/no-go', go.go_for_actual_submit_now ? 'GO' : 'NO-GO', go.go_for_actual_submit_now ? 'ok' : 'bad'),
@@ -1043,6 +1105,10 @@ def render_tiny_live_final_console_html() -> str:
         row('R262B valid', yn(r262b.risk_contract_valid), r262b.risk_contract_valid ? 'ok' : 'bad'),
         row('R263 armed', yn(data.final_console_controls_armed || (data.controls_panel || {}).controls_armed)),
         row('R264 dry preview valid', yn(r264.valid), r264.valid ? 'ok' : 'bad'),
+        row('R268 unlock packet found', yn(jit.found), jit.found ? 'ok' : 'bad'),
+        row('manual command available', yn(command.available), command.available ? 'ok' : 'bad'),
+        row('unlock phrase exact', yn(command.unlock_confirmation_valid), command.unlock_confirmation_valid ? 'ok' : 'bad'),
+        row('signed triplet fresh', yn(jit.signed_triplet_fresh), jit.signed_triplet_fresh ? 'ok' : 'bad'),
         row('candidate qty', r262b.candidate_qty),
         row('candidate notional', r262b.candidate_notional_usdt)
       ].join('');

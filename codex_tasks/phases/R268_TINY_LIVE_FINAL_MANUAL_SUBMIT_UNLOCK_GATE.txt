@@ -1,0 +1,146 @@
+# R268 — Tiny Live Final Manual Submit Unlock Gate
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: SAFETY HARDENING / FINAL MANUAL GATE
+  Secondary: WIRING, DIAGNOSTIC, OPERATOR CONTROL
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R267 committed the explicit BTCUSDT tiny-live contract:
+    - tiny_live_contract_mode: explicit_notional_cap_with_leverage
+    - max_position_notional_usdt: 80.0
+    - leverage: 10.0
+    - derived margin budget: 8.0
+    - 10x is intentional but bounded by 80 USDT notional
+  R267C aligned /trade-ticket and R264 dry preview.
+  R264 dry preview can now be valid under the 80/10x contract.
+  R267 intentionally kept final_live_submit_command_packet.available=false.
+  Next step is to create the final manual submit unlock gate, without Codex submitting.
+
+Hard goal:
+  Build a final manual submit unlock packet that can expose a manual-only submit command only when all required gates are clean.
+  Codex must never execute the live submit.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable global live execution unless this phase only creates a reviewed local/manual gate record and does not submit.
+  - Do NOT disable kill switches.
+  - Do NOT print secrets.
+  - Do NOT persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT execute any final live submit command from Codex.
+  - Do NOT make final command available unless all listed gates are clean.
+  - If any uncertainty exists, remain BLOCKED.
+
+Required capability scan first:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/tiny_live_percentage_risk_contract_fit_regeneration.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - tests/hammer_radar touching tiny live JIT, R264, final console, trade ticket, approval API
+
+Required gate conditions for manual command availability:
+  The final manual live submit command may become available only if:
+    - contract mode is explicit_notional_cap_with_leverage
+    - max_position_notional_usdt == 80.0
+    - leverage == 10.0
+    - candidate notional <= 80.0
+    - candidate quantity is valid and nonzero
+    - exchange minimum is cleared
+    - R262B contract fit is valid
+    - R263 controls are armed intentionally
+    - R264 dry preview is valid
+    - exact three orders are present
+    - main order is valid
+    - stop order is reduce-only and valid
+    - take-profit order is reduce-only and valid
+    - signed triplet is fresh
+    - idempotency is clean
+    - no prior live submit exists
+    - no order has been placed
+    - no Binance order endpoint has been called
+    - no secrets shown
+    - no transfer/withdraw/private account endpoints
+    - operator exact confirmation phrase is present for the unlock packet
+  If any condition fails, command must remain unavailable.
+
+Implementation scope:
+  1. JIT unlock mode:
+     - Add or extend a JIT/final-submit unlock mode that is explicit and manual-only.
+     - R267 diagnostic mode remains safe.
+     - R268 may produce final_live_submit_command_packet.available=true only when the unlock confirmation is exact and gates pass.
+     - The command must be clearly marked:
+         must_be_run_manually_by_operator=true
+         do_not_run_from_codex=true
+     - The command must not be executed by Codex.
+
+  2. Final console:
+     - Show the manual command availability state clearly.
+     - Show why command is unavailable if blocked.
+     - Show 80 USDT notional cap and 10x leverage.
+     - Show fresh/stale signed triplet status.
+     - Show R262B/R263/R264 status.
+     - Show no order endpoint called.
+     - No live submit button.
+
+  3. Trade ticket:
+     - Confirm trade-ticket remains aligned with 80/10x.
+     - If no fresh candidate exists, keep BLOCKED and show fresh-candidate blocker.
+     - If fresh candidate exists, show it but do not submit.
+
+  4. Tests:
+     Add/update tests proving:
+       - final command unavailable without exact R268 unlock confirmation
+       - final command unavailable if fresh candidate/signed triplet stale
+       - final command unavailable if notional >80
+       - final command unavailable if R264 invalid
+       - final command available only in manual-only packet when every gate is clean
+       - command string includes no extra endpoints and exactly the intended three-order flow
+       - Codex/test path never calls Binance order endpoint
+       - order_placed=false
+       - submit_attempted=false
+       - binance_order_endpoint_called=false
+       - secrets_shown=false
+
+Validation:
+  Run:
+    PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or final_console or actual_submit or jit_launch or trade_ticket"
+
+  Smoke:
+    systemctl is-active hammer-approval-api.service || true
+
+    curl -s http://127.0.0.1:8015/trade-ticket | jq .
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+      --log-dir logs/hammer_radar_forward \
+      tiny-live-jit-launch-packet \
+      --run-jit-launch-prep \
+      --record-jit-launch-packet \
+      --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+      --operator-id local_operator \
+      --reason "R268 diagnostic JIT check; no submit."
+
+Report back:
+  - files changed
+  - whether final command is still unavailable in diagnostic mode
+  - exact phrase required for manual unlock mode
+  - whether command becomes available only under exact unlock phrase and clean gates
+  - current fresh candidate state
+  - current final console status
+  - tests/smokes
+  - confirm no live orders, no submit attempts, no Binance order endpoint calls
