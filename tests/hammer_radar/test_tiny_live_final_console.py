@@ -396,6 +396,50 @@ def test_r267_final_console_surfaces_80_notional_10x_and_readonly_safety(tmp_pat
     assert payload["secrets_shown"] is False
 
 
+def test_r269_final_console_surfaces_fresh_candidate_status(tmp_path: Path, monkeypatch) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+
+    monkeypatch.setattr(
+        r263,
+        "build_trade_ticket",
+        lambda **_: {
+            "ticket_status": "PROPOSED",
+            "ticket_id": "tt_r269",
+            "signal_id": "fresh|r269",
+            "symbol": "BTCUSDT",
+            "timeframe": "8m",
+            "direction": "short",
+            "readiness_status": "READY",
+            "allowed_now": True,
+            "max_position_usd": 80.0,
+            "suggested_position_usd": 80.0,
+            "suggested_leverage": 10.0,
+            "active_contract_mode": "explicit_notional_cap_with_leverage",
+            "active_contract_max_notional_usdt": 80.0,
+            "active_contract_leverage": 10.0,
+            "active_contract_margin_budget_usdt": 8.0,
+            "blockers": [],
+        },
+    )
+
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+
+    fresh = payload["fresh_candidate_status"]
+    assert payload["fresh_candidate_available"] is True
+    assert payload["trade_ticket_status"] == "PROPOSED"
+    assert fresh["signal_id"] == "fresh|r269"
+    assert fresh["max_position_usd"] == 80.0
+    assert fresh["suggested_position_usd"] == 80.0
+    assert fresh["suggested_leverage"] == 10.0
+    assert payload["submit_allowed"] is False
+    assert payload["order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+
+
 def test_8m_short_lane_marked_paper_only_promotion_mismatched(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     payload = r263.build_tiny_live_final_console(

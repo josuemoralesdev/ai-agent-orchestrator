@@ -1,0 +1,117 @@
+# R269 — Tiny Live Fresh Candidate Final Unlock Readiness
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: FINAL READINESS / OPERATOR GATE
+  Secondary: DIAGNOSTIC, SAFETY HARDENING
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R267/R268 committed the explicit BTCUSDT tiny-live contract:
+    - 80 USDT max notional
+    - 10x leverage
+    - ~8 USDT margin
+    - no hidden leverage expansion
+  /trade-ticket now shows:
+    - max_position_usd=80
+    - suggested_position_usd=80
+    - suggested_leverage=10
+  R264 dry preview is valid.
+  Final command remains unavailable unless manual unlock gates pass.
+  Next step is to evaluate whether a fresh eligible BTCUSDT candidate exists and whether the manual unlock packet can become available safely.
+
+Hard goal:
+  Build/check final readiness for first tiny live manual submit, without executing it.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution unless this phase explicitly proves it remains non-submitting and operator gated.
+  - Do NOT disable kill switches.
+  - Do NOT print or persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT execute final live submit from Codex.
+  - If any uncertainty exists, remain BLOCKED.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - tests/hammer_radar touching tiny live, trade ticket, readiness, final console, JIT
+
+Scope:
+  1. Refresh current readiness:
+     - Confirm if there is a fresh eligible BTCUSDT candidate.
+     - Confirm /trade-ticket is PROPOSED only when candidate is valid.
+     - Confirm 80/10x contract is used everywhere.
+     - Confirm R264 dry preview is valid.
+
+  2. Manual unlock packet:
+     - If all gates are clean, allow a manual-only command packet to be produced.
+     - It must be clearly marked:
+         do_not_run_from_codex=true
+         must_be_run_manually_by_operator=true
+     - Codex must not execute it.
+     - If no fresh candidate exists, keep command unavailable and report wait state.
+
+  3. Final console:
+     - Surface:
+         fresh candidate status
+         signed triplet freshness
+         R262B/R263/R264 status
+         final manual unlock availability
+         exact blockers
+         safety flags
+     - No submit button.
+
+  4. Tests:
+     - command unavailable without fresh candidate
+     - command unavailable if stale signed triplet
+     - command unavailable if notional >80
+     - command unavailable if R264 invalid
+     - command available only as manual-only packet when all gates pass
+     - order_placed=false
+     - submit_attempted=false
+     - binance_order_endpoint_called=false
+     - secrets_shown=false
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or trade_ticket or readiness or jit_launch or final_console"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/readiness | jq .
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-jit-launch-packet \
+    --run-jit-launch-prep \
+    --record-jit-launch-packet \
+    --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+    --operator-id local_operator \
+    --reason "R269 final readiness refresh; no submit."
+
+Report:
+  - files changed
+  - fresh candidate status
+  - trade-ticket status
+  - R264 dry preview status
+  - final manual command availability
+  - exact blockers if unavailable
+  - tests/smokes
+  - safety confirmation: no order, no submit, no Binance order endpoint

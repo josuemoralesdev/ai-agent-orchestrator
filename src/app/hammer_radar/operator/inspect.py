@@ -3234,6 +3234,7 @@ def main() -> int:
                     run_jit_launch_prep=args.run_jit_launch_prep,
                     record_jit_launch_packet=args.record_jit_launch_packet,
                     confirm_jit_launch_prep=args.confirm_jit_launch_prep,
+                    confirm_final_manual_submit_unlock=args.confirm_final_manual_submit_unlock,
                     operator_id=args.operator_id,
                     reason=args.reason,
                 )
@@ -5805,6 +5806,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_jit_launch_packet_parser.add_argument(
         "--confirm-jit-launch-prep",
+        default=None,
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
+        "--confirm-final-manual-submit-unlock",
         default=None,
     )
     tiny_live_jit_launch_packet_parser.add_argument(

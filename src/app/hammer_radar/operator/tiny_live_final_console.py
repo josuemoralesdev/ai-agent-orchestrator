@@ -43,6 +43,7 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
+from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R263_TINY_LIVE_FINAL_CONSOLE_LANE_INTELLIGENCE_CONTROLS_ARMING"
@@ -149,6 +150,11 @@ def build_tiny_live_final_console(
         readiness_snapshot = load_readiness_snapshot(log_dir=resolved_log_dir)
         latest_r264_dry_preview = load_latest_r264_dry_preview_summary(
             log_dir=resolved_log_dir,
+            official_lane_key=official_lane_key,
+        )
+        fresh_candidate_status = build_final_console_fresh_candidate_status(
+            log_dir=resolved_log_dir,
+            risk_contract_config_path=risk_path,
             official_lane_key=official_lane_key,
         )
         latest_jit_launch_packet = load_latest_jit_launch_packet_summary(
@@ -322,6 +328,7 @@ def build_tiny_live_final_console(
                 "signed_triplet_panel": signed_triplet_panel,
                 "controls_panel": controls_panel,
                 "latest_r264_dry_preview": latest_r264_dry_preview,
+                "fresh_candidate_status": fresh_candidate_status,
                 "latest_jit_launch_packet": latest_jit_launch_packet,
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
@@ -331,7 +338,8 @@ def build_tiny_live_final_console(
                 "final_console_go_no_go_packet": go_no_go,
                 "final_console_matrix": matrix,
                 "operator_access": build_final_console_operator_access(),
-                "trade_ticket_status": "BLOCKED" if readiness_snapshot.get("readiness_status") != "READY" else "CHECK_REQUIRED",
+                "trade_ticket_status": fresh_candidate_status.get("trade_ticket_status") or "BLOCKED",
+                "fresh_candidate_available": fresh_candidate_status.get("fresh_candidate_available") is True,
                 "final_live_submit_command_packet": latest_jit_launch_packet.get(
                     "final_live_submit_command_packet"
                 )
@@ -508,6 +516,81 @@ def load_latest_jit_launch_packet_summary(
         "order_placed": False,
         "binance_order_endpoint_called": False,
     }
+
+
+def build_final_console_fresh_candidate_status(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract_config_path: str | Path | None = None,
+    official_lane_key: str = OFFICIAL_LANE_KEY,
+) -> dict[str, Any]:
+    symbol, _timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    try:
+        ticket = build_trade_ticket(
+            latest_only=True,
+            allow_short=direction == "short",
+            max_risk_usd=5.0,
+            fresh_minutes=30,
+            log_dir=log_dir,
+            risk_contract_config_path=risk_contract_config_path,
+            use_active_tiny_live_contract=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive console boundary
+        return {
+            "fresh_candidate_available": False,
+            "trade_ticket_status": "ERROR",
+            "blocked_by": [f"trade_ticket_error_{exc.__class__.__name__}"],
+            "symbol": symbol,
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    blockers = list(ticket.get("blockers") or [])
+    if ticket.get("ticket_status") != "PROPOSED":
+        blockers.append("fresh_trade_ticket_not_proposed")
+    if ticket.get("symbol") != symbol:
+        blockers.append("fresh_candidate_symbol_mismatch")
+    if direction and ticket.get("direction") != direction:
+        blockers.append("fresh_candidate_direction_mismatch")
+    suggested_position = _float_or_none(ticket.get("suggested_position_usd"))
+    suggested_leverage = _float_or_none(ticket.get("suggested_leverage"))
+    if _float_or_none(ticket.get("max_position_usd")) != 80.0:
+        blockers.append("trade_ticket_max_position_not_80")
+    if suggested_position is None or suggested_position <= 0:
+        blockers.append("trade_ticket_suggested_position_missing")
+    elif suggested_position > 80.0:
+        blockers.append("trade_ticket_suggested_position_exceeds_80")
+    if suggested_leverage != 10.0:
+        blockers.append("trade_ticket_suggested_leverage_not_10")
+    return _sanitize(
+        {
+            "fresh_candidate_available": not blockers,
+            "trade_ticket_status": ticket.get("ticket_status"),
+            "ticket_id": ticket.get("ticket_id"),
+            "signal_id": ticket.get("signal_id"),
+            "symbol": ticket.get("symbol") or symbol,
+            "timeframe": ticket.get("timeframe"),
+            "direction": ticket.get("direction"),
+            "readiness_status": ticket.get("readiness_status"),
+            "allowed_now": ticket.get("allowed_now") is True,
+            "max_position_usd": _float_or_none(ticket.get("max_position_usd")),
+            "suggested_position_usd": suggested_position,
+            "suggested_leverage": suggested_leverage,
+            "active_contract_mode": ticket.get("active_contract_mode"),
+            "active_contract_max_notional_usdt": ticket.get("active_contract_max_notional_usdt"),
+            "active_contract_leverage": ticket.get("active_contract_leverage"),
+            "active_contract_margin_budget_usdt": ticket.get("active_contract_margin_budget_usdt"),
+            "machine_reason": ticket.get("machine_reason"),
+            "blocked_by": _dedupe(blockers),
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    )
 
 
 def load_latest_binance_readonly_exchange_minimum_record(
@@ -1056,11 +1139,12 @@ def render_tiny_live_final_console_html() -> str:
       const risk = data.risk_contract_interpretation || {};
       const r262b = data.contract_fit_panel || {};
       const r264 = data.latest_r264_dry_preview || {};
+      const fresh = data.fresh_candidate_status || {};
       const jit = data.latest_jit_launch_packet || {};
       const command = data.final_live_submit_command_packet || {};
       const exchange = data.exchange_minimum_decision_packet || {};
       const go = data.final_console_go_no_go_packet || {};
-      const blockers = [...(risk.blocked_by || []), ...(readiness.readiness_blockers || []), ...(lane.warnings || [])];
+      const blockers = [...(fresh.blocked_by || []), ...(risk.blocked_by || []), ...(readiness.readiness_blockers || []), ...(lane.warnings || [])];
       if (exchange.block_reason) blockers.unshift(exchange.block_reason);
       if (command.unavailable_reason) blockers.unshift(command.unavailable_reason);
       document.getElementById('copyExchangeCommand').onclick = () => copyText(exchange.safe_next_command || 'curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .exchange_minimum_decision_packet');
@@ -1068,6 +1152,7 @@ def render_tiny_live_final_console_html() -> str:
         row('go/no-go', go.go_for_actual_submit_now ? 'GO' : 'NO-GO', go.go_for_actual_submit_now ? 'ok' : 'bad'),
         row('readiness status', lane.readiness_status || 'UNKNOWN', lane.readiness_status === 'READY' ? 'ok' : 'bad'),
         row('trade-ticket status', data.trade_ticket_status || 'not loaded in read-only console'),
+        row('fresh candidate', yn(data.fresh_candidate_available), data.fresh_candidate_available ? 'ok' : 'bad'),
         row('latest candidate age', readiness.latest_candidate_age_minutes ?? 'n/a'),
         row('final command available', yn(data.final_command_available), data.final_command_available ? 'ok' : 'bad'),
         row('blockers', blockers.length ? blockers.join('; ') : 'none', blockers.length ? 'bad' : 'ok')
@@ -1106,6 +1191,11 @@ def render_tiny_live_final_console_html() -> str:
         row('R263 armed', yn(data.final_console_controls_armed || (data.controls_panel || {}).controls_armed)),
         row('R264 dry preview valid', yn(r264.valid), r264.valid ? 'ok' : 'bad'),
         row('R268 unlock packet found', yn(jit.found), jit.found ? 'ok' : 'bad'),
+        row('fresh ticket signal', fresh.signal_id || 'n/a'),
+        row('fresh ticket status', fresh.trade_ticket_status || 'BLOCKED', fresh.trade_ticket_status === 'PROPOSED' ? 'ok' : 'bad'),
+        row('fresh ticket notional cap', fresh.max_position_usd ?? 'n/a'),
+        row('fresh ticket suggested position', fresh.suggested_position_usd ?? 'n/a'),
+        row('fresh ticket leverage', fresh.suggested_leverage ?? 'n/a'),
         row('manual command available', yn(command.available), command.available ? 'ok' : 'bad'),
         row('unlock phrase exact', yn(command.unlock_confirmation_valid), command.unlock_confirmation_valid ? 'ok' : 'bad'),
         row('signed triplet fresh', yn(jit.signed_triplet_fresh), jit.signed_triplet_fresh ? 'ok' : 'bad'),

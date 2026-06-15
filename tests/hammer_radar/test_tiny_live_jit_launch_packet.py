@@ -125,6 +125,24 @@ def test_final_command_unavailable_without_exact_r268_unlock_confirmation(tmp_pa
     _assert_no_submit_safety(payload)
 
 
+def test_final_command_unavailable_without_fresh_candidate(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch, fresh_candidate=False)
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert payload["fresh_candidate_status"]["fresh_candidate_available"] is False
+    assert command["available"] is False
+    assert "fresh_candidate_available" in command["gate_validation"]["blocked_by"]
+    assert "no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate" in command["gate_validation"]["blocked_by"]
+    _assert_no_submit_safety(payload)
+
+
 def test_final_command_available_only_manual_packet_when_all_gates_clean(tmp_path: Path, monkeypatch) -> None:
     _patch_success(monkeypatch)
     payload = r264b.build_tiny_live_jit_launch_packet(
@@ -297,10 +315,15 @@ def _run_exact(tmp_path: Path) -> dict:
     )
 
 
-def _patch_success(monkeypatch) -> None:
+def _patch_success(monkeypatch, *, fresh_candidate: bool = True) -> None:
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok())
+    monkeypatch.setattr(
+        r264b,
+        "build_fresh_candidate_status",
+        lambda **_: _fresh_candidate_ok() if fresh_candidate else _fresh_candidate_blocked(),
+    )
 
 
 def _r262b_ok(*, candidate_notional: float = 64.0) -> dict:
@@ -391,6 +414,49 @@ def _risk_interpretation(*, candidate_notional: float = 64.0) -> dict:
         "candidate_notional_usdt": candidate_notional,
         "clears_exchange_minimum": True,
         "blocked_by": [] if candidate_notional <= 80.0 else ["candidate_notional_exceeds_position_notional_cap"],
+    }
+
+
+def _fresh_candidate_ok() -> dict:
+    return {
+        "fresh_candidate_available": True,
+        "trade_ticket_status": "PROPOSED",
+        "ticket_id": "tt_r269",
+        "signal_id": "fresh|r269",
+        "symbol": "BTCUSDT",
+        "timeframe": "8m",
+        "direction": "short",
+        "readiness_status": "READY",
+        "allowed_now": True,
+        "max_position_usd": 80.0,
+        "suggested_position_usd": 80.0,
+        "suggested_leverage": 10.0,
+        "active_contract_mode": "explicit_notional_cap_with_leverage",
+        "active_contract_max_notional_usdt": 80.0,
+        "active_contract_leverage": 10.0,
+        "active_contract_margin_budget_usdt": 8.0,
+        "blocked_by": [],
+        "order_placed": False,
+        "real_order_placed": False,
+        "submit_attempted": False,
+        "binance_order_endpoint_called": False,
+        "secrets_shown": False,
+    }
+
+
+def _fresh_candidate_blocked() -> dict:
+    return {
+        **_fresh_candidate_ok(),
+        "fresh_candidate_available": False,
+        "trade_ticket_status": "BLOCKED",
+        "ticket_id": None,
+        "signal_id": None,
+        "suggested_position_usd": None,
+        "suggested_leverage": None,
+        "blocked_by": [
+            "no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate",
+            "fresh_trade_ticket_not_proposed",
+        ],
     }
 
 

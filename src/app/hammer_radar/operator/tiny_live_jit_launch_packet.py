@@ -35,6 +35,7 @@ from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regene
     CONTRACT_FIT_CONFIRMATION_PHRASE,
     build_tiny_live_percentage_risk_contract_fit_regeneration,
 )
+from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R264B_TINY_LIVE_JIT_LAUNCH_PACKET"
@@ -161,10 +162,23 @@ def build_tiny_live_jit_launch_packet(
             overall = TINY_LIVE_JIT_READY_FOR_CONFIRMATION
 
         validation = locals().get("validation") or validate_jit_launch_packet(jit_step_results=steps)
+        fresh_candidate_status = build_fresh_candidate_status(
+            log_dir=resolved_log_dir,
+            risk_contract_config_path=risk_path,
+            official_lane_key=official_lane_key,
+        )
         final_command = build_final_live_submit_command_packet(
             jit_validation=validation,
+            fresh_candidate_status=fresh_candidate_status,
             final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
         )
+        if (
+            run_jit_launch_prep
+            and record_jit_launch_packet
+            and validation.get("valid") is True
+            and final_command.get("available") is True
+        ):
+            overall = TINY_LIVE_JIT_RECORDED_READY_FOR_MANUAL_LIVE_COMMAND
         go_no_go = _go_no_go_packet(jit_validation=validation, final_command=final_command)
         matrix = _launch_matrix(jit_validation=validation, final_command=final_command)
         payload = _sanitize(
@@ -207,6 +221,7 @@ def build_tiny_live_jit_launch_packet(
                     ],
                 },
                 "jit_step_results": steps,
+                "fresh_candidate_status": fresh_candidate_status,
                 "jit_validation": validation,
                 "final_live_submit_command_packet": final_command,
                 "jit_go_no_go_packet": go_no_go,
@@ -515,13 +530,97 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
     }
 
 
+def build_fresh_candidate_status(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract_config_path: str | Path | None = None,
+    official_lane_key: str = OFFICIAL_LANE_KEY,
+) -> dict[str, Any]:
+    symbol, timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    try:
+        ticket = build_trade_ticket(
+            latest_only=True,
+            allow_short=direction == "short",
+            max_risk_usd=5.0,
+            fresh_minutes=30,
+            log_dir=log_dir,
+            risk_contract_config_path=risk_contract_config_path,
+            use_active_tiny_live_contract=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive operator packet boundary
+        return {
+            "fresh_candidate_available": False,
+            "trade_ticket_status": "ERROR",
+            "blocked_by": [f"trade_ticket_error_{exc.__class__.__name__}"],
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": direction,
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    blockers = list(ticket.get("blockers") or [])
+    if ticket.get("ticket_status") != "PROPOSED":
+        blockers.append("fresh_trade_ticket_not_proposed")
+    if ticket.get("symbol") != symbol:
+        blockers.append("fresh_candidate_symbol_mismatch")
+    if direction and ticket.get("direction") != direction:
+        blockers.append("fresh_candidate_direction_mismatch")
+    max_position = _float_or_none(ticket.get("max_position_usd"))
+    suggested_position = _float_or_none(ticket.get("suggested_position_usd"))
+    suggested_leverage = _float_or_none(ticket.get("suggested_leverage"))
+    if max_position != 80.0:
+        blockers.append("trade_ticket_max_position_not_80")
+    if suggested_position is None or suggested_position <= 0:
+        blockers.append("trade_ticket_suggested_position_missing")
+    elif suggested_position > 80.0:
+        blockers.append("trade_ticket_suggested_position_exceeds_80")
+    if suggested_leverage != 10.0:
+        blockers.append("trade_ticket_suggested_leverage_not_10")
+    if ticket.get("order_placed") is True or ticket.get("real_order_placed") is True:
+        blockers.append("trade_ticket_order_placed_safety_violation")
+    if ticket.get("submit_attempted") is True or ticket.get("binance_order_endpoint_called") is True:
+        blockers.append("trade_ticket_submit_safety_violation")
+    return _sanitize(
+        {
+            "fresh_candidate_available": not blockers,
+            "trade_ticket_status": ticket.get("ticket_status"),
+            "ticket_id": ticket.get("ticket_id"),
+            "signal_id": ticket.get("signal_id"),
+            "symbol": ticket.get("symbol") or symbol,
+            "timeframe": ticket.get("timeframe"),
+            "direction": ticket.get("direction"),
+            "readiness_status": ticket.get("readiness_status"),
+            "allowed_now": ticket.get("allowed_now") is True,
+            "max_position_usd": max_position,
+            "suggested_position_usd": suggested_position,
+            "suggested_leverage": suggested_leverage,
+            "active_contract_mode": ticket.get("active_contract_mode"),
+            "active_contract_max_notional_usdt": ticket.get("active_contract_max_notional_usdt"),
+            "active_contract_leverage": ticket.get("active_contract_leverage"),
+            "active_contract_margin_budget_usdt": ticket.get("active_contract_margin_budget_usdt"),
+            "machine_reason": ticket.get("machine_reason"),
+            "blocked_by": _dedupe(blockers),
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    )
+
+
 def build_final_live_submit_command_packet(
     *,
     jit_validation: Mapping[str, Any],
+    fresh_candidate_status: Mapping[str, Any] | None = None,
     final_manual_unlock_confirmation_valid: bool = False,
 ) -> dict[str, Any]:
     gate = validate_final_manual_submit_unlock_gate(
         jit_validation=jit_validation,
+        fresh_candidate_status=fresh_candidate_status or {},
         final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
     )
     command = _manual_live_submit_command() if gate["valid"] else ""
@@ -555,10 +654,22 @@ def build_final_live_submit_command_packet(
 def validate_final_manual_submit_unlock_gate(
     *,
     jit_validation: Mapping[str, Any],
+    fresh_candidate_status: Mapping[str, Any],
     final_manual_unlock_confirmation_valid: bool,
 ) -> dict[str, Any]:
     required = {
         "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
+        "fresh_candidate_available": fresh_candidate_status.get("fresh_candidate_available") is True,
+        "trade_ticket_proposed": fresh_candidate_status.get("trade_ticket_status") == "PROPOSED",
+        "fresh_candidate_btcusdt": fresh_candidate_status.get("symbol") == "BTCUSDT",
+        "trade_ticket_max_position_80": _float_or_none(fresh_candidate_status.get("max_position_usd")) == 80.0,
+        "trade_ticket_suggested_position_lte_80": (
+            _float_or_none(fresh_candidate_status.get("suggested_position_usd")) is not None
+            and _float_or_none(fresh_candidate_status.get("suggested_position_usd")) <= 80.0
+        ),
+        "trade_ticket_suggested_leverage_10": (
+            _float_or_none(fresh_candidate_status.get("suggested_leverage")) == 10.0
+        ),
         "jit_validation_clean": jit_validation.get("valid") is True,
         "contract_mode_explicit_notional_cap_with_leverage": (
             jit_validation.get("contract_mode") == "explicit_notional_cap_with_leverage"
@@ -601,6 +712,7 @@ def validate_final_manual_submit_unlock_gate(
     }
     blocked = [name for name, passed in required.items() if not passed]
     blocked.extend(str(item) for item in jit_validation.get("blocked_by") or [])
+    blocked.extend(str(item) for item in fresh_candidate_status.get("blocked_by") or [])
     return {
         "valid": not blocked,
         "manual_only": True,
