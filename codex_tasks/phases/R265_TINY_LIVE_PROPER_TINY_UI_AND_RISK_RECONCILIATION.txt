@@ -1,0 +1,210 @@
+# R265 — Tiny Live Proper Tiny, UI Console Exposure, and Risk-Contract Reconciliation
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: DIAGNOSTIC / AUDIT
+  Secondary: WIRING, SAFETY HARDENING, UI EXPOSURE
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  The operator reached the R262B/R263/R264 JIT launch path for BTCUSDT tiny-live, but R264 dry preview blocks with:
+    risk_contract_config_invalid
+
+  Current observed state:
+    - R262B contract-fit says risk_contract_valid=true.
+    - R263 final console arms the experimental 8m short lane.
+    - R264 dry preview says risk_contract_valid=false and blocks submit.
+    - /readiness returns NOT_READY because there is no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate.
+    - /trade-ticket returns BLOCKED because no current BTCUSDT live-checklist candidate exists.
+    - /strategy-promotion/status says 13m long and 44m long are promotion-ready future tiny-live candidates.
+    - 8m is paper-only by promotion config, while R263 temporarily arms it as an experimental lane.
+    - The protocol endpoint says max_position_usd=44, preferred_leverage=2, max_leverage=3.
+    - Some newer risk-contract/JIT artifacts are using tiny_live_margin_usdt=44 and leverage=10, producing ~399 USDT notional.
+    - This creates a semantic mismatch: “44 USDT tiny live” may mean margin budget in one validator and position/notional cap in another.
+
+Hard goal:
+  Make the next Tiny Live path proper tiny live:
+    - reconcile validator mismatch,
+    - expose the final console/UI clearly,
+    - make the operator-facing state obvious,
+    - keep all real order submission blocked until the final valid JIT packet says go,
+    - produce a clean manual-only path for the next fresh eligible candidate.
+
+Non-negotiable safety rules:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint unless an existing test explicitly already does so safely. Prefer no test-order calls.
+  - Do NOT enable live execution globally.
+  - Do NOT disable any kill switch.
+  - Do NOT print secrets.
+  - Do NOT persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT create a live submit command unless every safety and risk-contract gate is valid.
+  - If any uncertainty exists, remain BLOCKED.
+  - Codex must not run a final live submit.
+  - Codex must not ask for sudo or SSH key passphrase.
+
+Scope:
+  1. Risk-contract reconciliation:
+     - Locate all validators/loaders used by:
+       - R262B tiny_live_percentage_risk_contract_fit_regeneration
+       - R263 tiny_live_final_console
+       - R264 tiny_live_actual_submit_reconciliation / dry preview
+       - /readiness
+       - /trade-ticket
+     - Identify why R262B reports valid while R264 reports risk_contract_config_invalid.
+     - Produce a single shared validation summary function or shared adapter so all paths agree.
+     - Make the validation output explicitly distinguish:
+       - max position/notional USDT
+       - margin budget USDT
+       - leverage
+       - estimated max loss USDT
+       - stop-distance-based loss
+       - whether 44 means notional cap or margin budget
+     - Do not silently loosen risk limits.
+
+  2. Proper Tiny Live contract semantics:
+     - Add an explicit config interpretation field if missing, for example:
+       tiny_live_contract_mode: "position_notional_cap" or "margin_budget_cap"
+     - Prefer the safest interpretation for first live:
+       max_position_notional_usdt should be 44 unless the existing protocol/config explicitly proves otherwise.
+     - If Binance precision/min-notional would make a 44 USDT notional impossible, keep submit blocked and report:
+       proper_tiny_live_below_exchange_minimum
+     - Do not fake readiness by increasing size.
+     - Do not let 44 margin at 10x become a hidden ~440 USDT notional unless explicitly surfaced and manually accepted in a future phase.
+     - For R265, do not auto-accept the higher notional interpretation.
+
+  3. UI / browser console exposure:
+     - Inspect existing approval_api routes and lane_control_cockpit.
+     - Expose a read-only browser route for the final Tiny Live state if missing.
+     - Suggested route:
+       GET /tiny-live/final-console
+       or
+       GET /operator/tiny-live/final-console
+     - The UI must show at minimum:
+       - readiness status
+       - trade-ticket status
+       - latest candidate age/freshness
+       - promoted lanes
+       - current selected lane
+       - R262B valid/invalid
+       - R263 armed/not armed
+       - R264 dry preview valid/invalid
+       - risk contract interpretation
+       - max notional
+       - margin budget
+       - leverage
+       - estimated loss
+       - blockers
+       - go/no-go
+       - final command available: true/false
+       - order placed: false
+       - Binance order endpoint called: false
+       - secrets shown: false
+     - UI must be read-only in this phase.
+     - UI can include copyable safe diagnostic commands.
+     - UI must NOT include any live submit button in R265.
+
+  4. SSH tunnel/operator access helper:
+     - Add docs or UI note explaining:
+       - If browser is on the same desktop: open http://127.0.0.1:8015/\<route\>
+       - If accessing from another machine through SSH:
+         ssh -N -L 8015:127.0.0.1:8015 masonshift-node
+         then open http://127.0.0.1:8015/\<route\>
+     - Do not expose the approval API publicly.
+     - Keep it bound to localhost unless existing service config says otherwise.
+
+  5. JIT packet behavior:
+     - Update tiny-live-jit-launch-packet or related helpers so the operator-facing packet clearly says:
+       - whether it is blocked by stale candidate,
+       - whether it is blocked by risk-contract mismatch,
+       - whether it is blocked by proper tiny-live below exchange minimum,
+       - whether it is waiting for promoted fresh 13m/44m long,
+       - whether experimental 8m short is blocked because it is paper-only/not promotion-ready.
+     - Final live submit command must remain unavailable unless:
+       - fresh eligible candidate exists,
+       - risk contract is valid under shared validator,
+       - R262B/R263/R264 all agree,
+       - exact three orders are valid,
+       - reduce-only exits are valid,
+       - idempotency is clean,
+       - no prior submit exists,
+       - all safety flags are clean,
+       - manual operator final confirmation is exact.
+
+  6. Tests:
+     - Add or update tests proving:
+       - R262B/R263/R264 use consistent risk interpretation.
+       - A 44 USDT notional cap does not accidentally become 440 USDT notional via 10x leverage.
+       - When risk-contract mismatch occurs, R264 blocks and UI displays the exact mismatch.
+       - When no fresh candidate exists, /readiness and /trade-ticket remain NOT_READY/BLOCKED.
+       - The final console route is read-only and never places orders.
+       - safety flags remain false:
+         order_placed=false
+         submit_attempted=false
+         binance_order_endpoint_called=false
+         secrets_shown=false
+
+Required capability scan first:
+  Before changing code, inspect and summarize:
+    - src/app/hammer_radar/operator/tiny_live_percentage_risk_contract_fit_regeneration.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/lane_control_cockpit.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/readiness.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - existing tests under tests/hammer_radar touching tiny_live, approval_api, readiness, trade_ticket, or R264
+
+Implementation expectations:
+  - Reuse existing modules and ledgers.
+  - Do not duplicate a second final-console system if lane_control_cockpit can be extended.
+  - Prefer shared helper functions over copy-paste validators.
+  - Preserve existing safety-first behavior.
+  - Add clear operator-facing text; do not require NDJSON archaeology to understand blockers.
+  - Keep generated runtime NDJSON changes out of commit unless tests intentionally use fixtures.
+
+Validation commands:
+  Run the most relevant focused tests first, then broader hammer-radar tests if feasible.
+
+  Minimum expected validation:
+    PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or final_console or actual_submit or jit_launch or readiness or trade_ticket"
+
+  Then run smoke commands:
+    systemctl is-active hammer-approval-api.service || true
+
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+      --log-dir logs/hammer_radar_forward \
+      tiny-live-jit-launch-packet \
+      --run-jit-launch-prep \
+      --record-jit-launch-packet \
+      --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+      --operator-id local_operator \
+      --reason "R265 post-fix verification for proper tiny-live risk-contract and UI reconciliation."
+
+    curl -s http://127.0.0.1:8015/readiness | jq .
+    curl -s http://127.0.0.1:8015/trade-ticket | jq .
+    curl -s http://127.0.0.1:8015/strategy-promotion/status | jq .
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | head -120 || true
+    curl -s http://127.0.0.1:8015/operator/tiny-live/final-console | head -120 || true
+
+Report back:
+  - Files changed.
+  - What validator mismatch was found.
+  - What 44 USDT now means.
+  - Whether proper tiny-live notional is possible under exchange constraints.
+  - Which browser route exposes the final console.
+  - Exact tunnel command for remote viewing.
+  - Test results.
+  - Smoke results.
+  - Current final go/no-go.
+  - Confirm no live orders were placed and no Binance order endpoint was called.
+

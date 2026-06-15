@@ -149,6 +149,33 @@ def test_failed_r264_dry_preview_blocks(tmp_path: Path, monkeypatch) -> None:
     assert payload["jit_validation"]["r264_dry_preview_valid"] is False
 
 
+def test_risk_contract_mismatch_blocks_final_command(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
+    monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
+    monkeypatch.setattr(
+        r264b,
+        "run_r264_dry_preview_step",
+        lambda **_: {
+            **_r264_ok(),
+            "succeeded": False,
+            "pre_submit_valid": False,
+            "risk_contract_valid": False,
+            "blocked_by": ["risk_contract_config_invalid", "risk_contract_notional_cap_exceeds_44"],
+            "risk_contract_interpretation": {
+                "valid": False,
+                "tiny_live_contract_mode": "margin_budget_cap",
+                "higher_notional_interpretation_rejected": True,
+                "blocked_by": ["risk_contract_notional_cap_exceeds_44"],
+            },
+        },
+    )
+    payload = _run_exact(tmp_path)
+    assert payload["jit_launch_overall_status"] == r264b.TINY_LIVE_JIT_BLOCKED_BY_R264_DRY_PREVIEW
+    assert payload["jit_validation"]["risk_contract_valid"] is False
+    assert payload["final_live_submit_command_packet"]["available"] is False
+    assert payload["jit_go_no_go_packet"]["go_for_manual_live_submit_command"] is False
+
+
 def test_idempotency_dirty_blocks(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())

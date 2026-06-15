@@ -36,6 +36,13 @@ from src.app.hammer_radar.operator.tiny_live_controls_arming import (
 from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regeneration import (
     load_tiny_live_percentage_contract_fit_records,
 )
+from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_price_gate import (
+    build_exchange_minimum_tiny_live_decision_packet,
+    load_tiny_live_binance_readonly_precision_mark_price_records,
+)
+from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
+    build_tiny_live_risk_contract_validation_summary,
+)
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R263_TINY_LIVE_FINAL_CONSOLE_LANE_INTELLIGENCE_CONTROLS_ARMING"
@@ -89,6 +96,7 @@ SOURCE_SURFACES_USED = [
     "logs/hammer_radar_forward/tiny_live_controls_arming.ndjson",
     "logs/hammer_radar_forward/tiny_live_actual_submit_gate.ndjson",
     "logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson",
+    "logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson",
     f"logs/hammer_radar_forward/{LEDGER_FILENAME}",
 ]
 
@@ -139,6 +147,15 @@ def build_tiny_live_final_console(
         )
         promotion_snapshot = load_strategy_promotion_status_snapshot(log_dir=resolved_log_dir)
         readiness_snapshot = load_readiness_snapshot(log_dir=resolved_log_dir)
+        latest_r264_dry_preview = load_latest_r264_dry_preview_summary(
+            log_dir=resolved_log_dir,
+            official_lane_key=official_lane_key,
+        )
+        exchange_minimum_decision_packet = build_final_console_exchange_minimum_decision_packet(
+            log_dir=resolved_log_dir,
+            risk_contract=risk_contract,
+            official_lane_key=official_lane_key,
+        )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
             promotion_snapshot=promotion_snapshot,
@@ -146,7 +163,14 @@ def build_tiny_live_final_console(
             official_lane_key=official_lane_key,
         )
 
-        contract_fit_panel = summarize_contract_fit_panel(latest_r262b)
+        risk_interpretation = summarize_final_console_risk_interpretation(
+            latest_r262b=latest_r262b,
+            risk_contract=risk_contract,
+        )
+        contract_fit_panel = summarize_contract_fit_panel(
+            latest_r262b,
+            risk_interpretation=risk_interpretation,
+        )
         signed_triplet_panel = summarize_signed_triplet_panel(log_dir=resolved_log_dir, latest_r262b=latest_r262b)
         controls_panel = summarize_controls_panel(
             lane_controls=lane_controls,
@@ -222,6 +246,7 @@ def build_tiny_live_final_console(
             experimental_lane_acceptance_recorded=operator_choice_panel[
                 "experimental_lane_acceptance_recorded"
             ],
+            exchange_minimum_decision_packet=exchange_minimum_decision_packet,
         )
         matrix = _build_final_console_matrix(
             contract_fit_panel=contract_fit_panel,
@@ -232,6 +257,7 @@ def build_tiny_live_final_console(
                 "experimental_lane_acceptance_recorded"
             ],
             blocked_by=controls_arming_result["blocked_by"],
+            exchange_minimum_decision_packet=exchange_minimum_decision_packet,
         )
         overall = classify_tiny_live_final_console_status(
             r262b_found=contract_fit_panel["r262b_found"],
@@ -285,14 +311,23 @@ def build_tiny_live_final_console(
                     "binance_order_endpoint_called": False,
                 },
                 "contract_fit_panel": contract_fit_panel,
+                "risk_contract_interpretation": risk_interpretation,
                 "signed_triplet_panel": signed_triplet_panel,
                 "controls_panel": controls_panel,
+                "latest_r264_dry_preview": latest_r264_dry_preview,
                 "lane_intelligence_panel": lane_intelligence_panel,
+                "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "operator_choice_panel": operator_choice_panel,
                 "controls_arming_result": controls_arming_result,
                 "final_console_go_no_go_packet": go_no_go,
                 "final_console_matrix": matrix,
+                "operator_access": build_final_console_operator_access(),
+                "trade_ticket_status": "BLOCKED" if readiness_snapshot.get("readiness_status") != "READY" else "CHECK_REQUIRED",
+                "final_command_available": False,
+                "order_placed": False,
+                "binance_order_endpoint_called": False,
+                "secrets_shown": False,
                 "final_console_overall_status": overall,
                 "recommended_next_operator_move": _recommended_next_operator_move(go_no_go, overall),
                 "recommended_next_engineering_move": _recommended_next_engineering_move(go_no_go, overall),
@@ -389,6 +424,99 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
     return _sanitize(snapshot or fallback)
 
 
+def load_latest_r264_dry_preview_summary(
+    *, log_dir: str | Path | None = None, official_lane_key: str = OFFICIAL_LANE_KEY
+) -> dict[str, Any]:
+    record = _latest_file_record(Path(get_log_dir(log_dir, use_env=True)) / "tiny_live_actual_submit_reconciliation.ndjson")
+    if not record or _record_lane(record) != official_lane_key:
+        return {"found": False, "valid": False, "blocked_by": ["r264_dry_preview_missing"]}
+    pre = record.get("pre_submit_validation") if isinstance(record.get("pre_submit_validation"), Mapping) else {}
+    return {
+        "found": True,
+        "valid": pre.get("valid") is True,
+        "status": record.get("status"),
+        "overall_status": record.get("actual_submit_overall_status"),
+        "risk_contract_valid": pre.get("risk_contract_valid") is True,
+        "blocked_by": list(pre.get("blocked_by") or []),
+        "actual_submit_preview_recorded": record.get("actual_submit_preview_recorded") is True,
+        "order_placed": False,
+        "binance_order_endpoint_called": False,
+    }
+
+
+def load_latest_binance_readonly_exchange_minimum_record(
+    *, log_dir: str | Path | None = None, official_lane_key: str = OFFICIAL_LANE_KEY
+) -> dict[str, Any]:
+    for record in load_tiny_live_binance_readonly_precision_mark_price_records(log_dir=log_dir, limit=50):
+        if _record_lane(record) == official_lane_key and record.get("readonly_fetch_performed") is True:
+            return record
+    return {}
+
+
+def build_final_console_exchange_minimum_decision_packet(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract: Mapping[str, Any],
+    official_lane_key: str = OFFICIAL_LANE_KEY,
+) -> dict[str, Any]:
+    contract = risk_contract.get("contract") if isinstance(risk_contract.get("contract"), Mapping) else risk_contract
+    configured_cap = (
+        _float_or_none(contract.get("max_position_notional_usdt"))
+        or _float_or_none(contract.get("max_notional_usdt"))
+        or 44.0
+    )
+    record = load_latest_binance_readonly_exchange_minimum_record(
+        log_dir=log_dir,
+        official_lane_key=official_lane_key,
+    )
+    readonly = record.get("binance_readonly_result") if isinstance(record.get("binance_readonly_result"), Mapping) else {}
+    precision = readonly.get("precision_snapshot") if isinstance(readonly.get("precision_snapshot"), Mapping) else {}
+    mark = readonly.get("mark_price_snapshot") if isinstance(readonly.get("mark_price_snapshot"), Mapping) else {}
+    if precision.get("found") is True and mark.get("found") is True:
+        return build_exchange_minimum_tiny_live_decision_packet(
+            configured_cap_usdt=configured_cap,
+            precision_snapshot=precision,
+            mark_price_snapshot=mark,
+            operator_reported_wallet_usdt=126,
+        )
+    return {
+        "status": "EXCHANGE_MINIMUM_TINY_LIVE_DECISION_PACKET_BLOCKED",
+        "symbol": _lane_parts(official_lane_key)[0] or "BTCUSDT",
+        "configured_proper_tiny_cap_usdt": configured_cap,
+        "configured_cap_possible": False,
+        "configured_cap_blocked_by": ["exchange_minimum_readonly_snapshot_missing"],
+        "block_reason": "exchange_minimum_readonly_snapshot_missing",
+        "min_quantity": None,
+        "step_size": None,
+        "min_notional": None,
+        "mark_price": None,
+        "minimum_valid_quantity_after_rounding": None,
+        "minimum_valid_notional_after_rounding": None,
+        "wallet_funded_amount_usdt": 126.0,
+        "wallet_funded_amount_source": "operator_reported_phase_context_no_account_check",
+        "account_balance_checked": False,
+        "wallet_supports_exchange_minimum_tiny": None,
+        "recommended_operator_decision": "RUN_R242_READONLY_EXCHANGE_MINIMUM_CHECK",
+        "recommended_cap_usdt": None,
+        "recommended_cap_applied": False,
+        "recommended_cap_warning": "No cap recommendation is available until public exchange-info and mark-price are recorded.",
+        "safe_next_command": (
+            "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+            "--log-dir logs/hammer_radar_forward tiny-live-binance-readonly-precision-mark-price-gate "
+            "--fetch-binance-readonly --confirm-tiny-live-binance-readonly-fetch "
+            "\"I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT.\""
+        ),
+        "go_no_go": "NO-GO",
+        "final_command_available": False,
+        "order_placed": False,
+        "real_order_placed": False,
+        "execution_attempted": False,
+        "binance_order_endpoint_called": False,
+        "binance_test_order_endpoint_called": False,
+        "secrets_shown": False,
+    }
+
+
 def load_lane_fisherman_context(
     *,
     lane_controls: Mapping[str, Any],
@@ -426,14 +554,38 @@ def load_lane_fisherman_context(
     }
 
 
-def summarize_contract_fit_panel(latest_r262b: Mapping[str, Any]) -> dict[str, Any]:
+def summarize_final_console_risk_interpretation(
+    *, latest_r262b: Mapping[str, Any], risk_contract: Mapping[str, Any]
+) -> dict[str, Any]:
+    existing = latest_r262b.get("risk_contract_interpretation")
+    if isinstance(existing, Mapping) and existing:
+        return _sanitize(dict(existing))
+    sizing = latest_r262b.get("contract_fit_sizing_plan") if isinstance(latest_r262b.get("contract_fit_sizing_plan"), Mapping) else {}
+    return build_tiny_live_risk_contract_validation_summary(
+        risk_contract=risk_contract,
+        candidate_qty=sizing.get("candidate_qty"),
+        candidate_notional_usdt=sizing.get("candidate_notional_usdt"),
+        candidate_estimated_loss_usdt=sizing.get("candidate_estimated_loss_usdt"),
+        require_live_execution_enabled=False,
+    )
+
+
+def summarize_contract_fit_panel(
+    latest_r262b: Mapping[str, Any], *, risk_interpretation: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     model = latest_r262b.get("percentage_contract_model") if isinstance(latest_r262b.get("percentage_contract_model"), Mapping) else {}
     resolved = model.get("resolved_values") if isinstance(model.get("resolved_values"), Mapping) else {}
     intervention = latest_r262b.get("operator_intervention_model") if isinstance(latest_r262b.get("operator_intervention_model"), Mapping) else {}
     sizing = latest_r262b.get("contract_fit_sizing_plan") if isinstance(latest_r262b.get("contract_fit_sizing_plan"), Mapping) else {}
     validation = latest_r262b.get("output_validation") if isinstance(latest_r262b.get("output_validation"), Mapping) else {}
     r262b_found = bool(latest_r262b)
-    risk_valid = validation.get("risk_contract_valid_after") is True or latest_r262b.get("contract_fit_matrix", {}).get("risk_contract_valid") is True
+    risk_valid = (
+        (risk_interpretation or {}).get("valid") is True
+        and (
+            validation.get("risk_contract_valid_after") is True
+            or latest_r262b.get("contract_fit_matrix", {}).get("risk_contract_valid") is True
+        )
+    )
     fits = bool(
         r262b_found
         and risk_valid
@@ -455,6 +607,8 @@ def summarize_contract_fit_panel(latest_r262b: Mapping[str, Any]) -> dict[str, A
         "candidate_notional_usdt": sizing.get("candidate_notional_usdt"),
         "candidate_margin_usdt": sizing.get("candidate_margin_usdt"),
         "candidate_estimated_loss_usdt": sizing.get("candidate_estimated_loss_usdt"),
+        "risk_contract_interpretation_valid": (risk_interpretation or {}).get("valid") is True,
+        "risk_contract_blockers": list((risk_interpretation or {}).get("blocked_by") or []),
         "fits_contract": fits,
     }
 
@@ -497,6 +651,10 @@ def summarize_controls_panel(
         armed_by_this_phase=armed_by_this_phase,
     )
     risk_state = summarize_tiny_live_risk_contract_state(risk_contract=risk_contract)
+    shared_risk = build_tiny_live_risk_contract_validation_summary(
+        risk_contract=risk_contract,
+        require_live_execution_enabled=False,
+    )
     controls_armed = state.get("official_lane_allowed") is True
     return {
         "official_lane_allowed": controls_armed,
@@ -505,7 +663,9 @@ def summarize_controls_panel(
         "controls_armed": controls_armed,
         "controls_arming_required": not controls_armed,
         "latest_controls_record_found": bool(latest_controls),
-        "risk_contract_valid": risk_state.get("risk_contract_valid") is True or _risk_contract_limits_valid(risk_contract),
+        "risk_contract_valid": shared_risk.get("valid") is True,
+        "legacy_risk_contract_valid": risk_state.get("risk_contract_valid") is True or _risk_contract_limits_valid(risk_contract),
+        "risk_contract_blockers": list(shared_risk.get("blocked_by") or []),
     }
 
 
@@ -643,9 +803,14 @@ def build_final_console_go_no_go_packet(
     controls_panel: Mapping[str, Any],
     lane_intelligence_panel: Mapping[str, Any],
     experimental_lane_acceptance_recorded: bool,
+    exchange_minimum_decision_packet: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     r262b_valid = contract_fit_panel.get("r262b_found") and contract_fit_panel.get("risk_contract_valid") and contract_fit_panel.get("fits_contract")
-    if not r262b_valid:
+    exchange_packet = exchange_minimum_decision_packet or {}
+    exchange_minimum_blocks = exchange_packet.get("configured_cap_possible") is not True
+    if exchange_minimum_blocks:
+        next_step = "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT"
+    elif not r262b_valid:
         next_step = "RERUN_R262B"
     elif lane_intelligence_panel.get("operator_acceptance_required") and not experimental_lane_acceptance_recorded:
         next_step = "ARM_CONTROLS"
@@ -660,13 +825,18 @@ def build_final_console_go_no_go_packet(
     return {
         "go_for_actual_submit_now": False,
         "go_for_r264_actual_submit_checkpoint": bool(
-            r262b_valid and signed_triplet_panel.get("signed_triplet_available") and controls_panel.get("controls_armed")
+            not exchange_minimum_blocks
+            and r262b_valid
+            and signed_triplet_panel.get("signed_triplet_available")
+            and controls_panel.get("controls_armed")
         ),
         "go_for_controls_arming": bool(
-            r262b_valid and not controls_panel.get("controls_armed")
+            not exchange_minimum_blocks and r262b_valid and not controls_panel.get("controls_armed")
         ),
         "operator_should_submit_now": False,
         "next_required_step": next_step,
+        "exchange_minimum_blocks_submit": bool(exchange_minimum_blocks),
+        "exchange_minimum_block_reason": exchange_packet.get("block_reason"),
     }
 
 
@@ -741,6 +911,153 @@ def format_tiny_live_final_console_json(payload: Mapping[str, Any]) -> str:
     return json.dumps(_sanitize(payload), sort_keys=True, separators=(",", ":"))
 
 
+def build_final_console_operator_access() -> dict[str, Any]:
+    return {
+        "same_desktop_url": "http://127.0.0.1:8015/operator/tiny-live/final-console",
+        "ssh_tunnel_command": "ssh -N -L 8015:127.0.0.1:8015 masonshift-node",
+        "remote_browser_url_after_tunnel": "http://127.0.0.1:8015/operator/tiny-live/final-console",
+        "public_exposure_allowed": False,
+        "keep_approval_api_localhost_only": True,
+    }
+
+
+def render_tiny_live_final_console_html() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiny Live Final Console</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, Arial, sans-serif; background: #0a0c0f; color: #f3f6fb; }
+    body { margin: 0; background: #0a0c0f; }
+    header { padding: 18px 22px; border-bottom: 1px solid #2b3038; background: #10141a; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
+    main { padding: 14px; display: grid; gap: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .panel { border: 1px solid #313843; border-radius: 8px; background: #121720; padding: 14px; }
+    .danger { border-color: #8b1e2d; }
+    .safe { border-color: #23794f; }
+    .label { color: #97a3b6; font-size: 11px; text-transform: uppercase; font-weight: 800; }
+    .value { font-weight: 850; overflow-wrap: anywhere; }
+    .bad { color: #ff6673; }
+    .ok { color: #3ddb8d; }
+    .warn { color: #f7c65a; }
+    .row { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(0, 1.3fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid #242a33; }
+    button { min-height: 36px; border: 1px solid #3a4350; border-radius: 7px; background: #1a202b; color: #f3f6fb; font-weight: 850; cursor: pointer; }
+    pre { white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; background: #080a0d; border: 1px solid #242a33; border-radius: 7px; padding: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tiny Live Final Console</h1>
+      <div class="label">Read only · no live submit button · localhost/private tunnel only</div>
+      <div class="label">proper_tiny_live_below_exchange_minimum means the configured 44 USDT cap is smaller than the public BTCUSDT minimum valid order.</div>
+  </header>
+  <main>
+    <section id="summary" class="panel danger"></section>
+    <section class="grid">
+      <div id="risk" class="panel"></div>
+      <div id="exchange" class="panel danger"></div>
+      <div id="candidate" class="panel"></div>
+      <div id="lanes" class="panel"></div>
+      <div id="safety" class="panel"></div>
+    </section>
+    <section class="panel">
+      <div class="label">Safe Diagnostic Commands</div>
+      <button onclick="copyText('curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .')">Copy JSON curl</button>
+      <button id="copyExchangeCommand">Copy exchange-minimum check</button>
+      <button onclick="copyText('ssh -N -L 8015:127.0.0.1:8015 masonshift-node')">Copy SSH tunnel</button>
+      <pre id="access"></pre>
+    </section>
+    <section class="panel">
+      <div class="label">Raw State</div>
+      <pre id="raw">loading</pre>
+    </section>
+  </main>
+  <script>
+    function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function row(label, value, cls='') { return `<div class="row"><div class="label">${esc(label)}</div><div class="value ${cls}">${esc(value)}</div></div>`; }
+    function yn(value) { return value === true ? 'true' : 'false'; }
+    function copyText(text) { navigator.clipboard.writeText(text || ''); }
+    async function loadState() {
+      const response = await fetch('/tiny-live/final-console');
+      const data = await response.json();
+      const readiness = data.promotion_readiness_panel || {};
+      const lane = data.lane_intelligence_panel || {};
+      const risk = data.risk_contract_interpretation || {};
+      const r262b = data.contract_fit_panel || {};
+      const r264 = data.latest_r264_dry_preview || {};
+      const exchange = data.exchange_minimum_decision_packet || {};
+      const go = data.final_console_go_no_go_packet || {};
+      const blockers = [...(risk.blocked_by || []), ...(readiness.readiness_blockers || []), ...(lane.warnings || [])];
+      if (exchange.block_reason) blockers.unshift(exchange.block_reason);
+      document.getElementById('copyExchangeCommand').onclick = () => copyText(exchange.safe_next_command || 'curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .exchange_minimum_decision_packet');
+      document.getElementById('summary').innerHTML = [
+        row('go/no-go', go.go_for_actual_submit_now ? 'GO' : 'NO-GO', go.go_for_actual_submit_now ? 'ok' : 'bad'),
+        row('readiness status', lane.readiness_status || 'UNKNOWN', lane.readiness_status === 'READY' ? 'ok' : 'bad'),
+        row('trade-ticket status', data.trade_ticket_status || 'not loaded in read-only console'),
+        row('latest candidate age', readiness.latest_candidate_age_minutes ?? 'n/a'),
+        row('final command available', yn(data.final_command_available), data.final_command_available ? 'ok' : 'bad'),
+        row('blockers', blockers.length ? blockers.join('; ') : 'none', blockers.length ? 'bad' : 'ok')
+      ].join('');
+      document.getElementById('risk').innerHTML = [
+        row('contract mode', risk.tiny_live_contract_mode),
+        row('44 USDT means', risk.forty_four_usdt_meaning),
+        row('max notional', risk.max_position_notional_usdt),
+        row('configured notional', risk.configured_max_position_notional_usdt),
+        row('margin budget', risk.margin_budget_usdt),
+        row('leverage', risk.leverage),
+        row('estimated loss', risk.candidate_estimated_loss_usdt),
+        row('stop-distance loss', risk.stop_distance_loss_usdt),
+        row('valid', yn(risk.valid), risk.valid ? 'ok' : 'bad')
+      ].join('');
+      document.getElementById('exchange').innerHTML = [
+        row('exchange minimum reason', exchange.block_reason || 'none', exchange.block_reason ? 'bad' : 'ok'),
+        row('configured cap', exchange.configured_proper_tiny_cap_usdt),
+        row('min quantity', exchange.min_quantity),
+        row('step size', exchange.step_size),
+        row('min notional', exchange.min_notional),
+        row('mark price', exchange.mark_price),
+        row('minimum valid quantity', exchange.minimum_valid_quantity_after_rounding),
+        row('exchange minimum notional', exchange.minimum_valid_notional_after_rounding),
+        row('wallet funded context', exchange.wallet_funded_amount_usdt ?? 'unknown/not checked'),
+        row('126 USDT enough', exchange.wallet_supports_exchange_minimum_tiny ?? 'unknown/not checked', exchange.wallet_supports_exchange_minimum_tiny === true ? 'ok' : 'warn'),
+        row('recommended decision', exchange.recommended_operator_decision),
+        row('recommended cap', exchange.recommended_cap_usdt ?? 'none'),
+        row('cap applied', yn(exchange.recommended_cap_applied), exchange.recommended_cap_applied ? 'bad' : 'ok')
+      ].join('');
+      document.getElementById('candidate').innerHTML = [
+        row('R262B found', yn(r262b.r262b_found)),
+        row('R262B valid', yn(r262b.risk_contract_valid), r262b.risk_contract_valid ? 'ok' : 'bad'),
+        row('R263 armed', yn(data.final_console_controls_armed || (data.controls_panel || {}).controls_armed)),
+        row('R264 dry preview valid', yn(r264.valid), r264.valid ? 'ok' : 'bad'),
+        row('candidate qty', r262b.candidate_qty),
+        row('candidate notional', r262b.candidate_notional_usdt)
+      ].join('');
+      document.getElementById('lanes').innerHTML = [
+        row('selected lane', lane.execution_lane),
+        row('promoted lanes', (lane.promoted_lanes || []).join('; ') || 'none'),
+        row('timeframe status', lane.execution_lane_timeframe_status),
+        row('promotion status', lane.execution_lane_promotion_status),
+        row('fresh eligible count', lane.fresh_eligible_count)
+      ].join('');
+      document.getElementById('safety').innerHTML = [
+        row('order placed', yn(data.order_placed), 'ok'),
+        row('Binance order endpoint called', yn(data.binance_order_endpoint_called), 'ok'),
+        row('secrets shown', yn(data.secrets_shown), 'ok'),
+        row('submit allowed', yn((data.final_console_matrix || {}).submit_allowed), 'ok')
+      ].join('');
+      document.getElementById('access').textContent = JSON.stringify(data.operator_access || {}, null, 2);
+      document.getElementById('raw').textContent = JSON.stringify(data, null, 2);
+    }
+    loadState();
+    setInterval(loadState, 10000);
+  </script>
+</body>
+</html>"""
+
+
 def tiny_live_final_console_records_path(log_dir: str | Path) -> Path:
     return Path(log_dir) / LEDGER_FILENAME
 
@@ -753,8 +1070,12 @@ def _build_final_console_matrix(
     controls_panel: Mapping[str, Any],
     experimental_lane_acceptance_recorded: bool,
     blocked_by: Sequence[str],
+    exchange_minimum_decision_packet: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     blocked = list(blocked_by)
+    exchange_packet = exchange_minimum_decision_packet or {}
+    if exchange_packet.get("configured_cap_possible") is not True:
+        blocked.append(str(exchange_packet.get("block_reason") or "exchange_minimum_decision_missing"))
     if not contract_fit_panel.get("r262b_found"):
         blocked.append("missing_r262b")
     if not contract_fit_panel.get("risk_contract_valid"):
@@ -769,6 +1090,8 @@ def _build_final_console_matrix(
         "experimental_lane_acceptance_required": lane_intelligence_panel.get("operator_acceptance_required") is True,
         "experimental_lane_acceptance_recorded": bool(experimental_lane_acceptance_recorded),
         "controls_armed": controls_panel.get("controls_armed") is True,
+        "exchange_minimum_cap_possible": exchange_packet.get("configured_cap_possible") is True,
+        "exchange_minimum_block_reason": exchange_packet.get("block_reason"),
         "submit_allowed": False,
         "order_placed": False,
         "blocked_by": _dedupe(blocked),
@@ -843,6 +1166,8 @@ def _safety(*, lane_controls_written: bool, experimental_lane_acceptance_recorde
 
 def _recommended_next_operator_move(packet: Mapping[str, Any], overall: str) -> str:
     step = packet.get("next_required_step")
+    if step == "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT":
+        return "Review the exchange-minimum decision packet; keep NO-GO until an operator-approved cap decision is applied in a later safe phase."
     if step == "R264_ACTUAL_SUBMIT_CHECKPOINT":
         return "Proceed only to the R264 actual submit checkpoint; do not submit from R263."
     if step == "ARM_CONTROLS":
@@ -855,6 +1180,8 @@ def _recommended_next_operator_move(packet: Mapping[str, Any], overall: str) -> 
 
 
 def _recommended_next_engineering_move(packet: Mapping[str, Any], overall: str) -> str:
+    if packet.get("next_required_step") == "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT":
+        return "Keep final submit unavailable; add only an explicit operator decision/write phase if the exchange-minimum cap is accepted."
     if packet.get("next_required_step") == "R264_ACTUAL_SUBMIT_CHECKPOINT":
         return "Build/run R264 with R263 armed-state, R262B contract-fit, exact submit phrase, idempotency, and reconciliation checks."
     if packet.get("next_required_step") == "ARM_CONTROLS":

@@ -72,9 +72,10 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
                     "margin_budget_usdt": 44,
                     "max_margin_usdt": 44,
                     "max_loss_usdt": 4.44,
-                    "max_notional_usdt": 440,
-                    "max_position_notional_usdt": 440,
-                    "leverage": 10,
+                    "max_notional_usdt": 44,
+                    "max_position_notional_usdt": 44,
+                    "tiny_live_contract_mode": "position_notional_cap",
+                    "leverage": 1,
                     "live_execution_enabled": False,
                 }
             ]
@@ -91,15 +92,15 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
                     "isolated_risk_wallet_usdt": 88,
                     "position_margin_pct_of_wallet": 0.5,
                     "resolved_position_margin_usdt": 44,
-                    "leverage": 10,
-                    "resolved_max_notional_usdt": 440,
+                    "leverage": 1,
+                    "resolved_max_notional_usdt": 44,
                     "wallet_buffer_usdt": 44,
                 },
             },
             "contract_fit_sizing_plan": {
                 "candidate_qty": 0.006,
-                "candidate_notional_usdt": 384.0,
-                "candidate_margin_usdt": 38.4,
+                "candidate_notional_usdt": 42.0,
+                "candidate_margin_usdt": 42.0,
                 "candidate_estimated_loss_usdt": 4.44,
                 "fits_max_notional": True,
                 "fits_max_loss": True,
@@ -182,6 +183,48 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
     )
     return log_dir, lane_path, risk_path
+
+
+def _append_exchange_minimum_record(log_dir: Path, *, mark_price: float = 70000.0) -> None:
+    _append_ndjson(
+        log_dir / "tiny_live_binance_readonly_precision_mark_price_gate.ndjson",
+        {
+            "target_scope": {"official_lane_key": OFFICIAL},
+            "readonly_fetch_performed": True,
+            "binance_readonly_result": {
+                "fetched": True,
+                "exchange_info_endpoint_called": True,
+                "mark_price_endpoint_called": True,
+                "order_endpoint_called": False,
+                "account_endpoint_called": False,
+                "signed_request_created": False,
+                "precision_snapshot": {
+                    "found": True,
+                    "symbol": "BTCUSDT",
+                    "quantity_precision": 3,
+                    "min_qty": 0.001,
+                    "step_size": 0.001,
+                    "price_precision": 1,
+                    "tick_size": 0.1,
+                    "min_notional": 5.0,
+                    "source": "binance_public_exchangeInfo",
+                },
+                "mark_price_snapshot": {
+                    "found": True,
+                    "symbol": "BTCUSDT",
+                    "mark_price": mark_price,
+                    "timestamp": 1781114400000,
+                    "source": "binance_public_premiumIndex",
+                },
+            },
+            "safety": {
+                "order_placed": False,
+                "binance_order_endpoint_called": False,
+                "binance_test_order_endpoint_called": False,
+                "secrets_shown": False,
+            },
+        },
+    )
 
 
 def test_cli_preview_returns_json() -> None:
@@ -364,6 +407,42 @@ def test_final_console_blocks_actual_submit(tmp_path: Path) -> None:
     assert payload["final_console_matrix"]["submit_allowed"] is False
 
 
+def test_exchange_minimum_below_44_blocks_final_command_without_modifying_config(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    _append_exchange_minimum_record(log_dir, mark_price=70000.0)
+    before_risk = risk_path.read_text(encoding="utf-8")
+
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+
+    packet = payload["exchange_minimum_decision_packet"]
+    assert packet["block_reason"] == "proper_tiny_live_below_exchange_minimum"
+    assert packet["configured_proper_tiny_cap_usdt"] == 44.0
+    assert packet["minimum_valid_quantity_after_rounding"] == 0.001
+    assert packet["minimum_valid_notional_after_rounding"] == 70.0
+    assert packet["wallet_supports_exchange_minimum_tiny"] is True
+    assert packet["recommended_cap_usdt"] == 70.0
+    assert packet["recommended_cap_applied"] is False
+    assert payload["final_console_go_no_go_packet"]["go_for_actual_submit_now"] is False
+    assert payload["final_console_go_no_go_packet"]["go_for_r264_actual_submit_checkpoint"] is False
+    assert payload["final_console_go_no_go_packet"]["next_required_step"] == "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT"
+    assert payload["final_command_available"] is False
+    assert payload["order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+    assert payload["secrets_shown"] is False
+    assert risk_path.read_text(encoding="utf-8") == before_risk
+
+
+def test_operator_final_console_html_includes_exchange_minimum_reason() -> None:
+    html = r263.render_tiny_live_final_console_html()
+    assert "proper_tiny_live_below_exchange_minimum" in html
+    assert "exchange minimum notional" in html
+    assert "Copy exchange-minimum check" in html
+
+
 def test_api_get_final_console_returns_json() -> None:
     from fastapi.testclient import TestClient
 
@@ -373,6 +452,46 @@ def test_api_get_final_console_returns_json() -> None:
     response = client.get("/tiny-live/final-console")
     assert response.status_code == 200
     assert response.json()["target_scope"]["submit_allowed"] is False
+
+
+def test_operator_final_console_route_is_read_only_html() -> None:
+    from fastapi.testclient import TestClient
+
+    from src.app.hammer_radar.operator.approval_api import app
+
+    client = TestClient(app)
+    response = client.get("/operator/tiny-live/final-console")
+    assert response.status_code == 200
+    assert "Read only" in response.text
+    assert "no live submit button" in response.text
+    assert "/fapi/v1/order" not in response.text
+
+
+def test_margin_budget_10x_contract_displays_mismatch(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    risk = json.loads(risk_path.read_text(encoding="utf-8"))
+    row = risk["risk_contracts"][0]
+    row["tiny_live_contract_mode"] = "margin_budget_cap"
+    row["max_notional_usdt"] = 440
+    row["max_position_notional_usdt"] = 440
+    row["leverage"] = 10
+    risk_path.write_text(json.dumps(risk), encoding="utf-8")
+
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+
+    interpretation = payload["risk_contract_interpretation"]
+    assert payload["contract_fit_panel"]["risk_contract_valid"] is False
+    assert interpretation["valid"] is False
+    assert interpretation["higher_notional_interpretation_rejected"] is True
+    assert "risk_contract_notional_cap_exceeds_44" in interpretation["blocked_by"]
+    assert payload["final_command_available"] is False
+    assert payload["order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+    assert payload["secrets_shown"] is False
 
 
 def test_api_post_arm_requires_exact_phrase() -> None:

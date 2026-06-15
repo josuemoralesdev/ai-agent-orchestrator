@@ -35,9 +35,10 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
                     "margin_budget_usdt": 44,
                     "max_margin_usdt": 44,
                     "max_loss_usdt": 4.44,
-                    "max_notional_usdt": 440,
-                    "max_position_notional_usdt": 440,
-                    "leverage": 10,
+                    "max_notional_usdt": 44,
+                    "max_position_notional_usdt": 44,
+                    "tiny_live_contract_mode": "position_notional_cap",
+                    "leverage": 1,
                     "risk_reward_ratio": 2.0,
                     "live_execution_enabled": False,
                 }
@@ -106,7 +107,7 @@ def test_wrong_confirmation_rejects_without_child_calls(tmp_path: Path, monkeypa
     assert payload["safety"]["binance_order_endpoint_called"] is False
 
 
-def test_88_wallet_resolves_to_44_margin_and_440_notional(tmp_path: Path) -> None:
+def test_88_wallet_resolves_to_44_margin_and_44_notional(tmp_path: Path) -> None:
     _, risk_path, _ = _fixture(tmp_path)
     current = r262b.load_current_tiny_live_risk_contract(risk_contract_config_path=risk_path)
     model = r262b.derive_percentage_risk_contract_model(current)
@@ -116,43 +117,35 @@ def test_88_wallet_resolves_to_44_margin_and_440_notional(tmp_path: Path) -> Non
     assert resolved["position_margin_pct_of_wallet"] == 0.5
     assert resolved["resolved_position_margin_usdt"] == 44.0
     assert resolved["wallet_buffer_usdt"] == 44.0
-    assert resolved["leverage"] == 10.0
-    assert resolved["resolved_max_notional_usdt"] == 440.0
+    assert resolved["leverage"] == 1.0
+    assert resolved["resolved_max_notional_usdt"] == 44.0
     assert resolved["resolved_max_loss_usdt"] <= 4.44
 
 
-def test_quantity_reduces_to_fit_current_451_notional_case() -> None:
+def test_44_notional_cap_blocks_when_exchange_minimum_step_exceeds_cap() -> None:
     resolved = {
-        "resolved_max_notional_usdt": 440.0,
+        "resolved_max_notional_usdt": 44.0,
         "resolved_max_loss_usdt": 4.44,
-        "leverage": 10.0,
+        "leverage": 1.0,
     }
     before = r262b.validate_quantity_fits_contract(
-        quantity=0.007,
+        quantity=0.001,
         mark_price=64465.4,
         resolved_values=resolved,
         step_size=0.001,
         min_notional=5,
     )
-    assert round(before["notional_usdt"], 4) == 451.2578
+    assert round(before["notional_usdt"], 4) == 64.4654
     assert "notional_exceeds_max_notional" in before["blocked_by"]
 
     qty = r262b.compute_contract_fit_quantity(
         fresh_mark_price=64465.4,
-        max_notional_usdt=440,
+        max_notional_usdt=44,
         step_size=0.001,
         min_notional=5,
     )
-    after = r262b.validate_quantity_fits_contract(
-        quantity=qty["candidate_qty"],
-        mark_price=64465.4,
-        resolved_values=resolved,
-        step_size=0.001,
-        min_notional=5,
-    )
-    assert qty["candidate_qty"] == 0.006
-    assert after["valid"] is True
-    assert after["notional_usdt"] <= 440
+    assert qty["candidate_qty"] == 0.0
+    assert "quantity_zero_after_contract_fit" in qty["blocked_by"]
 
 
 def test_percentage_schema_update_does_not_loosen_risk(tmp_path: Path) -> None:
@@ -177,9 +170,10 @@ def test_percentage_schema_update_does_not_loosen_risk(tmp_path: Path) -> None:
     assert contract["uses_percentage_model"] is True
     assert contract["isolated_risk_wallet_usdt"] == 88.0
     assert contract["tiny_live_margin_usdt"] == 44.0
-    assert contract["max_notional_usdt"] == 440.0
+    assert contract["tiny_live_contract_mode"] == "position_notional_cap"
+    assert contract["max_notional_usdt"] == 44.0
     assert contract["max_loss_usdt"] <= 4.44
-    assert contract["leverage"] == 10.0
+    assert contract["leverage"] == 1.0
 
 
 def test_exact_confirmation_runs_monkeypatched_child_gates_and_records(tmp_path: Path, monkeypatch) -> None:
@@ -234,13 +228,13 @@ def test_exact_confirmation_runs_monkeypatched_child_gates_and_records(tmp_path:
     )
     raw = json.dumps(payload, sort_keys=True)
 
-    assert payload["status"] == r262b.TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_RECORDED
+    assert payload["status"] == r262b.TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_BLOCKED
     assert payload["contract_fit_regeneration_recorded"] is True
-    assert payload["contract_fit_sizing_plan"]["candidate_qty"] == 0.006
-    assert payload["contract_fit_sizing_plan"]["candidate_notional_usdt"] <= 440
-    assert payload["output_validation"]["risk_contract_valid_after"] is True
+    assert payload["contract_fit_sizing_plan"]["candidate_qty"] == 0.0
+    assert "quantity_zero_after_contract_fit" in payload["contract_fit_sizing_plan"]["blocked_by"]
+    assert payload["output_validation"]["risk_contract_valid_after"] is False
     assert payload["go_no_go_packet"]["go_for_manual_submit_now"] is False
-    assert payload["go_no_go_packet"]["go_for_controls_arming"] is True
+    assert payload["go_no_go_packet"]["go_for_controls_arming"] is False
     assert payload["safety"]["risk_contract_config_written"] is True
     assert payload["safety"]["lane_controls_written"] is False
     assert payload["safety"]["submit_attempted"] is False

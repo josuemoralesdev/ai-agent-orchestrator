@@ -36,7 +36,7 @@ def test_preview_writes_no_execution_enable_artifact(tmp_path: Path) -> None:
     assert payload["execution_enable_written"] is False
     assert payload["write_execution_enable_requested"] is False
     assert payload["confirmation_valid"] is False
-    assert payload["execution_enable_write_preview"]["would_write"] is True
+    assert payload["execution_enable_write_preview"]["would_write"] is False
     assert payload["execution_enable_write_preview"]["execution_enable_artifact"] == "ledger_only"
     assert not (log_dir / LEDGER_FILENAME).exists()
 

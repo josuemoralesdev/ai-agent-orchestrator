@@ -253,6 +253,7 @@ def run_r262b_contract_fit_refresh_step(
     sizing = payload.get("contract_fit_sizing_plan") if isinstance(payload.get("contract_fit_sizing_plan"), Mapping) else {}
     matrix = payload.get("contract_fit_matrix") if isinstance(payload.get("contract_fit_matrix"), Mapping) else {}
     safety = payload.get("safety") if isinstance(payload.get("safety"), Mapping) else {}
+    risk_interpretation = payload.get("risk_contract_interpretation") if isinstance(payload.get("risk_contract_interpretation"), Mapping) else {}
     blocked = list(validation.get("errors") or [])
     blocked.extend(str(item) for item in matrix.get("blocked_by") or [])
     return _sanitize(
@@ -269,6 +270,7 @@ def run_r262b_contract_fit_refresh_step(
             "signed_triplet_fresh": validation.get("fresh_signed_request_available") is True,
             "candidate_qty": sizing.get("candidate_qty"),
             "candidate_notional_usdt": sizing.get("candidate_notional_usdt"),
+            "risk_contract_interpretation": risk_interpretation,
             "blocked_by": _dedupe(blocked),
             "child_status": payload.get("status"),
             "child_overall_status": payload.get("contract_fit_overall_status"),
@@ -362,6 +364,7 @@ def run_r264_dry_preview_step(
             "reduce_only_exits": pre.get("reduce_only_exits") is True,
             "signed_triplet_fresh": pre.get("signed_triplet_fresh") is True,
             "risk_contract_valid": pre.get("risk_contract_valid") is True,
+            "risk_contract_interpretation": pre.get("risk_contract_interpretation") if isinstance(pre.get("risk_contract_interpretation"), Mapping) else {},
             "controls_armed": pre.get("controls_armed") is True,
             "experimental_lane_acceptance_recorded": pre.get("experimental_lane_acceptance_recorded") is True,
             "prior_live_submit_found": idem.get("prior_live_submit_found") is True,
@@ -406,7 +409,8 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
         "r263_armed": r263.get("succeeded") is True and r263.get("controls_armed") is True,
         "r264_dry_preview_valid": r264.get("succeeded") is True and r264.get("pre_submit_valid") is True,
         "signed_triplet_fresh": r264.get("signed_triplet_fresh") is True,
-        "risk_contract_valid": r264.get("risk_contract_valid") is True or r262b.get("risk_contract_valid") is True,
+        "risk_contract_valid": r264.get("risk_contract_valid") is True and r262b.get("risk_contract_valid") is True,
+        "risk_contract_interpretation": r264.get("risk_contract_interpretation") or r262b.get("risk_contract_interpretation") or {},
         "idempotency_clean": r264.get("idempotency_clean") is True,
         "exact_three_orders": r264.get("exact_three_orders") is True,
         "no_live_submit_performed": True,
@@ -485,6 +489,16 @@ def classify_tiny_live_jit_launch_packet_status(
     blockers = set(jit_validation.get("blocked_by") or [])
     if "prior_live_submit_exists" in blockers:
         return TINY_LIVE_JIT_BLOCKED_BY_IDEMPOTENCY
+    if blockers.intersection(
+        {
+            "risk_contract_config_invalid",
+            "risk_contract_notional_cap_exceeds_44",
+            "risk_contract_leverage_exceeds_3",
+            "candidate_notional_exceeds_position_notional_cap",
+            "proper_tiny_live_below_exchange_minimum",
+        }
+    ):
+        return TINY_LIVE_JIT_BLOCKED_BY_R264_DRY_PREVIEW
     if not run_requested or not record_requested:
         return TINY_LIVE_JIT_READY_FOR_CONFIRMATION
     if jit_validation.get("r262b_valid") is not True:

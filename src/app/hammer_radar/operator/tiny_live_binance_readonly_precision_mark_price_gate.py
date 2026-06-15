@@ -496,12 +496,14 @@ def parse_symbol_precision_from_exchange_info(exchange_info: Mapping[str, Any], 
     price_filter = _filter(filters, "PRICE_FILTER")
     min_filter = _filter(filters, "MIN_NOTIONAL") or _filter(filters, "NOTIONAL")
     step_size = _number(lot.get("stepSize"))
+    min_qty = _number(lot.get("minQty")) or step_size
     tick_size = _number(price_filter.get("tickSize"))
     min_notional = _number(min_filter.get("notional") or min_filter.get("minNotional"))
     return {
-        "found": step_size is not None and tick_size is not None and min_notional is not None,
+        "found": min_qty is not None and step_size is not None and tick_size is not None and min_notional is not None,
         "symbol": normalized_symbol,
         "quantity_precision": _int_or_none(match.get("quantityPrecision")) or _precision_from_step(step_size),
+        "min_qty": min_qty,
         "step_size": step_size,
         "price_precision": _int_or_none(match.get("pricePrecision")) or _precision_from_step(tick_size),
         "tick_size": tick_size,
@@ -540,6 +542,7 @@ def build_quantity_preview_from_readonly_data(
     notional = _decimal(notional_cap_usdt)
     mark_price = _decimal(mark_price_snapshot.get("mark_price"))
     step = _decimal(precision_snapshot.get("step_size"))
+    min_qty = _decimal(precision_snapshot.get("min_qty"))
     min_notional = _decimal(precision_snapshot.get("min_notional"))
     if notional is None or notional <= 0:
         blocked_by.append("notional_cap_invalid")
@@ -547,6 +550,8 @@ def build_quantity_preview_from_readonly_data(
         blocked_by.append("mark_price_invalid")
     if step is None or step <= 0:
         blocked_by.append("step_size_invalid")
+    if min_qty is None or min_qty <= 0:
+        blocked_by.append("min_qty_invalid")
     if min_notional is None or min_notional < 0:
         blocked_by.append("min_notional_unknown")
     if blocked_by:
@@ -554,8 +559,16 @@ def build_quantity_preview_from_readonly_data(
     quantity_raw = notional / mark_price
     quantity_rounded = (quantity_raw / step).to_integral_value(rounding=ROUND_FLOOR) * step
     notional_after_rounding = quantity_rounded * mark_price
+    min_notional_quantity = (min_notional / mark_price / step).to_integral_value(rounding=ROUND_FLOOR) * step
+    if min_notional_quantity * mark_price < min_notional:
+        min_notional_quantity += step
+    minimum_valid_quantity = max(min_qty, min_notional_quantity)
+    minimum_valid_notional = minimum_valid_quantity * mark_price
     if quantity_rounded <= 0:
         blocked_by.append("quantity_rounds_to_zero")
+    min_qty_ok = bool(quantity_rounded >= min_qty)
+    if not min_qty_ok:
+        blocked_by.append("min_qty_not_met_after_rounding")
     min_notional_ok = bool(notional_after_rounding >= min_notional)
     if not min_notional_ok:
         blocked_by.append("min_notional_not_met_after_rounding")
@@ -564,9 +577,91 @@ def build_quantity_preview_from_readonly_data(
         "quantity_raw": _float(quantity_raw),
         "quantity_rounded": _float(quantity_rounded),
         "notional_after_rounding": _float(notional_after_rounding),
+        "min_qty": _float(min_qty),
+        "step_size": _float(step),
+        "min_notional": _float(min_notional),
+        "min_qty_ok": min_qty_ok,
         "min_notional_ok": min_notional_ok,
+        "minimum_valid_quantity": _float(minimum_valid_quantity),
+        "minimum_valid_notional_after_rounding": _float(minimum_valid_notional),
+        "configured_cap_possible": bool(notional >= minimum_valid_notional),
         "blocked_by": _dedupe(blocked_by),
     }
+
+
+def build_exchange_minimum_tiny_live_decision_packet(
+    *,
+    configured_cap_usdt: Any = 44,
+    precision_snapshot: Mapping[str, Any],
+    mark_price_snapshot: Mapping[str, Any],
+    operator_reported_wallet_usdt: Any = 126,
+) -> dict[str, Any]:
+    quantity_preview = build_quantity_preview_from_readonly_data(
+        notional_cap_usdt=configured_cap_usdt,
+        precision_snapshot=precision_snapshot,
+        mark_price_snapshot=mark_price_snapshot,
+    )
+    configured_cap = _number(configured_cap_usdt)
+    minimum_valid_notional = _number(quantity_preview.get("minimum_valid_notional_after_rounding"))
+    wallet_amount = _number(operator_reported_wallet_usdt)
+    cap_possible = (
+        configured_cap is not None
+        and minimum_valid_notional is not None
+        and configured_cap >= minimum_valid_notional
+        and quantity_preview.get("blocked_by") == []
+    )
+    recommended_cap = None if cap_possible else minimum_valid_notional
+    wallet_enough = None
+    if wallet_amount is not None and minimum_valid_notional is not None:
+        wallet_enough = wallet_amount >= minimum_valid_notional
+    return _sanitize(
+        {
+            "status": "EXCHANGE_MINIMUM_TINY_LIVE_DECISION_PACKET_READY",
+            "symbol": str(precision_snapshot.get("symbol") or mark_price_snapshot.get("symbol") or "BTCUSDT"),
+            "configured_proper_tiny_cap_usdt": configured_cap,
+            "configured_cap_possible": bool(cap_possible),
+            "configured_cap_blocked_by": list(quantity_preview.get("blocked_by") or []),
+            "block_reason": None if cap_possible else "proper_tiny_live_below_exchange_minimum",
+            "min_quantity": precision_snapshot.get("min_qty"),
+            "step_size": precision_snapshot.get("step_size"),
+            "min_notional": precision_snapshot.get("min_notional"),
+            "mark_price": mark_price_snapshot.get("mark_price"),
+            "minimum_valid_quantity_after_rounding": quantity_preview.get("minimum_valid_quantity"),
+            "minimum_valid_notional_after_rounding": minimum_valid_notional,
+            "candidate_quantity_at_configured_cap": quantity_preview.get("quantity_rounded"),
+            "candidate_notional_at_configured_cap": quantity_preview.get("notional_after_rounding"),
+            "wallet_funded_amount_usdt": wallet_amount,
+            "wallet_funded_amount_source": "operator_reported_phase_context_no_account_check"
+            if wallet_amount is not None
+            else "unknown_not_checked",
+            "account_balance_checked": False,
+            "wallet_supports_exchange_minimum_tiny": wallet_enough,
+            "recommended_operator_decision": "ACCEPT_EXCHANGE_MINIMUM_TINY_LIVE_CAP"
+            if recommended_cap is not None
+            else "KEEP_44_USDT_PROPER_TINY_CAP",
+            "recommended_cap_usdt": recommended_cap,
+            "recommended_cap_applied": False,
+            "recommended_cap_warning": (
+                "Recommended exchange-minimum cap is not applied automatically; operator approval and a later safe write phase are required."
+                if recommended_cap is not None
+                else "No cap increase recommended by this packet."
+            ),
+            "safe_next_command": (
+                "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+                "--log-dir logs/hammer_radar_forward tiny-live-binance-readonly-precision-mark-price-gate "
+                "--fetch-binance-readonly --confirm-tiny-live-binance-readonly-fetch "
+                "\"I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT.\""
+            ),
+            "go_no_go": "NO-GO",
+            "final_command_available": False,
+            "order_placed": False,
+            "real_order_placed": False,
+            "execution_attempted": False,
+            "binance_order_endpoint_called": False,
+            "binance_test_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    )
 
 
 def validate_readonly_precision_mark_price_result(
@@ -901,6 +996,7 @@ def _empty_precision_snapshot(symbol: str) -> dict[str, Any]:
         "found": False,
         "symbol": symbol,
         "quantity_precision": None,
+        "min_qty": None,
         "step_size": None,
         "price_precision": None,
         "tick_size": None,
@@ -919,7 +1015,14 @@ def _blocked_quantity_preview(blocked_by: Sequence[str]) -> dict[str, Any]:
         "quantity_raw": None,
         "quantity_rounded": None,
         "notional_after_rounding": None,
+        "min_qty": None,
+        "step_size": None,
+        "min_notional": None,
+        "min_qty_ok": None,
         "min_notional_ok": None,
+        "minimum_valid_quantity": None,
+        "minimum_valid_notional_after_rounding": None,
+        "configured_cap_possible": False,
         "blocked_by": _dedupe(list(blocked_by)),
     }
 

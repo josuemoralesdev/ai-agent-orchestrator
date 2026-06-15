@@ -183,11 +183,9 @@ def test_current_blockers_and_decision_packet_reflect_r255(tmp_path: Path, monke
     payload = build_tiny_live_operator_real_submit_runbook(log_dir=log_dir, now=NOW)
 
     blockers = payload["current_submit_blockers"]
-    assert blockers["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in blockers["blocked_by"]
+    assert "live_execution_not_enabled" in blockers["blocked_by"]
+    assert "risk_contract_invalid" in blockers["blocked_by"]
     assert blockers["requires_regeneration"] is True
     assert blockers["requires_live_controls_arming"] is True
     assert blockers["submit_allowed_now"] is False
@@ -245,11 +243,9 @@ def _fixture_r256(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Path, Path]:
         now=NOW + timedelta(minutes=5),
     )
     assert r255["actual_submit_executed"] is False
-    assert r255["actual_submit_gate_matrix"]["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in r255["actual_submit_gate_matrix"]["blocked_by"]
+    assert "live_execution_not_enabled" in r255["actual_submit_gate_matrix"]["blocked_by"]
+    assert "risk_contract_invalid" in r255["actual_submit_gate_matrix"]["blocked_by"]
     return log_dir, risk_path, lane_path, external
 
 

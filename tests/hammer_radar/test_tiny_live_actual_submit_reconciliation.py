@@ -185,6 +185,41 @@ def test_stop_tp_reduce_only_mismatch_blocks(tmp_path: Path) -> None:
     assert "reduce_only_exit_missing" in payload["pre_submit_validation"]["blocked_by"]
 
 
+def test_44_margin_at_10x_blocks_as_not_proper_tiny_live(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    risk = json.loads(risk_path.read_text(encoding="utf-8"))
+    row = risk["risk_contracts"][0]
+    row["tiny_live_contract_mode"] = "margin_budget_cap"
+    row["margin_budget_usdt"] = 44
+    row["tiny_live_margin_usdt"] = 44
+    row["max_notional_usdt"] = 440
+    row["max_position_notional_usdt"] = 440
+    row["leverage"] = 10
+    risk_path.write_text(json.dumps(risk), encoding="utf-8")
+
+    payload = r264.build_tiny_live_actual_submit_reconciliation(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+        dry_run_actual_submit_reconcile=True,
+        record_actual_submit_preview=True,
+        confirm_actual_submit_dry_preview=r264.DRY_PREVIEW_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+
+    pre = payload["pre_submit_validation"]
+    interpretation = pre["risk_contract_interpretation"]
+    assert payload["status"] == r264.TINY_LIVE_ACTUAL_SUBMIT_BLOCKED
+    assert pre["risk_contract_valid"] is False
+    assert "risk_contract_config_invalid" in pre["blocked_by"]
+    assert "risk_contract_notional_cap_exceeds_44" in interpretation["blocked_by"]
+    assert interpretation["higher_notional_interpretation_rejected"] is True
+    assert payload["safety"]["order_placed"] is False
+    assert payload["safety"]["submit_attempted"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert payload["safety"]["secrets_shown"] is False
+
+
 def test_fake_client_successful_exact_three_submit_records_all_three(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     client = r264.FakeBinanceFuturesOrderSubmitClient()
@@ -313,9 +348,11 @@ def _fixture(
                     "direction": "short",
                     "entry_mode": "ladder_close_50_618",
                     "max_loss_usdt": 4.44,
-                    "max_notional_usdt": 440,
-                    "max_position_notional_usdt": 440,
-                    "leverage": 10,
+                    "max_notional_usdt": 44,
+                    "max_position_notional_usdt": 44,
+                    "tiny_live_contract_mode": "position_notional_cap",
+                    "margin_budget_usdt": 44,
+                    "leverage": 1,
                     "live_execution_enabled": True,
                 }
             ]
@@ -349,8 +386,8 @@ def _r262b_record() -> dict:
         "output_validation": {"valid": True, "risk_contract_valid_after": True},
         "contract_fit_sizing_plan": {
             "candidate_qty": 0.006,
-            "candidate_notional_usdt": 384,
-            "candidate_margin_usdt": 38.4,
+            "candidate_notional_usdt": 42,
+            "candidate_margin_usdt": 42,
             "candidate_estimated_loss_usdt": 4.44,
             "fits_max_notional": True,
             "fits_max_loss": True,
@@ -404,7 +441,7 @@ def _signed_request(query_without_signature: str) -> dict:
 def _executable_artifact(*, main_side: str, reduce_only: bool) -> dict:
     return {
         "created_by_phase": "R253B_TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE",
-        "reference_price": 64000,
+        "reference_price": 7000,
         "main_order": {"symbol": "BTCUSDT", "side": main_side, "type": "MARKET", "quantity": 0.006},
         "stop_order": {
             "symbol": "BTCUSDT",

@@ -46,7 +46,7 @@
       "entry_mode": "ladder_close_50_618",
       "isolated_risk_wallet_usdt": 88.0,
       "kill_switch_required": true,
-      "leverage": 10.0,
+      "leverage": 1.0,
       "live_authorization_required_later": true,
       "live_authorized": false,
       "live_execution_enabled": false,
@@ -56,12 +56,13 @@
       "max_loss_requires_review": true,
       "max_loss_usdt": 4.44,
       "max_margin_usdt": 44.0,
-      "max_notional_multiplier_of_position_margin": 10.0,
-      "max_notional_usdt": 440.0,
-      "max_position_notional_usdt": 440.0,
+      "max_notional_multiplier_of_position_margin": 1.0,
+      "max_notional_usdt": 44.0,
+      "max_position_notional_usdt": 44.0,
       "notes": [
         "R244 updates the risk contract to model 44 USDT margin at 10x leverage.",
         "Max notional becomes 440 USDT so BTCUSDT quantity clears Binance step size/min notional.",
+        "R265 reconciles first-live proper tiny semantics: 44 USDT is the position/notional cap, not hidden 10x notional.",
         "This config write does not enable live execution, create payloads, sign requests, or place orders."
       ],
       "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
@@ -71,11 +72,11 @@
       "protective_stop_required": true,
       "resolved_percentage_contract_values": {
         "isolated_risk_wallet_usdt": 88.0,
-        "leverage": 10.0,
+        "leverage": 1.0,
         "max_loss_pct_of_position_margin": 0.10090909090909092,
         "position_margin_pct_of_wallet": 0.5,
         "resolved_max_loss_usdt": 4.44,
-        "resolved_max_notional_usdt": 440.0,
+        "resolved_max_notional_usdt": 44.0,
         "resolved_position_margin_usdt": 44.0,
         "wallet_buffer_pct_of_wallet": 0.5,
         "wallet_buffer_usdt": 44.0
@@ -87,8 +88,9 @@
       "symbol": "BTCUSDT",
       "take_profit_required": true,
       "timeframe": "8m",
+      "tiny_live_contract_mode": "position_notional_cap",
       "tiny_live_margin_usdt": 44.0,
-      "updated_at": "2026-06-14T16:02:53.362027+00:00",
+      "updated_at": "2026-06-15T16:47:07.822910+00:00",
       "updated_by_phase": "R262B_TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_TRIPLET",
       "uses_percentage_model": true
     }

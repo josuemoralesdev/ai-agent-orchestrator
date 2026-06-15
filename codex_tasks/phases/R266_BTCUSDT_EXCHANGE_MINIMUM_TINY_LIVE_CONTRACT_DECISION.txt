@@ -1,0 +1,117 @@
+# R266 — BTCUSDT Exchange-Minimum Tiny Live Contract Decision
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: DIAGNOSTIC / AUDIT
+  Secondary: SAFETY HARDENING, RISK CONTRACT DECISION, UI CLARITY
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R265 fixed the semantic mismatch: 44 USDT now means maximum BTCUSDT position/notional cap, not margin multiplied by leverage.
+  The Tiny Live Final Console now blocks with:
+    proper_tiny_live_below_exchange_minimum
+
+  Operator has funded the futures wallet with 126 USDT, but no live order may be placed until the system explicitly proves the minimum valid BTCUSDT futures order and the operator accepts a safe exchange-minimum tiny-live contract.
+
+Hard goal:
+  Determine whether BTCUSDT proper tiny live is possible under Binance Futures precision/minimum rules while preserving the meaning of “tiny.”
+  If 44 USDT notional is below the valid exchange minimum, produce an explicit operator decision packet for an exchange-minimum tiny-live cap, but do not apply unsafe changes automatically.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution globally.
+  - Do NOT disable kill switches.
+  - Do NOT print or persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT make final live submit command available.
+  - Do NOT auto-increase notional cap.
+  - Do NOT use leverage to hide exposure.
+  - If uncertain, remain BLOCKED.
+
+Required capability scan first:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_risk_contract.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar touching R265/R264/final_console/risk_contract
+
+Scope:
+  1. Read-only exchange minimum analysis:
+     - Reuse existing read-only exchange-info/precision module if available.
+     - Determine BTCUSDT:
+       - min quantity
+       - step size
+       - min notional if available
+       - current mark/reference price
+       - minimum valid notional after rounding
+       - minimum valid quantity after rounding
+     - Network allowed only for read-only exchange-info and mark-price, if existing safe modules already permit it.
+     - No private/signed/order endpoints.
+
+  2. Decision packet:
+     Create an operator-facing packet showing:
+       - configured proper tiny cap: 44 USDT notional
+       - computed minimum valid BTCUSDT notional
+       - wallet funded amount if available from safe read-only funding state, otherwise “unknown/not checked”
+       - whether 126 USDT is enough for the minimum valid notional
+       - recommended cap if and only if 44 is impossible
+       - explicit warning that recommended cap is not applied automatically
+       - go/no-go remains NO-GO
+       - final command available remains false
+
+  3. UI:
+     Extend /operator/tiny-live/final-console to show:
+       - proper_tiny_live_below_exchange_minimum explanation
+       - exchange minimum notional
+       - configured cap
+       - recommended operator decision
+       - wallet-funded context if available
+       - copyable safe next command
+     Do not add submit button.
+
+  4. Tests:
+     Add tests proving:
+       - 44 cap below exchange minimum blocks.
+       - exchange-minimum recommendation does not modify config.
+       - final command remains unavailable.
+       - order_placed=false.
+       - binance_order_endpoint_called=false.
+       - secrets_shown=false.
+       - UI includes the exchange-minimum reason.
+
+Validation:
+  Run:
+    PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or final_console or risk_contract or jit_launch"
+
+  Smoke:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+      --log-dir logs/hammer_radar_forward \
+      tiny-live-jit-launch-packet \
+      --run-jit-launch-prep \
+      --record-jit-launch-packet \
+      --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+      --operator-id local_operator \
+      --reason "R266 exchange-minimum tiny-live decision verification; no submit."
+
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+    curl -s http://127.0.0.1:8015/operator/tiny-live/final-console | head -120
+
+Report back:
+  - files changed
+  - BTCUSDT exchange minimum quantity/notional
+  - whether 44 USDT proper tiny is possible
+  - whether 126 USDT wallet can support exchange-minimum tiny
+  - recommended next operator decision
+  - tests/smokes
+  - final go/no-go
+  - confirm no live orders and no Binance order endpoint calls

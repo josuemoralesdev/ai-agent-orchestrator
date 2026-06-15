@@ -89,6 +89,7 @@ from src.app.hammer_radar.operator.tiny_live_controls_arming import (
 )
 from src.app.hammer_radar.operator.tiny_live_final_console import (
     build_tiny_live_final_console,
+    render_tiny_live_final_console_html,
 )
 from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import (
     build_tiny_live_actual_submit_reconciliation,
@@ -868,6 +869,11 @@ def tiny_live_controls_arm(request: TinyLiveControlsArmRequest) -> dict:
 @app.get("/tiny-live/final-console")
 def tiny_live_final_console() -> dict:
     return build_tiny_live_final_console(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/operator/tiny-live/final-console", response_class=HTMLResponse)
+def operator_tiny_live_final_console() -> str:
+    return render_tiny_live_final_console_html()
 
 
 @app.post("/tiny-live/final-console/review/record")
@@ -3365,8 +3371,14 @@ def _operator_ui_html() -> str:
         <div><div class="label">readiness</div><div id="tlfReadiness" class="value">loading</div></div>
         <div><div class="label">R264 checkpoint</div><div id="tlfR264" class="value">loading</div></div>
         <div><div class="label">submit forbidden</div><div id="tlfForbidden" class="value danger">true</div></div>
+        <div><div class="label">exchange minimum reason</div><div id="tlfExchangeReason" class="value danger">loading</div></div>
+        <div><div class="label">exchange min notional</div><div id="tlfExchangeMinNotional" class="value">loading</div></div>
+        <div><div class="label">configured cap</div><div id="tlfConfiguredCap" class="value">loading</div></div>
+        <div><div class="label">recommended decision</div><div id="tlfExchangeDecision" class="value">loading</div></div>
       </div>
       <p><strong>NO SUBMIT FROM THIS SCREEN.</strong> R263 can record review or arm controls only after exact experimental-lane acceptance.</p>
+      <p><strong>Exchange-minimum decision:</strong> <span id="tlfExchangeSummary">loading</span></p>
+      <p><strong>Safe next command:</strong> <span id="tlfExchangeCommand" class="mono">loading</span></p>
       <p><strong>Promoted lanes:</strong> <span id="tlfPromoted">loading</span></p>
       <p><strong>Readiness blockers:</strong> <span id="tlfBlockers">loading</span></p>
       <p><strong>Lane/Fisherman warning:</strong> <span id="tlfWarning">loading</span></p>
@@ -4018,6 +4030,7 @@ async function loadTinyLiveFinalConsole() {
   const readiness = data.promotion_readiness_panel || {};
   const go = data.final_console_go_no_go_packet || {};
   const matrix = data.final_console_matrix || {};
+  const exchange = data.exchange_minimum_decision_packet || {};
   document.getElementById('tlfLane').textContent = data.target_scope?.official_lane_key || 'BTCUSDT|8m|short|ladder_close_50_618';
   document.getElementById('tlfOverall').textContent = data.final_console_overall_status || 'UNKNOWN';
   setBool('tlfR262b', matrix.r262b_valid);
@@ -4028,6 +4041,17 @@ async function loadTinyLiveFinalConsole() {
   document.getElementById('tlfReadiness').textContent = lane.readiness_status || 'UNKNOWN';
   setBool('tlfR264', go.go_for_r264_actual_submit_checkpoint);
   setBool('tlfForbidden', data.target_scope?.submit_allowed === false);
+  document.getElementById('tlfExchangeReason').textContent = exchange.block_reason || 'none';
+  document.getElementById('tlfExchangeMinNotional').textContent = exchange.minimum_valid_notional_after_rounding ?? 'unknown/not checked';
+  document.getElementById('tlfConfiguredCap').textContent = exchange.configured_proper_tiny_cap_usdt ?? 'unknown';
+  document.getElementById('tlfExchangeDecision').textContent = exchange.recommended_operator_decision || 'unknown';
+  document.getElementById('tlfExchangeSummary').textContent = [
+    `minimum quantity=${exchange.minimum_valid_quantity_after_rounding ?? 'unknown'}`,
+    `wallet 126 enough=${exchange.wallet_supports_exchange_minimum_tiny ?? 'unknown/not checked'}`,
+    `recommended cap=${exchange.recommended_cap_usdt ?? 'none'}`,
+    `applied=${exchange.recommended_cap_applied === true ? 'true' : 'false'}`
+  ].join('; ');
+  document.getElementById('tlfExchangeCommand').textContent = exchange.safe_next_command || 'curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .exchange_minimum_decision_packet';
   document.getElementById('tlfPromoted').textContent = (lane.promoted_lanes || []).join(', ') || 'none';
   document.getElementById('tlfBlockers').textContent = (readiness.readiness_blockers || []).join('; ') || 'none';
   document.getElementById('tlfWarning').textContent = (lane.warnings || []).join('; ') || 'none';
@@ -4038,6 +4062,7 @@ async function loadTinyLiveFinalConsole() {
     contract_fit_panel: contract,
     signed_triplet_panel: triplet,
     controls_panel: controls,
+    exchange_minimum_decision_packet: exchange,
     lane_intelligence_panel: lane,
     final_console_go_no_go_packet: go,
     safety: data.safety

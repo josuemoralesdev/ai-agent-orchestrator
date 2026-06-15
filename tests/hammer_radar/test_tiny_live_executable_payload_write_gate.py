@@ -51,7 +51,7 @@ def test_cli_command_exists_and_returns_json(tmp_path: Path) -> None:
     )
 
     payload = json.loads(result.stdout)
-    assert payload["status"] == TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_READY
+    assert payload["status"] == TINY_LIVE_EXECUTABLE_PAYLOAD_WRITE_GATE_BLOCKED
     assert payload["target_scope"]["official_lane_key"] == OFFICIAL
     assert payload["executable_payload_written"] is False
 

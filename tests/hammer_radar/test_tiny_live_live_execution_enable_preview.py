@@ -36,7 +36,7 @@ def test_preview_writes_no_record(tmp_path: Path) -> None:
         now=NOW,
     )
 
-    assert payload["status"] == TINY_LIVE_LIVE_EXECUTION_ENABLE_PREVIEW_READY
+    assert payload["status"] == "TINY_LIVE_LIVE_EXECUTION_ENABLE_PREVIEW_BLOCKED"
     assert payload["execution_enable_preview_recorded"] is False
     assert payload["execution_enable_preview_record_id"] is None
     assert payload["record_execution_enable_preview_requested"] is False

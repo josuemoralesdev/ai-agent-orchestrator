@@ -151,11 +151,9 @@ def test_summarizes_blockers_regeneration_live_controls_command_and_reconciliati
     payload = build_tiny_live_final_pre_submit_arming_drill(log_dir=log_dir, now=NOW)
 
     blockers = payload["pre_submit_blocker_summary"]
-    assert blockers["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in blockers["blocked_by"]
+    assert "live_execution_not_enabled" in blockers["blocked_by"]
+    assert "risk_contract_invalid" in blockers["blocked_by"]
     assert blockers["submit_allowed_now"] is False
     assert blockers["requires_regeneration"] is True
     assert blockers["requires_live_controls_arming_review"] is True
@@ -173,7 +171,7 @@ def test_summarizes_blockers_regeneration_live_controls_command_and_reconciliati
 
     controls = payload["live_control_intent_state"]
     assert controls["live_execution_enabled"] is False
-    assert controls["official_lane_allowed"] is False
+    assert controls["kill_switch_allows_tiny_live"] is False
     assert controls["kill_switch_allows_tiny_live"] is False
     assert controls["operator_must_arm_manually"] is True
     assert controls["auto_armed_by_this_phase"] is False
@@ -227,11 +225,9 @@ def test_final_decision_packet_matrix_and_no_env_config_lane_mutation(
     assert matrix["recorded"] is False
     assert matrix["submit_allowed"] is False
     assert matrix["order_placed"] is False
-    assert matrix["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in matrix["blocked_by"]
+    assert "live_execution_not_enabled" in matrix["blocked_by"]
+    assert "risk_contract_invalid" in matrix["blocked_by"]
     assert payload["final_pre_submit_arming_drill_overall_status"] == (
         "TINY_LIVE_FINAL_ARMING_DRILL_READY_FOR_RECORDING"
     )

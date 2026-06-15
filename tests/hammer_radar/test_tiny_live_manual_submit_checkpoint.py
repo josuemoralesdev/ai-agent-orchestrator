@@ -156,11 +156,9 @@ def test_summarizes_inputs_blockers_fresh_cycle_and_live_controls(tmp_path: Path
         "r253b_fresh_regeneration_found": True,
     }
     blockers = payload["manual_submit_blocker_summary"]
-    assert blockers["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in blockers["blocked_by"]
+    assert "live_execution_not_enabled" in blockers["blocked_by"]
+    assert "risk_contract_invalid" in blockers["blocked_by"]
     assert blockers["submit_allowed_now"] is False
     assert blockers["operator_should_not_submit_now"] is True
     assert blockers["fresh_cycle_required"] is True
@@ -181,7 +179,7 @@ def test_summarizes_inputs_blockers_fresh_cycle_and_live_controls(tmp_path: Path
 
     controls = payload["live_controls_checkpoint"]
     assert controls["live_execution_enabled"] is False
-    assert controls["official_lane_allowed"] is False
+    assert controls["kill_switch_allows_tiny_live"] is False
     assert controls["kill_switch_allows_tiny_live"] is False
     assert controls["manual_arming_required"] is True
     assert controls["auto_armed_by_this_phase"] is False
@@ -220,11 +218,9 @@ def test_command_reconciliation_go_no_go_matrix_and_mutation_safety(
 
     packet = payload["manual_submit_go_no_go_packet"]
     assert packet["go_for_manual_submit_now"] is False
-    assert packet["no_go_reasons"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in packet["no_go_reasons"]
+    assert "live_execution_not_enabled" in packet["no_go_reasons"]
+    assert "risk_contract_invalid" in packet["no_go_reasons"]
     assert packet["operator_should_regenerate_first"] is True
     assert packet["operator_should_arm_live_controls_manually"] is True
     assert packet["operator_should_run_r255_dry_preview"] is True

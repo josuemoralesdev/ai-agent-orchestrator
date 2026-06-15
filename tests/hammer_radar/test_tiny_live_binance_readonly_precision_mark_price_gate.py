@@ -16,6 +16,7 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
     TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_READY,
     TINY_LIVE_BINANCE_READONLY_PRECISION_MARK_PRICE_GATE_REJECTED,
     build_quantity_preview_from_readonly_data,
+    build_exchange_minimum_tiny_live_decision_packet,
     build_readonly_request_plan,
     build_tiny_live_binance_readonly_precision_mark_price_gate,
     load_tiny_live_binance_readonly_precision_mark_price_records,
@@ -191,6 +192,7 @@ def test_parse_exchange_info_precision() -> None:
         "found": True,
         "symbol": "BTCUSDT",
         "quantity_precision": 3,
+        "min_qty": 0.001,
         "step_size": 0.001,
         "price_precision": 1,
         "tick_size": 0.1,
@@ -228,9 +230,35 @@ def test_quantity_preview_min_notional_true_and_false() -> None:
 
     assert ok["can_compute"] is True
     assert ok["min_notional_ok"] is True
+    assert ok["min_qty_ok"] is True
     assert blocked["can_compute"] is False
     assert blocked["min_notional_ok"] is False
     assert "min_notional_not_met_after_rounding" in blocked["blocked_by"]
+
+
+def test_exchange_minimum_decision_packet_blocks_when_44_below_min_qty_notional() -> None:
+    precision = parse_symbol_precision_from_exchange_info({"raw": _exchange_info_payload()}, symbol="BTCUSDT")
+    mark = parse_mark_price_snapshot({"raw": {"symbol": "BTCUSDT", "markPrice": "70000.0"}}, symbol="BTCUSDT")
+
+    packet = build_exchange_minimum_tiny_live_decision_packet(
+        configured_cap_usdt=44,
+        precision_snapshot=precision,
+        mark_price_snapshot=mark,
+        operator_reported_wallet_usdt=126,
+    )
+
+    assert packet["configured_cap_possible"] is False
+    assert packet["block_reason"] == "proper_tiny_live_below_exchange_minimum"
+    assert packet["minimum_valid_quantity_after_rounding"] == 0.001
+    assert packet["minimum_valid_notional_after_rounding"] == 70.0
+    assert packet["recommended_cap_usdt"] == 70.0
+    assert packet["recommended_cap_applied"] is False
+    assert packet["wallet_supports_exchange_minimum_tiny"] is True
+    assert packet["final_command_available"] is False
+    assert packet["order_placed"] is False
+    assert packet["binance_order_endpoint_called"] is False
+    assert packet["binance_test_order_endpoint_called"] is False
+    assert packet["secrets_shown"] is False
 
 
 def test_safety_flags_preserve_non_actions(tmp_path: Path) -> None:
@@ -335,7 +363,7 @@ def _exchange_info_payload() -> dict[str, object]:
                 "pricePrecision": 1,
                 "filters": [
                     {"filterType": "PRICE_FILTER", "tickSize": "0.10"},
-                    {"filterType": "LOT_SIZE", "stepSize": "0.001"},
+                    {"filterType": "LOT_SIZE", "minQty": "0.001", "stepSize": "0.001"},
                     {"filterType": "MIN_NOTIONAL", "notional": "5"},
                 ],
             }

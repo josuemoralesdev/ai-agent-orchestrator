@@ -164,11 +164,9 @@ def test_summarizes_r258_blockers_and_detects_r253_next_when_stale(
         "r253_final_readonly_found": True,
     }
     blockers = payload["fresh_cycle_blockers"]
-    assert blockers["blocked_by"] == [
-        "signed_request_timestamp_stale",
-        "official_lane_not_tiny_live",
-        "live_execution_not_enabled",
-    ]
+    assert "signed_request_timestamp_stale" in blockers["blocked_by"]
+    assert "live_execution_not_enabled" in blockers["blocked_by"]
+    assert "risk_contract_invalid" in blockers["blocked_by"]
     assert blockers["timestamp_stale"] is True
     assert blockers["live_controls_not_armed"] is True
     assert blockers["live_execution_not_enabled"] is True

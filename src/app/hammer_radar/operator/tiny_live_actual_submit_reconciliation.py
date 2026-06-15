@@ -39,6 +39,9 @@ from src.app.hammer_radar.operator.tiny_live_final_console import (
 from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regeneration import (
     load_tiny_live_percentage_contract_fit_records,
 )
+from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
+    build_tiny_live_risk_contract_validation_summary,
+)
 from src.app.hammer_radar.operator.tiny_live_submit_gate_preview import (
     build_submit_gate_order_triplet_preview,
 )
@@ -479,16 +482,20 @@ def validate_contract_fit_risk(
         risk_contract_config_path=risk_contract_config_path,
         official_lane_key=official_lane_key,
     )
-    contract_row = contract.get("contract") if isinstance(contract.get("contract"), Mapping) else contract
-    config_valid = (
-        contract_row.get("symbol") == "BTCUSDT"
-        and contract_row.get("direction") == "short"
-        and _num(contract_row.get("max_loss_usdt")) is not None
-        and (_num(contract_row.get("max_loss_usdt")) or 999) <= 4.44 + 0.001
-        and (_num(contract_row.get("max_notional_usdt") or contract_row.get("max_position_notional_usdt")) or 999999) <= 440 + 0.001
-        and (_num(contract_row.get("leverage")) or 999) <= 10
-        and contract_row.get("live_execution_enabled") is True
+    triplet = signed_triplet.get("order_triplet") if isinstance((signed_triplet or {}).get("order_triplet"), Mapping) else {}
+    main = triplet.get("main_order") if isinstance(triplet.get("main_order"), Mapping) else {}
+    candidate_qty = _qty(main.get("quantity"))
+    reference_price = _num(triplet.get("entry_reference_price"))
+    candidate_notional = round(candidate_qty * reference_price, 8) if candidate_qty is not None and reference_price is not None else sizing.get("candidate_notional_usdt")
+    risk_summary = build_tiny_live_risk_contract_validation_summary(
+        risk_contract=contract,
+        candidate_qty=candidate_qty or sizing.get("candidate_qty"),
+        candidate_reference_price=reference_price,
+        candidate_notional_usdt=candidate_notional,
+        candidate_estimated_loss_usdt=sizing.get("candidate_estimated_loss_usdt"),
+        require_live_execution_enabled=True,
     )
+    config_valid = risk_summary.get("valid") is True
     r262b_valid = (
         bool(latest_r262b_contract_fit)
         and validation.get("valid") is True
@@ -509,6 +516,7 @@ def validate_contract_fit_risk(
         "risk_contract_valid": bool(r262b_valid and config_valid),
         "r262b_contract_fit_valid": bool(r262b_valid),
         "risk_contract_config_valid": bool(config_valid),
+        "risk_contract_interpretation": risk_summary,
         "blocked_by": _dedupe(blocked_by),
     }
 
@@ -639,6 +647,7 @@ def build_actual_submit_preview_packet(**kwargs: Any) -> dict[str, Any]:
                 "signed_triplet_fresh": kwargs["freshness"].get("signed_triplet_fresh") is True,
                 "signed_triplet_age_seconds": kwargs["freshness"].get("signed_triplet_age_seconds"),
                 "risk_contract_valid": kwargs["risk"].get("risk_contract_valid") is True,
+                "risk_contract_interpretation": kwargs["risk"].get("risk_contract_interpretation") or {},
                 "controls_armed": kwargs["controls"].get("controls_armed") is True,
                 "experimental_lane_acceptance_recorded": kwargs["controls"].get("experimental_lane_acceptance_recorded") is True,
                 "duplicate_submit_found": kwargs["idempotency"].get("prior_live_submit_found") is True,

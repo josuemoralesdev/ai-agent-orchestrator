@@ -41,6 +41,12 @@ from src.app.hammer_radar.operator.tiny_live_fresh_context_signed_request_regene
     build_tiny_live_fresh_context_signed_request_regeneration_gate,
     compute_fresh_contract_fit_quantity,
 )
+from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
+    DEFAULT_MAX_LEVERAGE,
+    DEFAULT_MAX_POSITION_NOTIONAL_USDT,
+    PROPER_TINY_LIVE_CONTRACT_MODE,
+    build_tiny_live_risk_contract_validation_summary,
+)
 from src.app.hammer_radar.operator.tiny_live_submit_gate_preview import (
     CONFIRM_TINY_LIVE_SUBMIT_GATE_PREVIEW_PHRASE,
     build_tiny_live_submit_gate_preview,
@@ -118,9 +124,14 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
         percentage_model = derive_percentage_risk_contract_model(current)
         resolved = resolve_percentage_risk_contract_values(percentage_model)
         percentage_model["resolved_values"] = dict(resolved)
+        risk_interpretation = build_tiny_live_risk_contract_validation_summary(
+            risk_contract=current,
+            require_live_execution_enabled=False,
+        )
         same_or_stricter = validate_percentage_contract_same_or_stricter(
             current_contract=current.get("contract") if isinstance(current.get("contract"), Mapping) else {},
             resolved_values=resolved,
+            risk_interpretation=risk_interpretation,
         )
         sizing_plan = build_contract_fit_sizing_plan(
             fresh_mark_price=None,
@@ -160,6 +171,16 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
                     step_size=readonly.get("step_size"),
                     min_notional=readonly.get("min_notional"),
                 )
+                risk_interpretation = build_tiny_live_risk_contract_validation_summary(
+                    risk_contract=current,
+                    candidate_qty=sizing_plan.get("candidate_qty"),
+                    candidate_reference_price=readonly.get("fresh_mark_price"),
+                    candidate_notional_usdt=sizing_plan.get("candidate_notional_usdt"),
+                    candidate_estimated_loss_usdt=sizing_plan.get("candidate_estimated_loss_usdt"),
+                    step_size=readonly.get("step_size"),
+                    min_notional=readonly.get("min_notional"),
+                    require_live_execution_enabled=False,
+                )
             if schema_update["succeeded"] and not sizing_plan.get("blocked_by"):
                 step_results["signed_regeneration"] = run_contract_fit_signed_regeneration(
                     log_dir=resolved_log_dir,
@@ -184,6 +205,7 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
                 sizing_plan=sizing_plan,
                 step_results=step_results,
                 same_or_stricter=same_or_stricter,
+                risk_interpretation=risk_interpretation,
             )
             overall = classify_tiny_live_percentage_contract_fit_status(
                 run_requested=run_contract_fit_regeneration,
@@ -205,6 +227,7 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
                 sizing_plan=sizing_plan,
                 step_results=step_results,
                 same_or_stricter=same_or_stricter,
+                risk_interpretation=risk_interpretation,
             )
             overall = TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_READY_FOR_CONFIRMATION
             status = TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_READY
@@ -213,6 +236,7 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
             sizing_plan=sizing_plan,
             step_results=step_results,
             same_or_stricter=same_or_stricter,
+            risk_interpretation=risk_interpretation,
         )
         packet = build_contract_fit_go_no_go_packet(
             output_validation=validation,
@@ -245,6 +269,7 @@ def build_tiny_live_percentage_risk_contract_fit_regeneration(
                     "binance_order_endpoint_called": False,
                 },
                 "operator_intervention_model": build_operator_intervention_model(resolved),
+                "risk_contract_interpretation": risk_interpretation,
                 "percentage_contract_model": percentage_model,
                 "contract_fit_sizing_plan": sizing_plan,
                 "step_results": step_results,
@@ -315,14 +340,18 @@ def derive_percentage_risk_contract_model(current_contract: Mapping[str, Any]) -
     contract = current_contract.get("contract") if isinstance(current_contract.get("contract"), Mapping) else current_contract
     margin = _number(contract.get("tiny_live_margin_usdt") or contract.get("margin_budget_usdt")) or 44.0
     isolated_wallet = _number(contract.get("isolated_risk_wallet_usdt")) or 88.0
-    leverage = _number(contract.get("leverage")) or 10.0
+    leverage = min(_number(contract.get("leverage")) or DEFAULT_MAX_LEVERAGE, DEFAULT_MAX_LEVERAGE)
     max_loss = _number(contract.get("max_loss_usdt")) or 4.44
     return {
         "uses_percentage_model": True,
+        "tiny_live_contract_mode": str(contract.get("tiny_live_contract_mode") or PROPER_TINY_LIVE_CONTRACT_MODE),
         "isolated_wallet_reference_pct": 1.0,
         "isolated_risk_wallet_usdt": isolated_wallet,
         "position_margin_pct_of_isolated_wallet": margin / isolated_wallet if isolated_wallet else 0.5,
-        "max_notional_multiplier_of_position_margin": leverage,
+        "max_notional_multiplier_of_position_margin": min(
+            leverage,
+            DEFAULT_MAX_POSITION_NOTIONAL_USDT / margin if margin else DEFAULT_MAX_LEVERAGE,
+        ),
         "max_loss_pct_of_position_margin": max_loss / margin if margin else None,
         "resolved_values": {},
     }
@@ -340,7 +369,7 @@ def resolve_percentage_risk_contract_values(model: Mapping[str, Any]) -> dict[st
         "position_margin_pct_of_wallet": margin_pct,
         "resolved_position_margin_usdt": margin,
         "leverage": leverage,
-        "resolved_max_notional_usdt": round(margin * leverage, 8),
+        "resolved_max_notional_usdt": min(round(margin * leverage, 8), DEFAULT_MAX_POSITION_NOTIONAL_USDT),
         "wallet_buffer_usdt": round(isolated - margin, 8),
         "wallet_buffer_pct_of_wallet": round(1 - margin_pct, 8),
         "resolved_max_loss_usdt": max_loss,
@@ -352,20 +381,23 @@ def validate_percentage_contract_same_or_stricter(
     *,
     current_contract: Mapping[str, Any],
     resolved_values: Mapping[str, Any],
+    risk_interpretation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     blocked: list[str] = []
     current_margin = _number(current_contract.get("tiny_live_margin_usdt") or current_contract.get("margin_budget_usdt") or current_contract.get("max_margin_usdt")) or 44.0
-    current_notional = _number(current_contract.get("max_notional_usdt") or current_contract.get("max_position_notional_usdt")) or 440.0
+    current_notional = _number(current_contract.get("max_notional_usdt") or current_contract.get("max_position_notional_usdt")) or DEFAULT_MAX_POSITION_NOTIONAL_USDT
     current_loss = _number(current_contract.get("max_loss_usdt")) or 4.44
-    current_leverage = _number(current_contract.get("leverage")) or 10.0
+    current_leverage = _number(current_contract.get("leverage")) or DEFAULT_MAX_LEVERAGE
     if (_number(resolved_values.get("resolved_position_margin_usdt")) or 0) > min(current_margin, 44.0):
         blocked.append("position_margin_above_current_or_44")
-    if (_number(resolved_values.get("resolved_max_notional_usdt")) or 0) > min(current_notional, 440.0):
-        blocked.append("max_notional_above_current_or_440")
+    if (_number(resolved_values.get("resolved_max_notional_usdt")) or 0) > min(current_notional, DEFAULT_MAX_POSITION_NOTIONAL_USDT):
+        blocked.append("max_notional_above_current_or_44")
     if (_number(resolved_values.get("resolved_max_loss_usdt")) or 0) > min(current_loss, 4.44) + 0.000001:
         blocked.append("max_loss_above_current_or_4_44")
-    if (_number(resolved_values.get("leverage")) or 0) > min(current_leverage, 10.0):
-        blocked.append("leverage_above_current_or_10")
+    if (_number(resolved_values.get("leverage")) or 0) > min(current_leverage, DEFAULT_MAX_LEVERAGE):
+        blocked.append("leverage_above_current_or_3")
+    if risk_interpretation and risk_interpretation.get("valid") is not True:
+        blocked.extend(str(item) for item in risk_interpretation.get("blocked_by") or [])
     return {
         "valid": not blocked,
         "no_risk_limit_increase": not blocked,
@@ -494,6 +526,7 @@ def apply_percentage_risk_contract_schema_update(
         if isinstance(contract, dict) and _contract_lane_key(contract) == official_lane_key:
             contract["contract_version"] = "tiny_live_percentage_risk_contract_v2"
             contract["uses_percentage_model"] = True
+            contract["tiny_live_contract_mode"] = PROPER_TINY_LIVE_CONTRACT_MODE
             contract["isolated_risk_wallet_usdt"] = resolved_values["isolated_risk_wallet_usdt"]
             contract["position_margin_pct_of_isolated_wallet"] = resolved_values[
                 "position_margin_pct_of_wallet"
@@ -623,12 +656,15 @@ def build_contract_fit_output_validation(
     sizing_plan: Mapping[str, Any],
     step_results: Mapping[str, Any],
     same_or_stricter: Mapping[str, Any],
+    risk_interpretation: Mapping[str, Any],
 ) -> dict[str, Any]:
     errors: list[str] = []
     dry = step_results.get("dry_preview") if isinstance(step_results.get("dry_preview"), Mapping) else {}
     signed = step_results.get("signed_regeneration") if isinstance(step_results.get("signed_regeneration"), Mapping) else {}
     if same_or_stricter.get("valid") is not True:
         errors.append("unsafe_risk_change")
+    if risk_interpretation.get("valid") is not True:
+        errors.extend(str(item) for item in risk_interpretation.get("blocked_by") or [])
     if sizing_plan.get("blocked_by"):
         errors.extend(str(item) for item in sizing_plan.get("blocked_by") or [])
     notional_ok = sizing_plan.get("fits_max_notional") is True
@@ -640,6 +676,8 @@ def build_contract_fit_output_validation(
         "signed_request_fresh_enough_for_dry_preview": dry.get("succeeded") is True,
         "notional_within_contract": notional_ok,
         "loss_within_contract": loss_ok,
+        "risk_contract_interpretation_valid": risk_interpretation.get("valid") is True,
+        "risk_contract_interpretation": dict(risk_interpretation),
         "no_risk_limit_increase": same_or_stricter.get("no_risk_limit_increase") is True,
         "errors": _dedupe(errors),
         "warnings": [],

@@ -38,7 +38,7 @@ def test_preview_writes_no_authorization(tmp_path: Path) -> None:
     assert payload["authorization_written"] is False
     assert payload["record_gate_requested"] is False
     assert payload["confirmation_valid"] is False
-    assert payload["authorization_write_preview"]["would_write"] is True
+    assert payload["authorization_write_preview"]["would_write"] is False
     assert payload["authorization_write_preview"]["authorization_artifact"] == "ledger_only"
     assert not (log_dir / LEDGER_FILENAME).exists()
 

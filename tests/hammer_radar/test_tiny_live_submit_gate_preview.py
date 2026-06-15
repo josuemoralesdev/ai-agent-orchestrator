@@ -285,6 +285,7 @@ def _fixture_r254(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Path, Path]:
     monkeypatch.delenv(BINANCE_API_SECRET_ENV, raising=False)
     r253b = build_tiny_live_fresh_context_signed_request_regeneration_gate(
         log_dir=log_dir,
+        risk_contract_config_path=risk_path,
         regenerate_fresh_context_signed_request=True,
         confirm_tiny_live_fresh_context_regeneration=CONFIRM_TINY_LIVE_FRESH_CONTEXT_REGENERATION_PHRASE,
         now=NOW,

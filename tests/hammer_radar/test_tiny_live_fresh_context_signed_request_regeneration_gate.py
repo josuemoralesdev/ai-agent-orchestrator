@@ -71,10 +71,11 @@ def test_cli_exists_and_returns_json(tmp_path: Path, monkeypatch) -> None:
     )
 
     payload = json.loads(result.stdout)
-    assert payload["status"] == TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_READY
+    assert payload["status"] == TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_BLOCKED
     assert payload["target_scope"]["official_lane_key"] == OFFICIAL
     assert payload["input_summary"]["r253_regeneration_required"] is True
     assert payload["fresh_context_regeneration_written"] is False
+    assert "quantity_invalid" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
     assert payload["safety"]["network_allowed"] is False
     _assert_no_secret_values(payload)
 
@@ -85,9 +86,10 @@ def test_preview_writes_no_ledger_and_does_not_sign(tmp_path: Path, monkeypatch)
 
     payload = build_tiny_live_fresh_context_signed_request_regeneration_gate(log_dir=log_dir, now=NOW)
 
-    assert payload["status"] == TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_READY
+    assert payload["status"] == TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_BLOCKED
     assert payload["regenerate_fresh_context_signed_request_requested"] is False
     assert payload["fresh_context_regeneration_written"] is False
+    assert "quantity_invalid" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
     assert payload["safety"]["hmac_signature_created"] is False
     assert _ledger_counts(log_dir) == before
     assert not (log_dir / LEDGER_FILENAME).exists()
@@ -137,9 +139,13 @@ def test_blocks_if_r253_fresh_context_missing(tmp_path: Path, monkeypatch) -> No
 
 
 def test_builds_fresh_short_stop_take_profit_and_payload(tmp_path: Path, monkeypatch) -> None:
-    log_dir, _, _ = _fixture_ready_r253b(tmp_path, monkeypatch, mark_price="63675")
+    log_dir, risk_path, _ = _fixture_ready_r253b(tmp_path, monkeypatch, mark_price="63675")
 
-    payload = build_tiny_live_fresh_context_signed_request_regeneration_gate(log_dir=log_dir, now=NOW)
+    payload = build_tiny_live_fresh_context_signed_request_regeneration_gate(
+        log_dir=log_dir,
+        risk_contract_config_path=risk_path,
+        now=NOW,
+    )
 
     context = payload["fresh_reference_context"]
     stop = payload["fresh_stop_take_profit_source"]
@@ -180,6 +186,7 @@ def test_exact_confirmation_writes_fresh_signed_artifact_and_no_secrets(
 
     payload = build_tiny_live_fresh_context_signed_request_regeneration_gate(
         log_dir=log_dir,
+        risk_contract_config_path=risk_path,
         regenerate_fresh_context_signed_request=True,
         confirm_tiny_live_fresh_context_regeneration=CONFIRM_TINY_LIVE_FRESH_CONTEXT_REGENERATION_PHRASE,
         now=NOW,
