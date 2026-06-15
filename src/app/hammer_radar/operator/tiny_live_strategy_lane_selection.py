@@ -29,6 +29,10 @@ DEFAULT_MIN_SAMPLE = 30
 PREFERRED_ENTRY_MODE = "ladder_close_50_618"
 STRATEGY_PROMOTION_EVENTS_FILENAME = "strategy_promotion_events.ndjson"
 DEFAULT_MIN_WIN_RATE_PCT = 55.0
+NEAR_MISS_MIN_WIN_RATE_PCT = 53.0
+LIVE_QUALIFIED = "LIVE_QUALIFIED"
+NEAR_MISS_INCUBATOR = "NEAR_MISS_INCUBATOR"
+PAPER_ONLY = "PAPER_ONLY"
 R270B_CREATED_BY_PHASE = "R270B_STRATEGY_QUALIFIED_LANE_RISK_CONTRACT_SELECTION"
 R270B_RISK_CONTRACT_APPLY_CONFIRMATION_PHRASE = (
     "I CONFIRM R270B EXACT LANE RISK CONTRACT APPLY ONLY; "
@@ -81,6 +85,13 @@ def build_strategy_lane_qualification(
     win_rate = _float_or_none(raw_evidence.get("win_rate_pct"))
     sample_count = _int_or_none(raw_evidence.get("sample_count") or raw_evidence.get("samples"))
     avg_pnl_pct = _float_or_none(raw_evidence.get("avg_pnl_pct"))
+    live_classification = _classify_strategy_lane(
+        win_rate_pct=win_rate,
+        sample_count=sample_count,
+        avg_pnl_pct=avg_pnl_pct,
+        min_sample=min_sample,
+        min_win_rate_pct=float(min_win_rate_pct),
+    )
     blockers: list[str] = []
     if str(symbol or "") != BTC_SYMBOL:
         blockers.append("strategy_lane_symbol_not_BTCUSDT")
@@ -94,6 +105,7 @@ def build_strategy_lane_qualification(
         blockers.append("strategy_lane_win_rate_missing")
         blockers.append("strategy_evidence_missing")
     elif win_rate < float(min_win_rate_pct):
+        blockers.append("strategy_near_miss_not_live_eligible")
         blockers.append("win_rate_below_operator_55_policy")
         blockers.append("strategy_lane_win_rate_below_55")
         blockers.append("strategy_win_rate_below_55")
@@ -115,6 +127,12 @@ def build_strategy_lane_qualification(
         "lane_key": lane_key,
         "strategy_qualified": not blockers,
         "qualification_status": "QUALIFIED" if not blockers else "BLOCKED",
+        "live_qualification_class": live_classification,
+        "watch_category": live_classification,
+        "near_miss_incubator": live_classification == NEAR_MISS_INCUBATOR,
+        "paper_only": live_classification == PAPER_ONLY,
+        "manual_live_unlock_allowed": live_classification == LIVE_QUALIFIED and not blockers,
+        "near_miss_min_win_rate_pct": NEAR_MISS_MIN_WIN_RATE_PCT,
         "win_rate_pct": win_rate,
         "sample_count": sample_count,
         "avg_pnl_pct": avg_pnl_pct,
@@ -402,6 +420,27 @@ def _int_or_none(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _classify_strategy_lane(
+    *,
+    win_rate_pct: float | None,
+    sample_count: int | None,
+    avg_pnl_pct: float | None,
+    min_sample: int,
+    min_win_rate_pct: float,
+) -> str:
+    if sample_count is None or sample_count < min_sample:
+        return PAPER_ONLY
+    if avg_pnl_pct is None or avg_pnl_pct <= 0.0:
+        return PAPER_ONLY
+    if win_rate_pct is None:
+        return PAPER_ONLY
+    if win_rate_pct >= min_win_rate_pct:
+        return LIVE_QUALIFIED
+    if NEAR_MISS_MIN_WIN_RATE_PCT <= win_rate_pct < min_win_rate_pct:
+        return NEAR_MISS_INCUBATOR
+    return PAPER_ONLY
 
 
 def _dedupe(values: list[str]) -> list[str]:

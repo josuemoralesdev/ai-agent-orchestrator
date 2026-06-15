@@ -36,6 +36,7 @@ from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regene
     build_tiny_live_percentage_risk_contract_fit_regeneration,
 )
 from src.app.hammer_radar.operator.trade_ticket import build_lane_key, build_trade_ticket
+from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import LIVE_QUALIFIED
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R264B_TINY_LIVE_JIT_LAUNCH_PACKET"
@@ -746,6 +747,12 @@ def validate_final_manual_submit_unlock_gate(
         else {}
     )
     avg_pnl_pct = _float_or_none(strategy_qualification.get("avg_pnl_pct"))
+    win_rate_pct = _float_or_none(strategy_qualification.get("win_rate_pct"))
+    live_class = str(
+        strategy_qualification.get("live_qualification_class")
+        or strategy_qualification.get("watch_category")
+        or ""
+    )
     packet_symbol, packet_timeframe, packet_direction, _packet_entry_mode = _lane_parts(packet_lane_key)
     required = {
         "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
@@ -758,6 +765,9 @@ def validate_final_manual_submit_unlock_gate(
         "fresh_candidate_direction_matches_packet": fresh_candidate_status.get("direction") == packet_direction,
         "fresh_candidate_lane_matches_packet": fresh_candidate_status.get("lane_key") == packet_lane_key,
         "strategy_lane_qualified": fresh_candidate_status.get("strategy_qualified") is True,
+        "strategy_live_qualified": live_class in {"", LIVE_QUALIFIED}
+        and win_rate_pct is not None
+        and win_rate_pct >= 55.0,
         "strategy_avg_pnl_positive": avg_pnl_pct is not None and avg_pnl_pct > 0.0,
         "exact_lane_risk_contract_valid": fresh_candidate_status.get("exact_risk_contract_valid") is True,
         "signal_origin_allowed": origin.get("manual_unlock_allowed") is True,
@@ -812,6 +822,8 @@ def validate_final_manual_submit_unlock_gate(
         ),
     }
     blocked = [name for name, passed in required.items() if not passed]
+    if live_class and live_class != LIVE_QUALIFIED:
+        blocked.append("strategy_near_miss_not_live_eligible")
     blocked.extend(str(item) for item in jit_validation.get("blocked_by") or [])
     blocked.extend(str(item) for item in fresh_candidate_status.get("blocked_by") or [])
     blocked.extend(str(item) for item in origin.get("blocked_by") or [])
@@ -928,6 +940,8 @@ def _strategy_evidence_summary(value: object) -> dict[str, Any]:
         "sample_count": value.get("sample_count"),
         "min_sample": value.get("min_sample") or value.get("min_sample_count"),
         "avg_pnl_pct": value.get("avg_pnl_pct"),
+        "live_qualification_class": value.get("live_qualification_class") or value.get("watch_category"),
+        "near_miss_incubator": value.get("near_miss_incubator") is True,
         "strategy_qualified": value.get("strategy_qualified") is True,
     }
 

@@ -300,9 +300,10 @@ def test_final_console_surfaces_current_4m_long_lane_expected_orders_and_origin(
     assert payload["binance_order_endpoint_called"] is False
 
 
-def test_exact_arming_phrase_records_experimental_acceptance_and_writes_only_lane_controls(tmp_path: Path) -> None:
+def test_exact_arming_phrase_blocks_near_miss_or_paper_lane_without_writes(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     before_risk = risk_path.read_text(encoding="utf-8")
+    before_lane = lane_path.read_text(encoding="utf-8")
     payload = r263.build_tiny_live_final_console(
         log_dir=log_dir,
         lane_controls_path=lane_path,
@@ -312,24 +313,22 @@ def test_exact_arming_phrase_records_experimental_acceptance_and_writes_only_lan
         operator_id="local_operator",
         reason="R263 acceptance test",
     )
-    after_lane = json.loads(lane_path.read_text(encoding="utf-8"))
-    assert payload["final_console_controls_armed"] is True
-    assert payload["operator_choice_panel"]["experimental_lane_acceptance_recorded"] is True
-    assert payload["safety"]["lane_controls_written"] is True
+    assert payload["final_console_controls_armed"] is False
+    assert payload["operator_choice_panel"]["experimental_lane_acceptance_recorded"] is False
+    assert payload["safety"]["lane_controls_written"] is False
     assert payload["safety"]["risk_contract_config_written"] is False
     assert payload["safety"]["submit_attempted"] is False
     assert payload["safety"]["order_placed"] is False
     assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert "strategy_near_miss_not_live_eligible" in payload["controls_arming_result"]["blocked_by"]
     assert risk_path.read_text(encoding="utf-8") == before_risk
-    assert after_lane["lanes"][0]["mode"] == "tiny_live"
-    assert after_lane["lanes"][2]["mode"] == "tiny_live"
-    assert after_lane["lanes"][2]["tiny_live_armed_by_phase"] == "R263"
-    assert after_lane["lanes"][2]["experimental_lane_acceptance_recorded"] is True
+    assert lane_path.read_text(encoding="utf-8") == before_lane
 
 
-def test_cli_exact_arming_uses_injected_temp_lane_controls(tmp_path: Path) -> None:
+def test_cli_exact_arming_for_8m_short_keeps_injected_temp_lane_controls_unchanged(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     real_before = REAL_LANE_CONTROLS.read_text(encoding="utf-8")
+    temp_before = lane_path.read_text(encoding="utf-8")
     result = subprocess.run(
         [
             sys.executable,
@@ -355,11 +354,10 @@ def test_cli_exact_arming_uses_injected_temp_lane_controls(tmp_path: Path) -> No
         text=True,
     )
     payload = json.loads(result.stdout)
-    temp_lane = json.loads(lane_path.read_text(encoding="utf-8"))
-    assert payload["final_console_controls_armed"] is True
-    assert payload["safety"]["lane_controls_written"] is True
-    assert temp_lane["lanes"][2]["mode"] == "tiny_live"
-    assert temp_lane["lanes"][2]["tiny_live_armed_by_phase"] == "R263"
+    assert payload["final_console_controls_armed"] is False
+    assert payload["safety"]["lane_controls_written"] is False
+    assert "strategy_near_miss_not_live_eligible" in payload["controls_arming_result"]["blocked_by"]
+    assert lane_path.read_text(encoding="utf-8") == temp_before
     assert REAL_LANE_CONTROLS.read_text(encoding="utf-8") == real_before
 
 
@@ -512,6 +510,7 @@ def test_8m_short_lane_marked_paper_only_promotion_mismatched(tmp_path: Path) ->
     lane = payload["lane_intelligence_panel"]
     assert lane["execution_lane_timeframe_status"] == "paper_only"
     assert lane["execution_lane_promotion_status"] == "not_promotion_ready"
+    assert lane["live_qualification_class"] == "PAPER_ONLY"
     assert lane["execution_lane_direction_status"] == "experimental_short"
     assert lane["operator_acceptance_required"] is True
 

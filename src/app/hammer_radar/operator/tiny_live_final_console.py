@@ -44,6 +44,7 @@ from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
 from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket
+from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import LIVE_QUALIFIED, NEAR_MISS_INCUBATOR
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R263_TINY_LIVE_FINAL_CONSOLE_LANE_INTELLIGENCE_CONTROLS_ARMING"
@@ -164,6 +165,10 @@ def build_tiny_live_final_console(
         latest_jit_launch_packet = load_latest_jit_launch_packet_summary(
             log_dir=resolved_log_dir,
             official_lane_key=official_lane_key,
+        )
+        latest_jit_launch_packet = suppress_final_command_for_unqualified_candidate(
+            latest_jit_launch_packet=latest_jit_launch_packet,
+            fresh_candidate_status=fresh_candidate_status,
         )
         exchange_minimum_decision_packet = build_final_console_exchange_minimum_decision_packet(
             log_dir=resolved_log_dir,
@@ -540,6 +545,48 @@ def load_latest_jit_launch_packet_summary(
     }
 
 
+def suppress_final_command_for_unqualified_candidate(
+    *,
+    latest_jit_launch_packet: Mapping[str, Any],
+    fresh_candidate_status: Mapping[str, Any],
+) -> dict[str, Any]:
+    packet = _sanitize(dict(latest_jit_launch_packet))
+    strategy = (
+        fresh_candidate_status.get("strategy_qualification")
+        if isinstance(fresh_candidate_status.get("strategy_qualification"), Mapping)
+        else {}
+    )
+    live_class = str(strategy.get("live_qualification_class") or strategy.get("watch_category") or "")
+    if live_class in {"", LIVE_QUALIFIED} and fresh_candidate_status.get("fresh_candidate_available") is True:
+        return packet
+    blocked_by = _dedupe(
+        [
+            "strategy_near_miss_not_live_eligible",
+            *[str(item) for item in packet.get("blocked_by") or []],
+            *[str(item) for item in fresh_candidate_status.get("blocked_by") or []],
+        ]
+    )
+    command = packet.get("final_live_submit_command_packet")
+    if not isinstance(command, Mapping):
+        command = {}
+    gate = command.get("gate_validation") if isinstance(command.get("gate_validation"), Mapping) else {}
+    packet["valid"] = False
+    packet["final_command_available"] = False
+    packet["blocked_by"] = blocked_by
+    packet["final_live_submit_command_packet"] = {
+        **dict(command),
+        "available": False,
+        "command": "",
+        "unavailable_reason": "; ".join(blocked_by),
+        "gate_validation": {
+            **dict(gate),
+            "valid": False,
+            "blocked_by": _dedupe([*[str(item) for item in gate.get("blocked_by") or []], *blocked_by]),
+        },
+    }
+    return packet
+
+
 def build_final_console_fresh_candidate_status(
     *,
     log_dir: str | Path | None = None,
@@ -729,6 +776,7 @@ def load_lane_fisherman_context(
     lane = lane_controls.get("official_lane") if isinstance(lane_controls.get("official_lane"), Mapping) else {}
     mode = str(lane.get("mode") or "").lower()
     promoted = _promotion_ready_lanes(promotion_snapshot)
+    near_miss = _near_miss_lanes(promotion_snapshot)
     timeframe = _lane_parts(official_lane_key)[1]
     direction = _lane_parts(official_lane_key)[2]
     if timeframe in {"13m", "44m"}:
@@ -740,6 +788,13 @@ def load_lane_fisherman_context(
     else:
         timeframe_status = "unknown"
     promotion_status = "promotion_ready" if official_lane_key in promoted else "not_promotion_ready"
+    live_class = (
+        LIVE_QUALIFIED
+        if official_lane_key in promoted
+        else NEAR_MISS_INCUBATOR
+        if official_lane_key in near_miss
+        else "PAPER_ONLY"
+    )
     direction_status = "promoted" if promotion_status == "promotion_ready" else (
         "experimental_short" if direction == "short" else "unknown"
     )
@@ -748,8 +803,10 @@ def load_lane_fisherman_context(
         "lane_control_mode": mode or "unknown",
         "execution_lane_timeframe_status": timeframe_status,
         "execution_lane_promotion_status": promotion_status,
+        "live_qualification_class": live_class,
         "execution_lane_direction_status": direction_status,
         "promoted_lanes": promoted,
+        "near_miss_incubator_lanes": near_miss,
         "readiness_status": readiness_snapshot.get("readiness_status") or "UNKNOWN",
         "fisherman_warning": promotion_status != "promotion_ready" or timeframe_status != "allowed_tiny_live",
         "operator_acceptance_required": promotion_status != "promotion_ready",
@@ -954,6 +1011,8 @@ def summarize_lane_intelligence_panel(
         warnings.append("execution lane timeframe is paper-only by promotion config")
     if lane_context.get("execution_lane_promotion_status") != "promotion_ready":
         warnings.append("execution lane is not promotion-ready")
+    if lane_context.get("live_qualification_class") != LIVE_QUALIFIED:
+        warnings.append("strategy_near_miss_not_live_eligible")
     if lane_context.get("execution_lane_direction_status") == "experimental_short":
         warnings.append("8m short is a manual experimental lane, not fisherman-promoted")
     if readiness_snapshot.get("readiness_status") == "NOT_READY":
@@ -962,8 +1021,10 @@ def summarize_lane_intelligence_panel(
         "execution_lane": lane_context.get("execution_lane"),
         "execution_lane_timeframe_status": lane_context.get("execution_lane_timeframe_status") or "unknown",
         "execution_lane_promotion_status": lane_context.get("execution_lane_promotion_status") or "unknown",
+        "live_qualification_class": lane_context.get("live_qualification_class") or "PAPER_ONLY",
         "execution_lane_direction_status": lane_context.get("execution_lane_direction_status") or "unknown",
         "promoted_lanes": _promotion_ready_lanes(promotion_snapshot),
+        "near_miss_incubator_lanes": _near_miss_lanes(promotion_snapshot),
         "readiness_status": readiness_snapshot.get("readiness_status") or "UNKNOWN",
         "fresh_eligible_count": state.get("fresh_eligible_count"),
         "expired_eligible_count": state.get("expired_eligible_count"),
@@ -1023,6 +1084,8 @@ def validate_final_console_controls_arming_request(
         blocked_by.append("missing_r262b")
     if not contract_fit_panel.get("risk_contract_valid") or not contract_fit_panel.get("fits_contract"):
         blocked_by.append("contract_fit_invalid")
+    if lane_intelligence_panel.get("live_qualification_class") != LIVE_QUALIFIED:
+        blocked_by.append("strategy_near_miss_not_live_eligible")
     if lane_intelligence_panel.get("operator_acceptance_required") and not confirmation_valid:
         blocked_by.append("experimental_lane_acceptance_required")
     return {"valid": not blocked_by, "blocked_by": _dedupe(blocked_by)}
@@ -1081,8 +1144,11 @@ def build_final_console_go_no_go_packet(
     r262b_valid = contract_fit_panel.get("r262b_found") and contract_fit_panel.get("risk_contract_valid") and contract_fit_panel.get("fits_contract")
     exchange_packet = exchange_minimum_decision_packet or {}
     exchange_minimum_blocks = exchange_packet.get("configured_cap_possible") is not True
+    strategy_blocks = lane_intelligence_panel.get("live_qualification_class") != LIVE_QUALIFIED
     if exchange_minimum_blocks:
         next_step = "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT"
+    elif strategy_blocks:
+        next_step = "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
     elif not r262b_valid:
         next_step = "RERUN_R262B"
     elif lane_intelligence_panel.get("operator_acceptance_required") and not experimental_lane_acceptance_recorded:
@@ -1099,17 +1165,20 @@ def build_final_console_go_no_go_packet(
         "go_for_actual_submit_now": False,
         "go_for_r264_actual_submit_checkpoint": bool(
             not exchange_minimum_blocks
+            and not strategy_blocks
             and r262b_valid
             and signed_triplet_panel.get("signed_triplet_available")
             and controls_panel.get("controls_armed")
         ),
         "go_for_controls_arming": bool(
-            not exchange_minimum_blocks and r262b_valid and not controls_panel.get("controls_armed")
+            not exchange_minimum_blocks and not strategy_blocks and r262b_valid and not controls_panel.get("controls_armed")
         ),
         "operator_should_submit_now": False,
         "next_required_step": next_step,
         "exchange_minimum_blocks_submit": bool(exchange_minimum_blocks),
         "exchange_minimum_block_reason": exchange_packet.get("block_reason"),
+        "strategy_blocks_submit": bool(strategy_blocks),
+        "strategy_block_reason": "strategy_near_miss_not_live_eligible" if strategy_blocks else "",
     }
 
 
@@ -1375,6 +1444,8 @@ def _build_final_console_matrix(
         blocked.append("risk_contract_invalid")
     if lane_intelligence_panel.get("operator_acceptance_required") and not experimental_lane_acceptance_recorded:
         blocked.append("experimental_lane_acceptance_required")
+    if lane_intelligence_panel.get("live_qualification_class") != LIVE_QUALIFIED:
+        blocked.append("strategy_near_miss_not_live_eligible")
     return {
         "r262b_valid": contract_fit_panel.get("r262b_found") is True and contract_fit_panel.get("fits_contract") is True,
         "signed_triplet_available": signed_triplet_panel.get("signed_triplet_available") is True,
@@ -1382,6 +1453,7 @@ def _build_final_console_matrix(
         "lane_intelligence_loaded": bool(lane_intelligence_panel.get("execution_lane")),
         "experimental_lane_acceptance_required": lane_intelligence_panel.get("operator_acceptance_required") is True,
         "experimental_lane_acceptance_recorded": bool(experimental_lane_acceptance_recorded),
+        "live_qualification_class": lane_intelligence_panel.get("live_qualification_class") or "PAPER_ONLY",
         "controls_armed": controls_panel.get("controls_armed") is True,
         "exchange_minimum_cap_possible": exchange_packet.get("configured_cap_possible") is True,
         "exchange_minimum_block_reason": exchange_packet.get("block_reason"),
@@ -1463,6 +1535,8 @@ def _recommended_next_operator_move(packet: Mapping[str, Any], overall: str) -> 
         return "Review the exchange-minimum decision packet; keep NO-GO until an operator-approved cap decision is applied in a later safe phase."
     if step == "R264_ACTUAL_SUBMIT_CHECKPOINT":
         return "Proceed only to the R264 actual submit checkpoint; do not submit from R263."
+    if step == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE":
+        return "Wait for a fresh LIVE_QUALIFIED candidate; near-miss lanes remain incubator/watchlist only."
     if step == "ARM_CONTROLS":
         return "Use the exact R263 controls arming phrase only if accepting the 8m short experimental lane."
     if step == "RERUN_R262B":
@@ -1477,6 +1551,8 @@ def _recommended_next_engineering_move(packet: Mapping[str, Any], overall: str) 
         return "Keep final submit unavailable; add only an explicit operator decision/write phase if the exchange-minimum cap is accepted."
     if packet.get("next_required_step") == "R264_ACTUAL_SUBMIT_CHECKPOINT":
         return "Build/run R264 with R263 armed-state, R262B contract-fit, exact submit phrase, idempotency, and reconciliation checks."
+    if packet.get("next_required_step") == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE":
+        return "Keep final command unavailable; route near-miss lanes to Strategy Lab paper work."
     if packet.get("next_required_step") == "ARM_CONTROLS":
         return "Keep R264 blocked until R263 experimental-lane acceptance and controls arming are recorded."
     return "Keep R263 read-only except exact controls arming; do not create submit behavior here."
@@ -1494,6 +1570,26 @@ def _promotion_ready_lanes(snapshot: Mapping[str, Any]) -> list[str]:
         if lane not in lanes:
             lanes.append(lane)
     return lanes
+
+
+def _near_miss_lanes(snapshot: Mapping[str, Any]) -> list[str]:
+    lanes: list[str] = []
+    for key in ("near_miss_incubator_lanes",):
+        for row in snapshot.get(key) or []:
+            if not isinstance(row, Mapping):
+                continue
+            lane = row.get("strategy_key") or _lane_key_from_row(row)
+            if lane:
+                lanes.append(str(lane))
+    watch = snapshot.get("qualified_candidate_watch")
+    if isinstance(watch, Mapping):
+        for row in watch.get("near_miss_incubator_lanes") or []:
+            if not isinstance(row, Mapping):
+                continue
+            lane = row.get("strategy_key") or _lane_key_from_row(row)
+            if lane:
+                lanes.append(str(lane))
+    return _dedupe(lanes)
 
 
 def _risk_contract_limits_valid(risk_contract: Mapping[str, Any]) -> bool:

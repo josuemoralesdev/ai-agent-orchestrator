@@ -37,6 +37,10 @@ def test_lane_below_55_blocks(tmp_path: Path) -> None:
         evidence=_evidence(win_rate_pct=54.99, sample_count=80),
     )
     assert payload["strategy_qualified"] is False
+    assert payload["live_qualification_class"] == r270b.NEAR_MISS_INCUBATOR
+    assert payload["near_miss_incubator"] is True
+    assert payload["manual_live_unlock_allowed"] is False
+    assert "strategy_near_miss_not_live_eligible" in payload["blocked_by"]
     assert "win_rate_below_operator_55_policy" in payload["blocked_by"]
     assert "strategy_lane_win_rate_below_55" in payload["blocked_by"]
     assert "strategy_win_rate_below_55" in payload["blocked_by"]
@@ -52,6 +56,8 @@ def test_13m_47_27_does_not_qualify(tmp_path: Path) -> None:
         evidence=_evidence(win_rate_pct=47.27, sample_count=55),
     )
     assert payload["strategy_qualified"] is False
+    assert payload["live_qualification_class"] == r270b.PAPER_ONLY
+    assert payload["paper_only"] is True
     assert payload["min_win_rate_pct"] == 55.0
     assert "win_rate_below_operator_55_policy" in payload["blocked_by"]
     assert "strategy_win_rate_below_55" in payload["blocked_by"]
@@ -67,7 +73,30 @@ def test_44m_58_57_qualifies_with_sample_minimum(tmp_path: Path) -> None:
         evidence=_evidence(win_rate_pct=58.57, sample_count=70),
     )
     assert payload["strategy_qualified"] is True
+    assert payload["live_qualification_class"] == r270b.LIVE_QUALIFIED
+    assert payload["manual_live_unlock_allowed"] is True
     assert payload["evidence_policy_all_timeframes_enabled"] is True
+
+
+def test_53_to_54_99_enters_incubator_not_live(tmp_path: Path) -> None:
+    payload = r270b.build_strategy_lane_qualification(
+        symbol="BTCUSDT",
+        timeframe="8m",
+        direction="short",
+        entry_mode="ladder_close_50_618",
+        log_dir=tmp_path / "logs",
+        evidence={
+            **_evidence(win_rate_pct=53.0, sample_count=30),
+            "strategy_key": LANE_8M_SHORT,
+            "timeframe": "8m",
+            "direction": "short",
+        },
+    )
+    assert payload["strategy_qualified"] is False
+    assert payload["live_qualification_class"] == r270b.NEAR_MISS_INCUBATOR
+    assert payload["near_miss_incubator"] is True
+    assert payload["manual_live_unlock_allowed"] is False
+    assert "strategy_near_miss_not_live_eligible" in payload["blocked_by"]
 
 
 def test_lane_below_sample_minimum_blocks(tmp_path: Path) -> None:

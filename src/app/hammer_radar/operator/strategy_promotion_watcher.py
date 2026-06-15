@@ -25,6 +25,12 @@ from src.app.hammer_radar.operator.strategy_performance import (
     build_live_eligibility_matrix,
     load_strategy_audit_config,
 )
+from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
+    LIVE_QUALIFIED,
+    NEAR_MISS_INCUBATOR,
+    NEAR_MISS_MIN_WIN_RATE_PCT,
+    PAPER_ONLY,
+)
 
 STRATEGY_PROMOTION_EVENTS_FILENAME = "strategy_promotion_events.ndjson"
 STRATEGY_NEAR_PROMOTION = "STRATEGY_NEAR_PROMOTION"
@@ -51,7 +57,10 @@ def build_strategy_promotion_status(
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     audit_config = _tiny_live_policy_config(config or load_strategy_audit_config())
     matrix = build_live_eligibility_matrix(log_dir=resolved_log_dir, config=audit_config)
-    rows = list(matrix.get("recommendations") or [])
+    rows = _merge_candidate_rows(
+        list(matrix.get("recommendations") or []),
+        _latest_strategy_promotion_status_rows(resolved_log_dir),
+    )
     eligible = [_promotion_payload(row, event_type=STRATEGY_PROMOTION_READY, config=audit_config) for row in rows if _is_ready(row, config=audit_config)]
     near = [
         _promotion_payload(row, event_type=STRATEGY_NEAR_PROMOTION, config=audit_config)
@@ -63,6 +72,7 @@ def build_strategy_promotion_status(
         for row in rows
         if _is_blocked_promotion_candidate(row, config=audit_config)
     ]
+    candidate_watch = _qualified_candidate_watch(rows, config=audit_config, log_dir=resolved_log_dir)
     events = load_strategy_promotion_events(limit=1, log_dir=resolved_log_dir)
     return {
         **_safety_fields(),
@@ -75,6 +85,7 @@ def build_strategy_promotion_status(
             "min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
             "legacy_min_win_rate_pct": LEGACY_MIN_WIN_RATE,
             "tiny_live_min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
+            "near_miss_min_win_rate_pct": NEAR_MISS_MIN_WIN_RATE_PCT,
             "min_sample_count": audit_config.min_sample,
             "evidence_policy_all_timeframes_enabled": True,
             "near_promotion_sample_gap": near_sample_gap,
@@ -82,6 +93,11 @@ def build_strategy_promotion_status(
         "near_promotion": near,
         "promotion_ready": eligible,
         "blocked_candidates": blocked,
+        "qualified_candidate_watch": candidate_watch,
+        "live_qualified_lanes": candidate_watch["live_qualified_lanes"],
+        "near_miss_incubator_lanes": candidate_watch["near_miss_incubator_lanes"],
+        "paper_only_lanes": candidate_watch["paper_only_lanes"],
+        "current_fresh_candidate_status": candidate_watch["current_fresh_candidate_status"],
         "latest_promotion_event": events[0] if events else None,
         "message_payloads": [build_promotion_message(row) for row in [*eligible, *near]],
     }
@@ -270,6 +286,170 @@ def _is_blocked_promotion_candidate(row: dict[str, Any], *, config: StrategyAudi
     )
 
 
+def _qualified_candidate_watch(rows: list[dict[str, Any]], *, config: StrategyAuditConfig, log_dir: Path) -> dict[str, Any]:
+    live_qualified: list[dict[str, Any]] = []
+    near_miss: list[dict[str, Any]] = []
+    paper_only: list[dict[str, Any]] = []
+    for row in rows:
+        if not _base_strategy_match(row, config=config):
+            continue
+        payload = _watch_lane_payload(row, config=config)
+        category = payload["watch_category"]
+        if category == LIVE_QUALIFIED:
+            live_qualified.append(payload)
+        elif category == NEAR_MISS_INCUBATOR:
+            near_miss.append(payload)
+        else:
+            paper_only.append(payload)
+    fresh_status = _current_fresh_candidate_status(
+        live_qualified_lane_keys={str(row["strategy_key"]) for row in live_qualified},
+        log_dir=log_dir,
+    )
+    return {
+        "live_qualified_lanes": live_qualified,
+        "near_miss_incubator_lanes": near_miss,
+        "paper_only_lanes": paper_only,
+        "current_fresh_candidate_status": fresh_status,
+        "next_action": "WAIT" if fresh_status["qualified_fresh_candidate_exists"] is not True else "REVIEW_MANUAL_ONLY_UNLOCK_PACKET",
+        "manual_unlock_available_only_for": LIVE_QUALIFIED,
+        "near_miss_manual_unlock_available": False,
+        "strategy_lab_recommendation": "Use NEAR_MISS_INCUBATOR lanes for future Strategy Lab work; do not unlock live.",
+        **_safety_fields(),
+    }
+
+
+def _watch_lane_payload(row: dict[str, Any], *, config: StrategyAuditConfig) -> dict[str, Any]:
+    sample_count = int(row.get("sample_count") or 0)
+    win_rate = float(row.get("win_rate_pct") or 0.0)
+    avg_pnl = float(row.get("avg_pnl_pct") or 0.0)
+    if sample_count >= config.min_sample and avg_pnl > 0.0 and win_rate >= TINY_LIVE_MIN_WIN_RATE:
+        category = LIVE_QUALIFIED
+    elif sample_count >= config.min_sample and avg_pnl > 0.0 and NEAR_MISS_MIN_WIN_RATE_PCT <= win_rate < TINY_LIVE_MIN_WIN_RATE:
+        category = NEAR_MISS_INCUBATOR
+    else:
+        category = PAPER_ONLY
+    blockers: list[str] = []
+    if category == NEAR_MISS_INCUBATOR:
+        blockers.append("strategy_near_miss_not_live_eligible")
+    elif category == PAPER_ONLY:
+        blockers.extend(str(item) for item in row.get("blockers") or [])
+        if win_rate < TINY_LIVE_MIN_WIN_RATE:
+            blockers.append("strategy_near_miss_not_live_eligible")
+    return {
+        "strategy_key": _strategy_key(row),
+        "watch_category": category,
+        "timeframe": row.get("timeframe"),
+        "direction": row.get("direction"),
+        "entry_mode": row.get("entry_mode"),
+        "sample_count": sample_count,
+        "required_sample_count": config.min_sample,
+        "win_rate_pct": row.get("win_rate_pct"),
+        "avg_pnl_pct": row.get("avg_pnl_pct"),
+        "total_pnl_pct": row.get("total_pnl_pct"),
+        "manual_live_unlock_available": category == LIVE_QUALIFIED,
+        "final_command_available": False,
+        "recommended_next_action": "WAIT_FOR_FRESH_CANDIDATE" if category == LIVE_QUALIFIED else "STRATEGY_LAB_PAPER_REVIEW",
+        "blockers": _dedupe(blockers),
+        **_safety_fields(),
+    }
+
+
+def _current_fresh_candidate_status(*, live_qualified_lane_keys: set[str], log_dir: Path) -> dict[str, Any]:
+    try:
+        from src.app.hammer_radar.operator.readiness import build_readiness_payload
+
+        readiness = build_readiness_payload(log_dir=log_dir)
+    except Exception as exc:  # pragma: no cover - defensive status surface
+        return {
+            "qualified_fresh_candidate_exists": False,
+            "fresh_candidate_lane_keys": [],
+            "qualified_fresh_candidate_lane_keys": [],
+            "next_action": "WAIT",
+            "blocked_by": [f"readiness_status_unavailable_{exc.__class__.__name__}"],
+            **_safety_fields(),
+        }
+    fresh_lanes = [
+        str(row.get("lane_key"))
+        for row in readiness.get("strategy_checked_candidates") or []
+        if isinstance(row, dict) and row.get("lane_key")
+    ]
+    qualified_fresh = [lane for lane in fresh_lanes if lane in live_qualified_lane_keys]
+    return {
+        "qualified_fresh_candidate_exists": bool(qualified_fresh),
+        "fresh_candidate_lane_keys": fresh_lanes,
+        "qualified_fresh_candidate_lane_keys": qualified_fresh,
+        "readiness_status": readiness.get("readiness_status"),
+        "next_action": "REVIEW_MANUAL_ONLY_UNLOCK_PACKET" if qualified_fresh else "WAIT",
+        "blocked_by": [] if qualified_fresh else ["no_qualified_fresh_candidate"],
+        **_safety_fields(),
+    }
+
+
+def _latest_strategy_promotion_status_rows(log_dir: Path) -> list[dict[str, Any]]:
+    records = _read_ndjson_reverse(log_dir / "strategy_promotion_status.ndjson")
+    if not records:
+        return []
+    latest = records[0]
+    rows: list[dict[str, Any]] = []
+    for key in (
+        "promotion_ready",
+        "live_qualified_lanes",
+        "near_miss_incubator_lanes",
+        "paper_only_lanes",
+        "blocked_candidates",
+        "recommendations",
+    ):
+        value = latest.get(key)
+        if isinstance(value, list):
+            rows.extend(_normalize_strategy_row(dict(item)) for item in value if isinstance(item, dict))
+    watch = latest.get("qualified_candidate_watch")
+    if isinstance(watch, dict):
+        for key in ("live_qualified_lanes", "near_miss_incubator_lanes", "paper_only_lanes"):
+            value = watch.get(key)
+            if isinstance(value, list):
+                rows.extend(_normalize_strategy_row(dict(item)) for item in value if isinstance(item, dict))
+    return rows
+
+
+def _read_ndjson_reverse(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                records.append(payload)
+    return list(reversed(records))
+
+
+def _merge_candidate_rows(primary: list[dict[str, Any]], fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for row in [*fallback, *primary]:
+        if not isinstance(row, dict):
+            continue
+        key = row.get("strategy_key") or _strategy_key(row)
+        merged[str(key)] = row
+    return list(merged.values())
+
+
+def _normalize_strategy_row(row: dict[str, Any]) -> dict[str, Any]:
+    lane = row.get("strategy_key") or row.get("lane_key")
+    if isinstance(lane, str):
+        parts = [*lane.split("|"), "", "", "", ""]
+        row.setdefault("symbol", parts[0])
+        row.setdefault("timeframe", parts[1])
+        row.setdefault("direction", parts[2])
+        row.setdefault("entry_mode", parts[3])
+    return row
+
+
 def _base_strategy_match(row: dict[str, Any], *, config: StrategyAuditConfig) -> bool:
     return (
         str(row.get("symbol") or BTC_SYMBOL) == BTC_SYMBOL
@@ -301,6 +481,10 @@ def _dedupe_key(payload: dict[str, Any]) -> str:
             str(payload.get("total_pnl_pct")),
         ]
     )
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))
 
 
 def _operator_note(event_type: str) -> str:

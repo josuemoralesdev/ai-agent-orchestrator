@@ -357,6 +357,47 @@ def test_final_command_unavailable_when_strategy_avg_pnl_not_positive(tmp_path: 
     _assert_no_submit_safety(payload)
 
 
+def test_near_miss_strategy_cannot_unlock_final_manual_command(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch)
+    near_miss = {
+        **_strategy_qualification(),
+        "strategy_qualified": False,
+        "qualification_status": "BLOCKED",
+        "win_rate_pct": 54.99,
+        "live_qualification_class": "NEAR_MISS_INCUBATOR",
+        "watch_category": "NEAR_MISS_INCUBATOR",
+        "near_miss_incubator": True,
+        "manual_live_unlock_allowed": False,
+        "blocked_by": ["strategy_near_miss_not_live_eligible"],
+    }
+    monkeypatch.setattr(
+        r264b,
+        "build_fresh_candidate_status",
+        lambda **_: {
+            **_fresh_candidate_ok(),
+            "strategy_qualification": near_miss,
+            "strategy_qualified": False,
+            "strategy_win_rate_pct": 54.99,
+            "blocked_by": ["strategy_near_miss_not_live_eligible"],
+        },
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    blocked = command["gate_validation"]["blocked_by"]
+    assert command["available"] is False
+    assert "strategy_live_qualified" in blocked
+    assert "strategy_near_miss_not_live_eligible" in blocked
+    assert command["strategy_evidence"]["near_miss_incubator"] is True
+    _assert_no_submit_safety(payload)
+
+
 def test_no_binance_order_private_or_account_calls_and_no_actual_submit(tmp_path: Path, monkeypatch) -> None:
     _patch_success(monkeypatch)
     with patch("urllib.request.urlopen") as urlopen:
@@ -738,6 +779,10 @@ def _strategy_qualification(*, lane_key: str = OFFICIAL) -> dict:
         "win_rate_pct": 62.0,
         "sample_count": 40,
         "avg_pnl_pct": 0.1,
+        "live_qualification_class": "LIVE_QUALIFIED",
+        "watch_category": "LIVE_QUALIFIED",
+        "near_miss_incubator": False,
+        "manual_live_unlock_allowed": True,
         "min_sample": 30,
         "min_win_rate_pct": 55.0,
         "symbol": symbol,

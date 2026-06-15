@@ -99,6 +99,35 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
         row = payload["promotion_ready"][0]
         self.assertEqual("BTCUSDT|44m|long|ladder_close_50_618", row["strategy_key"])
         self.assertEqual(58.57, row["win_rate_pct"])
+        self.assertEqual(1, len(payload["live_qualified_lanes"]))
+        self.assertEqual("LIVE_QUALIFIED", payload["live_qualified_lanes"][0]["watch_category"])
+        self.assertTrue(payload["live_qualified_lanes"][0]["manual_live_unlock_available"])
+
+    def test_near_miss_incubator_is_watchlist_only(self) -> None:
+        self._seed_group("near-miss", "8m", "short", "ladder_close_50_618", wins=16, losses=14)
+
+        payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
+
+        self.assertEqual([], payload["promotion_ready"])
+        self.assertEqual(1, len(payload["near_miss_incubator_lanes"]))
+        row = payload["near_miss_incubator_lanes"][0]
+        self.assertEqual("BTCUSDT|8m|short|ladder_close_50_618", row["strategy_key"])
+        self.assertEqual("NEAR_MISS_INCUBATOR", row["watch_category"])
+        self.assertFalse(row["manual_live_unlock_available"])
+        self.assertFalse(row["final_command_available"])
+        self.assertIn("strategy_near_miss_not_live_eligible", row["blockers"])
+        self.assertFalse(payload["qualified_candidate_watch"]["near_miss_manual_unlock_available"])
+        self.assertEqual("WAIT", payload["qualified_candidate_watch"]["next_action"])
+
+    def test_below_53_is_paper_only(self) -> None:
+        self._seed_group("paper", "8m", "short", "ladder_close_50_618", wins=15, losses=15)
+
+        payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
+
+        self.assertEqual(1, len(payload["paper_only_lanes"]))
+        row = payload["paper_only_lanes"][0]
+        self.assertEqual("PAPER_ONLY", row["watch_category"])
+        self.assertFalse(row["manual_live_unlock_available"])
 
     def test_promotion_for_shorts_when_evidence_passes(self) -> None:
         self._seed_group("short", "13m", "short", "ladder_close_50_618", wins=25, losses=5)

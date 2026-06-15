@@ -1,0 +1,96 @@
+# R272 — Qualified Candidate Watch and Near-Miss Incubator
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: FINAL READINESS / WATCH GATE
+  Secondary: STRATEGY POLICY, NEAR-MISS INCUBATOR, SAFETY HARDENING
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R270/R271 enforced tiny-live eligibility:
+    - win_rate_pct >= 55.0
+    - sample_count >= 30
+    - positive avg pnl
+    - exact lane contract
+    - 80 USDT notional cap
+    - 10x explicit leverage
+    - no Betrayal/inverse first live without explicit future gate
+  Current qualified lanes include examples such as:
+    - BTCUSDT 44m long
+    - BTCUSDT 44m short
+    - BTCUSDT 55m long
+  Near-miss lanes such as BTCUSDT 8m short may be close to 55% but must not be allowed into first tiny live by exception.
+
+Hard goal:
+  Build a watch surface that separates:
+    - LIVE_QUALIFIED lanes: >=55%
+    - NEAR_MISS_INCUBATOR lanes: 53.0% to 54.99%
+    - PAPER_ONLY lanes: below near-miss range
+  Keep first tiny-live manual unlock available only for LIVE_QUALIFIED lanes.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT execute final submit.
+  - Do NOT make final command available for near-miss lanes.
+  - Do NOT create exceptions to the 55% rule.
+  - Do NOT allow Betrayal/inverse live.
+  - If uncertain, remain BLOCKED.
+
+Scope:
+  1. Qualified candidate watch:
+     - Show all currently qualified tiny-live lanes:
+       win_rate >=55, sample >=30, avg_pnl >0.
+     - Show whether a fresh current candidate exists for any qualified lane.
+     - If no qualified fresh candidate exists, next action is WAIT.
+
+  2. Near-miss incubator:
+     - Add a non-live incubator category for lanes with:
+       53.0 <= win_rate_pct < 55.0
+       sample_count >= 30
+       avg_pnl > 0
+     - These lanes are watchlist only.
+     - They must not produce manual live unlock commands.
+     - They should recommend future Strategy Lab work.
+
+  3. Trade ticket/final console:
+     - If current fresh ticket is below 55 or near-miss, block it clearly:
+       strategy_near_miss_not_live_eligible
+     - If current fresh ticket is >=55 and passes gates, allow manual-only unlock packet availability path.
+     - Final command remains unavailable in diagnostic mode.
+
+  4. Tests:
+     - >=55 qualifies.
+     - 53–54.99 enters incubator, not live.
+     - below 53 paper only.
+     - near-miss cannot unlock.
+     - no order placed.
+     - no Binance order endpoint called.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "strategy_promotion or tiny_live_strategy_lane_selection or readiness or trade_ticket or jit_launch or final_console"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/strategy-promotion/status | jq .
+  curl -s http://127.0.0.1:8015/readiness | jq .
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+Report:
+  - files changed
+  - live-qualified lanes
+  - near-miss incubator lanes
+  - whether 8m short is incubator or blocked
+  - current fresh candidate status
+  - final command availability
+  - safety confirmation
