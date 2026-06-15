@@ -18,8 +18,10 @@ from src.app.hammer_radar.operator.strategy_performance import (
     BTC_SYMBOL,
     ELIGIBLE_FOR_FUTURE_TINY_LIVE,
     INSUFFICIENT_DATA,
+    LEGACY_MIN_WIN_RATE,
     PREFERRED_ENTRY_MODE,
     StrategyAuditConfig,
+    TINY_LIVE_MIN_WIN_RATE,
     build_live_eligibility_matrix,
     load_strategy_audit_config,
 )
@@ -47,7 +49,7 @@ def build_strategy_promotion_status(
     near_sample_gap: int = DEFAULT_NEAR_PROMOTION_SAMPLE_GAP,
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
-    audit_config = config or load_strategy_audit_config()
+    audit_config = _tiny_live_policy_config(config or load_strategy_audit_config())
     matrix = build_live_eligibility_matrix(log_dir=resolved_log_dir, config=audit_config)
     rows = list(matrix.get("recommendations") or [])
     eligible = [_promotion_payload(row, event_type=STRATEGY_PROMOTION_READY, config=audit_config) for row in rows if _is_ready(row, config=audit_config)]
@@ -69,6 +71,12 @@ def build_strategy_promotion_status(
         "strategy_promotion_events_path": str(strategy_promotion_events_path(resolved_log_dir)),
         "config": {
             **audit_config.to_dict(),
+            "min_win_rate": TINY_LIVE_MIN_WIN_RATE,
+            "min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
+            "legacy_min_win_rate_pct": LEGACY_MIN_WIN_RATE,
+            "tiny_live_min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
+            "min_sample_count": audit_config.min_sample,
+            "evidence_policy_all_timeframes_enabled": True,
             "near_promotion_sample_gap": near_sample_gap,
         },
         "near_promotion": near,
@@ -205,6 +213,11 @@ def _promotion_payload(row: dict[str, Any], *, event_type: str, config: Strategy
         "entry_mode": row.get("entry_mode"),
         "sample_count": int(row.get("sample_count") or 0),
         "required_sample_count": config.min_sample,
+        "min_sample_count": config.min_sample,
+        "legacy_min_win_rate_pct": LEGACY_MIN_WIN_RATE,
+        "tiny_live_min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
+        "min_win_rate_pct": TINY_LIVE_MIN_WIN_RATE,
+        "evidence_policy_all_timeframes_enabled": True,
         "win_rate_pct": row.get("win_rate_pct"),
         "avg_pnl_pct": row.get("avg_pnl_pct"),
         "total_pnl_pct": row.get("total_pnl_pct"),
@@ -251,8 +264,7 @@ def _is_near_promotion(row: dict[str, Any], *, config: StrategyAuditConfig, near
 
 def _is_blocked_promotion_candidate(row: dict[str, Any], *, config: StrategyAuditConfig) -> bool:
     return (
-        str(row.get("timeframe") or "") in config.allowed_tiny_live_timeframes
-        and str(row.get("direction") or "") == "long"
+        str(row.get("direction") or "") in {"long", "short"}
         and str(row.get("entry_mode") or "") == PREFERRED_ENTRY_MODE
         and row.get("recommendation") not in {ELIGIBLE_FOR_FUTURE_TINY_LIVE, INSUFFICIENT_DATA}
     )
@@ -261,9 +273,8 @@ def _is_blocked_promotion_candidate(row: dict[str, Any], *, config: StrategyAudi
 def _base_strategy_match(row: dict[str, Any], *, config: StrategyAuditConfig) -> bool:
     return (
         str(row.get("symbol") or BTC_SYMBOL) == BTC_SYMBOL
-        and str(row.get("direction") or "") == "long"
+        and str(row.get("direction") or "") in {"long", "short"}
         and str(row.get("entry_mode") or "") == PREFERRED_ENTRY_MODE
-        and str(row.get("timeframe") or "") in config.allowed_tiny_live_timeframes
     )
 
 
@@ -313,3 +324,14 @@ def _safety_fields() -> dict[str, Any]:
         "order_payload_created": ORDER_PAYLOAD_CREATED,
         "secrets_shown": SECRETS_SHOWN,
     }
+
+
+def _tiny_live_policy_config(config: StrategyAuditConfig) -> StrategyAuditConfig:
+    return StrategyAuditConfig(
+        min_sample=max(int(config.min_sample or 0), 30),
+        min_win_rate=TINY_LIVE_MIN_WIN_RATE,
+        allowed_tiny_live_timeframes=config.allowed_tiny_live_timeframes,
+        paper_only_timeframes=config.paper_only_timeframes,
+        context_only_timeframes=config.context_only_timeframes,
+        blocked_timeframes=config.blocked_timeframes,
+    )

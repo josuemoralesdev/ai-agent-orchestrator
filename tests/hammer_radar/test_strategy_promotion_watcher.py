@@ -65,44 +65,73 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
 
         payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
 
+        self.assertEqual(55.0, payload["config"]["min_win_rate"])
+        self.assertEqual(55.0, payload["config"]["min_win_rate_pct"])
+        self.assertEqual(55.0, payload["config"]["tiny_live_min_win_rate_pct"])
+        self.assertEqual(45.0, payload["config"]["legacy_min_win_rate_pct"])
+        self.assertTrue(payload["config"]["evidence_policy_all_timeframes_enabled"])
         self.assertEqual(1, len(payload["promotion_ready"]))
         row = payload["promotion_ready"][0]
         self.assertEqual(STRATEGY_PROMOTION_READY, row["event_type"])
         self.assertEqual(30, row["sample_count"])
         self.assertEqual("BTCUSDT|13m|long|ladder_close_50_618", row["strategy_key"])
 
-    def test_no_promotion_for_shorts(self) -> None:
+    def test_13m_47_27_win_rate_is_not_promotion_ready(self) -> None:
+        self._seed_group("weak13", "13m", "long", "ladder_close_50_618", wins=26, losses=29)
+
+        payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
+
+        self.assertEqual([], payload["promotion_ready"])
+        blocked = payload["blocked_candidates"]
+        self.assertEqual(1, len(blocked))
+        self.assertEqual("BTCUSDT|13m|long|ladder_close_50_618", blocked[0]["strategy_key"])
+        self.assertEqual(47.27, blocked[0]["win_rate_pct"])
+        self.assertIn("win_rate_below_operator_55_policy", blocked[0]["blockers"])
+        self.assertIn("below_operator_55_policy", blocked[0]["blockers"])
+        self.assertNotEqual("ELIGIBLE_FOR_FUTURE_TINY_LIVE", blocked[0]["recommendation"])
+
+    def test_44m_58_57_win_rate_is_promotion_ready(self) -> None:
+        self._seed_group("ready44", "44m", "long", "ladder_close_50_618", wins=41, losses=29)
+
+        payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
+
+        self.assertEqual(1, len(payload["promotion_ready"]))
+        row = payload["promotion_ready"][0]
+        self.assertEqual("BTCUSDT|44m|long|ladder_close_50_618", row["strategy_key"])
+        self.assertEqual(58.57, row["win_rate_pct"])
+
+    def test_promotion_for_shorts_when_evidence_passes(self) -> None:
         self._seed_group("short", "13m", "short", "ladder_close_50_618", wins=25, losses=5)
 
         payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
 
         self.assertEqual([], payload["near_promotion"])
-        self.assertEqual([], payload["promotion_ready"])
+        self.assertEqual(1, len(payload["promotion_ready"]))
 
-    def test_no_promotion_for_paper_only_timeframes_even_if_metrics_pass(self) -> None:
+    def test_paper_only_timeframes_can_promote_when_evidence_passes(self) -> None:
         self._seed_group("four", "4m", "long", "ladder_close_50_618", wins=25, losses=5)
         self._seed_group("eight", "8m", "long", "ladder_close_50_618", wins=25, losses=5)
 
         payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
 
         self.assertEqual([], payload["near_promotion"])
-        self.assertEqual([], payload["promotion_ready"])
+        self.assertEqual(2, len(payload["promotion_ready"]))
 
-    def test_no_promotion_for_context_only_timeframes(self) -> None:
+    def test_context_only_timeframes_can_promote_when_evidence_passes(self) -> None:
         self._seed_group("context", "4H", "long", "ladder_close_50_618", wins=25, losses=5)
 
         payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
 
         self.assertEqual([], payload["near_promotion"])
-        self.assertEqual([], payload["promotion_ready"])
+        self.assertEqual(1, len(payload["promotion_ready"]))
 
-    def test_no_promotion_for_blocked_timeframes(self) -> None:
+    def test_blocked_timeframes_can_promote_when_evidence_passes(self) -> None:
         self._seed_group("blocked", "55m", "long", "ladder_close_50_618", wins=25, losses=5)
 
         payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
 
         self.assertEqual([], payload["near_promotion"])
-        self.assertEqual([], payload["promotion_ready"])
+        self.assertEqual(1, len(payload["promotion_ready"]))
 
     def test_promotion_events_are_persisted_and_deduped(self) -> None:
         self._seed_group("ready", "13m", "long", "ladder_close_50_618", wins=20, losses=10)

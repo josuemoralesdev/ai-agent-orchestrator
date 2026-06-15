@@ -279,6 +279,27 @@ def test_wrong_arming_phrase_rejects(tmp_path: Path) -> None:
     assert payload["safety"]["lane_controls_written"] is False
 
 
+def test_final_console_surfaces_current_4m_long_lane_expected_orders_and_origin(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    monkeypatch.setattr(r263, "build_trade_ticket", lambda **_: _long_trade_ticket())
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    assert payload["current_proposed_ticket_lane"]["lane_key"] == "BTCUSDT|4m|long|ladder_close_50_618"
+    assert payload["current_proposed_ticket_lane"]["matches_console_lane"] is False
+    assert payload["lane_specific_expected_orders"]["main"].startswith("BUY MARKET")
+    assert payload["lane_specific_expected_orders"]["stop"] == "SELL STOP_MARKET REDUCE_ONLY"
+    assert payload["signal_origin_status"]["signal_origin_family"] == "standard"
+    assert payload["submit_allowed"] is False
+    assert payload["order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+
+
 def test_exact_arming_phrase_records_experimental_acceptance_and_writes_only_lane_controls(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     before_risk = risk_path.read_text(encoding="utf-8")
@@ -356,7 +377,7 @@ def test_r262b_valid_panel_loads_latest_record(tmp_path: Path) -> None:
     assert panel["fits_contract"] is True
 
 
-def test_r267_final_console_surfaces_80_notional_10x_and_readonly_safety(tmp_path: Path) -> None:
+def test_r270c_final_console_does_not_surface_stale_risk_as_active_without_ticket(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     risk = json.loads(risk_path.read_text(encoding="utf-8"))
     row = risk["risk_contracts"][0]
@@ -381,10 +402,10 @@ def test_r267_final_console_surfaces_80_notional_10x_and_readonly_safety(tmp_pat
 
     interpretation = payload["risk_contract_interpretation"]
     exchange = payload["exchange_minimum_decision_packet"]
-    assert interpretation["tiny_live_contract_mode"] == "explicit_notional_cap_with_leverage"
-    assert interpretation["max_position_notional_usdt"] == 80.0
-    assert interpretation["leverage"] == 10.0
-    assert interpretation["derived_margin_budget_usdt"] == 8.0
+    assert interpretation["active_context"] == "no_current_proposed_ticket"
+    assert interpretation["no_current_proposed_ticket"] is True
+    assert "no_current_proposed_ticket" in interpretation["blocked_by"]
+    assert payload["previous_r264_preview"]["found"] is False
     assert exchange["configured_cap_clears_exchange_minimum"] is True
     assert payload["final_command_available"] is False
     assert payload["submit_allowed"] is False
@@ -409,6 +430,8 @@ def test_r269_final_console_surfaces_fresh_candidate_status(tmp_path: Path, monk
             "symbol": "BTCUSDT",
             "timeframe": "8m",
             "direction": "short",
+            "entry_mode": "ladder_close_50_618",
+            "lane_key": OFFICIAL,
             "readiness_status": "READY",
             "allowed_now": True,
             "max_position_usd": 80.0,
@@ -418,6 +441,40 @@ def test_r269_final_console_surfaces_fresh_candidate_status(tmp_path: Path, monk
             "active_contract_max_notional_usdt": 80.0,
             "active_contract_leverage": 10.0,
             "active_contract_margin_budget_usdt": 8.0,
+            "signal_origin": {
+                "signal_id": "fresh|r269",
+                "lane_key": OFFICIAL,
+                "signal_origin_family": "standard",
+                "betrayal_mode_involved": False,
+                "betrayal_inverse_involved": False,
+                "promotion_family": "standard",
+                "promotion_status": "known_not_promotion_ready",
+                "candidate_origin_classification": "standard checklist",
+                "manual_unlock_allowed": True,
+                "blocked_by": [],
+            },
+            "strategy_qualification": {
+                "lane_key": OFFICIAL,
+                "strategy_qualified": True,
+                "qualification_status": "QUALIFIED",
+                "win_rate_pct": 62.0,
+                "sample_count": 40,
+                "min_sample": 30,
+                "min_win_rate_pct": 55.0,
+                "blocked_by": [],
+            },
+            "strategy_qualified": True,
+            "strategy_win_rate_pct": 62.0,
+            "strategy_sample_count": 40,
+            "strategy_min_sample": 30,
+            "exact_risk_contract_status": {
+                "lane_key": OFFICIAL,
+                "exact_contract_found": True,
+                "risk_contract_valid": True,
+                "blocked_by": [],
+            },
+            "exact_risk_contract_found": True,
+            "exact_risk_contract_valid": True,
             "blockers": [],
         },
     )
@@ -429,12 +486,17 @@ def test_r269_final_console_surfaces_fresh_candidate_status(tmp_path: Path, monk
     )
 
     fresh = payload["fresh_candidate_status"]
+    interpretation = payload["risk_contract_interpretation"]
     assert payload["fresh_candidate_available"] is True
     assert payload["trade_ticket_status"] == "PROPOSED"
     assert fresh["signal_id"] == "fresh|r269"
     assert fresh["max_position_usd"] == 80.0
     assert fresh["suggested_position_usd"] == 80.0
     assert fresh["suggested_leverage"] == 10.0
+    assert interpretation["active_context"] == "current_proposed_ticket"
+    assert interpretation["max_position_notional_usdt"] == 80.0
+    assert interpretation["leverage"] == 10.0
+    assert interpretation["candidate_notional_usdt"] == 80.0
     assert payload["submit_allowed"] is False
     assert payload["order_placed"] is False
     assert payload["binance_order_endpoint_called"] is False
@@ -570,8 +632,9 @@ def test_margin_budget_10x_contract_displays_mismatch(tmp_path: Path) -> None:
     interpretation = payload["risk_contract_interpretation"]
     assert payload["contract_fit_panel"]["risk_contract_valid"] is False
     assert interpretation["valid"] is False
-    assert interpretation["higher_notional_interpretation_rejected"] is True
-    assert "risk_contract_notional_cap_exceeds_44" in interpretation["blocked_by"]
+    assert interpretation["active_context"] == "no_current_proposed_ticket"
+    assert "no_current_proposed_ticket" in interpretation["blocked_by"]
+    assert "risk_contract_notional_cap_exceeds_44" in payload["contract_fit_panel"]["risk_contract_blockers"]
     assert payload["final_command_available"] is False
     assert payload["order_placed"] is False
     assert payload["binance_order_endpoint_called"] is False
@@ -618,3 +681,68 @@ def test_no_secrets_in_output(tmp_path: Path, monkeypatch) -> None:
     assert "BINANCE_API_KEY" not in raw
     assert "BINANCE_API_SECRET" not in raw
     assert all(value not in raw for value in os.environ.values() if value == SECRET_SENTINEL)
+
+
+def _long_trade_ticket() -> dict:
+    origin = {
+        "signal_id": "fresh|r270|4m|long",
+        "lane_key": "BTCUSDT|4m|long|ladder_close_50_618",
+        "signal_origin_family": "standard",
+        "betrayal_mode_involved": False,
+        "betrayal_inverse_involved": False,
+        "promotion_family": "standard",
+        "promotion_status": "known_not_promotion_ready",
+        "candidate_origin_classification": "standard checklist",
+        "manual_unlock_allowed": True,
+        "blocked_by": [],
+        "source_record_found": True,
+    }
+    return {
+        "ticket_status": "PROPOSED",
+        "ticket_id": "tt_r270_4m_long",
+        "signal_id": "fresh|r270|4m|long",
+        "symbol": "BTCUSDT",
+        "timeframe": "4m",
+        "direction": "long",
+        "entry_mode": "ladder_close_50_618",
+        "lane_key": "BTCUSDT|4m|long|ladder_close_50_618",
+        "readiness_status": "READY",
+        "allowed_now": True,
+        "max_position_usd": 80.0,
+        "suggested_position_usd": 80.0,
+        "suggested_leverage": 10.0,
+        "active_contract_mode": "explicit_notional_cap_with_leverage",
+        "active_contract_max_notional_usdt": 80.0,
+        "active_contract_leverage": 10.0,
+        "active_contract_margin_budget_usdt": 8.0,
+        "machine_reason": "fixture",
+        "blockers": [],
+        "signal_origin": origin,
+        "strategy_qualification": {
+            "lane_key": "BTCUSDT|4m|long|ladder_close_50_618",
+            "strategy_qualified": True,
+            "qualification_status": "QUALIFIED",
+            "win_rate_pct": 62.0,
+            "sample_count": 40,
+            "min_sample": 30,
+            "min_win_rate_pct": 55.0,
+            "blocked_by": [],
+        },
+        "strategy_qualified": True,
+        "strategy_win_rate_pct": 62.0,
+        "strategy_sample_count": 40,
+        "strategy_min_sample": 30,
+        "exact_risk_contract_status": {
+            "lane_key": "BTCUSDT|4m|long|ladder_close_50_618",
+            "exact_contract_found": True,
+            "risk_contract_valid": True,
+            "blocked_by": [],
+        },
+        "exact_risk_contract_found": True,
+        "exact_risk_contract_valid": True,
+        "order_placed": False,
+        "real_order_placed": False,
+        "submit_attempted": False,
+        "binance_order_endpoint_called": False,
+        "secrets_shown": False,
+    }

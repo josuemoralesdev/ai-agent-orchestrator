@@ -1,0 +1,155 @@
+# R270 — Lane-Aware Manual Unlock and Betrayal Visibility
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: FINAL READINESS / OPERATOR GATE
+  Secondary: WIRING, DIAGNOSTIC, STRATEGY ORIGIN VISIBILITY, SAFETY HARDENING
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R267/R268/R269 prepared the tiny-live final gate:
+    - BTCUSDT tiny live uses explicit 80 USDT max notional.
+    - 10x leverage is intentional but bounded by 80 USDT notional.
+    - Trade ticket is aligned with 80/10x.
+    - R264 dry preview is valid.
+    - JIT validation is valid.
+    - Final live command remains unavailable unless exact manual unlock gates pass.
+  R269 found a fresh proposed ticket:
+    - BTCUSDT 4m long
+  But the existing final manual unlock phrase/packet is still scoped to:
+    - BTCUSDT 8m short
+  This correctly blocks due to direction/lane mismatch.
+
+Hard goal:
+  Build a lane-aware manual unlock selector that uses the actual current proposed trade ticket lane, while exposing whether Betrayal/inverse/signal-origin strategy family contributed to the candidate.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT print or persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT execute final live submit from Codex.
+  - Do NOT make a command available for a lane different from the current proposed ticket.
+  - If Betrayal or inverse mode is involved and not explicitly allowed for first tiny live, block and explain.
+  - If any uncertainty exists, remain BLOCKED.
+
+Required capability scan first:
+  Inspect:
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/betrayal_* modules relevant to signal origin/status
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - tests/hammer_radar touching trade ticket, readiness, final console, JIT, betrayal, promotion
+
+Scope:
+  1. Lane-aware unlock selection:
+     - Determine current proposed ticket:
+         symbol
+         timeframe
+         direction
+         entry_mode if available
+         signal_id
+     - Manual unlock packet must be generated for this exact lane only.
+     - If current ticket is BTCUSDT 4m long, do not use BTCUSDT 8m short phrases/orders.
+     - Expected order wording must reflect actual side:
+         long -> main BUY MARKET, exits SELL reduce-only
+         short -> main SELL MARKET, exits BUY reduce-only
+     - Candidate notional must stay <= 80 USDT.
+     - Leverage must remain 10x.
+     - No final command in diagnostic mode.
+
+  2. Betrayal / signal-origin visibility:
+     - Surface in trade ticket and final console:
+         signal_origin_family
+         betrayal_mode_involved true/false/unknown
+         betrayal_inverse_involved true/false/unknown
+         promotion_family/status if available
+         whether this candidate is standard checklist, betrayal-derived, inverse-derived, or unknown
+     - If Betrayal/inverse is involved:
+         - block final manual unlock unless an explicit operator acceptance gate exists for betrayal first tiny live
+         - explain blocker as betrayal_first_tiny_live_not_explicitly_accepted
+     - If origin is unknown:
+         - block final manual unlock or mark needs_manual_origin_review
+       unless existing project policy already allows unknown origin. Prefer safety.
+
+  3. Final console:
+     - Show:
+         current proposed ticket lane
+         lane-specific expected orders
+         signal origin / betrayal status
+         R262B/R263/R264 status
+         signed triplet freshness
+         80 USDT / 10x contract
+         exact blockers
+         final manual command availability
+     - No submit button.
+
+  4. JIT:
+     - Diagnostic mode stays safe.
+     - Manual unlock mode may expose manual-only command only when:
+         current ticket lane matches generated packet
+         signal origin is allowed
+         no betrayal/inverse uncertainty remains
+         all R269 gates pass
+         exact unlock phrase is supplied
+     - Command must remain:
+         do_not_run_from_codex=true
+         must_be_run_manually_by_operator=true
+
+  5. Tests:
+     Add/update tests proving:
+       - 4m long ticket gets BUY main / SELL reduce-only expected order wording.
+       - 8m short packet is not used for 4m long ticket.
+       - mismatch blocks command availability.
+       - betrayal/inverse involvement blocks unless explicitly accepted.
+       - unknown origin blocks or is clearly marked according to safest policy.
+       - standard allowed origin can proceed to manual-only availability when all gates and exact phrase pass.
+       - no order placed.
+       - no submit attempted.
+       - no Binance order endpoint called.
+       - secrets_shown=false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or trade_ticket or readiness or jit_launch or final_console or betrayal"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/readiness | jq .
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-jit-launch-packet \
+    --run-jit-launch-prep \
+    --record-jit-launch-packet \
+    --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+    --operator-id local_operator \
+    --reason "R270 lane-aware manual unlock and betrayal visibility diagnostic; no submit."
+
+Report:
+  - files changed
+  - current proposed ticket lane
+  - whether Betrayal/inverse mode is involved
+  - signal origin status
+  - lane-specific expected order side
+  - final command availability
+  - exact blockers if unavailable
+  - tests/smokes
+  - safety confirmation: no order, no submit, no Binance order endpoint

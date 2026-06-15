@@ -16,7 +16,6 @@ from src.app.hammer_radar.operator.strategy_performance import (
     BLOCKED_FROM_LIVE,
     ELIGIBLE_FOR_FUTURE_TINY_LIVE,
     INSUFFICIENT_DATA,
-    PAPER_ONLY,
     StrategyAuditConfig,
     build_live_eligibility_matrix,
     build_strategy_entry_mode_summary,
@@ -34,7 +33,7 @@ class StrategyPerformanceTestCase(unittest.TestCase):
         self.client = TestClient(app)
         self.config = StrategyAuditConfig(
             min_sample=3,
-            min_win_rate=45.0,
+            min_win_rate=55.0,
             allowed_tiny_live_timeframes=("13m", "44m"),
             paper_only_timeframes=("4m", "8m", "88m"),
             context_only_timeframes=("4H", "13H", "13D", "888m"),
@@ -116,6 +115,33 @@ class StrategyPerformanceTestCase(unittest.TestCase):
         self.assertFalse(row["order_placed"])
         self.assertTrue(row["no_order_payload_created"])
 
+    def test_47_27_win_rate_is_blocked_by_active_55_policy_even_if_config_is_45(self) -> None:
+        config = StrategyAuditConfig(
+            min_sample=30,
+            min_win_rate=45.0,
+            allowed_tiny_live_timeframes=("13m", "44m"),
+            paper_only_timeframes=("4m", "8m", "88m"),
+            context_only_timeframes=("4H", "13H", "13D", "888m"),
+            blocked_timeframes=("22m", "55m", "222m", "444m"),
+        )
+        self._seed_group("weak13", "13m", "long", "ladder_close_50_618", tuple([1.0] * 26 + [-0.5] * 29))
+
+        matrix = build_live_eligibility_matrix(log_dir=self.log_dir, config=config)
+        row = self._find(
+            matrix["recommendations"],
+            timeframe="13m",
+            direction="long",
+            entry_mode="ladder_close_50_618",
+        )
+
+        self.assertEqual(55.0, matrix["config"]["min_win_rate"])
+        self.assertEqual(55.0, matrix["config"]["tiny_live_min_win_rate_pct"])
+        self.assertEqual(45.0, matrix["config"]["legacy_min_win_rate_pct"])
+        self.assertEqual(47.27, row["win_rate_pct"])
+        self.assertEqual(BLOCKED_FROM_LIVE, row["recommendation"])
+        self.assertIn("win_rate_below_operator_55_policy", row["blockers"])
+        self.assertEqual([], matrix["eligible_recommendations"])
+
     def test_negative_timeframe_is_blocked_from_live(self) -> None:
         self._seed_group("weak", "55m", "long", "ladder_close_50_618", (-1.0, -0.5, -0.25))
 
@@ -126,16 +152,16 @@ class StrategyPerformanceTestCase(unittest.TestCase):
 
         self.assertEqual(BLOCKED_FROM_LIVE, row["recommendation"])
 
-    def test_4m_and_8m_remain_paper_only_despite_positive_metrics(self) -> None:
+    def test_4m_and_8m_can_be_recommended_when_evidence_passes(self) -> None:
         self._seed_group("four", "4m", "long", "ladder_close_50_618", (1.0, -0.5, 2.0))
         self._seed_group("eight", "8m", "long", "ladder_close_50_618", (1.0, -0.5, 2.0))
 
         rows = build_live_eligibility_matrix(log_dir=self.log_dir, config=self.config)["recommendations"]
 
-        self.assertEqual(PAPER_ONLY, self._find(rows, timeframe="4m")["recommendation"])
-        self.assertEqual(PAPER_ONLY, self._find(rows, timeframe="8m")["recommendation"])
+        self.assertEqual(ELIGIBLE_FOR_FUTURE_TINY_LIVE, self._find(rows, timeframe="4m")["recommendation"])
+        self.assertEqual(ELIGIBLE_FOR_FUTURE_TINY_LIVE, self._find(rows, timeframe="8m")["recommendation"])
 
-    def test_short_groups_do_not_become_live_eligible(self) -> None:
+    def test_short_groups_can_be_recommended_when_evidence_passes(self) -> None:
         self._seed_group("short", "13m", "short", "ladder_close_50_618", (1.0, -0.5, 2.0))
 
         row = self._find(
@@ -143,8 +169,8 @@ class StrategyPerformanceTestCase(unittest.TestCase):
             direction="short",
         )
 
-        self.assertEqual(PAPER_ONLY, row["recommendation"])
-        self.assertIn("shorts remain paper/operator visibility only", row["blockers"])
+        self.assertEqual(ELIGIBLE_FOR_FUTURE_TINY_LIVE, row["recommendation"])
+        self.assertEqual([], row["blockers"])
 
     def test_low_sample_groups_become_insufficient_data(self) -> None:
         self._seed_group("small", "44m", "long", "ladder_close_50_618", (1.0, 2.0))

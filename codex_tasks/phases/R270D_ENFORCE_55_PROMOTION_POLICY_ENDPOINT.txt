@@ -1,0 +1,106 @@
+# R270D — Enforce 55% Tiny-Live Promotion Policy Endpoint
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: POLICY HARDENING
+  Secondary: API CONSISTENCY, FINAL READINESS
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R270C attempted to enforce the operator tiny-live policy:
+    - any BTCUSDT lane/timeframe can qualify by evidence
+    - win_rate_pct >= 55.0
+    - sample_count >= min_sample, default 30
+  But verification still shows /strategy-promotion/status reporting:
+    config.min_win_rate = 45.0
+    BTCUSDT|13m|long with win_rate_pct 47.27 as promotion_ready
+  This violates the operator policy for first tiny live.
+
+Hard goal:
+  Make /strategy-promotion/status and all tiny-live promotion surfaces use 55.0% as the active tiny-live eligibility threshold.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT execute final submit.
+  - Do NOT make final live command available in diagnostic mode.
+  - Do NOT let 45% win-rate strategies appear as tiny-live eligible.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/strategy_performance.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - tests/hammer_radar/test_strategy_promotion_watcher.py
+    - tests/hammer_radar/test_strategy_performance.py
+    - tests/hammer_radar/test_notification_watcher.py
+    - tests/hammer_radar/test_approval_api.py
+    - tests/hammer_radar/test_tiny_live_strategy_lane_selection.py
+
+Implementation:
+  1. Active tiny-live threshold:
+     - Expose active tiny-live policy threshold as 55.0.
+     - Preserve old 45.0 only as legacy/near-promotion/reporting if required.
+     - Make naming explicit:
+         legacy_min_win_rate_pct: 45.0
+         tiny_live_min_win_rate_pct: 55.0
+       or equivalent.
+
+  2. Promotion-ready filtering:
+     - promotion_ready must only include lanes with:
+         win_rate_pct >= 55.0
+         sample_count >= min_sample
+     - BTCUSDT|13m|long at 47.27 must not appear as promotion_ready.
+     - BTCUSDT|44m|long at 58.57 may appear if sample_count >= 30.
+
+  3. Blocked/near reporting:
+     - Lanes between 45 and 55 may appear as near_promotion or blocked_candidates with blocker:
+         win_rate_below_operator_55_policy
+     - They must not say ELIGIBLE_FOR_FUTURE_TINY_LIVE.
+
+  4. Readiness/trade-ticket:
+     - Confirm they use the same 55 threshold.
+     - Below-55 fresh candidates must not become READY/PROPOSED.
+
+  5. Tests:
+     Add/update tests proving:
+       - 47.27 does not qualify for tiny live.
+       - 58.57 qualifies if sample_count >= 30.
+       - config or policy output exposes 55 as active tiny-live min.
+       - no order placed, no submit, no Binance order endpoint.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "strategy_promotion or strategy_performance or notification_watcher or approval_api or tiny_live_strategy_lane_selection or readiness or trade_ticket"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/strategy-promotion/status | jq '{
+    config,
+    promotion_ready,
+    near_promotion,
+    blocked_candidates
+  }'
+
+  curl -s http://127.0.0.1:8015/readiness | jq .
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+Report:
+  - files changed
+  - active tiny-live threshold shown
+  - whether 13m long 47.27 is blocked
+  - whether 44m long 58.57 qualifies
+  - readiness/trade-ticket status
+  - safety confirmation

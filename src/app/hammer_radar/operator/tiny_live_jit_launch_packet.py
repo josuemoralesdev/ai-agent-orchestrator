@@ -35,7 +35,7 @@ from src.app.hammer_radar.operator.tiny_live_percentage_risk_contract_fit_regene
     CONTRACT_FIT_CONFIRMATION_PHRASE,
     build_tiny_live_percentage_risk_contract_fit_regeneration,
 )
-from src.app.hammer_radar.operator.trade_ticket import build_trade_ticket
+from src.app.hammer_radar.operator.trade_ticket import build_lane_key, build_trade_ticket
 
 OFFICIAL_LANE_KEY = DEFAULT_OFFICIAL_TINY_LIVE_LANE
 CREATED_BY_PHASE = "R264B_TINY_LIVE_JIT_LAUNCH_PACKET"
@@ -109,7 +109,13 @@ def build_tiny_live_jit_launch_packet(
     final_manual_unlock_confirmation_valid = (
         confirm_final_manual_submit_unlock == R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
     )
-    symbol, timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    current_ticket_context = build_current_proposed_ticket_context(
+        log_dir=resolved_log_dir,
+        risk_contract_config_path=risk_path,
+        fallback_lane_key=official_lane_key,
+    )
+    selected_lane_key = str(current_ticket_context.get("lane_key") or official_lane_key)
+    symbol, timeframe, direction, _entry_mode = _lane_parts(selected_lane_key)
     try:
         steps = _empty_jit_step_results()
         if run_jit_launch_prep and not confirmation_valid:
@@ -119,7 +125,7 @@ def build_tiny_live_jit_launch_packet(
             steps["r262b_contract_fit_refresh"] = run_r262b_contract_fit_refresh_step(
                 log_dir=resolved_log_dir,
                 risk_contract_config_path=risk_path,
-                official_lane_key=official_lane_key,
+                official_lane_key=selected_lane_key,
                 now=generated_at,
             )
             if steps["r262b_contract_fit_refresh"]["succeeded"]:
@@ -129,7 +135,7 @@ def build_tiny_live_jit_launch_packet(
                     lane_controls_path=lane_path,
                     operator_id=operator_id,
                     reason=reason,
-                    official_lane_key=official_lane_key,
+                    official_lane_key=selected_lane_key,
                     now=generated_at,
                 )
             if steps["r263_runtime_arming"]["succeeded"]:
@@ -139,7 +145,7 @@ def build_tiny_live_jit_launch_packet(
                     lane_controls_path=lane_path,
                     operator_id=operator_id,
                     reason=reason,
-                    official_lane_key=official_lane_key,
+                    official_lane_key=selected_lane_key,
                     now=generated_at,
                 )
             validation = validate_jit_launch_packet(jit_step_results=steps)
@@ -165,11 +171,13 @@ def build_tiny_live_jit_launch_packet(
         fresh_candidate_status = build_fresh_candidate_status(
             log_dir=resolved_log_dir,
             risk_contract_config_path=risk_path,
-            official_lane_key=official_lane_key,
+            official_lane_key=selected_lane_key,
         )
         final_command = build_final_live_submit_command_packet(
             jit_validation=validation,
             fresh_candidate_status=fresh_candidate_status,
+            current_ticket_context=current_ticket_context,
+            packet_lane_key=selected_lane_key,
             final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
         )
         if (
@@ -201,7 +209,10 @@ def build_tiny_live_jit_launch_packet(
                     "source_phase": "R264B",
                 },
                 "target_scope": {
-                    "official_lane_key": official_lane_key,
+                    "official_lane_key": selected_lane_key,
+                    "configured_official_lane_key": official_lane_key,
+                    "current_proposed_ticket_lane_key": current_ticket_context.get("lane_key"),
+                    "current_proposed_ticket_selected": current_ticket_context.get("selected") is True,
                     "symbol": symbol,
                     "timeframe": timeframe,
                     "direction": direction,
@@ -214,12 +225,16 @@ def build_tiny_live_jit_launch_packet(
                     "accepted_only_by_exact_r263_phrase": steps["r263_runtime_arming"][
                         "experimental_lane_acceptance_recorded"
                     ],
-                    "message": "8m short is paper-only/promotion-mismatched and is allowed only as a manual experimental tiny-live lane.",
+                    "message": "Selected current ticket lane is manual-only and must match all lane-specific gates.",
                     "promoted_lanes_remain": [
                         "BTCUSDT|13m|long|ladder_close_50_618",
                         "BTCUSDT|44m|long|ladder_close_50_618",
                     ],
                 },
+                "current_proposed_ticket": current_ticket_context,
+                "signal_origin_status": fresh_candidate_status.get("signal_origin_status")
+                if isinstance(fresh_candidate_status.get("signal_origin_status"), Mapping)
+                else current_ticket_context.get("signal_origin_status"),
                 "jit_step_results": steps,
                 "fresh_candidate_status": fresh_candidate_status,
                 "jit_validation": validation,
@@ -536,7 +551,7 @@ def build_fresh_candidate_status(
     risk_contract_config_path: str | Path | None = None,
     official_lane_key: str = OFFICIAL_LANE_KEY,
 ) -> dict[str, Any]:
-    symbol, timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    symbol, timeframe, direction, entry_mode = _lane_parts(official_lane_key)
     try:
         ticket = build_trade_ticket(
             latest_only=True,
@@ -568,6 +583,10 @@ def build_fresh_candidate_status(
         blockers.append("fresh_candidate_symbol_mismatch")
     if direction and ticket.get("direction") != direction:
         blockers.append("fresh_candidate_direction_mismatch")
+    if timeframe and ticket.get("timeframe") != timeframe:
+        blockers.append("fresh_candidate_timeframe_mismatch")
+    if entry_mode and ticket.get("entry_mode") not in {None, "", entry_mode}:
+        blockers.append("fresh_candidate_entry_mode_mismatch")
     max_position = _float_or_none(ticket.get("max_position_usd"))
     suggested_position = _float_or_none(ticket.get("suggested_position_usd"))
     suggested_leverage = _float_or_none(ticket.get("suggested_leverage"))
@@ -583,6 +602,9 @@ def build_fresh_candidate_status(
         blockers.append("trade_ticket_order_placed_safety_violation")
     if ticket.get("submit_attempted") is True or ticket.get("binance_order_endpoint_called") is True:
         blockers.append("trade_ticket_submit_safety_violation")
+    origin = ticket.get("signal_origin") if isinstance(ticket.get("signal_origin"), Mapping) else {}
+    if origin.get("manual_unlock_allowed") is not True:
+        blockers.extend(str(item) for item in origin.get("blocked_by") or ["needs_manual_origin_review"])
     return _sanitize(
         {
             "fresh_candidate_available": not blockers,
@@ -592,6 +614,9 @@ def build_fresh_candidate_status(
             "symbol": ticket.get("symbol") or symbol,
             "timeframe": ticket.get("timeframe"),
             "direction": ticket.get("direction"),
+            "entry_mode": ticket.get("entry_mode"),
+            "lane_key": ticket.get("lane_key"),
+            "expected_lane_key": official_lane_key,
             "readiness_status": ticket.get("readiness_status"),
             "allowed_now": ticket.get("allowed_now") is True,
             "max_position_usd": max_position,
@@ -602,6 +627,25 @@ def build_fresh_candidate_status(
             "active_contract_leverage": ticket.get("active_contract_leverage"),
             "active_contract_margin_budget_usdt": ticket.get("active_contract_margin_budget_usdt"),
             "machine_reason": ticket.get("machine_reason"),
+            "signal_origin_status": origin,
+            "strategy_qualification": ticket.get("strategy_qualification")
+            if isinstance(ticket.get("strategy_qualification"), Mapping)
+            else {},
+            "strategy_qualified": ticket.get("strategy_qualified") is True,
+            "strategy_win_rate_pct": ticket.get("strategy_win_rate_pct"),
+            "strategy_sample_count": ticket.get("strategy_sample_count"),
+            "strategy_min_sample": ticket.get("strategy_min_sample"),
+            "exact_risk_contract_status": ticket.get("exact_risk_contract_status")
+            if isinstance(ticket.get("exact_risk_contract_status"), Mapping)
+            else {},
+            "exact_risk_contract_found": ticket.get("exact_risk_contract_found") is True,
+            "exact_risk_contract_valid": ticket.get("exact_risk_contract_valid") is True,
+            "signal_origin_family": origin.get("signal_origin_family"),
+            "betrayal_mode_involved": origin.get("betrayal_mode_involved"),
+            "betrayal_inverse_involved": origin.get("betrayal_inverse_involved"),
+            "promotion_family": origin.get("promotion_family"),
+            "promotion_status": origin.get("promotion_status"),
+            "candidate_origin_classification": origin.get("candidate_origin_classification"),
             "blocked_by": _dedupe(blockers),
             "order_placed": False,
             "real_order_placed": False,
@@ -616,14 +660,24 @@ def build_final_live_submit_command_packet(
     *,
     jit_validation: Mapping[str, Any],
     fresh_candidate_status: Mapping[str, Any] | None = None,
+    current_ticket_context: Mapping[str, Any] | None = None,
+    packet_lane_key: str = OFFICIAL_LANE_KEY,
     final_manual_unlock_confirmation_valid: bool = False,
 ) -> dict[str, Any]:
     gate = validate_final_manual_submit_unlock_gate(
         jit_validation=jit_validation,
         fresh_candidate_status=fresh_candidate_status or {},
+        current_ticket_context=current_ticket_context or {},
+        packet_lane_key=packet_lane_key,
         final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
     )
     command = _manual_live_submit_command() if gate["valid"] else ""
+    expected_orders = expected_orders_for_direction(
+        str((fresh_candidate_status or {}).get("direction") or _lane_parts(packet_lane_key)[2])
+    )
+    origin = (fresh_candidate_status or {}).get("signal_origin_status")
+    if not isinstance(origin, Mapping):
+        origin = (current_ticket_context or {}).get("signal_origin_status")
     return {
         "available": bool(gate["valid"]),
         "must_be_run_manually_by_operator": True,
@@ -636,11 +690,16 @@ def build_final_live_submit_command_packet(
         "unlock_confirmation_valid": bool(final_manual_unlock_confirmation_valid),
         "unavailable_reason": "" if gate["valid"] else "; ".join(gate["blocked_by"]),
         "gate_validation": gate,
-        "expected_orders": {
-            "main": "SELL MARKET quantity must remain within 80 USDT notional cap",
-            "stop": "BUY STOP_MARKET REDUCE_ONLY",
-            "take_profit": "BUY TAKE_PROFIT_MARKET REDUCE_ONLY",
-        },
+        "current_proposed_ticket_lane_key": (current_ticket_context or {}).get("lane_key"),
+        "packet_lane_key": packet_lane_key,
+        "signal_origin_status": origin if isinstance(origin, Mapping) else {},
+        "strategy_qualification": (fresh_candidate_status or {}).get("strategy_qualification")
+        if isinstance((fresh_candidate_status or {}).get("strategy_qualification"), Mapping)
+        else {},
+        "exact_risk_contract_status": (fresh_candidate_status or {}).get("exact_risk_contract_status")
+        if isinstance((fresh_candidate_status or {}).get("exact_risk_contract_status"), Mapping)
+        else {},
+        "expected_orders": expected_orders,
         "allowed_endpoint": "/fapi/v1/order",
         "forbidden_endpoints": [
             "/fapi/v1/order/test",
@@ -655,13 +714,34 @@ def validate_final_manual_submit_unlock_gate(
     *,
     jit_validation: Mapping[str, Any],
     fresh_candidate_status: Mapping[str, Any],
+    current_ticket_context: Mapping[str, Any] | None = None,
+    packet_lane_key: str = OFFICIAL_LANE_KEY,
     final_manual_unlock_confirmation_valid: bool,
 ) -> dict[str, Any]:
+    current_ticket_context = current_ticket_context or {}
+    origin = fresh_candidate_status.get("signal_origin_status")
+    if not isinstance(origin, Mapping):
+        origin = (
+            current_ticket_context.get("signal_origin_status")
+            if isinstance(current_ticket_context.get("signal_origin_status"), Mapping)
+            else {}
+        )
+    packet_symbol, packet_timeframe, packet_direction, _packet_entry_mode = _lane_parts(packet_lane_key)
     required = {
         "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
+        "current_ticket_selected": current_ticket_context.get("selected") is True,
+        "current_ticket_lane_matches_packet": current_ticket_context.get("lane_key") == packet_lane_key,
         "fresh_candidate_available": fresh_candidate_status.get("fresh_candidate_available") is True,
         "trade_ticket_proposed": fresh_candidate_status.get("trade_ticket_status") == "PROPOSED",
-        "fresh_candidate_btcusdt": fresh_candidate_status.get("symbol") == "BTCUSDT",
+        "fresh_candidate_btcusdt": fresh_candidate_status.get("symbol") == packet_symbol == "BTCUSDT",
+        "fresh_candidate_timeframe_matches_packet": fresh_candidate_status.get("timeframe") == packet_timeframe,
+        "fresh_candidate_direction_matches_packet": fresh_candidate_status.get("direction") == packet_direction,
+        "fresh_candidate_lane_matches_packet": fresh_candidate_status.get("lane_key") == packet_lane_key,
+        "strategy_lane_qualified": fresh_candidate_status.get("strategy_qualified") is True,
+        "exact_lane_risk_contract_valid": fresh_candidate_status.get("exact_risk_contract_valid") is True,
+        "signal_origin_allowed": origin.get("manual_unlock_allowed") is True,
+        "betrayal_not_involved": origin.get("betrayal_mode_involved") is False,
+        "betrayal_inverse_not_involved": origin.get("betrayal_inverse_involved") is False,
         "trade_ticket_max_position_80": _float_or_none(fresh_candidate_status.get("max_position_usd")) == 80.0,
         "trade_ticket_suggested_position_lte_80": (
             _float_or_none(fresh_candidate_status.get("suggested_position_usd")) is not None
@@ -713,6 +793,7 @@ def validate_final_manual_submit_unlock_gate(
     blocked = [name for name, passed in required.items() if not passed]
     blocked.extend(str(item) for item in jit_validation.get("blocked_by") or [])
     blocked.extend(str(item) for item in fresh_candidate_status.get("blocked_by") or [])
+    blocked.extend(str(item) for item in origin.get("blocked_by") or [])
     return {
         "valid": not blocked,
         "manual_only": True,
@@ -720,6 +801,95 @@ def validate_final_manual_submit_unlock_gate(
         "do_not_run_from_codex": True,
         "required_gates": required,
         "blocked_by": _dedupe(blocked),
+    }
+
+
+def build_current_proposed_ticket_context(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract_config_path: str | Path | None = None,
+    fallback_lane_key: str = OFFICIAL_LANE_KEY,
+) -> dict[str, Any]:
+    symbol, timeframe, direction, entry_mode = _lane_parts(fallback_lane_key)
+    try:
+        ticket = build_trade_ticket(
+            latest_only=True,
+            allow_short=True,
+            max_risk_usd=5.0,
+            fresh_minutes=30,
+            log_dir=log_dir,
+            risk_contract_config_path=risk_contract_config_path,
+            use_active_tiny_live_contract=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive operator packet boundary
+        return {
+            "selected": False,
+            "lane_key": fallback_lane_key,
+            "actual_ticket_lane_key": None,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": direction,
+            "entry_mode": entry_mode,
+            "blocked_by": [f"trade_ticket_error_{exc.__class__.__name__}"],
+            "signal_origin_status": {
+                "manual_unlock_allowed": False,
+                "blocked_by": ["needs_manual_origin_review"],
+            },
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    actual_lane_key = ticket.get("lane_key") or build_lane_key(
+        symbol=ticket.get("symbol") or symbol,
+        timeframe=ticket.get("timeframe") or timeframe,
+        direction=ticket.get("direction") or direction,
+        entry_mode=ticket.get("entry_mode") or entry_mode,
+    )
+    selected = ticket.get("ticket_status") == "PROPOSED"
+    return _sanitize(
+        {
+            "selected": selected,
+            "ticket_status": ticket.get("ticket_status"),
+            "ticket_id": ticket.get("ticket_id"),
+            "signal_id": ticket.get("signal_id"),
+            "lane_key": actual_lane_key if selected else None,
+            "actual_ticket_lane_key": actual_lane_key,
+            "symbol": ticket.get("symbol") or symbol,
+            "timeframe": ticket.get("timeframe") or timeframe,
+            "direction": ticket.get("direction") or direction,
+            "entry_mode": ticket.get("entry_mode") or entry_mode,
+            "blockers": list(ticket.get("blockers") or []),
+            "signal_origin_status": ticket.get("signal_origin")
+            if isinstance(ticket.get("signal_origin"), Mapping)
+            else {},
+            "strategy_qualification": ticket.get("strategy_qualification")
+            if isinstance(ticket.get("strategy_qualification"), Mapping)
+            else {},
+            "exact_risk_contract_status": ticket.get("exact_risk_contract_status")
+            if isinstance(ticket.get("exact_risk_contract_status"), Mapping)
+            else {},
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    )
+
+
+def expected_orders_for_direction(direction: str) -> dict[str, str]:
+    if str(direction or "").lower() == "long":
+        main_side = "BUY"
+        exit_side = "SELL"
+    else:
+        main_side = "SELL"
+        exit_side = "BUY"
+    return {
+        "main": f"{main_side} MARKET quantity must remain within 80 USDT notional cap",
+        "stop": f"{exit_side} STOP_MARKET REDUCE_ONLY",
+        "take_profit": f"{exit_side} TAKE_PROFIT_MARKET REDUCE_ONLY",
     }
 
 

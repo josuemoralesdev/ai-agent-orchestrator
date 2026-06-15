@@ -10,6 +10,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
@@ -29,11 +30,17 @@ from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     DEFAULT_OFFICIAL_LANE_KEY as TINY_LIVE_OFFICIAL_LANE_KEY,
     DEFAULT_RISK_CONTRACT_CONFIG_PATH,
     EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE,
+    R267_MAX_POSITION_NOTIONAL_USDT,
     build_tiny_live_risk_contract_validation_summary,
     load_tiny_live_risk_contract_for_lane,
 )
+from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
+    build_exact_lane_risk_contract_status,
+    build_strategy_lane_qualification,
+)
 
 TRADE_TICKETS_FILENAME = "trade_tickets.ndjson"
+DEFAULT_ENTRY_MODE = "ladder_close_50_618"
 PAPER_EXECUTION_ENABLED = False
 PAPER_ORDER_PLACED = False
 SUBMIT_ATTEMPTED = False
@@ -102,9 +109,39 @@ def build_trade_ticket(
             risk_contract=contract_limits,
         )
 
+    selected_lane_key = build_lane_key(
+        symbol=selected.candidate.signal.symbol,
+        timeframe=selected.candidate.signal.timeframe,
+        direction=selected.candidate.signal.direction,
+        entry_mode=DEFAULT_ENTRY_MODE,
+    )
+    strategy_qualification = build_strategy_lane_qualification(
+        symbol=selected.candidate.signal.symbol,
+        timeframe=selected.candidate.signal.timeframe,
+        direction=selected.candidate.signal.direction,
+        entry_mode=DEFAULT_ENTRY_MODE,
+        log_dir=resolved_log_dir,
+    )
+    exact_risk_contract_status = build_exact_lane_risk_contract_status(
+        lane_key=selected_lane_key,
+        risk_contract_config_path=risk_contract_config_path,
+        strategy_qualification=strategy_qualification,
+    )
+    contract_limits = _active_tiny_live_contract_limits(
+        risk_contract_config_path=risk_contract_config_path,
+        official_lane_key=selected_lane_key,
+    )
     candidate_contract_limits = contract_limits if contract_limits.get("risk_contract_valid") else {}
-    ticket_max_position_usd = resolved_max_position_usd
-    ticket_max_leverage = resolved_max_leverage
+    ticket_max_position_usd = (
+        _resolve_max_position_usd(max_position_usd, contract_limits=contract_limits)
+        if candidate_contract_limits
+        else float(max_position_usd or R267_MAX_POSITION_NOTIONAL_USDT)
+    )
+    ticket_max_leverage = (
+        _resolve_max_leverage(max_leverage, contract_limits=contract_limits)
+        if candidate_contract_limits
+        else float(max_leverage or 10.0)
+    )
     candidate_blockers = _candidate_blockers(
         selected,
         allow_short=allow_short,
@@ -112,14 +149,25 @@ def build_trade_ticket(
         max_leverage=ticket_max_leverage,
     )
     blockers.extend(candidate_blockers)
+    blockers.extend(_strategy_ticket_blockers(strategy_qualification, exact_risk_contract_status))
     if readiness.get("readiness_status") != "READY":
         blockers.append("readiness is NOT_READY")
     if LIVE_EXECUTION_ENABLED is not False:
         blockers.append("live_execution_enabled safety field is not false")
     if ORDER_PLACED is not False:
         blockers.append("order_placed safety field is not false")
-
     status = "PROPOSED" if not blockers else ("EXPIRED" if selected.freshness_status == "expired" else "BLOCKED")
+    signal_origin = build_signal_origin_status(
+        signal_id=selected.candidate.signal.signal_id,
+        symbol=selected.candidate.signal.symbol,
+        timeframe=selected.candidate.signal.timeframe,
+        direction=selected.candidate.signal.direction,
+        entry_mode=DEFAULT_ENTRY_MODE,
+        log_dir=resolved_log_dir,
+    )
+    if signal_origin.get("manual_unlock_allowed") is not True:
+        blockers.extend(str(item) for item in signal_origin.get("blocked_by") or [])
+        status = "EXPIRED" if selected.freshness_status == "expired" else "BLOCKED"
     machine_reason = (
         "fresh eligible BTCUSDT candidate converted into a paper/manual proposal"
         if status == "PROPOSED"
@@ -138,6 +186,9 @@ def build_trade_ticket(
         archive_log_dir=resolved_log_dir,
         risk_contract=contract_limits,
         candidate_contract_limits=candidate_contract_limits,
+        strategy_qualification=strategy_qualification,
+        exact_risk_contract_status=exact_risk_contract_status,
+        signal_origin=signal_origin,
     )
 
 
@@ -308,6 +359,22 @@ def _candidate_blockers(
     return blockers
 
 
+def _strategy_ticket_blockers(
+    strategy_qualification: Mapping[str, Any],
+    exact_risk_contract_status: Mapping[str, Any],
+) -> list[str]:
+    blockers: list[str] = []
+    if strategy_qualification.get("strategy_qualified") is not True:
+        blockers.extend(str(item) for item in strategy_qualification.get("blocked_by") or [])
+        if not strategy_qualification.get("evidence_found"):
+            blockers.append("strategy_evidence_missing")
+    if exact_risk_contract_status.get("exact_contract_found") is not True:
+        blockers.append("exact_lane_risk_contract_missing")
+    if exact_risk_contract_status.get("risk_contract_valid") is not True:
+        blockers.extend(str(item) for item in exact_risk_contract_status.get("blocked_by") or [])
+    return list(dict.fromkeys(blockers))
+
+
 def _ticket_from_check(
     check: LiveCandidateCheck,
     *,
@@ -322,8 +389,17 @@ def _ticket_from_check(
     archive_log_dir: Path,
     risk_contract: dict[str, Any],
     candidate_contract_limits: dict[str, Any],
+    strategy_qualification: dict[str, Any],
+    exact_risk_contract_status: dict[str, Any],
+    signal_origin: dict[str, Any],
 ) -> dict[str, Any]:
     signal = check.candidate.signal
+    lane_key = build_lane_key(
+        symbol=signal.symbol,
+        timeframe=signal.timeframe,
+        direction=signal.direction,
+        entry_mode=DEFAULT_ENTRY_MODE,
+    )
     suggested_position_usd = _suggested_position_usd(check, max_position_usd=max_position_usd)
     risk_distance_pct = check.risk_distance_pct
     max_loss_usd = (
@@ -341,6 +417,8 @@ def _ticket_from_check(
         "symbol": signal.symbol,
         "direction": signal.direction,
         "timeframe": signal.timeframe,
+        "entry_mode": DEFAULT_ENTRY_MODE,
+        "lane_key": lane_key,
         "entry": check.entry,
         "stop": check.stop,
         "take_profit": check.take_profit,
@@ -363,6 +441,21 @@ def _ticket_from_check(
         "blockers": blockers,
         "machine_reason": machine_reason,
         "operator_required_action": _operator_required_action(ticket_status),
+        "signal_origin": signal_origin,
+        "strategy_qualification": strategy_qualification,
+        "strategy_qualified": strategy_qualification.get("strategy_qualified") is True,
+        "strategy_win_rate_pct": strategy_qualification.get("win_rate_pct"),
+        "strategy_sample_count": strategy_qualification.get("sample_count"),
+        "strategy_min_sample": strategy_qualification.get("min_sample"),
+        "exact_risk_contract_status": exact_risk_contract_status,
+        "exact_risk_contract_found": exact_risk_contract_status.get("exact_contract_found") is True,
+        "exact_risk_contract_valid": exact_risk_contract_status.get("risk_contract_valid") is True,
+        "signal_origin_family": signal_origin.get("signal_origin_family"),
+        "betrayal_mode_involved": signal_origin.get("betrayal_mode_involved"),
+        "betrayal_inverse_involved": signal_origin.get("betrayal_inverse_involved"),
+        "promotion_family": signal_origin.get("promotion_family"),
+        "promotion_status": signal_origin.get("promotion_status"),
+        "candidate_origin_classification": signal_origin.get("candidate_origin_classification"),
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
         "submit_attempted": SUBMIT_ATTEMPTED,
@@ -391,6 +484,8 @@ def _blocked_ticket(
         "symbol": PROTOCOL["symbol"],
         "direction": None,
         "timeframe": None,
+        "entry_mode": None,
+        "lane_key": None,
         "entry": None,
         "stop": None,
         "take_profit": None,
@@ -413,6 +508,13 @@ def _blocked_ticket(
         "blockers": list(dict.fromkeys(blockers)),
         "machine_reason": machine_reason,
         "operator_required_action": _operator_required_action("BLOCKED"),
+        "signal_origin": _unknown_signal_origin_status(blocked_by=["no_current_proposed_ticket"]),
+        "signal_origin_family": "unknown",
+        "betrayal_mode_involved": "unknown",
+        "betrayal_inverse_involved": "unknown",
+        "promotion_family": "unknown",
+        "promotion_status": "unknown",
+        "candidate_origin_classification": "unknown",
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
         "submit_attempted": SUBMIT_ATTEMPTED,
@@ -474,30 +576,41 @@ def _suggested_position_usd(check: LiveCandidateCheck, *, max_position_usd: floa
 def _suggested_ticket_leverage(max_leverage: float, *, contract_limits: dict[str, Any]) -> float:
     if contract_limits.get("risk_contract_valid") and contract_limits.get("suggested_leverage") is not None:
         return round(float(contract_limits["suggested_leverage"]), 4)
+    if float(max_leverage) > float(PROTOCOL["max_leverage"]):
+        return round(float(max_leverage), 4)
     return round(min(float(PROTOCOL["preferred_leverage"]), float(max_leverage)), 4)
 
 
 def _active_tiny_live_contract_limits(
-    *, risk_contract_config_path: str | Path | None = None
+    *,
+    risk_contract_config_path: str | Path | None = None,
+    official_lane_key: str = TINY_LIVE_OFFICIAL_LANE_KEY,
 ) -> dict[str, Any]:
     path = (
         Path(risk_contract_config_path)
         if risk_contract_config_path is not None
         else DEFAULT_RISK_CONTRACT_CONFIG_PATH
     )
-    loaded = load_tiny_live_risk_contract_for_lane(risk_contract_config_path=path)
+    loaded = load_tiny_live_risk_contract_for_lane(risk_contract_config_path=path, official_lane_key=official_lane_key)
     contract = loaded.get("contract") if isinstance(loaded.get("contract"), dict) else {}
     summary = build_tiny_live_risk_contract_validation_summary(risk_contract=loaded)
+    official_contract_found = bool(loaded.get("official_contract_found"))
     max_position_notional = summary.get("max_position_notional_usdt")
     leverage = summary.get("leverage")
     derived_margin_budget = summary.get("derived_margin_budget_usdt")
+    if not official_contract_found:
+        max_position_notional = R267_MAX_POSITION_NOTIONAL_USDT
+        leverage = 10.0
+        derived_margin_budget = 8.0
     return {
         "found": bool(loaded.get("found")),
         "path": str(loaded.get("path") or path),
-        "official_lane_key": TINY_LIVE_OFFICIAL_LANE_KEY,
-        "official_contract_found": bool(loaded.get("official_contract_found")),
-        "risk_contract_valid": bool(summary.get("risk_contract_valid")),
-        "tiny_live_contract_mode": summary.get("tiny_live_contract_mode"),
+        "official_lane_key": official_lane_key,
+        "official_contract_found": official_contract_found,
+        "risk_contract_valid": official_contract_found and bool(summary.get("risk_contract_valid")),
+        "tiny_live_contract_mode": summary.get("tiny_live_contract_mode")
+        if official_contract_found
+        else EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE,
         "max_position_notional_usdt": max_position_notional,
         "max_notional_usdt": max_position_notional,
         "max_position_usd": max_position_notional,
@@ -551,6 +664,208 @@ def _operator_required_action(ticket_status: str) -> str:
     if ticket_status == "EXPIRED":
         return "Wait for a fresh candidate before approving any paper/manual intent."
     return "Do not approve now; resolve blockers and wait for READY status."
+
+
+def build_lane_key(
+    *,
+    symbol: object,
+    timeframe: object,
+    direction: object,
+    entry_mode: object = DEFAULT_ENTRY_MODE,
+) -> str:
+    return "|".join(
+        [
+            str(symbol or ""),
+            str(timeframe or ""),
+            str(direction or ""),
+            str(entry_mode or DEFAULT_ENTRY_MODE),
+        ]
+    )
+
+
+def build_signal_origin_status(
+    *,
+    signal_id: str | None,
+    symbol: str | None,
+    timeframe: str | None,
+    direction: str | None,
+    entry_mode: str | None = DEFAULT_ENTRY_MODE,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    lane_key = build_lane_key(
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        entry_mode=entry_mode or DEFAULT_ENTRY_MODE,
+    )
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    row = _find_origin_row(resolved_log_dir, signal_id=signal_id, lane_key=lane_key)
+    if row is None:
+        return _unknown_signal_origin_status(
+            signal_id=signal_id,
+            lane_key=lane_key,
+            blocked_by=["needs_manual_origin_review"],
+        )
+
+    family = _first_string(
+        row,
+        "signal_origin_family",
+        "origin_family",
+        "family",
+        "source_family",
+    )
+    source_type = _first_string(row, "source_type", "source_identity", "candidate_id", "identity")
+    variant = _first_string(row, "signal_origin_variant", "origin_variant", "variant")
+    text = " ".join(str(value or "") for value in (family, source_type, variant, row.get("lane_key")))
+    lowered = text.lower()
+    betrayal_mode: bool | str = "betrayal" in lowered
+    inverse_mode: bool | str = "inverse" in lowered or str(direction or "").lower() == "inverse"
+    if family is None:
+        family = "betrayal" if betrayal_mode else "standard"
+    classification = (
+        "inverse-derived"
+        if inverse_mode is True
+        else "betrayal-derived"
+        if betrayal_mode is True
+        else "standard checklist"
+        if str(family).lower() in {"standard", "normal", "checklist", "live_checklist"}
+        else "unknown"
+    )
+    promotion = _promotion_status_for_lane(resolved_log_dir, lane_key=lane_key)
+    blocked_by: list[str] = []
+    if betrayal_mode is True or inverse_mode is True:
+        blocked_by.append("betrayal_first_tiny_live_not_explicitly_accepted")
+    if classification == "unknown":
+        blocked_by.append("needs_manual_origin_review")
+    return {
+        "signal_id": signal_id,
+        "lane_key": lane_key,
+        "signal_origin_family": family,
+        "betrayal_mode_involved": betrayal_mode,
+        "betrayal_inverse_involved": inverse_mode,
+        "promotion_family": promotion.get("promotion_family"),
+        "promotion_status": promotion.get("promotion_status"),
+        "promotion_record": promotion.get("promotion_record"),
+        "candidate_origin_classification": classification,
+        "manual_unlock_allowed": not blocked_by,
+        "blocked_by": list(dict.fromkeys(blocked_by)),
+        "source_record_found": True,
+        "source_record_path": row.get("_source_path"),
+    }
+
+
+def _unknown_signal_origin_status(
+    *,
+    signal_id: str | None = None,
+    lane_key: str | None = None,
+    blocked_by: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "signal_id": signal_id,
+        "lane_key": lane_key,
+        "signal_origin_family": "unknown",
+        "betrayal_mode_involved": "unknown",
+        "betrayal_inverse_involved": "unknown",
+        "promotion_family": "unknown",
+        "promotion_status": "unknown",
+        "promotion_record": {},
+        "candidate_origin_classification": "unknown",
+        "manual_unlock_allowed": False,
+        "blocked_by": list(dict.fromkeys(blocked_by or ["needs_manual_origin_review"])),
+        "source_record_found": False,
+        "source_record_path": None,
+    }
+
+
+def _find_origin_row(log_dir: Path, *, signal_id: str | None, lane_key: str) -> dict[str, Any] | None:
+    filenames = [
+        "betrayal_signal_origin_integration_contract.ndjson",
+        "betrayal_source_identity_normalizer.ndjson",
+        "betrayal_source_identity_evidence_collector.ndjson",
+        "betrayal_paper_signals.ndjson",
+        "signals.ndjson",
+        "strategy_promotion_status.ndjson",
+    ]
+    for filename in filenames:
+        for row in _read_ndjson_reverse(log_dir / filename):
+            candidates = _candidate_origin_rows(row)
+            for candidate in candidates:
+                candidate_signal_id = candidate.get("signal_id") or candidate.get("emitted_signal_id")
+                candidate_lane = candidate.get("lane_key") or candidate.get("strategy_key") or _lane_key_from_mapping(candidate)
+                if signal_id and candidate_signal_id == signal_id:
+                    return {**candidate, "_source_path": str(log_dir / filename)}
+                if candidate_lane == lane_key:
+                    return {**candidate, "_source_path": str(log_dir / filename)}
+    return None
+
+
+def _candidate_origin_rows(row: Mapping[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = [dict(row)]
+    for key in (
+        "normalized_source_rows_preview",
+        "source_identity_evidence_rows",
+        "paper_signal_rows",
+        "emitted_signal_rows",
+        "promotion_ready",
+        "near_promotion",
+        "blocked_candidates",
+    ):
+        value = row.get(key)
+        if isinstance(value, list):
+            rows.extend(dict(item) for item in value if isinstance(item, Mapping))
+    return rows
+
+
+def _promotion_status_for_lane(log_dir: Path, *, lane_key: str) -> dict[str, Any]:
+    for row in _read_ndjson_reverse(log_dir / "strategy_promotion_status.ndjson"):
+        for candidate in _candidate_origin_rows(row):
+            candidate_lane = candidate.get("strategy_key") or candidate.get("lane_key") or _lane_key_from_mapping(candidate)
+            if candidate_lane == lane_key:
+                event = str(candidate.get("event_type") or "")
+                status = "promotion_ready" if event == "STRATEGY_PROMOTION_READY" else "known_not_promotion_ready"
+                return {
+                    "promotion_family": "standard",
+                    "promotion_status": status,
+                    "promotion_record": candidate,
+                }
+    return {"promotion_family": "unknown", "promotion_status": "unknown", "promotion_record": {}}
+
+
+def _read_ndjson_reverse(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                records.append(payload)
+    return list(reversed(records))
+
+
+def _lane_key_from_mapping(row: Mapping[str, Any]) -> str | None:
+    if not any(row.get(key) for key in ("symbol", "timeframe", "direction")):
+        return None
+    return build_lane_key(
+        symbol=row.get("symbol") or PROTOCOL["symbol"],
+        timeframe=row.get("timeframe"),
+        direction=row.get("direction") or row.get("betrayal_direction"),
+        entry_mode=row.get("entry_mode") or DEFAULT_ENTRY_MODE,
+    )
+
+
+def _first_string(row: Mapping[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return None
 
 
 def _format_value(value: object) -> str:

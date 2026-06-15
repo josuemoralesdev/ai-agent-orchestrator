@@ -14,14 +14,20 @@ from src.app.hammer_radar.operator.inspect import (
     build_live_candidate_snapshot,
 )
 from src.app.hammer_radar.operator.manual_outcomes import load_manual_outcomes
+from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
+    PREFERRED_ENTRY_MODE,
+    build_exact_lane_risk_contract_status,
+    build_lane_key,
+    build_strategy_lane_qualification,
+)
 
 LIVE_EXECUTION_ENABLED = False
 ORDER_PLACED = False
 PROTOCOL = {
     "symbol": "BTCUSDT",
-    "max_position_usd": 44,
-    "preferred_leverage": 2,
-    "max_leverage": 3,
+    "max_position_usd": 80,
+    "preferred_leverage": 10,
+    "max_leverage": 10,
     "margin": "isolated",
     "max_trades_per_day": 1,
     "hard_daily_stop": "one live loss or 5 USDT loss",
@@ -65,6 +71,16 @@ def build_readiness_payload(*, log_dir: str | Path | None = None) -> dict[str, A
             and check.suggested_leverage <= float(PROTOCOL["max_leverage"])
         )
     ]
+    strategy_checked_candidates = [
+        _strategy_readiness_for_check(check, log_dir=resolved_log_dir)
+        for check in eligible_checks
+    ]
+    strategy_ready_candidates = [
+        candidate
+        for candidate in strategy_checked_candidates
+        if candidate["strategy_qualification"].get("strategy_qualified") is True
+        and candidate["exact_risk_contract_status"].get("risk_contract_valid") is True
+    ]
     manual_outcomes = load_manual_outcomes(limit=0, log_dir=resolved_log_dir)
     today = generated_at.date()
     outcomes_today = [
@@ -89,6 +105,8 @@ def build_readiness_payload(*, log_dir: str | Path | None = None) -> dict[str, A
         blockers.append("no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate")
     if not eligible_checks and expired_eligible_count:
         blockers.append("only expired otherwise-eligible candidates are available")
+    if eligible_checks and not strategy_ready_candidates:
+        blockers.extend(_strategy_readiness_blockers(strategy_checked_candidates))
     if len(outcomes_today) >= int(PROTOCOL["max_trades_per_day"]):
         blockers.append("manual outcome already logged today")
     if losses_today > 0:
@@ -122,7 +140,8 @@ def build_readiness_payload(*, log_dir: str | Path | None = None) -> dict[str, A
         "reason_summary": reason_summary,
         "protocol": dict(PROTOCOL),
         "current_state": {
-            "fresh_eligible_count": len(eligible_checks),
+            "fresh_eligible_count": len(strategy_ready_candidates),
+            "fresh_live_checklist_eligible_count": len(eligible_checks),
             "expired_eligible_count": expired_eligible_count,
             "paper_only_count": decisions.count(LIVE_DECISION_PAPER_ONLY),
             "forbidden_count": decisions.count(LIVE_DECISION_FORBIDDEN),
@@ -134,6 +153,12 @@ def build_readiness_payload(*, log_dir: str | Path | None = None) -> dict[str, A
         },
         "allowed_now": allowed_now,
         "blockers": blockers,
+        "strategy_policy": {
+            "evidence_policy_all_timeframes_enabled": True,
+            "min_win_rate_pct": 55.0,
+            "min_sample_count": 30,
+        },
+        "strategy_checked_candidates": strategy_checked_candidates,
         "next_required_action": next_required_action,
         "today_timezone": "UTC",
     }
@@ -204,3 +229,51 @@ def _parse_datetime(value: str) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def _strategy_readiness_for_check(check: Any, *, log_dir: Path) -> dict[str, Any]:
+    signal = check.candidate.signal
+    lane_key = build_lane_key(
+        symbol=signal.symbol,
+        timeframe=signal.timeframe,
+        direction=signal.direction,
+        entry_mode=PREFERRED_ENTRY_MODE,
+    )
+    strategy_qualification = build_strategy_lane_qualification(
+        symbol=signal.symbol,
+        timeframe=signal.timeframe,
+        direction=signal.direction,
+        entry_mode=PREFERRED_ENTRY_MODE,
+        log_dir=log_dir,
+    )
+    exact_risk_contract_status = build_exact_lane_risk_contract_status(
+        lane_key=lane_key,
+        strategy_qualification=strategy_qualification,
+    )
+    return {
+        "signal_id": signal.signal_id,
+        "lane_key": lane_key,
+        "strategy_qualification": strategy_qualification,
+        "exact_risk_contract_status": exact_risk_contract_status,
+        "blocked_by": _dedupe(
+            [
+                *[str(item) for item in strategy_qualification.get("blocked_by") or []],
+                *[str(item) for item in exact_risk_contract_status.get("blocked_by") or []],
+            ]
+        ),
+    }
+
+
+def _strategy_readiness_blockers(candidates: list[dict[str, Any]]) -> list[str]:
+    blockers: list[str] = []
+    if not candidates:
+        return blockers
+    for candidate in candidates:
+        blockers.extend(str(item) for item in candidate.get("blocked_by") or [])
+    if not blockers:
+        blockers.append("strategy_evidence_missing")
+    return _dedupe(blockers)
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))

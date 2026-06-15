@@ -108,6 +108,104 @@ def test_successful_jit_packet_keeps_final_manual_command_unavailable(tmp_path: 
     assert "80 USDT notional cap" in command["expected_orders"]["main"]
 
 
+def test_4m_long_ticket_gets_buy_main_sell_reduce_only_expected_orders(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch, lane_key="BTCUSDT|4m|long|ladder_close_50_618")
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert payload["target_scope"]["official_lane_key"] == "BTCUSDT|4m|long|ladder_close_50_618"
+    assert command["expected_orders"]["main"].startswith("BUY MARKET")
+    assert command["expected_orders"]["stop"] == "SELL STOP_MARKET REDUCE_ONLY"
+    assert command["expected_orders"]["take_profit"] == "SELL TAKE_PROFIT_MARKET REDUCE_ONLY"
+    assert "BTCUSDT|8m|short|ladder_close_50_618" != command["packet_lane_key"]
+    _assert_no_submit_safety(payload)
+
+
+def test_mismatch_blocks_command_availability(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch, lane_key="BTCUSDT|4m|long|ladder_close_50_618")
+    monkeypatch.setattr(
+        r264b,
+        "build_fresh_candidate_status",
+        lambda **_: _fresh_candidate_ok(lane_key="BTCUSDT|8m|short|ladder_close_50_618"),
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    blocked = payload["final_live_submit_command_packet"]["gate_validation"]["blocked_by"]
+    assert payload["final_live_submit_command_packet"]["available"] is False
+    assert "fresh_candidate_lane_matches_packet" in blocked
+    assert "fresh_candidate_timeframe_matches_packet" in blocked
+    _assert_no_submit_safety(payload)
+
+
+def test_betrayal_or_inverse_origin_blocks_manual_unlock(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(
+        monkeypatch,
+        origin={
+            **_standard_origin(),
+            "signal_origin_family": "betrayal",
+            "betrayal_mode_involved": True,
+            "betrayal_inverse_involved": True,
+            "candidate_origin_classification": "inverse-derived",
+            "manual_unlock_allowed": False,
+            "blocked_by": ["betrayal_first_tiny_live_not_explicitly_accepted"],
+        },
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    blocked = payload["final_live_submit_command_packet"]["gate_validation"]["blocked_by"]
+    assert payload["final_live_submit_command_packet"]["available"] is False
+    assert "betrayal_first_tiny_live_not_explicitly_accepted" in blocked
+    assert "betrayal_not_involved" in blocked
+    assert "betrayal_inverse_not_involved" in blocked
+    _assert_no_submit_safety(payload)
+
+
+def test_unknown_origin_blocks_manual_unlock(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(
+        monkeypatch,
+        origin={
+            **_standard_origin(),
+            "signal_origin_family": "unknown",
+            "betrayal_mode_involved": "unknown",
+            "betrayal_inverse_involved": "unknown",
+            "candidate_origin_classification": "unknown",
+            "manual_unlock_allowed": False,
+            "blocked_by": ["needs_manual_origin_review"],
+        },
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    blocked = payload["final_live_submit_command_packet"]["gate_validation"]["blocked_by"]
+    assert payload["final_live_submit_command_packet"]["available"] is False
+    assert "needs_manual_origin_review" in blocked
+    assert "signal_origin_allowed" in blocked
+    _assert_no_submit_safety(payload)
+
+
 def test_final_command_unavailable_without_exact_r268_unlock_confirmation(tmp_path: Path, monkeypatch) -> None:
     _patch_success(monkeypatch)
     payload = r264b.build_tiny_live_jit_launch_packet(
@@ -315,14 +413,27 @@ def _run_exact(tmp_path: Path) -> dict:
     )
 
 
-def _patch_success(monkeypatch, *, fresh_candidate: bool = True) -> None:
+def _patch_success(
+    monkeypatch,
+    *,
+    fresh_candidate: bool = True,
+    lane_key: str = OFFICIAL,
+    origin: dict | None = None,
+) -> None:
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok())
     monkeypatch.setattr(
         r264b,
+        "build_current_proposed_ticket_context",
+        lambda **_: _current_ticket_context(lane_key=lane_key, origin=origin or _standard_origin(lane_key=lane_key)),
+    )
+    monkeypatch.setattr(
+        r264b,
         "build_fresh_candidate_status",
-        lambda **_: _fresh_candidate_ok() if fresh_candidate else _fresh_candidate_blocked(),
+        lambda **_: _fresh_candidate_ok(lane_key=lane_key, origin=origin or _standard_origin(lane_key=lane_key))
+        if fresh_candidate
+        else _fresh_candidate_blocked(),
     )
 
 
@@ -417,15 +528,24 @@ def _risk_interpretation(*, candidate_notional: float = 64.0) -> dict:
     }
 
 
-def _fresh_candidate_ok() -> dict:
+def _fresh_candidate_ok(
+    *,
+    lane_key: str = OFFICIAL,
+    origin: dict | None = None,
+) -> dict:
+    symbol, timeframe, direction, entry_mode = lane_key.split("|")
+    origin = origin or _standard_origin(lane_key=lane_key)
     return {
         "fresh_candidate_available": True,
         "trade_ticket_status": "PROPOSED",
         "ticket_id": "tt_r269",
         "signal_id": "fresh|r269",
-        "symbol": "BTCUSDT",
-        "timeframe": "8m",
-        "direction": "short",
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction,
+        "entry_mode": entry_mode,
+        "lane_key": lane_key,
+        "expected_lane_key": lane_key,
         "readiness_status": "READY",
         "allowed_now": True,
         "max_position_usd": 80.0,
@@ -435,12 +555,96 @@ def _fresh_candidate_ok() -> dict:
         "active_contract_max_notional_usdt": 80.0,
         "active_contract_leverage": 10.0,
         "active_contract_margin_budget_usdt": 8.0,
+        "signal_origin_status": origin,
+        "strategy_qualification": _strategy_qualification(lane_key=lane_key),
+        "strategy_qualified": True,
+        "strategy_win_rate_pct": 62.0,
+        "strategy_sample_count": 40,
+        "strategy_min_sample": 30,
+        "exact_risk_contract_status": _exact_risk_contract_status(lane_key=lane_key),
+        "exact_risk_contract_found": True,
+        "exact_risk_contract_valid": True,
+        "signal_origin_family": origin["signal_origin_family"],
+        "betrayal_mode_involved": origin["betrayal_mode_involved"],
+        "betrayal_inverse_involved": origin["betrayal_inverse_involved"],
+        "promotion_family": origin["promotion_family"],
+        "promotion_status": origin["promotion_status"],
+        "candidate_origin_classification": origin["candidate_origin_classification"],
         "blocked_by": [],
         "order_placed": False,
         "real_order_placed": False,
         "submit_attempted": False,
         "binance_order_endpoint_called": False,
         "secrets_shown": False,
+    }
+
+
+def _current_ticket_context(*, lane_key: str = OFFICIAL, origin: dict | None = None) -> dict:
+    symbol, timeframe, direction, entry_mode = lane_key.split("|")
+    return {
+        "selected": True,
+        "ticket_status": "PROPOSED",
+        "ticket_id": "tt_r269",
+        "signal_id": "fresh|r269",
+        "lane_key": lane_key,
+        "actual_ticket_lane_key": lane_key,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction,
+        "entry_mode": entry_mode,
+        "blockers": [],
+        "signal_origin_status": origin or _standard_origin(lane_key=lane_key),
+        "strategy_qualification": _strategy_qualification(lane_key=lane_key),
+        "exact_risk_contract_status": _exact_risk_contract_status(lane_key=lane_key),
+        "order_placed": False,
+        "real_order_placed": False,
+        "submit_attempted": False,
+        "binance_order_endpoint_called": False,
+        "secrets_shown": False,
+    }
+
+
+def _standard_origin(*, lane_key: str = OFFICIAL) -> dict:
+    return {
+        "signal_id": "fresh|r269",
+        "lane_key": lane_key,
+        "signal_origin_family": "standard",
+        "betrayal_mode_involved": False,
+        "betrayal_inverse_involved": False,
+        "promotion_family": "standard",
+        "promotion_status": "promotion_ready",
+        "candidate_origin_classification": "standard checklist",
+        "manual_unlock_allowed": True,
+        "blocked_by": [],
+        "source_record_found": True,
+    }
+
+
+def _strategy_qualification(*, lane_key: str = OFFICIAL) -> dict:
+    symbol, timeframe, direction, entry_mode = lane_key.split("|")
+    return {
+        "lane_key": lane_key,
+        "strategy_qualified": True,
+        "qualification_status": "QUALIFIED",
+        "win_rate_pct": 62.0,
+        "sample_count": 40,
+        "min_sample": 30,
+        "min_win_rate_pct": 55.0,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "direction": direction,
+        "entry_mode": entry_mode,
+        "blocked_by": [],
+    }
+
+
+def _exact_risk_contract_status(*, lane_key: str = OFFICIAL) -> dict:
+    return {
+        "lane_key": lane_key,
+        "exact_contract_found": True,
+        "risk_contract_valid": True,
+        "blocked_by": [],
+        "no_cross_lane_borrowing": True,
     }
 
 

@@ -72,6 +72,7 @@ def build_exchange_dry_run(ticket: dict[str, Any]) -> dict[str, Any]:
     take_profit = _float_or_none(ticket.get("take_profit"))
     notional = _float_or_none(ticket.get("suggested_position_usd"))
     leverage = _float_or_none(ticket.get("suggested_leverage"))
+    max_leverage_allowed = _effective_max_leverage_allowed(ticket=ticket, rules=rules)
     margin_mode = str(ticket.get("margin_mode") or "")
     ticket_status = str(ticket.get("ticket_status") or "")
 
@@ -92,7 +93,7 @@ def build_exchange_dry_run(ticket: dict[str, Any]) -> dict[str, Any]:
         "price_tick_ok": bool(
             rules and entry_rounded is not None and stop_rounded is not None and take_profit_rounded is not None
         ),
-        "leverage_ok": bool(rules and leverage is not None and leverage <= float(rules["max_leverage_allowed"])),
+        "leverage_ok": bool(rules and leverage is not None and leverage <= max_leverage_allowed),
         "margin_mode_ok": bool(rules and margin_mode == str(rules["allowed_margin_mode"])),
         "stop_present": stop is not None,
         "take_profit_present": take_profit is not None,
@@ -103,6 +104,7 @@ def build_exchange_dry_run(ticket: dict[str, Any]) -> dict[str, Any]:
         direction=direction,
         ticket_blockers=ticket.get("blockers"),
         rules=rules,
+        max_leverage_allowed=max_leverage_allowed,
         notional=notional,
         leverage=leverage,
         margin_mode=margin_mode,
@@ -193,6 +195,7 @@ def _blockers(
     direction: str,
     ticket_blockers: object,
     rules: dict[str, Any] | None,
+    max_leverage_allowed: float,
     notional: float | None,
     leverage: float | None,
     margin_mode: str,
@@ -215,7 +218,7 @@ def _blockers(
     if not validations["price_tick_ok"]:
         blockers.append("price fields do not satisfy tick_size rounding")
     if not validations["leverage_ok"]:
-        maximum = rules["max_leverage_allowed"] if rules else "n/a"
+        maximum = max_leverage_allowed if rules else "n/a"
         blockers.append(f"leverage above max {maximum}: {leverage}")
     if not validations["margin_mode_ok"]:
         expected = rules["allowed_margin_mode"] if rules else "isolated"
@@ -225,6 +228,17 @@ def _blockers(
     if not validations["take_profit_present"]:
         blockers.append("missing take_profit")
     return list(dict.fromkeys(blockers))
+
+
+def _effective_max_leverage_allowed(*, ticket: dict[str, Any], rules: dict[str, Any] | None) -> float:
+    default = float((rules or {}).get("max_leverage_allowed") or 0.0)
+    if (
+        ticket.get("active_contract_mode") == "explicit_notional_cap_with_leverage"
+        and _float_or_none(ticket.get("active_contract_max_notional_usdt")) == 80.0
+        and _float_or_none(ticket.get("active_contract_leverage")) == 10.0
+    ):
+        return 10.0
+    return default
 
 
 def _payload_preview(

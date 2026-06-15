@@ -27,7 +27,9 @@ NO_ORDER_PAYLOAD_CREATED = True
 SECRETS_SHOWN = False
 
 DEFAULT_MIN_SAMPLE = 30
-DEFAULT_MIN_WIN_RATE = 45.0
+LEGACY_MIN_WIN_RATE = 45.0
+TINY_LIVE_MIN_WIN_RATE = 55.0
+DEFAULT_MIN_WIN_RATE = TINY_LIVE_MIN_WIN_RATE
 DEFAULT_ALLOWED_TINY_LIVE_TIMEFRAMES = ("13m", "44m")
 DEFAULT_PAPER_ONLY_TIMEFRAMES = ("4m", "8m", "88m")
 DEFAULT_CONTEXT_ONLY_TIMEFRAMES = ("4H", "13H", "13D", "888m")
@@ -61,6 +63,10 @@ class StrategyAuditConfig:
             "blocked_timeframes": list(self.blocked_timeframes),
             "preferred_entry_mode": PREFERRED_ENTRY_MODE,
             "btc_symbol": BTC_SYMBOL,
+            "evidence_policy_all_timeframes_enabled": True,
+            "legacy_min_win_rate_pct": LEGACY_MIN_WIN_RATE,
+            "tiny_live_min_win_rate_pct": max(float(self.min_win_rate), TINY_LIVE_MIN_WIN_RATE),
+            "tiny_live_min_sample_count": self.min_sample,
         }
 
 
@@ -68,10 +74,13 @@ def load_strategy_audit_config(env: dict[str, str] | None = None) -> StrategyAud
     source = os.environ if env is None else env
     return StrategyAuditConfig(
         min_sample=_env_int(source.get("HAMMER_STRATEGY_AUDIT_MIN_SAMPLE"), default=DEFAULT_MIN_SAMPLE, minimum=1),
-        min_win_rate=_env_float(
-            source.get("HAMMER_STRATEGY_AUDIT_MIN_WIN_RATE"),
-            default=DEFAULT_MIN_WIN_RATE,
-            minimum=0.0,
+        min_win_rate=max(
+            _env_float(
+                source.get("HAMMER_STRATEGY_AUDIT_MIN_WIN_RATE"),
+                default=DEFAULT_MIN_WIN_RATE,
+                minimum=0.0,
+            ),
+            TINY_LIVE_MIN_WIN_RATE,
         ),
         allowed_tiny_live_timeframes=_env_list(
             source.get("HAMMER_STRATEGY_AUDIT_ALLOWED_TINY_LIVE_TIMEFRAMES"),
@@ -150,9 +159,10 @@ def build_live_eligibility_matrix(
     log_dir: str | Path | None = None,
     config: StrategyAuditConfig | None = None,
 ) -> dict[str, Any]:
-    audit = _build_audit(log_dir=log_dir, config=config)
+    live_config = _tiny_live_policy_config(config or load_strategy_audit_config())
+    audit = _build_audit(log_dir=log_dir, config=live_config)
     recommendations = [
-        _recommendation(row, config=load_strategy_audit_config() if config is None else config)
+        _recommendation(row, config=live_config)
         for row in audit["groups"]["timeframe_direction_entry_mode"]
     ]
     recommendations.sort(
@@ -175,7 +185,7 @@ def build_live_eligibility_matrix(
         "notes": [
             "Recommendation only. Not permission to execute.",
             "No live orders. No signed order payloads.",
-            "BTCUSDT long-only remains the future tiny-live recommendation boundary.",
+            "BTCUSDT lanes qualify by evidence, not fixed timeframe buckets.",
         ],
     }
 
@@ -298,33 +308,17 @@ def _window_summary(
 
 
 def _recommendation(row: dict[str, Any], *, config: StrategyAuditConfig) -> dict[str, Any]:
-    timeframe = str(row.get("timeframe") or "")
     direction = str(row.get("direction") or "")
     entry_mode = str(row.get("entry_mode") or "")
     blockers: list[str] = []
-    recommendation = PAPER_ONLY
+    recommendation = ELIGIBLE_FOR_FUTURE_TINY_LIVE
 
-    if direction == "short":
-        recommendation = PAPER_ONLY
-        blockers.append("shorts remain paper/operator visibility only")
-    elif direction != "long":
+    if direction not in {"long", "short"}:
         recommendation = BLOCKED_FROM_LIVE
         blockers.append(f"unsupported direction: {direction}")
-    elif timeframe in config.context_only_timeframes:
-        recommendation = CONTEXT_ONLY
-        blockers.append("timeframe is context-only until explicitly promoted")
-    elif timeframe in config.paper_only_timeframes:
-        recommendation = PAPER_ONLY
-        blockers.append("timeframe remains paper-only by default because of noise/context risk")
-    elif timeframe in config.blocked_timeframes:
-        recommendation = BLOCKED_FROM_LIVE
-        blockers.append("timeframe is blocked from live by R40 audit defaults")
     elif int(row["sample_count"]) < config.min_sample:
         recommendation = INSUFFICIENT_DATA
         blockers.append(f"sample_count below minimum {config.min_sample}")
-    elif timeframe not in config.allowed_tiny_live_timeframes:
-        recommendation = PAPER_ONLY
-        blockers.append("timeframe is not in allowed future tiny-live recommendation list")
     elif entry_mode != PREFERRED_ENTRY_MODE:
         recommendation = PAPER_ONLY
         blockers.append(f"entry_mode is not preferred {PREFERRED_ENTRY_MODE}")
@@ -336,13 +330,16 @@ def _recommendation(row: dict[str, Any], *, config: StrategyAuditConfig) -> dict
         blockers.append("total_pnl_pct must be positive")
     elif float(row["win_rate_pct"]) < config.min_win_rate:
         recommendation = BLOCKED_FROM_LIVE
+        blockers.append("win_rate_below_operator_55_policy")
+        blockers.append("below_operator_55_policy")
         blockers.append(f"win_rate_pct below minimum {config.min_win_rate}")
-    else:
-        recommendation = ELIGIBLE_FOR_FUTURE_TINY_LIVE
 
     return {
         **row,
         "recommendation": recommendation,
+        "evidence_policy_all_timeframes_enabled": True,
+        "min_win_rate_pct": config.min_win_rate,
+        "min_sample_count": config.min_sample,
         "preferred_entry_mode": PREFERRED_ENTRY_MODE,
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
@@ -398,6 +395,17 @@ def _operator_note(recommendation: str) -> str:
     if recommendation == BLOCKED_FROM_LIVE:
         return "Do not promote to live under R40 audit rules."
     return "Continue paper/watch-only tracking."
+
+
+def _tiny_live_policy_config(config: StrategyAuditConfig) -> StrategyAuditConfig:
+    return StrategyAuditConfig(
+        min_sample=int(config.min_sample or DEFAULT_MIN_SAMPLE),
+        min_win_rate=max(float(config.min_win_rate), TINY_LIVE_MIN_WIN_RATE),
+        allowed_tiny_live_timeframes=config.allowed_tiny_live_timeframes,
+        paper_only_timeframes=config.paper_only_timeframes,
+        context_only_timeframes=config.context_only_timeframes,
+        blocked_timeframes=config.blocked_timeframes,
+    )
 
 
 def _recommendation_rank(value: str) -> int:

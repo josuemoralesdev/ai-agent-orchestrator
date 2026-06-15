@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator import archive
 from src.app.hammer_radar.operator.approval_api import app
-from src.app.hammer_radar.operator.models import SignalRecord
+from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.notification_watcher import (
     NotificationConfig,
     check_notifications,
@@ -72,6 +73,7 @@ class NotificationWatcherTestCase(unittest.TestCase):
         self.assertNotIn("SECRET_TOKEN", str(safe))
 
     def test_ready_snapshot_creates_would_alert_true(self) -> None:
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="notify|ready"), log_dir=self.log_dir)
 
         result = check_notifications(send=False, channel="none", log_dir=self.log_dir)
@@ -327,6 +329,8 @@ class NotificationWatcherTestCase(unittest.TestCase):
         self.assertEqual(1, len(calls))
 
     def test_alert_record_writes_readiness_alerts_ndjson(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="notify|record"), log_dir=self.log_dir)
         config = NotificationConfig(
             telegram_enabled=True,
@@ -343,13 +347,17 @@ class NotificationWatcherTestCase(unittest.TestCase):
             expired_missed_record_enabled=True,
         )
 
-        result = check_notifications(
-            send=True,
-            channel="telegram",
-            log_dir=self.log_dir,
-            config=config,
-            telegram_sender=lambda _chat_id, _message: {"sent": True, "status": "sent"},
-        )
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            result = check_notifications(
+                send=True,
+                channel="telegram",
+                log_dir=self.log_dir,
+                config=config,
+                telegram_sender=lambda _chat_id, _message: {"sent": True, "status": "sent"},
+            )
         records = load_alert_records(limit=10, log_dir=self.log_dir)
 
         self.assertTrue(result["recorded"])
@@ -528,6 +536,76 @@ class NotificationWatcherTestCase(unittest.TestCase):
             divergence_type=divergence_type,
             divergence_confirmed=True,
         )
+
+    def _seed_strategy_evidence(
+        self,
+        *,
+        timeframe: str = "13m",
+        direction: str = "long",
+        wins: int = 20,
+        losses: int = 10,
+    ) -> None:
+        base_time = datetime.now(UTC) - timedelta(hours=3)
+        for index in range(wins + losses):
+            pnl_pct = 1.0 if index < wins else -0.5
+            signal_id = f"strategy|{timeframe}|{direction}|{index}"
+            timestamp = (base_time + timedelta(minutes=index)).isoformat()
+            archive.append_signal(
+                self._eligible_signal(
+                    signal_id=signal_id,
+                    direction=direction,
+                    timestamp=timestamp,
+                ),
+                log_dir=self.log_dir,
+            )
+            archive.append_outcome(
+                OutcomeRecord(
+                    signal_id=signal_id,
+                    symbol="BTCUSDT",
+                    timeframe=timeframe,
+                    direction=direction,
+                    timestamp=timestamp,
+                    entry_price=100.0,
+                    exit_price=100.0 + pnl_pct,
+                    fill_status="filled",
+                    outcome="win" if pnl_pct > 0 else "loss",
+                    mae_pct=abs(pnl_pct) / 2.0,
+                    mfe_pct=abs(pnl_pct),
+                    pnl_pct=pnl_pct,
+                    stop_hit=pnl_pct <= 0,
+                    evaluated_at=(base_time + timedelta(minutes=index + 1)).isoformat(),
+                    entry_mode="ladder_close_50_618",
+                ),
+                log_dir=self.log_dir,
+            )
+
+    def _write_r267_risk_contract(self, *, timeframe: str = "13m", direction: str = "long") -> Path:
+        path = self.log_dir / "tiny_live_risk_contracts.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "risk_contracts": [
+                        {
+                            "official_lane_key": f"BTCUSDT|{timeframe}|{direction}|ladder_close_50_618",
+                            "symbol": "BTCUSDT",
+                            "timeframe": timeframe,
+                            "direction": direction,
+                            "entry_mode": "ladder_close_50_618",
+                            "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
+                            "max_position_notional_usdt": 80.0,
+                            "max_notional_usdt": 80.0,
+                            "margin_budget_usdt": 8.0,
+                            "tiny_live_margin_usdt": 8.0,
+                            "leverage": 10.0,
+                            "max_loss_usdt": 4.44,
+                            "live_execution_enabled": False,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return path
 
 
 if __name__ == "__main__":

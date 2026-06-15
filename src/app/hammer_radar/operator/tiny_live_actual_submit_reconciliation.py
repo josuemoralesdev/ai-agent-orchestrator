@@ -181,7 +181,10 @@ def build_tiny_live_actual_submit_reconciliation(
             lane_controls_path=lane_path,
             official_lane_key=official_lane_key,
         )
-        triplet_shape = validate_contract_fit_triplet_shape(signed_triplet)
+        triplet_shape = validate_contract_fit_triplet_shape(
+            signed_triplet,
+            official_lane_key=official_lane_key,
+        )
         risk = validate_contract_fit_risk(
             latest_r262b_contract_fit=r262b,
             risk_contract_config_path=risk_path,
@@ -441,7 +444,11 @@ def validate_r263_controls_armed(
     }
 
 
-def validate_contract_fit_triplet_shape(signed_triplet: Mapping[str, Any]) -> dict[str, Any]:
+def validate_contract_fit_triplet_shape(
+    signed_triplet: Mapping[str, Any],
+    *,
+    official_lane_key: str = OFFICIAL_LANE_KEY,
+) -> dict[str, Any]:
     triplet = signed_triplet.get("order_triplet") if isinstance(signed_triplet.get("order_triplet"), Mapping) else {}
     main = triplet.get("main_order") if isinstance(triplet.get("main_order"), Mapping) else {}
     stop = triplet.get("stop_order") if isinstance(triplet.get("stop_order"), Mapping) else {}
@@ -449,14 +456,17 @@ def validate_contract_fit_triplet_shape(signed_triplet: Mapping[str, Any]) -> di
     signed_requests = signed_triplet.get("signed_requests") if isinstance(signed_triplet.get("signed_requests"), Mapping) else {}
     exact_three = len(signed_requests) == 3 and all(key in signed_requests for key in _ORDER_KEYS)
     main_qty = _qty(main.get("quantity"))
+    _symbol, _timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    main_side = "BUY" if direction == "long" else "SELL"
+    exit_side = "SELL" if direction == "long" else "BUY"
     main_valid = (
-        _upper(main.get("side")) == "SELL"
+        _upper(main.get("side")) == main_side
         and _upper(main.get("type")) == "MARKET"
         and main_qty is not None
         and main_qty > 0
     )
-    stop_valid = _exit_valid(stop, "STOP_MARKET", expected_qty=main_qty)
-    take_valid = _exit_valid(take, "TAKE_PROFIT_MARKET", expected_qty=main_qty)
+    stop_valid = _exit_valid(stop, "STOP_MARKET", expected_qty=main_qty, expected_side=exit_side)
+    take_valid = _exit_valid(take, "TAKE_PROFIT_MARKET", expected_qty=main_qty, expected_side=exit_side)
     reduce_only = stop.get("reduceOnly") is True and take.get("reduceOnly") is True
     same_symbol = all(_order_symbol(order) == "BTCUSDT" for order in (main, stop, take))
     endpoint_ok = all(
@@ -473,6 +483,8 @@ def validate_contract_fit_triplet_shape(signed_triplet: Mapping[str, Any]) -> di
         "reduce_only_exits": bool(reduce_only),
         "same_symbol_lane": bool(same_symbol),
         "endpoint_allowlist_valid": bool(endpoint_ok),
+        "expected_main_side": main_side,
+        "expected_exit_side": exit_side,
         "blocked_by": _triplet_blockers(exact_three, main_valid, stop_valid, take_valid, reduce_only, same_symbol, endpoint_ok),
     }
 
@@ -1037,10 +1049,16 @@ def _triplet_blockers(*flags: bool) -> list[str]:
     return [name for flag, name in zip(flags, names, strict=True) if not flag]
 
 
-def _exit_valid(order: Mapping[str, Any], expected_type: str, *, expected_qty: float | None) -> bool:
+def _exit_valid(
+    order: Mapping[str, Any],
+    expected_type: str,
+    *,
+    expected_qty: float | None,
+    expected_side: str = "BUY",
+) -> bool:
     qty = _qty(order.get("quantity"))
     return (
-        _upper(order.get("side")) == "BUY"
+        _upper(order.get("side")) == expected_side
         and _upper(order.get("type")) == expected_type
         and expected_qty is not None
         and qty == expected_qty

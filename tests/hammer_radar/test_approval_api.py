@@ -16,7 +16,7 @@ from src.app.hammer_radar.operator.approval_api import app
 from src.app.hammer_radar.operator.binance_live_status import build_binance_live_status
 from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
 from src.app.hammer_radar.operator.live_connector_stub import submit_live_order_stub
-from src.app.hammer_radar.operator.models import SignalRecord
+from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.operator_actions import LIVE_BLOCK_REASON, parse_operator_action
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -243,9 +243,15 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("SHADOW_NO_DATA", outcomes_result.stdout)
 
     def test_readiness_ready_with_fresh_eligible_candidate_and_no_manual_outcomes(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|ready"), log_dir=self.log_dir)
 
-        response = self.client.get("/readiness")
+        with patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            response = self.client.get("/readiness")
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
@@ -253,6 +259,25 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertTrue(payload["allowed_now"])
         self.assertEqual(1, payload["current_state"]["fresh_eligible_count"])
         self.assertEqual(0, payload["current_state"]["manual_outcomes_today"])
+
+    def test_readiness_blocks_fresh_candidate_below_operator_55_policy(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long", wins=26, losses=29)
+        archive.append_signal(self._eligible_signal(signal_id="eligible|weak-policy"), log_dir=self.log_dir)
+
+        with patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            response = self.client.get("/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertFalse(payload["allowed_now"])
+        self.assertEqual(55.0, payload["strategy_policy"]["min_win_rate_pct"])
+        self.assertIn("win_rate_below_operator_55_policy", payload["blockers"])
+        self.assertFalse(payload["order_placed"])
 
     def test_readiness_not_ready_when_candidate_is_expired(self) -> None:
         archive.append_signal(
@@ -625,6 +650,7 @@ class ApprovalApiTestCase(unittest.TestCase):
     def test_live_approval_evaluate_ready_candidate_still_execution_disabled(self) -> None:
         timestamp = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
         signal_id = self._exact_signal_id(timestamp=timestamp)
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id=signal_id, timestamp=timestamp), log_dir=self.log_dir)
 
         response = self.client.post("/operator/live-approval/evaluate", json={"text": f"LIVE APPROVE {signal_id}"})
@@ -791,10 +817,14 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["real_order_placed"])
 
     def test_trade_ticket_returns_proposed_with_fresh_eligible_candidate(self) -> None:
-        risk_path = self._write_r267_risk_contract()
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|ticket"), log_dir=self.log_dir)
 
-        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path):
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
             response = self.client.get("/trade-ticket")
 
         self.assertEqual(200, response.status_code)
@@ -817,6 +847,27 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual(8.0, payload["active_contract_margin_budget_usdt"])
         self.assertEqual("isolated", payload["margin_mode"])
         self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+        self.assertFalse(payload["submit_attempted"])
+        self.assertFalse(payload["binance_order_endpoint_called"])
+        self.assertFalse(payload["real_order_placed"])
+
+    def test_trade_ticket_blocks_fresh_candidate_below_operator_55_policy(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long", wins=26, losses=29)
+        archive.append_signal(self._eligible_signal(signal_id="eligible|weak-ticket"), log_dir=self.log_dir)
+
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            response = self.client.get("/trade-ticket")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["ticket_status"])
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertIn("win_rate_below_operator_55_policy", payload["blockers"])
         self.assertFalse(payload["order_placed"])
         self.assertFalse(payload["submit_attempted"])
         self.assertFalse(payload["binance_order_endpoint_called"])
@@ -921,18 +972,24 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("signal_id not found in current BTCUSDT live-checklist window", "; ".join(payload["blockers"]))
 
     def test_approve_paper_trade_ticket_records_without_order_placement(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|approve-ticket"), log_dir=self.log_dir)
-        ticket = self.client.get("/trade-ticket").json()
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            ticket = self.client.get("/trade-ticket").json()
 
-        response = self.client.post(
-            "/trade-ticket/approve-paper",
-            json={
-                "ticket_id": ticket["ticket_id"],
-                "operator": "josue",
-                "notes": "paper approval intent only",
-                "ticket_snapshot": ticket,
-            },
-        )
+            response = self.client.post(
+                "/trade-ticket/approve-paper",
+                json={
+                    "ticket_id": ticket["ticket_id"],
+                    "operator": "josue",
+                    "notes": "paper approval intent only",
+                    "ticket_snapshot": ticket,
+                },
+            )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
@@ -945,12 +1002,18 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertTrue((self.log_dir / "trade_tickets.ndjson").exists())
 
     def test_trade_tickets_lists_records(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|list-ticket"), log_dir=self.log_dir)
-        ticket = self.client.get("/trade-ticket").json()
-        self.client.post(
-            "/trade-ticket/approve-paper",
-            json={"ticket_id": ticket["ticket_id"], "operator": "josue", "ticket_snapshot": ticket},
-        )
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            ticket = self.client.get("/trade-ticket").json()
+            self.client.post(
+                "/trade-ticket/approve-paper",
+                json={"ticket_id": ticket["ticket_id"], "operator": "josue", "ticket_snapshot": ticket},
+            )
 
         response = self.client.get("/trade-tickets")
 
@@ -976,17 +1039,23 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse((self.log_dir / "paper_executions.ndjson").exists())
 
     def test_execute_paper_trade_ticket_creates_paper_execution_for_proposed_ticket(self) -> None:
+        risk_path = self._write_r267_risk_contract(timeframe="13m", direction="long")
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|execute-ticket"), log_dir=self.log_dir)
-        ticket = self.client.get("/trade-ticket").json()
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path), patch(
+            "src.app.hammer_radar.operator.tiny_live_strategy_lane_selection.DEFAULT_RISK_CONTRACT_CONFIG_PATH",
+            risk_path,
+        ):
+            ticket = self.client.get("/trade-ticket").json()
 
-        response = self.client.post(
-            "/trade-ticket/execute-paper",
-            json={
-                "ticket_id": ticket["ticket_id"],
-                "operator": "josue",
-                "notes": "paper execution only",
-            },
-        )
+            response = self.client.post(
+                "/trade-ticket/execute-paper",
+                json={
+                    "ticket_id": ticket["ticket_id"],
+                    "operator": "josue",
+                    "notes": "paper execution only",
+                },
+            )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
@@ -1002,6 +1071,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertTrue((self.log_dir / "trade_tickets.ndjson").exists())
 
     def test_paper_executions_lists_records(self) -> None:
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|paper-list"), log_dir=self.log_dir)
         ticket = self.client.get("/trade-ticket").json()
         created = self.client.post(
@@ -1044,6 +1114,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("ticket_id", result.stderr)
 
     def test_cli_paper_executions_displays_records(self) -> None:
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-paper-list"), log_dir=self.log_dir)
         ticket = self.client.get("/trade-ticket").json()
         self.client.post(
@@ -1083,6 +1154,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertIn("ticket_status must be PROPOSED", "; ".join(payload["blockers"]))
 
     def test_exchange_dry_run_validates_proposed_btcusdt_long_ticket(self) -> None:
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|dry-run-long"), log_dir=self.log_dir)
 
         response = self.client.get("/exchange-dry-run")
@@ -1100,7 +1172,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual(100.0, payload["entry_price_rounded"])
         self.assertEqual(95.0, payload["stop_price_rounded"])
         self.assertEqual(105.0, payload["take_profit_price_rounded"])
-        self.assertEqual(2.0, payload["leverage"])
+        self.assertEqual(1.0, payload["leverage"])
         self.assertEqual("isolated", payload["margin_mode"])
         self.assertTrue(payload["dry_run"])
         self.assertFalse(payload["order_placed"])
@@ -1186,6 +1258,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["order_placed"])
 
     def test_cli_exchange_dry_run_works(self) -> None:
+        self._seed_strategy_evidence(timeframe="13m", direction="long")
         archive.append_signal(self._eligible_signal(signal_id="eligible|cli-dry-run"), log_dir=self.log_dir)
 
         result = run(
@@ -1654,7 +1727,8 @@ class ApprovalApiTestCase(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("HAMMER RADAR MACHINE TRADE TICKET", result.stdout)
-        self.assertIn("ticket_status: PROPOSED", result.stdout)
+        self.assertIn("ticket_status: BLOCKED", result.stdout)
+        self.assertIn("strategy_evidence_missing", result.stdout)
         self.assertIn("live_execution_enabled: false", result.stdout)
 
     def _evaluate_live_safety(
@@ -1851,17 +1925,61 @@ class ApprovalApiTestCase(unittest.TestCase):
             divergence_confirmed=divergence_confirmed,
         )
 
-    def _write_r267_risk_contract(self) -> Path:
+    def _seed_strategy_evidence(
+        self,
+        *,
+        timeframe: str = "13m",
+        direction: str = "long",
+        wins: int = 20,
+        losses: int = 10,
+    ) -> None:
+        base_time = datetime.now(UTC) - timedelta(hours=3)
+        for index in range(wins + losses):
+            pnl_pct = 1.0 if index < wins else -0.5
+            signal_id = f"strategy|{timeframe}|{direction}|{index}"
+            timestamp = (base_time + timedelta(minutes=index)).isoformat()
+            archive.append_signal(
+                self._eligible_signal(
+                    signal_id=signal_id,
+                    timeframe=timeframe,
+                    direction=direction,
+                    timestamp=timestamp,
+                ),
+                log_dir=self.log_dir,
+            )
+            archive.append_outcome(
+                OutcomeRecord(
+                    signal_id=signal_id,
+                    symbol="BTCUSDT",
+                    timeframe=timeframe,
+                    direction=direction,
+                    timestamp=timestamp,
+                    entry_price=100.0,
+                    exit_price=100.0 + pnl_pct,
+                    fill_status="filled",
+                    outcome="win" if pnl_pct > 0 else "loss",
+                    mae_pct=abs(pnl_pct) / 2.0,
+                    mfe_pct=abs(pnl_pct),
+                    pnl_pct=pnl_pct,
+                    stop_hit=pnl_pct <= 0,
+                    evaluated_at=(base_time + timedelta(minutes=index + 1)).isoformat(),
+                    entry_mode="ladder_close_50_618",
+                ),
+                log_dir=self.log_dir,
+            )
+
+    def _write_r267_risk_contract(self, *, timeframe: str = "8m", direction: str = "short") -> Path:
         path = self.log_dir / "tiny_live_risk_contracts.json"
+        lane_key = f"BTCUSDT|{timeframe}|{direction}|ladder_close_50_618"
         path.write_text(
             json.dumps(
                 {
                     "risk_contracts": [
                         {
-                            "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+                            "official_lane_key": lane_key,
                             "symbol": "BTCUSDT",
-                            "timeframe": "8m",
-                            "direction": "short",
+                            "timeframe": timeframe,
+                            "direction": direction,
                             "entry_mode": "ladder_close_50_618",
                             "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
                             "max_position_notional_usdt": 80.0,

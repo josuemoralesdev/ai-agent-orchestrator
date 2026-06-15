@@ -157,6 +157,10 @@ def build_tiny_live_final_console(
             risk_contract_config_path=risk_path,
             official_lane_key=official_lane_key,
         )
+        current_lane_key = str(fresh_candidate_status.get("lane_key") or official_lane_key)
+        current_expected_orders = expected_orders_for_direction(
+            str(fresh_candidate_status.get("direction") or direction)
+        )
         latest_jit_launch_packet = load_latest_jit_launch_packet_summary(
             log_dir=resolved_log_dir,
             official_lane_key=official_lane_key,
@@ -176,10 +180,15 @@ def build_tiny_live_final_console(
         risk_interpretation = summarize_final_console_risk_interpretation(
             latest_r262b=latest_r262b,
             risk_contract=risk_contract,
+            fresh_candidate_status=fresh_candidate_status,
+        )
+        contract_fit_risk_interpretation = summarize_contract_fit_risk_interpretation(
+            latest_r262b=latest_r262b,
+            risk_contract=risk_contract,
         )
         contract_fit_panel = summarize_contract_fit_panel(
             latest_r262b,
-            risk_interpretation=risk_interpretation,
+            risk_interpretation=contract_fit_risk_interpretation,
         )
         signed_triplet_panel = summarize_signed_triplet_panel(log_dir=resolved_log_dir, latest_r262b=latest_r262b)
         controls_panel = summarize_controls_panel(
@@ -312,6 +321,7 @@ def build_tiny_live_final_console(
                 },
                 "target_scope": {
                     "official_lane_key": official_lane_key,
+                    "current_proposed_ticket_lane_key": fresh_candidate_status.get("lane_key"),
                     "symbol": symbol,
                     "timeframe": timeframe,
                     "direction": direction,
@@ -328,7 +338,19 @@ def build_tiny_live_final_console(
                 "signed_triplet_panel": signed_triplet_panel,
                 "controls_panel": controls_panel,
                 "latest_r264_dry_preview": latest_r264_dry_preview,
+                "previous_r264_preview": latest_r264_dry_preview,
                 "fresh_candidate_status": fresh_candidate_status,
+                "current_proposed_ticket_lane": {
+                    "lane_key": fresh_candidate_status.get("lane_key"),
+                    "symbol": fresh_candidate_status.get("symbol"),
+                    "timeframe": fresh_candidate_status.get("timeframe"),
+                    "direction": fresh_candidate_status.get("direction"),
+                    "entry_mode": fresh_candidate_status.get("entry_mode"),
+                    "signal_id": fresh_candidate_status.get("signal_id"),
+                    "matches_console_lane": current_lane_key == official_lane_key,
+                },
+                "lane_specific_expected_orders": current_expected_orders,
+                "signal_origin_status": fresh_candidate_status.get("signal_origin_status"),
                 "latest_jit_launch_packet": latest_jit_launch_packet,
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
@@ -524,7 +546,7 @@ def build_final_console_fresh_candidate_status(
     risk_contract_config_path: str | Path | None = None,
     official_lane_key: str = OFFICIAL_LANE_KEY,
 ) -> dict[str, Any]:
-    symbol, _timeframe, direction, _entry_mode = _lane_parts(official_lane_key)
+    symbol, timeframe, direction, entry_mode = _lane_parts(official_lane_key)
     try:
         ticket = build_trade_ticket(
             latest_only=True,
@@ -554,6 +576,10 @@ def build_final_console_fresh_candidate_status(
         blockers.append("fresh_candidate_symbol_mismatch")
     if direction and ticket.get("direction") != direction:
         blockers.append("fresh_candidate_direction_mismatch")
+    if timeframe and ticket.get("timeframe") != timeframe:
+        blockers.append("fresh_candidate_timeframe_mismatch")
+    if entry_mode and ticket.get("entry_mode") not in {None, "", entry_mode}:
+        blockers.append("fresh_candidate_entry_mode_mismatch")
     suggested_position = _float_or_none(ticket.get("suggested_position_usd"))
     suggested_leverage = _float_or_none(ticket.get("suggested_leverage"))
     if _float_or_none(ticket.get("max_position_usd")) != 80.0:
@@ -564,6 +590,9 @@ def build_final_console_fresh_candidate_status(
         blockers.append("trade_ticket_suggested_position_exceeds_80")
     if suggested_leverage != 10.0:
         blockers.append("trade_ticket_suggested_leverage_not_10")
+    origin = ticket.get("signal_origin") if isinstance(ticket.get("signal_origin"), Mapping) else {}
+    if origin.get("manual_unlock_allowed") is not True:
+        blockers.extend(str(item) for item in origin.get("blocked_by") or ["needs_manual_origin_review"])
     return _sanitize(
         {
             "fresh_candidate_available": not blockers,
@@ -573,6 +602,9 @@ def build_final_console_fresh_candidate_status(
             "symbol": ticket.get("symbol") or symbol,
             "timeframe": ticket.get("timeframe"),
             "direction": ticket.get("direction"),
+            "entry_mode": ticket.get("entry_mode"),
+            "lane_key": ticket.get("lane_key"),
+            "expected_lane_key": official_lane_key,
             "readiness_status": ticket.get("readiness_status"),
             "allowed_now": ticket.get("allowed_now") is True,
             "max_position_usd": _float_or_none(ticket.get("max_position_usd")),
@@ -583,6 +615,25 @@ def build_final_console_fresh_candidate_status(
             "active_contract_leverage": ticket.get("active_contract_leverage"),
             "active_contract_margin_budget_usdt": ticket.get("active_contract_margin_budget_usdt"),
             "machine_reason": ticket.get("machine_reason"),
+            "signal_origin_status": origin,
+            "strategy_qualification": ticket.get("strategy_qualification")
+            if isinstance(ticket.get("strategy_qualification"), Mapping)
+            else {},
+            "strategy_qualified": ticket.get("strategy_qualified") is True,
+            "strategy_win_rate_pct": ticket.get("strategy_win_rate_pct"),
+            "strategy_sample_count": ticket.get("strategy_sample_count"),
+            "strategy_min_sample": ticket.get("strategy_min_sample"),
+            "exact_risk_contract_status": ticket.get("exact_risk_contract_status")
+            if isinstance(ticket.get("exact_risk_contract_status"), Mapping)
+            else {},
+            "exact_risk_contract_found": ticket.get("exact_risk_contract_found") is True,
+            "exact_risk_contract_valid": ticket.get("exact_risk_contract_valid") is True,
+            "signal_origin_family": origin.get("signal_origin_family"),
+            "betrayal_mode_involved": origin.get("betrayal_mode_involved"),
+            "betrayal_inverse_involved": origin.get("betrayal_inverse_involved"),
+            "promotion_family": origin.get("promotion_family"),
+            "promotion_status": origin.get("promotion_status"),
+            "candidate_origin_classification": origin.get("candidate_origin_classification"),
             "blocked_by": _dedupe(blockers),
             "order_placed": False,
             "real_order_placed": False,
@@ -705,6 +756,77 @@ def load_lane_fisherman_context(
 
 
 def summarize_final_console_risk_interpretation(
+    *,
+    latest_r262b: Mapping[str, Any],
+    risk_contract: Mapping[str, Any],
+    fresh_candidate_status: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    fresh_candidate_status = fresh_candidate_status or {}
+    if fresh_candidate_status.get("trade_ticket_status") != "PROPOSED":
+        return {
+            "valid": False,
+            "active_context": "no_current_proposed_ticket",
+            "no_current_proposed_ticket": True,
+            "blocked_by": ["no_current_proposed_ticket"],
+            "previous_r264_preview_available": bool(latest_r262b),
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    max_notional = _float_or_none(
+        fresh_candidate_status.get("active_contract_max_notional_usdt")
+        or fresh_candidate_status.get("max_position_usd")
+    )
+    leverage = _float_or_none(fresh_candidate_status.get("active_contract_leverage"))
+    candidate_notional = _float_or_none(fresh_candidate_status.get("suggested_position_usd"))
+    if max_notional is not None or leverage is not None or candidate_notional is not None:
+        blocked = []
+        if max_notional != 80.0:
+            blocked.append("max_position_notional_not_80")
+        if leverage != 10.0:
+            blocked.append("leverage_not_10")
+        if candidate_notional is None:
+            blocked.append("candidate_notional_missing")
+        elif candidate_notional > 80.0:
+            blocked.append("candidate_notional_exceeds_80")
+        return {
+            "valid": not blocked,
+            "active_context": "current_proposed_ticket",
+            "lane_key": fresh_candidate_status.get("lane_key"),
+            "symbol": fresh_candidate_status.get("symbol"),
+            "timeframe": fresh_candidate_status.get("timeframe"),
+            "direction": fresh_candidate_status.get("direction"),
+            "tiny_live_contract_mode": fresh_candidate_status.get("active_contract_mode"),
+            "max_position_notional_usdt": max_notional,
+            "max_notional_usdt": max_notional,
+            "leverage": leverage,
+            "candidate_notional_usdt": candidate_notional,
+            "candidate_qty": None,
+            "derived_margin_budget_usdt": fresh_candidate_status.get("active_contract_margin_budget_usdt"),
+            "blocked_by": blocked,
+            "previous_r264_preview_available": bool(latest_r262b),
+            "order_placed": False,
+            "real_order_placed": False,
+            "submit_attempted": False,
+            "binance_order_endpoint_called": False,
+            "secrets_shown": False,
+        }
+    existing = latest_r262b.get("risk_contract_interpretation")
+    if isinstance(existing, Mapping) and existing:
+        return _sanitize(dict(existing))
+    sizing = latest_r262b.get("contract_fit_sizing_plan") if isinstance(latest_r262b.get("contract_fit_sizing_plan"), Mapping) else {}
+    return build_tiny_live_risk_contract_validation_summary(
+        risk_contract=risk_contract,
+        candidate_qty=sizing.get("candidate_qty"),
+        candidate_notional_usdt=sizing.get("candidate_notional_usdt"),
+        candidate_estimated_loss_usdt=sizing.get("candidate_estimated_loss_usdt"),
+        require_live_execution_enabled=False,
+    )
+
+
+def summarize_contract_fit_risk_interpretation(
     *, latest_r262b: Mapping[str, Any], risk_contract: Mapping[str, Any]
 ) -> dict[str, Any]:
     existing = latest_r262b.get("risk_contract_interpretation")
@@ -1437,6 +1559,20 @@ def _lane_parts(lane_key: str) -> tuple[str, str, str, str]:
     parts = str(lane_key).split("|")
     padded = (parts + ["", "", "", ""])[:4]
     return padded[0], padded[1], padded[2], padded[3]
+
+
+def expected_orders_for_direction(direction: str) -> dict[str, str]:
+    if str(direction or "").lower() == "long":
+        main_side = "BUY"
+        exit_side = "SELL"
+    else:
+        main_side = "SELL"
+        exit_side = "BUY"
+    return {
+        "main": f"{main_side} MARKET quantity must remain within 80 USDT notional cap",
+        "stop": f"{exit_side} STOP_MARKET REDUCE_ONLY",
+        "take_profit": f"{exit_side} TAKE_PROFIT_MARKET REDUCE_ONLY",
+    }
 
 
 def _float_or_none(value: Any) -> float | None:
