@@ -3221,6 +3221,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-jit-launch-packet":
+        from src.app.hammer_radar.operator.tiny_live_jit_launch_packet import (
+            build_tiny_live_jit_launch_packet,
+            format_tiny_live_jit_launch_packet_json,
+        )
+
+        print(
+            format_tiny_live_jit_launch_packet_json(
+                build_tiny_live_jit_launch_packet(
+                    log_dir=args.log_dir,
+                    run_jit_launch_prep=args.run_jit_launch_prep,
+                    record_jit_launch_packet=args.record_jit_launch_packet,
+                    confirm_jit_launch_prep=args.confirm_jit_launch_prep,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-risk-contract-fix":
         from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
             build_tiny_live_risk_contract_diagnostic,
@@ -5769,6 +5787,31 @@ def _build_parser() -> argparse.ArgumentParser:
         default="local_operator",
     )
     tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+
+    tiny_live_jit_launch_packet_parser = subparsers.add_parser(
+        "tiny-live-jit-launch-packet",
+        parents=[parent],
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
+        "--run-jit-launch-prep",
+        action="store_true",
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
+        "--record-jit-launch-packet",
+        action="store_true",
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
+        "--confirm-jit-launch-prep",
+        default=None,
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_jit_launch_packet_parser.add_argument(
         "--reason",
         default=None,
     )

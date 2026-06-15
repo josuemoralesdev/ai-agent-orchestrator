@@ -312,6 +312,41 @@ R264 records all dry previews, blocked/rejected execution attempts, actual
 submit attempts, reconciliation results, and partial-success critical states in
 `logs/hammer_radar_forward/tiny_live_actual_submit_reconciliation.ndjson`.
 
+## R264B JIT Launch Packet
+
+R264B is the compressed just-in-time prep lane for tonight/early-morning tiny
+live. It runs R262B contract-fit regeneration, R263 experimental-lane controls
+arming, and R264 dry preview under one exact phrase, then prints the final
+manual live command only if the packet says GO.
+
+R264B does not submit, place orders, call Binance order/test-order/account
+endpoints, call private/signed Binance endpoints, or run the printed command.
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-jit-launch-packet
+```
+
+Run JIT prep, still no submit:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-jit-launch-packet \
+  --run-jit-launch-prep \
+  --record-jit-launch-packet \
+  --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+  --operator-id local_operator \
+  --reason "Final JIT prep for first tiny-live BTCUSDT 8m short experimental lane."
+```
+
+If `jit_go_no_go_packet.go_for_manual_live_submit_command=false`, do not run
+the manual live command. If it is true, still review the final command and run
+it manually only once outside Codex.
+
 ## Reconciliation
 
 - Record all exchange order ids.

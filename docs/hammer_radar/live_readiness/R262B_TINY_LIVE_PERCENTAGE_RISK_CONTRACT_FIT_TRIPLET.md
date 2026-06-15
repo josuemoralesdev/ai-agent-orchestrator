@@ -108,3 +108,8 @@ R262B always reports:
 If the regenerated dry preview is valid, the next operator step is R263 final
 console review and experimental-lane-aware controls arming. R262B itself is not
 a submit phase and does not arm controls.
+
+R264B can orchestrate R262B regeneration as the first step in a just-in-time
+launch packet, then continue to R263 arming and R264 dry preview. R264B still
+does not submit, place orders, call Binance order/private/account endpoints, or
+run the final live command.

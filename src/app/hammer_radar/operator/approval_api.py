@@ -93,6 +93,9 @@ from src.app.hammer_radar.operator.tiny_live_final_console import (
 from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import (
     build_tiny_live_actual_submit_reconciliation,
 )
+from src.app.hammer_radar.operator.tiny_live_jit_launch_packet import (
+    build_tiny_live_jit_launch_packet,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -773,6 +776,13 @@ class TinyLiveActualSubmitExecuteRequest(BaseModel):
     reason: str | None = None
 
 
+class TinyLiveJitLaunchPacketRunRequest(BaseModel):
+    confirm_jit_launch_prep: str = Field(min_length=1)
+    record_jit_launch_packet: bool = True
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
 class TinyLiveRiskContractDiagnosticRecordRequest(BaseModel):
     confirm_risk_contract_diagnostic: str = Field(min_length=1)
     operator_id: str = "local_operator"
@@ -906,6 +916,23 @@ def tiny_live_actual_submit_execute(request: TinyLiveActualSubmitExecuteRequest)
         execute_actual_live_submit=True,
         allow_binance_order_endpoint=request.allow_binance_order_endpoint,
         confirm_actual_live_submit=request.confirm_actual_live_submit,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.get("/tiny-live/jit-launch-packet")
+def tiny_live_jit_launch_packet() -> dict:
+    return build_tiny_live_jit_launch_packet(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/jit-launch-packet/run")
+def tiny_live_jit_launch_packet_run(request: TinyLiveJitLaunchPacketRunRequest) -> dict:
+    return build_tiny_live_jit_launch_packet(
+        log_dir=get_log_dir(use_env=True),
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=request.record_jit_launch_packet,
+        confirm_jit_launch_prep=request.confirm_jit_launch_prep,
         operator_id=request.operator_id,
         reason=request.reason,
     )
@@ -3389,6 +3416,36 @@ def _operator_ui_html() -> str:
       <pre id="tlaRaw">loading</pre>
     </section>
 
+    <h2>Tiny Live JIT Launch Packet</h2>
+    <section id="tinyLiveJitLaunchPacket" class="tiny-live-jit-launch blocked">
+      <div class="grid">
+        <div><div class="label">official lane</div><div id="tljLane" class="value mono">BTCUSDT|8m|short|ladder_close_50_618</div></div>
+        <div><div class="label">overall status</div><div id="tljOverall" class="value">loading</div></div>
+        <div><div class="label">R262B fresh</div><div id="tljR262b" class="value">loading</div></div>
+        <div><div class="label">R263 armed</div><div id="tljR263" class="value">loading</div></div>
+        <div><div class="label">R264 dry preview</div><div id="tljR264" class="value">loading</div></div>
+        <div><div class="label">idempotency clean</div><div id="tljIdem" class="value">loading</div></div>
+        <div><div class="label">manual command</div><div id="tljCommandAvailable" class="value">loading</div></div>
+        <div><div class="label">submit allowed</div><div id="tljSubmitAllowed" class="value danger">false</div></div>
+        <div><div class="label">order placed</div><div id="tljOrderPlaced" class="value danger">false</div></div>
+        <div><div class="label">recorded</div><div id="tljRecorded" class="value">false</div></div>
+      </div>
+      <p><strong>GIANT WARNING:</strong> no submit from this screen. This card prepares and records only the JIT packet.</p>
+      <p><strong>Experimental lane:</strong> <span id="tljWarning">8m short is paper-only/promotion-mismatched; exact R263 acceptance is required.</span></p>
+      <p><strong>Blocked by:</strong> <span id="tljBlockers">loading</span></p>
+      <p><strong>Next required step:</strong> <span id="tljNext">loading</span></p>
+      <p><strong>Recommended operator move:</strong> <span id="tljOperatorMove">loading</span></p>
+      <p><strong>Manual live command packet:</strong></p>
+      <pre id="tljCommand">loading</pre>
+      <div class="button-row">
+        <input id="tljPhrase" class="notes" type="text" placeholder="R264B JIT prep confirmation phrase">
+        <input id="tljReason" class="notes" type="text" placeholder="Reason">
+        <label><input id="tljRecord" type="checkbox" checked> record JIT packet</label>
+        <button onclick="runTinyLiveJitLaunchPrep()">Run JIT Prep Only</button>
+      </div>
+      <pre id="tljRaw">loading</pre>
+    </section>
+
     <h2>Friday Readiness</h2>
     <section id="readiness" class="readiness not-ready">
       <div class="grid">
@@ -3867,6 +3924,7 @@ async function refreshAll() {
   await loadTinyLiveControls();
   await loadTinyLiveFinalConsole();
   await loadTinyLiveActualSubmit();
+  await loadTinyLiveJitLaunchPacket();
   await loadReadiness();
   await loadTradeTicket();
   await loadExchangeDryRun();
@@ -4074,6 +4132,61 @@ async function executeTinyLiveActualSubmit() {
   });
   const data = await res.json();
   document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveActualSubmit();
+}
+
+async function loadTinyLiveJitLaunchPacket() {
+  const res = await fetch('/tiny-live/jit-launch-packet');
+  const data = await res.json();
+  const steps = data.jit_step_results || {};
+  const r262b = steps.r262b_contract_fit_refresh || {};
+  const r263 = steps.r263_runtime_arming || {};
+  const r264 = steps.r264_dry_preview || {};
+  const validation = data.jit_validation || {};
+  const command = data.final_live_submit_command_packet || {};
+  const go = data.jit_go_no_go_packet || {};
+  const matrix = data.jit_launch_matrix || {};
+  document.getElementById('tljLane').textContent = data.target_scope?.official_lane_key || 'BTCUSDT|8m|short|ladder_close_50_618';
+  document.getElementById('tljOverall').textContent = data.jit_launch_overall_status || 'UNKNOWN';
+  setBool('tljR262b', validation.r262b_valid || r262b.succeeded);
+  setBool('tljR263', validation.r263_armed || r263.controls_armed);
+  setBool('tljR264', validation.r264_dry_preview_valid || r264.succeeded);
+  setBool('tljIdem', validation.idempotency_clean || r264.idempotency_clean);
+  setBool('tljCommandAvailable', command.available);
+  setBool('tljSubmitAllowed', data.target_scope?.submit_allowed === true);
+  setBool('tljOrderPlaced', data.target_scope?.order_placed === true);
+  setBool('tljRecorded', data.jit_launch_packet_recorded);
+  document.getElementById('tljWarning').textContent = data.experimental_lane_warning?.message || '8m short experimental lane acceptance required.';
+  document.getElementById('tljBlockers').textContent = (validation.blocked_by || matrix.blocked_by || []).join(', ') || 'none';
+  document.getElementById('tljNext').textContent = go.next_required_step || 'UNKNOWN';
+  document.getElementById('tljOperatorMove').textContent = data.recommended_next_operator_move || 'loading';
+  document.getElementById('tljCommand').textContent = command.available ? command.command : 'Manual command unavailable until JIT packet is GO.';
+  document.getElementById('tinyLiveJitLaunchPacket').className = 'tiny-live-jit-launch ' + (go.go_for_manual_live_submit_command ? 'ready' : 'blocked');
+  document.getElementById('tljRaw').textContent = JSON.stringify({
+    status: data.status,
+    jit_step_results: steps,
+    jit_validation: validation,
+    final_live_submit_command_packet: command,
+    jit_go_no_go_packet: go,
+    jit_launch_matrix: matrix,
+    safety: data.safety
+  }, null, 2);
+}
+
+async function runTinyLiveJitLaunchPrep() {
+  const phrase = document.getElementById('tljPhrase').value;
+  const reason = document.getElementById('tljReason').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const record = document.getElementById('tljRecord').checked;
+  const res = await fetch('/tiny-live/jit-launch-packet/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_jit_launch_prep: phrase, record_jit_launch_packet: record, operator_id: operatorId, reason})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveJitLaunchPacket();
+  await loadTinyLiveFinalConsole();
   await loadTinyLiveActualSubmit();
 }
 
