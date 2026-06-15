@@ -90,6 +90,9 @@ from src.app.hammer_radar.operator.tiny_live_controls_arming import (
 from src.app.hammer_radar.operator.tiny_live_final_console import (
     build_tiny_live_final_console,
 )
+from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import (
+    build_tiny_live_actual_submit_reconciliation,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -757,6 +760,19 @@ class TinyLiveFinalConsoleControlsArmRequest(BaseModel):
     reason: str | None = None
 
 
+class TinyLiveActualSubmitDryPreviewRequest(BaseModel):
+    confirm_actual_submit_dry_preview: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
+class TinyLiveActualSubmitExecuteRequest(BaseModel):
+    confirm_actual_live_submit: str = Field(min_length=1)
+    allow_binance_order_endpoint: bool = False
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
 class TinyLiveRiskContractDiagnosticRecordRequest(BaseModel):
     confirm_risk_contract_diagnostic: str = Field(min_length=1)
     operator_id: str = "local_operator"
@@ -861,6 +877,35 @@ def tiny_live_final_console_controls_arm(request: TinyLiveFinalConsoleControlsAr
         log_dir=get_log_dir(use_env=True),
         arm_controls_from_final_console=True,
         confirm_final_console_controls_arming=request.confirm_final_console_controls_arming,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.get("/tiny-live/actual-submit/reconcile")
+def tiny_live_actual_submit_reconcile() -> dict:
+    return build_tiny_live_actual_submit_reconciliation(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/actual-submit/dry-preview")
+def tiny_live_actual_submit_dry_preview(request: TinyLiveActualSubmitDryPreviewRequest) -> dict:
+    return build_tiny_live_actual_submit_reconciliation(
+        log_dir=get_log_dir(use_env=True),
+        dry_run_actual_submit_reconcile=True,
+        record_actual_submit_preview=True,
+        confirm_actual_submit_dry_preview=request.confirm_actual_submit_dry_preview,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.post("/tiny-live/actual-submit/execute")
+def tiny_live_actual_submit_execute(request: TinyLiveActualSubmitExecuteRequest) -> dict:
+    return build_tiny_live_actual_submit_reconciliation(
+        log_dir=get_log_dir(use_env=True),
+        execute_actual_live_submit=True,
+        allow_binance_order_endpoint=request.allow_binance_order_endpoint,
+        confirm_actual_live_submit=request.confirm_actual_live_submit,
         operator_id=request.operator_id,
         reason=request.reason,
     )
@@ -3196,7 +3241,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .tiny-live-controls, .tiny-live-final-console, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .tiny-live-controls, .tiny-live-final-console, .tiny-live-actual-submit, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -3309,6 +3354,39 @@ def _operator_ui_html() -> str:
         <button onclick="armTinyLiveFinalConsoleControls()">Arm From Final Console Only</button>
       </div>
       <pre id="tlfRaw">loading</pre>
+    </section>
+
+    <h2>Tiny Live Actual Submit Checkpoint</h2>
+    <section id="tinyLiveActualSubmit" class="tiny-live-actual-submit blocked">
+      <div class="grid">
+        <div><div class="label">official lane</div><div id="tlaLane" class="value mono">BTCUSDT|8m|short|ladder_close_50_618</div></div>
+        <div><div class="label">overall status</div><div id="tlaOverall" class="value">loading</div></div>
+        <div><div class="label">pre-submit valid</div><div id="tlaValid" class="value">loading</div></div>
+        <div><div class="label">R263 armed</div><div id="tlaArmed" class="value">loading</div></div>
+        <div><div class="label">triplet fresh</div><div id="tlaFresh" class="value">loading</div></div>
+        <div><div class="label">idempotency clean</div><div id="tlaIdem" class="value">loading</div></div>
+        <div><div class="label">executed</div><div id="tlaExecuted" class="value danger">false</div></div>
+        <div><div class="label">reconciled</div><div id="tlaReconciled" class="value">loading</div></div>
+      </div>
+      <p><strong>WARNING:</strong> no auto-submit. Execute requires the exact R264 phrase and explicit endpoint allow flag.</p>
+      <p><strong>Blocked by:</strong> <span id="tlaBlockers">loading</span></p>
+      <p><strong>Triplet:</strong> <span id="tlaTriplet">loading</span></p>
+      <p><strong>Idempotency:</strong> <span id="tlaIdempotency">loading</span></p>
+      <p><strong>Reconciliation:</strong> <span id="tlaReconciliation">loading</span></p>
+      <p><strong>Partial success recovery:</strong> <span id="tlaRecovery">loading</span></p>
+      <p><strong>Exact live command:</strong></p>
+      <pre id="tlaCommand">loading</pre>
+      <div class="button-row">
+        <input id="tlaDryPhrase" class="notes" type="text" placeholder="R264 dry preview phrase">
+        <button onclick="recordTinyLiveActualSubmitDryPreview()">Record Dry Preview Only</button>
+      </div>
+      <div class="button-row">
+        <input id="tlaLivePhrase" class="notes" type="text" placeholder="R264 exact live submit phrase">
+        <input id="tlaLiveReason" class="notes" type="text" placeholder="Reason">
+        <label><input id="tlaAllowEndpoint" type="checkbox"> allow Binance order endpoint</label>
+        <button class="reject" onclick="executeTinyLiveActualSubmit()">Execute Exact Live Submit</button>
+      </div>
+      <pre id="tlaRaw">loading</pre>
     </section>
 
     <h2>Friday Readiness</h2>
@@ -3788,6 +3866,7 @@ async function refreshAll() {
   await loadHealth();
   await loadTinyLiveControls();
   await loadTinyLiveFinalConsole();
+  await loadTinyLiveActualSubmit();
   await loadReadiness();
   await loadTradeTicket();
   await loadExchangeDryRun();
@@ -3932,6 +4011,70 @@ async function armTinyLiveFinalConsoleControls() {
   const data = await res.json();
   document.getElementById('message').textContent = JSON.stringify(data, null, 2);
   await loadTinyLiveFinalConsole();
+}
+
+async function loadTinyLiveActualSubmit() {
+  const res = await fetch('/tiny-live/actual-submit/reconcile');
+  const data = await res.json();
+  const pre = data.pre_submit_validation || {};
+  const triplet = data.order_triplet_summary || {};
+  const idem = data.idempotency || {};
+  const rec = data.reconciliation || {};
+  const recovery = data.partial_success_recovery_packet || {};
+  const matrix = data.actual_submit_matrix || {};
+  document.getElementById('tlaLane').textContent = data.target_scope?.official_lane_key || 'BTCUSDT|8m|short|ladder_close_50_618';
+  document.getElementById('tlaOverall').textContent = data.actual_submit_overall_status || 'UNKNOWN';
+  setBool('tlaValid', pre.valid);
+  setBool('tlaArmed', matrix.r263_armed);
+  setBool('tlaFresh', matrix.signed_triplet_fresh);
+  setBool('tlaIdem', matrix.idempotency_clean);
+  setBool('tlaExecuted', matrix.executed);
+  setBool('tlaReconciled', matrix.reconciled);
+  document.getElementById('tlaBlockers').textContent = (pre.blocked_by || []).join(', ') || 'none';
+  document.getElementById('tlaTriplet').textContent = JSON.stringify(triplet);
+  document.getElementById('tlaIdempotency').textContent = `${idem.actual_submit_idempotency_key || 'missing'} prior=${idem.prior_live_submit_found}`;
+  document.getElementById('tlaReconciliation').textContent = `attempted=${rec.attempted} all_three=${rec.all_three_reconciled} partial=${rec.partial_success}`;
+  document.getElementById('tlaRecovery').textContent = recovery.required ? recovery.operator_action : 'not required';
+  document.getElementById('tinyLiveActualSubmit').className = 'tiny-live-actual-submit ' + (pre.valid ? 'ready' : 'blocked');
+  document.getElementById('tlaCommand').textContent = 'PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-reconcile --execute-actual-live-submit --allow-binance-order-endpoint --confirm-actual-live-submit "I CONFIRM TINY LIVE BTCUSDT 8M SHORT ACTUAL SUBMIT; USE LATEST R262B CONTRACT-FIT SIGNED TRIPLET ONLY; MAIN SELL MARKET 0.006 BTC; STOP BUY STOP_MARKET REDUCE_ONLY; TAKE_PROFIT BUY TAKE_PROFIT_MARKET REDUCE_ONLY; NO OTHER ORDERS." --operator-id local_operator --reason "R264 actual tiny-live submit after R262B contract-fit and R263 final console arming."';
+  document.getElementById('tlaRaw').textContent = JSON.stringify({
+    status: data.status,
+    input_summary: data.input_summary,
+    pre_submit_validation: pre,
+    submit_plan: data.submit_plan,
+    submit_result: data.submit_result,
+    reconciliation: rec,
+    partial_success_recovery_packet: recovery,
+    safety: data.safety
+  }, null, 2);
+}
+
+async function recordTinyLiveActualSubmitDryPreview() {
+  const phrase = document.getElementById('tlaDryPhrase').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/actual-submit/dry-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_actual_submit_dry_preview: phrase, operator_id: operatorId})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveActualSubmit();
+}
+
+async function executeTinyLiveActualSubmit() {
+  const phrase = document.getElementById('tlaLivePhrase').value;
+  const reason = document.getElementById('tlaLiveReason').value;
+  const allow = document.getElementById('tlaAllowEndpoint').checked;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/actual-submit/execute', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_actual_live_submit: phrase, allow_binance_order_endpoint: allow, operator_id: operatorId, reason})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveActualSubmit();
 }
 
 async function loadHealth() {

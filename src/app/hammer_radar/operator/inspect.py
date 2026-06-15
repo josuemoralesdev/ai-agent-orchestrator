@@ -3200,6 +3200,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-actual-submit-reconcile":
+        from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import (
+            build_tiny_live_actual_submit_reconciliation,
+            format_tiny_live_actual_submit_reconciliation_json,
+        )
+
+        print(
+            format_tiny_live_actual_submit_reconciliation_json(
+                build_tiny_live_actual_submit_reconciliation(
+                    log_dir=args.log_dir,
+                    dry_run_actual_submit_reconcile=args.dry_run_actual_submit_reconcile,
+                    record_actual_submit_preview=args.record_actual_submit_preview,
+                    confirm_actual_submit_dry_preview=args.confirm_actual_submit_dry_preview,
+                    execute_actual_live_submit=args.execute_actual_live_submit,
+                    allow_binance_order_endpoint=args.allow_binance_order_endpoint,
+                    confirm_actual_live_submit=args.confirm_actual_live_submit,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-risk-contract-fix":
         from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
             build_tiny_live_risk_contract_diagnostic,
@@ -5711,6 +5732,43 @@ def _build_parser() -> argparse.ArgumentParser:
         default="local_operator",
     )
     tiny_live_final_console_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+
+    tiny_live_actual_submit_reconcile_parser = subparsers.add_parser(
+        "tiny-live-actual-submit-reconcile",
+        parents=[parent],
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--dry-run-actual-submit-reconcile",
+        action="store_true",
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--record-actual-submit-preview",
+        action="store_true",
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--confirm-actual-submit-dry-preview",
+        default=None,
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--execute-actual-live-submit",
+        action="store_true",
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--allow-binance-order-endpoint",
+        action="store_true",
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--confirm-actual-live-submit",
+        default=None,
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_actual_submit_reconcile_parser.add_argument(
         "--reason",
         default=None,
     )
