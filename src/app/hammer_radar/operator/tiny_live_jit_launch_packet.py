@@ -116,7 +116,9 @@ def build_tiny_live_jit_launch_packet(
         risk_contract_config_path=risk_path,
         fallback_lane_key=official_lane_key,
     )
+    current_ticket_selected = current_ticket_context.get("selected") is True and bool(current_ticket_context.get("lane_key"))
     selected_lane_key = str(current_ticket_context.get("lane_key") or official_lane_key)
+    packet_lane_key = selected_lane_key if current_ticket_selected else None
     symbol, timeframe, direction, _entry_mode = _lane_parts(selected_lane_key)
     try:
         steps = _empty_jit_step_results()
@@ -184,13 +186,14 @@ def build_tiny_live_jit_launch_packet(
         fresh_candidate_status = build_fresh_candidate_status(
             log_dir=resolved_log_dir,
             risk_contract_config_path=risk_path,
-            official_lane_key=selected_lane_key,
+            official_lane_key=packet_lane_key or official_lane_key,
         )
         final_command = build_final_live_submit_command_packet(
             jit_validation=validation,
             fresh_candidate_status=fresh_candidate_status,
             current_ticket_context=current_ticket_context,
-            packet_lane_key=selected_lane_key,
+            packet_lane_key=packet_lane_key,
+            historical_official_lane_key=official_lane_key,
             final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
         )
         if (
@@ -223,9 +226,11 @@ def build_tiny_live_jit_launch_packet(
                 },
                 "target_scope": {
                     "official_lane_key": selected_lane_key,
+                    "historical_official_lane_key": official_lane_key,
+                    "packet_lane_key": packet_lane_key,
                     "configured_official_lane_key": official_lane_key,
                     "current_proposed_ticket_lane_key": current_ticket_context.get("lane_key"),
-                    "current_proposed_ticket_selected": current_ticket_context.get("selected") is True,
+                    "current_proposed_ticket_selected": current_ticket_selected,
                     "symbol": symbol,
                     "timeframe": timeframe,
                     "direction": direction,
@@ -239,10 +244,12 @@ def build_tiny_live_jit_launch_packet(
                         "experimental_lane_acceptance_recorded"
                     ],
                     "message": "Selected current ticket lane is manual-only and must match all lane-specific gates.",
-                    "promoted_lanes_remain": [
+                    "historical_legacy_promoted_lanes_remain": [
                         "BTCUSDT|13m|long|ladder_close_50_618",
                         "BTCUSDT|44m|long|ladder_close_50_618",
                     ],
+                    "promoted_lanes_remain": [],
+                    "promoted_lanes_field_status": "deprecated_legacy_promoted_lanes_hidden_from_current_readiness",
                 },
                 "current_proposed_ticket": current_ticket_context,
                 "signal_origin_status": fresh_candidate_status.get("signal_origin_status")
@@ -675,7 +682,8 @@ def build_final_live_submit_command_packet(
     jit_validation: Mapping[str, Any],
     fresh_candidate_status: Mapping[str, Any] | None = None,
     current_ticket_context: Mapping[str, Any] | None = None,
-    packet_lane_key: str = OFFICIAL_LANE_KEY,
+    packet_lane_key: str | None = OFFICIAL_LANE_KEY,
+    historical_official_lane_key: str = OFFICIAL_LANE_KEY,
     final_manual_unlock_confirmation_valid: bool = False,
 ) -> dict[str, Any]:
     gate = validate_final_manual_submit_unlock_gate(
@@ -686,8 +694,13 @@ def build_final_live_submit_command_packet(
         final_manual_unlock_confirmation_valid=final_manual_unlock_confirmation_valid,
     )
     command = _manual_live_submit_command() if gate["valid"] else ""
-    expected_orders = expected_orders_for_direction(
-        str((fresh_candidate_status or {}).get("direction") or _lane_parts(packet_lane_key)[2])
+    current_ticket_selected = (current_ticket_context or {}).get("selected") is True and bool(
+        (current_ticket_context or {}).get("lane_key")
+    )
+    expected_orders = (
+        expected_orders_for_direction(str((fresh_candidate_status or {}).get("direction") or ""))
+        if current_ticket_selected
+        else None
     )
     origin = (fresh_candidate_status or {}).get("signal_origin_status")
     if not isinstance(origin, Mapping):
@@ -699,13 +712,14 @@ def build_final_live_submit_command_packet(
         "manual_only": True,
         "submit_allowed_from_codex": False,
         "command": command,
-        "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE,
+        "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE if current_ticket_selected else "",
         "unlock_confirmation_phrase": R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
         "unlock_confirmation_valid": bool(final_manual_unlock_confirmation_valid),
         "unavailable_reason": "" if gate["valid"] else "; ".join(gate["blocked_by"]),
         "gate_validation": gate,
         "current_proposed_ticket_lane_key": (current_ticket_context or {}).get("lane_key"),
         "packet_lane_key": packet_lane_key,
+        "historical_official_lane_key": historical_official_lane_key,
         "signal_origin_status": origin if isinstance(origin, Mapping) else {},
         "strategy_qualification": (fresh_candidate_status or {}).get("strategy_qualification")
         if isinstance((fresh_candidate_status or {}).get("strategy_qualification"), Mapping)
@@ -730,7 +744,7 @@ def validate_final_manual_submit_unlock_gate(
     jit_validation: Mapping[str, Any],
     fresh_candidate_status: Mapping[str, Any],
     current_ticket_context: Mapping[str, Any] | None = None,
-    packet_lane_key: str = OFFICIAL_LANE_KEY,
+    packet_lane_key: str | None = OFFICIAL_LANE_KEY,
     final_manual_unlock_confirmation_valid: bool,
 ) -> dict[str, Any]:
     current_ticket_context = current_ticket_context or {}
@@ -753,10 +767,12 @@ def validate_final_manual_submit_unlock_gate(
         or strategy_qualification.get("watch_category")
         or ""
     )
-    packet_symbol, packet_timeframe, packet_direction, _packet_entry_mode = _lane_parts(packet_lane_key)
+    packet_symbol, packet_timeframe, packet_direction, _packet_entry_mode = _lane_parts(packet_lane_key or "")
     required = {
         "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
         "current_ticket_selected": current_ticket_context.get("selected") is True,
+        "current_ticket_exists": bool(current_ticket_context.get("lane_key")),
+        "packet_lane_selected": bool(packet_lane_key),
         "current_ticket_lane_matches_packet": current_ticket_context.get("lane_key") == packet_lane_key,
         "fresh_candidate_available": fresh_candidate_status.get("fresh_candidate_available") is True,
         "trade_ticket_proposed": fresh_candidate_status.get("trade_ticket_status") == "PROPOSED",
@@ -824,6 +840,8 @@ def validate_final_manual_submit_unlock_gate(
     blocked = [name for name, passed in required.items() if not passed]
     if live_class and live_class != LIVE_QUALIFIED:
         blocked.append("strategy_near_miss_not_live_eligible")
+    if not packet_lane_key or not current_ticket_context.get("lane_key"):
+        blocked.append("no_current_ticket")
     blocked.extend(str(item) for item in jit_validation.get("blocked_by") or [])
     blocked.extend(str(item) for item in fresh_candidate_status.get("blocked_by") or [])
     blocked.extend(str(item) for item in origin.get("blocked_by") or [])
@@ -857,12 +875,13 @@ def build_current_proposed_ticket_context(
     except Exception as exc:  # pragma: no cover - defensive operator packet boundary
         return {
             "selected": False,
-            "lane_key": fallback_lane_key,
+            "lane_key": None,
             "actual_ticket_lane_key": None,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "direction": direction,
-            "entry_mode": entry_mode,
+            "historical_official_lane_key": fallback_lane_key,
+            "symbol": None,
+            "timeframe": None,
+            "direction": None,
+            "entry_mode": None,
             "blocked_by": [f"trade_ticket_error_{exc.__class__.__name__}"],
             "signal_origin_status": {
                 "manual_unlock_allowed": False,

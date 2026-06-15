@@ -1,0 +1,142 @@
+# R273 — Final Console Clarity: No Stale Lane Wording
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: OPERATOR UI / CLARITY HARDENING
+  Secondary: SAFETY VISIBILITY, FINAL READINESS
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R270-R272 made the tiny-live policy safer:
+    - live-qualified lanes require win_rate_pct >= 55.0
+    - near-miss lanes such as BTCUSDT 8m short are incubator only
+    - final command remains unavailable
+    - current action is WAIT when no live-qualified fresh candidate exists
+  However, final console can still display stale lane wording from the old official 8m short packet or old promoted-lane labels when there is no current proposed ticket.
+  This is not currently a live-risk bug because command availability remains false, but it is operator confusion risk.
+
+Hard goal:
+  Make final console and JIT packet wording clearly distinguish:
+    - current proposed ticket lane
+    - official historical/default lane
+    - previous preview lane
+    - current live-qualified candidate
+    - no current candidate / WAIT state
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT expose final live command in diagnostic mode.
+  - Do NOT weaken the 55% live policy.
+  - Do NOT allow near-miss lanes to unlock.
+  - Do NOT allow Betrayal/inverse live.
+  - Do NOT modify env files.
+  - If uncertain, keep final_command_available=false.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - tests/hammer_radar/test_tiny_live_final_console.py
+    - tests/hammer_radar/test_tiny_live_jit_launch_packet.py
+    - tests/hammer_radar/test_tiny_live_strategy_lane_selection.py
+
+Scope:
+  1. No-current-ticket display:
+     - When current_proposed_ticket_lane_key is null:
+       - lane_specific_expected_orders should be null or explicitly say no_current_ticket.
+       - final_live_submit_command_packet.confirmation_phrase must not reference 8m short actual submit.
+       - packet_lane_key may remain as historical/default only if labeled historical_official_lane_key.
+       - available must remain false.
+       - command must remain empty.
+       - recommended_next_operator_move must say WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE.
+
+  2. Current ticket display:
+     - When a current ticket exists:
+       - lane-specific expected order wording must reflect current ticket direction:
+         long = BUY main / SELL exits
+         short = SELL main / BUY exits.
+       - No hardcoded 8m short wording unless the current ticket actually is 8m short.
+
+  3. Promotion/readiness clarity:
+     - Remove or relabel stale `promoted_lanes` fields if they include blocked lanes.
+     - If legacy/historical promoted lanes are shown, label them as historical or legacy.
+     - Current live-qualified lanes should come from R272 watch policy:
+       - LIVE_QUALIFIED
+       - NEAR_MISS_INCUBATOR
+       - PAPER_ONLY
+     - 13m long must not appear as current live-qualified.
+
+  4. Near-miss clarity:
+     - 8m short should appear only as NEAR_MISS_INCUBATOR.
+     - It must show:
+       manual_live_unlock_available=false
+       final_command_available=false
+       blocker strategy_near_miss_not_live_eligible
+       recommended_next_action STRATEGY_LAB_PAPER_REVIEW
+
+  5. Tests:
+     Add/update tests proving:
+       - no current ticket produces no stale 8m actual-submit confirmation phrase.
+       - no current ticket keeps final command unavailable and command empty.
+       - no current ticket expected orders are null or explicitly no_current_ticket.
+       - 8m short near-miss cannot unlock.
+       - 13m long blocked lane is not shown as current live-qualified.
+       - live-qualified lanes remain 44m long, 44m short, 55m long under current evidence.
+       - safety flags remain false for order/submission.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live_final_console or tiny_live_jit_launch_packet or tiny_live_strategy_lane_selection or strategy_promotion"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/strategy-promotion/status | jq '{
+    config,
+    live_qualified_lanes,
+    near_miss_incubator_lanes,
+    qualified_candidate_watch
+  }'
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    lane_key,
+    strategy_qualification,
+    strategy_watchlist_status,
+    blockers,
+    final_command_available,
+    order_placed,
+    submit_attempted,
+    binance_order_endpoint_called
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    current_proposed_ticket_lane,
+    lane_specific_expected_orders,
+    lane_intelligence_panel,
+    final_live_submit_command_packet,
+    final_console_go_no_go_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+Report:
+  - files changed
+  - tests run
+  - endpoint statuses
+  - proof no stale 8m actual-submit wording when no current ticket exists
+  - proof 8m short is incubator only
+  - proof final command unavailable
+  - proof no order/no submit/no Binance order endpoint

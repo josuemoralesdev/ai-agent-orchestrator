@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 
 from src.app.hammer_radar.operator import tiny_live_final_console as r263
+from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import (
+    LIVE_SUBMIT_CONFIRMATION_PHRASE,
+)
 
 OFFICIAL = "BTCUSDT|8m|short|ladder_close_50_618"
 SECRET_SENTINEL = "R263_SECRET_SHOULD_NOT_APPEAR"
@@ -404,7 +407,13 @@ def test_r270c_final_console_does_not_surface_stale_risk_as_active_without_ticke
     assert interpretation["no_current_proposed_ticket"] is True
     assert "no_current_proposed_ticket" in interpretation["blocked_by"]
     assert payload["previous_r264_preview"]["found"] is False
+    assert payload["target_scope"]["historical_official_lane_key"] == OFFICIAL
+    assert payload["current_proposed_ticket_lane"]["lane_key"] is None
+    assert payload["current_proposed_ticket_lane"]["no_current_ticket"] is True
+    assert payload["lane_specific_expected_orders"] is None
     assert exchange["configured_cap_clears_exchange_minimum"] is True
+    assert payload["final_console_go_no_go_packet"]["next_required_step"] == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
+    assert payload["recommended_next_operator_move"].startswith("WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE")
     assert payload["final_command_available"] is False
     assert payload["submit_allowed"] is False
     assert payload["submit_attempted"] is False
@@ -413,6 +422,53 @@ def test_r270c_final_console_does_not_surface_stale_risk_as_active_without_ticke
     assert payload["binance_order_endpoint_called"] is False
     assert payload["binance_test_order_endpoint_called"] is False
     assert payload["secrets_shown"] is False
+
+
+def test_no_current_ticket_suppresses_stale_jit_actual_submit_wording(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    _append_ndjson(
+        log_dir / "tiny_live_jit_launch_packet.ndjson",
+        {
+            "target_scope": {"official_lane_key": OFFICIAL},
+            "jit_validation": {"valid": True},
+            "final_live_submit_command_packet": {
+                "available": True,
+                "command": "stale command should not appear",
+                "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE,
+                "packet_lane_key": OFFICIAL,
+                "expected_orders": {
+                    "main": "SELL MARKET quantity must remain within 80 USDT notional cap",
+                    "stop": "BUY STOP_MARKET REDUCE_ONLY",
+                    "take_profit": "BUY TAKE_PROFIT_MARKET REDUCE_ONLY",
+                },
+                "gate_validation": {"valid": True, "blocked_by": []},
+            },
+        },
+    )
+
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+
+    command = payload["final_live_submit_command_packet"]
+    assert payload["current_proposed_ticket_lane"]["lane_key"] is None
+    assert payload["lane_specific_expected_orders"] is None
+    assert command["available"] is False
+    assert command["command"] == ""
+    assert command["confirmation_phrase"] == ""
+    assert command["expected_orders"] is None
+    assert command["packet_lane_key"] is None
+    assert command["historical_official_lane_key"] == OFFICIAL
+    assert "no_current_ticket" in command["gate_validation"]["blocked_by"]
+    assert payload["final_console_go_no_go_packet"]["next_required_step"] == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
+    assert payload["recommended_next_operator_move"].startswith("WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE")
+    assert payload["final_command_available"] is False
+    assert payload["order_placed"] is False
+    assert payload["real_order_placed"] is False
+    assert payload["submit_attempted"] is False
+    assert payload["binance_order_endpoint_called"] is False
 
 
 def test_r269_final_console_surfaces_fresh_candidate_status(tmp_path: Path, monkeypatch) -> None:
@@ -509,22 +565,26 @@ def test_8m_short_lane_marked_paper_only_promotion_mismatched(tmp_path: Path) ->
     )
     lane = payload["lane_intelligence_panel"]
     assert lane["execution_lane_timeframe_status"] == "paper_only"
-    assert lane["execution_lane_promotion_status"] == "not_promotion_ready"
-    assert lane["live_qualification_class"] == "PAPER_ONLY"
+    assert lane["execution_lane_promotion_status"] == "not_live_qualified"
+    assert lane["live_qualification_class"] in {"PAPER_ONLY", "NEAR_MISS_INCUBATOR"}
     assert lane["execution_lane_direction_status"] == "experimental_short"
     assert lane["operator_acceptance_required"] is True
 
 
-def test_promoted_13m_and_44m_lanes_shown(tmp_path: Path) -> None:
+def test_legacy_promoted_lanes_are_relabelled_not_current_live_qualified(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     payload = r263.build_tiny_live_final_console(
         log_dir=log_dir,
         lane_controls_path=lane_path,
         risk_contract_config_path=risk_path,
     )
-    promoted = payload["lane_intelligence_panel"]["promoted_lanes"]
-    assert "BTCUSDT|13m|long|ladder_close_50_618" in promoted
-    assert "BTCUSDT|44m|long|ladder_close_50_618" in promoted
+    lane = payload["lane_intelligence_panel"]
+    legacy = lane["historical_legacy_promoted_lanes"]
+    assert lane["promoted_lanes"] == []
+    assert lane["promoted_lanes_field_status"] == "deprecated_use_live_qualified_lanes_or_historical_legacy_promoted_lanes"
+    assert "BTCUSDT|13m|long|ladder_close_50_618" in legacy
+    assert "BTCUSDT|44m|long|ladder_close_50_618" in legacy
+    assert "BTCUSDT|13m|long|ladder_close_50_618" not in lane["live_qualified_lanes"]
 
 
 def test_readiness_not_ready_shown_when_no_fresh_eligible_candidate(tmp_path: Path) -> None:
@@ -573,7 +633,8 @@ def test_exchange_minimum_below_44_blocks_final_command_without_modifying_config
     assert packet["recommended_cap_applied"] is False
     assert payload["final_console_go_no_go_packet"]["go_for_actual_submit_now"] is False
     assert payload["final_console_go_no_go_packet"]["go_for_r264_actual_submit_checkpoint"] is False
-    assert payload["final_console_go_no_go_packet"]["next_required_step"] == "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT"
+    assert payload["final_console_go_no_go_packet"]["next_required_step"] == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
+    assert payload["recommended_next_operator_move"].startswith("WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE")
     assert payload["final_command_available"] is False
     assert payload["order_placed"] is False
     assert payload["binance_order_endpoint_called"] is False

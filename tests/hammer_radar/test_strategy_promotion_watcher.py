@@ -116,6 +116,7 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
         self.assertFalse(row["manual_live_unlock_available"])
         self.assertFalse(row["final_command_available"])
         self.assertIn("strategy_near_miss_not_live_eligible", row["blockers"])
+        self.assertEqual("STRATEGY_LAB_PAPER_REVIEW", row["recommended_next_action"])
         self.assertFalse(payload["qualified_candidate_watch"]["near_miss_manual_unlock_available"])
         self.assertEqual("WAIT", payload["qualified_candidate_watch"]["next_action"])
 
@@ -161,6 +162,37 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
 
         self.assertEqual([], payload["near_promotion"])
         self.assertEqual(1, len(payload["promotion_ready"]))
+
+    def test_current_live_qualified_lanes_exclude_13m_and_keep_8m_short_incubator(self) -> None:
+        self._seed_group("weak13", "13m", "long", "ladder_close_50_618", wins=26, losses=29)
+        self._seed_group("near8", "8m", "short", "ladder_close_50_618", wins=16, losses=14)
+        self._seed_group("ready44l", "44m", "long", "ladder_close_50_618", wins=25, losses=5)
+        self._seed_group("ready44s", "44m", "short", "ladder_close_50_618", wins=25, losses=5)
+        self._seed_group("ready55l", "55m", "long", "ladder_close_50_618", wins=25, losses=5)
+
+        payload = build_strategy_promotion_status(log_dir=self.log_dir, config=self.config)
+
+        live_keys = {row["strategy_key"] for row in payload["live_qualified_lanes"]}
+        near_keys = {row["strategy_key"] for row in payload["near_miss_incubator_lanes"]}
+        self.assertEqual(
+            {
+                "BTCUSDT|44m|long|ladder_close_50_618",
+                "BTCUSDT|44m|short|ladder_close_50_618",
+                "BTCUSDT|55m|long|ladder_close_50_618",
+            },
+            live_keys,
+        )
+        self.assertNotIn("BTCUSDT|13m|long|ladder_close_50_618", live_keys)
+        self.assertIn("BTCUSDT|8m|short|ladder_close_50_618", near_keys)
+        near = next(
+            row
+            for row in payload["near_miss_incubator_lanes"]
+            if row["strategy_key"] == "BTCUSDT|8m|short|ladder_close_50_618"
+        )
+        self.assertFalse(near["manual_live_unlock_available"])
+        self.assertFalse(near["final_command_available"])
+        self.assertIn("strategy_near_miss_not_live_eligible", near["blockers"])
+        self.assertEqual("STRATEGY_LAB_PAPER_REVIEW", near["recommended_next_action"])
 
     def test_promotion_events_are_persisted_and_deduped(self) -> None:
         self._seed_group("ready", "13m", "long", "ladder_close_50_618", wins=20, losses=10)

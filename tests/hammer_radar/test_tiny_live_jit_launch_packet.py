@@ -292,7 +292,16 @@ def test_jit_prep_does_not_run_child_steps_without_current_candidate(tmp_path: P
     assert calls == []
     assert payload["status"] == r264b.TINY_LIVE_JIT_LAUNCH_PACKET_BLOCKED
     assert "no_current_qualified_fresh_candidate" in payload["jit_validation"]["blocked_by"]
+    assert payload["target_scope"]["current_proposed_ticket_lane_key"] is None
+    assert payload["target_scope"]["packet_lane_key"] is None
+    assert payload["target_scope"]["historical_official_lane_key"] == OFFICIAL
     assert payload["final_live_submit_command_packet"]["available"] is False
+    assert payload["final_live_submit_command_packet"]["command"] == ""
+    assert payload["final_live_submit_command_packet"]["confirmation_phrase"] == ""
+    assert payload["final_live_submit_command_packet"]["packet_lane_key"] is None
+    assert payload["final_live_submit_command_packet"]["historical_official_lane_key"] == OFFICIAL
+    assert payload["final_live_submit_command_packet"]["expected_orders"] is None
+    assert "no_current_ticket" in payload["final_live_submit_command_packet"]["gate_validation"]["blocked_by"]
     _assert_no_submit_safety(payload)
 
 

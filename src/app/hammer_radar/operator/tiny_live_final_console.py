@@ -158,9 +158,15 @@ def build_tiny_live_final_console(
             risk_contract_config_path=risk_path,
             official_lane_key=official_lane_key,
         )
-        current_lane_key = str(fresh_candidate_status.get("lane_key") or official_lane_key)
-        current_expected_orders = expected_orders_for_direction(
-            str(fresh_candidate_status.get("direction") or direction)
+        current_lane_key = fresh_candidate_status.get("lane_key")
+        current_ticket_exists = bool(
+            fresh_candidate_status.get("trade_ticket_status") == "PROPOSED"
+            and current_lane_key
+        )
+        current_expected_orders = (
+            expected_orders_for_direction(str(fresh_candidate_status.get("direction") or ""))
+            if current_ticket_exists
+            else None
         )
         latest_jit_launch_packet = load_latest_jit_launch_packet_summary(
             log_dir=resolved_log_dir,
@@ -271,6 +277,7 @@ def build_tiny_live_final_console(
                 "experimental_lane_acceptance_recorded"
             ],
             exchange_minimum_decision_packet=exchange_minimum_decision_packet,
+            no_current_ticket=not current_ticket_exists,
         )
         matrix = _build_final_console_matrix(
             contract_fit_panel=contract_fit_panel,
@@ -325,8 +332,10 @@ def build_tiny_live_final_console(
                     "source_phase": "R263",
                 },
                 "target_scope": {
+                    "historical_official_lane_key": official_lane_key,
                     "official_lane_key": official_lane_key,
                     "current_proposed_ticket_lane_key": fresh_candidate_status.get("lane_key"),
+                    "current_proposed_ticket_selected": current_ticket_exists,
                     "symbol": symbol,
                     "timeframe": timeframe,
                     "direction": direction,
@@ -352,7 +361,9 @@ def build_tiny_live_final_console(
                     "direction": fresh_candidate_status.get("direction"),
                     "entry_mode": fresh_candidate_status.get("entry_mode"),
                     "signal_id": fresh_candidate_status.get("signal_id"),
-                    "matches_console_lane": current_lane_key == official_lane_key,
+                    "matches_console_lane": current_lane_key == official_lane_key if current_ticket_exists else False,
+                    "no_current_ticket": not current_ticket_exists,
+                    "historical_official_lane_key": official_lane_key,
                 },
                 "lane_specific_expected_orders": current_expected_orders,
                 "signal_origin_status": fresh_candidate_status.get("signal_origin_status"),
@@ -557,11 +568,19 @@ def suppress_final_command_for_unqualified_candidate(
         else {}
     )
     live_class = str(strategy.get("live_qualification_class") or strategy.get("watch_category") or "")
-    if live_class in {"", LIVE_QUALIFIED} and fresh_candidate_status.get("fresh_candidate_available") is True:
+    current_ticket_exists = bool(
+        fresh_candidate_status.get("trade_ticket_status") == "PROPOSED"
+        and fresh_candidate_status.get("lane_key")
+    )
+    if (
+        current_ticket_exists
+        and live_class in {"", LIVE_QUALIFIED}
+        and fresh_candidate_status.get("fresh_candidate_available") is True
+    ):
         return packet
     blocked_by = _dedupe(
         [
-            "strategy_near_miss_not_live_eligible",
+            "no_current_ticket" if not current_ticket_exists else "strategy_near_miss_not_live_eligible",
             *[str(item) for item in packet.get("blocked_by") or []],
             *[str(item) for item in fresh_candidate_status.get("blocked_by") or []],
         ]
@@ -573,7 +592,7 @@ def suppress_final_command_for_unqualified_candidate(
     packet["valid"] = False
     packet["final_command_available"] = False
     packet["blocked_by"] = blocked_by
-    packet["final_live_submit_command_packet"] = {
+    suppressed_command = {
         **dict(command),
         "available": False,
         "command": "",
@@ -584,6 +603,12 @@ def suppress_final_command_for_unqualified_candidate(
             "blocked_by": _dedupe([*[str(item) for item in gate.get("blocked_by") or []], *blocked_by]),
         },
     }
+    if not current_ticket_exists:
+        suppressed_command["confirmation_phrase"] = ""
+        suppressed_command["expected_orders"] = None
+        suppressed_command["packet_lane_key"] = None
+        suppressed_command["historical_official_lane_key"] = command.get("packet_lane_key")
+    packet["final_live_submit_command_packet"] = suppressed_command
     return packet
 
 
@@ -775,7 +800,8 @@ def load_lane_fisherman_context(
 ) -> dict[str, Any]:
     lane = lane_controls.get("official_lane") if isinstance(lane_controls.get("official_lane"), Mapping) else {}
     mode = str(lane.get("mode") or "").lower()
-    promoted = _promotion_ready_lanes(promotion_snapshot)
+    legacy_promoted = _promotion_ready_lanes(promotion_snapshot)
+    live_qualified = _live_qualified_lanes(promotion_snapshot)
     near_miss = _near_miss_lanes(promotion_snapshot)
     timeframe = _lane_parts(official_lane_key)[1]
     direction = _lane_parts(official_lane_key)[2]
@@ -787,15 +813,15 @@ def load_lane_fisherman_context(
         timeframe_status = "blocked"
     else:
         timeframe_status = "unknown"
-    promotion_status = "promotion_ready" if official_lane_key in promoted else "not_promotion_ready"
+    promotion_status = "live_qualified" if official_lane_key in live_qualified else "not_live_qualified"
     live_class = (
         LIVE_QUALIFIED
-        if official_lane_key in promoted
+        if official_lane_key in live_qualified
         else NEAR_MISS_INCUBATOR
         if official_lane_key in near_miss
         else "PAPER_ONLY"
     )
-    direction_status = "promoted" if promotion_status == "promotion_ready" else (
+    direction_status = "live_qualified" if promotion_status == "live_qualified" else (
         "experimental_short" if direction == "short" else "unknown"
     )
     return {
@@ -805,11 +831,12 @@ def load_lane_fisherman_context(
         "execution_lane_promotion_status": promotion_status,
         "live_qualification_class": live_class,
         "execution_lane_direction_status": direction_status,
-        "promoted_lanes": promoted,
+        "live_qualified_lanes": live_qualified,
+        "historical_legacy_promoted_lanes": legacy_promoted,
         "near_miss_incubator_lanes": near_miss,
         "readiness_status": readiness_snapshot.get("readiness_status") or "UNKNOWN",
-        "fisherman_warning": promotion_status != "promotion_ready" or timeframe_status != "allowed_tiny_live",
-        "operator_acceptance_required": promotion_status != "promotion_ready",
+        "fisherman_warning": promotion_status != "live_qualified" or timeframe_status != "allowed_tiny_live",
+        "operator_acceptance_required": promotion_status != "live_qualified",
     }
 
 
@@ -1009,8 +1036,8 @@ def summarize_lane_intelligence_panel(
     warnings: list[str] = []
     if lane_context.get("execution_lane_timeframe_status") == "paper_only":
         warnings.append("execution lane timeframe is paper-only by promotion config")
-    if lane_context.get("execution_lane_promotion_status") != "promotion_ready":
-        warnings.append("execution lane is not promotion-ready")
+    if lane_context.get("execution_lane_promotion_status") != "live_qualified":
+        warnings.append("execution lane is not current live-qualified")
     if lane_context.get("live_qualification_class") != LIVE_QUALIFIED:
         warnings.append("strategy_near_miss_not_live_eligible")
     if lane_context.get("execution_lane_direction_status") == "experimental_short":
@@ -1023,7 +1050,10 @@ def summarize_lane_intelligence_panel(
         "execution_lane_promotion_status": lane_context.get("execution_lane_promotion_status") or "unknown",
         "live_qualification_class": lane_context.get("live_qualification_class") or "PAPER_ONLY",
         "execution_lane_direction_status": lane_context.get("execution_lane_direction_status") or "unknown",
-        "promoted_lanes": _promotion_ready_lanes(promotion_snapshot),
+        "live_qualified_lanes": _live_qualified_lanes(promotion_snapshot),
+        "historical_legacy_promoted_lanes": _promotion_ready_lanes(promotion_snapshot),
+        "promoted_lanes": [],
+        "promoted_lanes_field_status": "deprecated_use_live_qualified_lanes_or_historical_legacy_promoted_lanes",
         "near_miss_incubator_lanes": _near_miss_lanes(promotion_snapshot),
         "readiness_status": readiness_snapshot.get("readiness_status") or "UNKNOWN",
         "fresh_eligible_count": state.get("fresh_eligible_count"),
@@ -1042,6 +1072,12 @@ def summarize_promotion_readiness_panel(
     return {
         "strategy_performance_endpoint_available": True,
         "promotion_ready": list(promotion_snapshot.get("promotion_ready") or []),
+        "promotion_ready_field_status": "legacy_historical_not_current_live_qualified",
+        "live_qualified_lanes": list(promotion_snapshot.get("live_qualified_lanes") or []),
+        "near_miss_incubator_lanes": list(promotion_snapshot.get("near_miss_incubator_lanes") or []),
+        "qualified_candidate_watch": promotion_snapshot.get("qualified_candidate_watch")
+        if isinstance(promotion_snapshot.get("qualified_candidate_watch"), Mapping)
+        else {},
         "readiness_blockers": list(readiness_snapshot.get("blockers") or []),
         "latest_candidate_age_minutes": state.get("latest_candidate_age_minutes"),
         "live_execution_enabled": readiness_snapshot.get("live_execution_enabled") is True,
@@ -1140,12 +1176,15 @@ def build_final_console_go_no_go_packet(
     lane_intelligence_panel: Mapping[str, Any],
     experimental_lane_acceptance_recorded: bool,
     exchange_minimum_decision_packet: Mapping[str, Any] | None = None,
+    no_current_ticket: bool = False,
 ) -> dict[str, Any]:
     r262b_valid = contract_fit_panel.get("r262b_found") and contract_fit_panel.get("risk_contract_valid") and contract_fit_panel.get("fits_contract")
     exchange_packet = exchange_minimum_decision_packet or {}
     exchange_minimum_blocks = exchange_packet.get("configured_cap_possible") is not True
     strategy_blocks = lane_intelligence_panel.get("live_qualification_class") != LIVE_QUALIFIED
-    if exchange_minimum_blocks:
+    if no_current_ticket:
+        next_step = "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
+    elif exchange_minimum_blocks:
         next_step = "DECIDE_EXCHANGE_MINIMUM_TINY_LIVE_CONTRACT"
     elif strategy_blocks:
         next_step = "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
@@ -1178,7 +1217,7 @@ def build_final_console_go_no_go_packet(
         "exchange_minimum_blocks_submit": bool(exchange_minimum_blocks),
         "exchange_minimum_block_reason": exchange_packet.get("block_reason"),
         "strategy_blocks_submit": bool(strategy_blocks),
-        "strategy_block_reason": "strategy_near_miss_not_live_eligible" if strategy_blocks else "",
+        "strategy_block_reason": "no_current_ticket" if no_current_ticket else "strategy_near_miss_not_live_eligible" if strategy_blocks else "",
     }
 
 
@@ -1536,7 +1575,7 @@ def _recommended_next_operator_move(packet: Mapping[str, Any], overall: str) -> 
     if step == "R264_ACTUAL_SUBMIT_CHECKPOINT":
         return "Proceed only to the R264 actual submit checkpoint; do not submit from R263."
     if step == "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE":
-        return "Wait for a fresh LIVE_QUALIFIED candidate; near-miss lanes remain incubator/watchlist only."
+        return "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE: wait for a fresh LIVE_QUALIFIED candidate; near-miss lanes remain incubator/watchlist only."
     if step == "ARM_CONTROLS":
         return "Use the exact R263 controls arming phrase only if accepting the 8m short experimental lane."
     if step == "RERUN_R262B":
@@ -1570,6 +1609,26 @@ def _promotion_ready_lanes(snapshot: Mapping[str, Any]) -> list[str]:
         if lane not in lanes:
             lanes.append(lane)
     return lanes
+
+
+def _live_qualified_lanes(snapshot: Mapping[str, Any]) -> list[str]:
+    lanes: list[str] = []
+    for key in ("live_qualified_lanes",):
+        for row in snapshot.get(key) or []:
+            if not isinstance(row, Mapping):
+                continue
+            lane = row.get("strategy_key") or _lane_key_from_row(row)
+            if lane:
+                lanes.append(str(lane))
+    watch = snapshot.get("qualified_candidate_watch")
+    if isinstance(watch, Mapping):
+        for row in watch.get("live_qualified_lanes") or []:
+            if not isinstance(row, Mapping):
+                continue
+            lane = row.get("strategy_key") or _lane_key_from_row(row)
+            if lane:
+                lanes.append(str(lane))
+    return _dedupe(lanes)
 
 
 def _near_miss_lanes(snapshot: Mapping[str, Any]) -> list[str]:
