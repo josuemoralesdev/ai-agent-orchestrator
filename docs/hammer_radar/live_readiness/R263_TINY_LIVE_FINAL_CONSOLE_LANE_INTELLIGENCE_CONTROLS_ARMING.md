@@ -113,3 +113,8 @@ PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
   --log-dir logs/hammer_radar_forward \
   tiny-live-actual-submit-reconcile
 ```
+
+R264B may call this R263 arming path internally after the exact R264B prep
+phrase, using the exact R263 experimental-lane acceptance phrase. R264B remains
+prep-only: it does not submit, place orders, call Binance order/private/account
+endpoints, or change promotion state.

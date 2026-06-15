@@ -28,6 +28,21 @@ PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
   --confirm-actual-submit-dry-preview "I CONFIRM TINY LIVE R264 ACTUAL SUBMIT DRY PREVIEW ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
 ```
 
+R264B JIT launch prep can run the required R262B refresh, R263 runtime arming,
+and this R264 dry preview in one exact-confirmed packet. It still does not
+submit or place orders:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-jit-launch-packet \
+  --run-jit-launch-prep \
+  --record-jit-launch-packet \
+  --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+  --operator-id local_operator \
+  --reason "Final JIT prep for first tiny-live BTCUSDT 8m short experimental lane."
+```
+
 Rejected live-submit example:
 
 ```bash
