@@ -3179,6 +3179,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-final-console":
+        from src.app.hammer_radar.operator.tiny_live_final_console import (
+            build_tiny_live_final_console,
+            format_tiny_live_final_console_json,
+        )
+
+        print(
+            format_tiny_live_final_console_json(
+                build_tiny_live_final_console(
+                    log_dir=args.log_dir,
+                    risk_contract_config_path=args.risk_contract_config_path,
+                    lane_controls_path=args.lane_controls_path,
+                    record_final_console_review=args.record_final_console_review,
+                    confirm_final_console_review=args.confirm_final_console_review,
+                    arm_controls_from_final_console=args.arm_controls_from_final_console,
+                    confirm_final_console_controls_arming=args.confirm_final_console_controls_arming,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-risk-contract-fix":
         from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
             build_tiny_live_risk_contract_diagnostic,
@@ -5653,6 +5674,43 @@ def _build_parser() -> argparse.ArgumentParser:
         default="local_operator",
     )
     tiny_live_controls_arming_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+
+    tiny_live_final_console_parser = subparsers.add_parser(
+        "tiny-live-final-console",
+        parents=[parent],
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--record-final-console-review",
+        action="store_true",
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--confirm-final-console-review",
+        default=None,
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--arm-controls-from-final-console",
+        action="store_true",
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--confirm-final-console-controls-arming",
+        default=None,
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--risk-contract-config-path",
+        default=None,
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--lane-controls-path",
+        default=None,
+    )
+    tiny_live_final_console_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_final_console_parser.add_argument(
         "--reason",
         default=None,
     )

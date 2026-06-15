@@ -203,8 +203,9 @@ PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
 
 R261 must report `submit_still_forbidden=true` and
 `operator_should_submit_now=false`. If the risk contract remains invalid, fix
-that blocker before arming. If R261 arms controls successfully, the next step is
-R262 final submit console, not real submit from R261.
+that blocker before arming. For the R263 path, do not reuse the older R261
+arming phrase as final acceptance because the 8m short lane is paper-only and
+promotion-mismatched by default.
 
 ## R262A Tiny-Live Risk Contract Fix And Controls Recheck
 
@@ -244,15 +245,30 @@ PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
 ```
 
 R262B does not arm controls and does not submit. If valid, the next operator
-move is R261 controls arming review, followed by R263 final console review.
+move is R263 final console review and experimental-lane-aware controls arming.
 
-## R255 Manual Submit Template
+## R263 Final Console And Controls Arming
+
+R263 displays R262B contract fit, signed triplet context, controls state,
+promotion-ready lanes, readiness blockers, and lane/fisherman warnings in one
+surface. It may append `tiny_live_final_console.ndjson`, and it may update only
+`configs/hammer_radar/lane_controls.json` after this exact phrase:
+
+```text
+I CONFIRM ARM TINY LIVE CONTROLS FOR BTCUSDT 8M SHORT EXPERIMENTAL LANE ONLY; I ACCEPT 8M SHORT IS PAPER-ONLY/PROMOTION-MISMATCHED; NO SUBMIT; NO ORDER; NO BINANCE CALL.
+```
+
+R263 must report `go_for_actual_submit_now=false`, `submit_allowed=false`, and
+`operator_should_submit_now=false`. If it arms controls successfully, the next
+step is R264 actual submit checkpoint, not real submit from R263.
+
+## R264 Manual Submit Template
 
 This is a template only. It must be manually reviewed and pasted by the operator
 only after the checklist is complete:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-gate --execute-actual-submit --allow-real-binance-order-endpoint --confirm-tiny-live-actual-submit "<R263 must render the exact phrase with the latest regenerated quantity; do not reuse the old 0.007 BTC phrase if R262B resized the triplet.>"
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-gate --execute-actual-submit --allow-real-binance-order-endpoint --confirm-tiny-live-actual-submit "<R264 must render the exact phrase with the latest regenerated quantity; do not reuse the old 0.007 BTC phrase if R262B resized the triplet.>"
 ```
 
 ## Reconciliation
