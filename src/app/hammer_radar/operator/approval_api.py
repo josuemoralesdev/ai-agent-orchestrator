@@ -87,6 +87,9 @@ from src.app.hammer_radar.operator.lane_control_cockpit import (
 from src.app.hammer_radar.operator.tiny_live_controls_arming import (
     build_tiny_live_controls_review,
 )
+from src.app.hammer_radar.operator.tiny_live_final_console import (
+    build_tiny_live_final_console,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -742,6 +745,18 @@ class TinyLiveControlsArmRequest(BaseModel):
     reason: str | None = None
 
 
+class TinyLiveFinalConsoleReviewRecordRequest(BaseModel):
+    confirm_final_console_review: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
+class TinyLiveFinalConsoleControlsArmRequest(BaseModel):
+    confirm_final_console_controls_arming: str = Field(min_length=1)
+    operator_id: str = "local_operator"
+    reason: str | None = None
+
+
 class TinyLiveRiskContractDiagnosticRecordRequest(BaseModel):
     confirm_risk_contract_diagnostic: str = Field(min_length=1)
     operator_id: str = "local_operator"
@@ -819,6 +834,33 @@ def tiny_live_controls_arm(request: TinyLiveControlsArmRequest) -> dict:
         log_dir=get_log_dir(use_env=True),
         arm_tiny_live_controls=True,
         confirm_arm_tiny_live_controls=request.confirm_arm_tiny_live_controls,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.get("/tiny-live/final-console")
+def tiny_live_final_console() -> dict:
+    return build_tiny_live_final_console(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/final-console/review/record")
+def tiny_live_final_console_review_record(request: TinyLiveFinalConsoleReviewRecordRequest) -> dict:
+    return build_tiny_live_final_console(
+        log_dir=get_log_dir(use_env=True),
+        record_final_console_review=True,
+        confirm_final_console_review=request.confirm_final_console_review,
+        operator_id=request.operator_id,
+        reason=request.reason,
+    )
+
+
+@app.post("/tiny-live/final-console/controls/arm")
+def tiny_live_final_console_controls_arm(request: TinyLiveFinalConsoleControlsArmRequest) -> dict:
+    return build_tiny_live_final_console(
+        log_dir=get_log_dir(use_env=True),
+        arm_controls_from_final_console=True,
+        confirm_final_console_controls_arming=request.confirm_final_console_controls_arming,
         operator_id=request.operator_id,
         reason=request.reason,
     )
@@ -3154,7 +3196,7 @@ def _operator_ui_html() -> str:
     header { padding: 18px 24px; background: #18212f; color: white; }
     main { max-width: 1240px; margin: 0 auto; padding: 20px; }
     .banner { background: #fff7ed; border-bottom: 1px solid #fed7aa; color: #7c2d12; padding: 12px 24px; font-weight: 800; }
-    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .tiny-live-controls, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+    .status, .controls, .readiness, .ticket, .exchange-dry-run, .live-safety, .live-connector, .binance-readonly, .binance-live-connector, .tiny-live-controls, .tiny-live-final-console, .operator-actions, .strategy-performance, .strategy-promotion, .live-preflight, .notification-watcher, .alt-watchlist, .multi-symbol-scanner, .market-intelligence, .eth-paper-candidate, .eth-paper-outcome, .paper-refresh-scheduler, .betrayal-shadow, .paper-execution, .candidate, .decision, .feedback { background: white; border: 1px solid #d9ddd6; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .controls-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
     .label { color: #5d675f; font-size: 12px; text-transform: uppercase; }
@@ -3236,6 +3278,37 @@ def _operator_ui_html() -> str:
         <button onclick="armTinyLiveControls()">Arm Controls Only</button>
       </div>
       <pre id="tlcRaw">loading</pre>
+    </section>
+
+    <h2>Tiny Live Final Console</h2>
+    <section id="tinyLiveFinalConsole" class="tiny-live-final-console blocked">
+      <div class="grid">
+        <div><div class="label">official lane</div><div id="tlfLane" class="value mono">BTCUSDT|8m|short|ladder_close_50_618</div></div>
+        <div><div class="label">overall status</div><div id="tlfOverall" class="value">loading</div></div>
+        <div><div class="label">R262B valid</div><div id="tlfR262b" class="value">loading</div></div>
+        <div><div class="label">signed triplet</div><div id="tlfTriplet" class="value">loading</div></div>
+        <div><div class="label">controls armed</div><div id="tlfControls" class="value">loading</div></div>
+        <div><div class="label">lane status</div><div id="tlfLaneStatus" class="value">loading</div></div>
+        <div><div class="label">promotion status</div><div id="tlfPromotionStatus" class="value">loading</div></div>
+        <div><div class="label">readiness</div><div id="tlfReadiness" class="value">loading</div></div>
+        <div><div class="label">R264 checkpoint</div><div id="tlfR264" class="value">loading</div></div>
+        <div><div class="label">submit forbidden</div><div id="tlfForbidden" class="value danger">true</div></div>
+      </div>
+      <p><strong>NO SUBMIT FROM THIS SCREEN.</strong> R263 can record review or arm controls only after exact experimental-lane acceptance.</p>
+      <p><strong>Promoted lanes:</strong> <span id="tlfPromoted">loading</span></p>
+      <p><strong>Readiness blockers:</strong> <span id="tlfBlockers">loading</span></p>
+      <p><strong>Lane/Fisherman warning:</strong> <span id="tlfWarning">loading</span></p>
+      <p><strong>Next required step:</strong> <span id="tlfNext">loading</span></p>
+      <div class="button-row">
+        <input id="tlfReviewPhrase" class="notes" type="text" placeholder="Final console review phrase">
+        <button onclick="recordTinyLiveFinalConsoleReview()">Record Final Console Review</button>
+      </div>
+      <div class="button-row">
+        <input id="tlfArmPhrase" class="notes" type="text" placeholder="R263 experimental-lane arming phrase">
+        <input id="tlfArmReason" class="notes" type="text" placeholder="Reason">
+        <button onclick="armTinyLiveFinalConsoleControls()">Arm From Final Console Only</button>
+      </div>
+      <pre id="tlfRaw">loading</pre>
     </section>
 
     <h2>Friday Readiness</h2>
@@ -3714,6 +3787,7 @@ function setBool(id, value) {
 async function refreshAll() {
   await loadHealth();
   await loadTinyLiveControls();
+  await loadTinyLiveFinalConsole();
   await loadReadiness();
   await loadTradeTicket();
   await loadExchangeDryRun();
@@ -3795,6 +3869,69 @@ async function armTinyLiveControls() {
   const data = await res.json();
   document.getElementById('message').textContent = JSON.stringify(data, null, 2);
   await loadTinyLiveControls();
+}
+
+async function loadTinyLiveFinalConsole() {
+  const res = await fetch('/tiny-live/final-console');
+  const data = await res.json();
+  const contract = data.contract_fit_panel || {};
+  const triplet = data.signed_triplet_panel || {};
+  const controls = data.controls_panel || {};
+  const lane = data.lane_intelligence_panel || {};
+  const readiness = data.promotion_readiness_panel || {};
+  const go = data.final_console_go_no_go_packet || {};
+  const matrix = data.final_console_matrix || {};
+  document.getElementById('tlfLane').textContent = data.target_scope?.official_lane_key || 'BTCUSDT|8m|short|ladder_close_50_618';
+  document.getElementById('tlfOverall').textContent = data.final_console_overall_status || 'UNKNOWN';
+  setBool('tlfR262b', matrix.r262b_valid);
+  setBool('tlfTriplet', triplet.signed_triplet_available);
+  setBool('tlfControls', controls.controls_armed);
+  document.getElementById('tlfLaneStatus').textContent = lane.execution_lane_timeframe_status || 'unknown';
+  document.getElementById('tlfPromotionStatus').textContent = lane.execution_lane_promotion_status || 'unknown';
+  document.getElementById('tlfReadiness').textContent = lane.readiness_status || 'UNKNOWN';
+  setBool('tlfR264', go.go_for_r264_actual_submit_checkpoint);
+  setBool('tlfForbidden', data.target_scope?.submit_allowed === false);
+  document.getElementById('tlfPromoted').textContent = (lane.promoted_lanes || []).join(', ') || 'none';
+  document.getElementById('tlfBlockers').textContent = (readiness.readiness_blockers || []).join('; ') || 'none';
+  document.getElementById('tlfWarning').textContent = (lane.warnings || []).join('; ') || 'none';
+  document.getElementById('tlfNext').textContent = go.next_required_step || 'UNKNOWN';
+  document.getElementById('tinyLiveFinalConsole').className = 'tiny-live-final-console ' + (go.go_for_r264_actual_submit_checkpoint ? 'ready' : 'blocked');
+  document.getElementById('tlfRaw').textContent = JSON.stringify({
+    status: data.status,
+    contract_fit_panel: contract,
+    signed_triplet_panel: triplet,
+    controls_panel: controls,
+    lane_intelligence_panel: lane,
+    final_console_go_no_go_packet: go,
+    safety: data.safety
+  }, null, 2);
+}
+
+async function recordTinyLiveFinalConsoleReview() {
+  const phrase = document.getElementById('tlfReviewPhrase').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/final-console/review/record', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_final_console_review: phrase, operator_id: operatorId})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveFinalConsole();
+}
+
+async function armTinyLiveFinalConsoleControls() {
+  const phrase = document.getElementById('tlfArmPhrase').value;
+  const reason = document.getElementById('tlfArmReason').value;
+  const operatorId = document.getElementById('operator')?.value || 'local_operator';
+  const res = await fetch('/tiny-live/final-console/controls/arm', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({confirm_final_console_controls_arming: phrase, operator_id: operatorId, reason})
+  });
+  const data = await res.json();
+  document.getElementById('message').textContent = JSON.stringify(data, null, 2);
+  await loadTinyLiveFinalConsole();
 }
 
 async function loadHealth() {

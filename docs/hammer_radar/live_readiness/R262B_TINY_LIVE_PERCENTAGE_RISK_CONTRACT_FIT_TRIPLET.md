@@ -105,6 +105,6 @@ R262B always reports:
 - `secrets_shown=false`
 - `secret_values_in_output=false`
 
-If the regenerated dry preview is valid, the next operator step is R261 controls
-arming review. The next engineering step is R263 final console. R262B itself is
-not a submit phase.
+If the regenerated dry preview is valid, the next operator step is R263 final
+console review and experimental-lane-aware controls arming. R262B itself is not
+a submit phase and does not arm controls.

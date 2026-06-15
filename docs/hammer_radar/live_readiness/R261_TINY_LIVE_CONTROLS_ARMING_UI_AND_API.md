@@ -81,8 +81,11 @@ validation and does not treat controls arming as submit permission.
 
 ## R263 Handoff
 
-After controls are armed and blockers are clear, the next engineering step is
-R263 final submit console. R263 must consume the R262B contract-fit result and
-the R261 arming result, show the final signed triplet quantity and freshness
-age, show all blockers, and present the exact manual submit command without
-auto-submit by default.
+R263 supersedes the older R261 arming phrase for the current final-console
+path because lane intelligence marks the official 8m short lane as paper-only
+and promotion-mismatched by default. R263 requires explicit acceptance of that
+experimental lane context before writing `lane_controls.json`.
+
+After R263 controls arming is recorded, the next engineering step is R264
+actual submit checkpoint. R263 must still report `submit_allowed=false` and
+must not expose an actual submit button.

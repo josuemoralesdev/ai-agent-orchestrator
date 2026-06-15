@@ -1,0 +1,417 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from src.app.hammer_radar.operator import tiny_live_final_console as r263
+
+OFFICIAL = "BTCUSDT|8m|short|ladder_close_50_618"
+SECRET_SENTINEL = "R263_SECRET_SHOULD_NOT_APPEAR"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+REAL_LANE_CONTROLS = REPO_ROOT / "configs" / "hammer_radar" / "lane_controls.json"
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _append_ndjson(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload) + "\n")
+
+
+def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
+    log_dir = tmp_path / "logs"
+    lane_path = tmp_path / "lane_controls.json"
+    risk_path = tmp_path / "tiny_live_risk_contracts.json"
+    _write_json(
+        lane_path,
+        {
+            "schema_version": "1.0",
+            "lanes": [
+                {
+                    "symbol": "BTCUSDT",
+                    "timeframe": "13m",
+                    "direction": "long",
+                    "entry_mode": "ladder_close_50_618",
+                    "mode": "tiny_live",
+                },
+                {
+                    "symbol": "BTCUSDT",
+                    "timeframe": "44m",
+                    "direction": "long",
+                    "entry_mode": "ladder_close_50_618",
+                    "mode": "tiny_live",
+                },
+                {
+                    "symbol": "BTCUSDT",
+                    "timeframe": "8m",
+                    "direction": "short",
+                    "entry_mode": "ladder_close_50_618",
+                    "mode": "paper",
+                },
+            ],
+        },
+    )
+    _write_json(
+        risk_path,
+        {
+            "risk_contracts": [
+                {
+                    "official_lane_key": OFFICIAL,
+                    "symbol": "BTCUSDT",
+                    "timeframe": "8m",
+                    "direction": "short",
+                    "entry_mode": "ladder_close_50_618",
+                    "tiny_live_margin_usdt": 44,
+                    "margin_budget_usdt": 44,
+                    "max_margin_usdt": 44,
+                    "max_loss_usdt": 4.44,
+                    "max_notional_usdt": 440,
+                    "max_position_notional_usdt": 440,
+                    "leverage": 10,
+                    "live_execution_enabled": False,
+                }
+            ]
+        },
+    )
+    _append_ndjson(
+        log_dir / "tiny_live_percentage_risk_contract_fit.ndjson",
+        {
+            "target_scope": {"official_lane_key": OFFICIAL},
+            "contract_fit_record_id": "r262b_test",
+            "percentage_contract_model": {
+                "uses_percentage_model": True,
+                "resolved_values": {
+                    "isolated_risk_wallet_usdt": 88,
+                    "position_margin_pct_of_wallet": 0.5,
+                    "resolved_position_margin_usdt": 44,
+                    "leverage": 10,
+                    "resolved_max_notional_usdt": 440,
+                    "wallet_buffer_usdt": 44,
+                },
+            },
+            "contract_fit_sizing_plan": {
+                "candidate_qty": 0.006,
+                "candidate_notional_usdt": 384.0,
+                "candidate_margin_usdt": 38.4,
+                "candidate_estimated_loss_usdt": 4.44,
+                "fits_max_notional": True,
+                "fits_max_loss": True,
+                "fits_binance_step_size": True,
+                "fits_binance_min_notional": True,
+            },
+            "output_validation": {
+                "valid": True,
+                "risk_contract_valid_after": True,
+                "fresh_signed_request_available": True,
+                "signed_request_fresh_enough_for_dry_preview": True,
+            },
+        },
+    )
+    _append_ndjson(
+        log_dir / "tiny_live_submit_gate_preview.ndjson",
+        {
+            "target_scope": {"official_lane_key": OFFICIAL},
+            "submit_gate_preview_recorded": True,
+            "fresh_signed_request_summary": {"signed_requests_count": 3},
+        },
+    )
+    _append_ndjson(
+        log_dir / "tiny_live_actual_submit_gate.ndjson",
+        {
+            "target_scope": {"official_lane_key": OFFICIAL},
+            "actual_submit_gate_preview_recorded": True,
+            "actual_submit_dry_run_preview": {
+                "orders": {
+                    "main_order": {"side": "SELL", "quantity": 0.006, "type": "MARKET"},
+                    "stop_order": {"side": "BUY", "quantity": 0.006, "reduceOnly": True, "type": "STOP_MARKET"},
+                    "take_profit_order": {
+                        "side": "BUY",
+                        "quantity": 0.006,
+                        "reduceOnly": True,
+                        "type": "TAKE_PROFIT_MARKET",
+                    },
+                }
+            },
+            "risk_contract_submit_summary": {"within_tiny_live_contract": True},
+        },
+    )
+    _append_ndjson(
+        log_dir / "strategy_promotion_status.ndjson",
+        {
+            "promotion_ready": [
+                {
+                    "strategy_key": "BTCUSDT|13m|long|ladder_close_50_618",
+                    "sample_count": 268,
+                    "win_rate_pct": 47.39,
+                    "avg_pnl_pct": 0.0043,
+                    "total_pnl_pct": 1.154,
+                },
+                {
+                    "strategy_key": "BTCUSDT|44m|long|ladder_close_50_618",
+                    "sample_count": 69,
+                    "win_rate_pct": 59.42,
+                    "avg_pnl_pct": 0.0429,
+                    "total_pnl_pct": 2.9622,
+                },
+            ]
+        },
+    )
+    _append_ndjson(
+        log_dir / "readiness_status.ndjson",
+        {
+            "readiness_status": "NOT_READY",
+            "live_execution_enabled": False,
+            "order_placed": False,
+            "blockers": [
+                "no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate",
+                "only expired otherwise-eligible candidates are available",
+            ],
+            "current_state": {
+                "fresh_eligible_count": 0,
+                "expired_eligible_count": 1,
+                "paper_only_count": 2,
+                "latest_candidate_age_minutes": 20.66,
+            },
+        },
+    )
+    return log_dir, lane_path, risk_path
+
+
+def test_cli_preview_returns_json() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            "logs/hammer_radar_forward",
+            "tiny-live-final-console",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["target_scope"]["submit_allowed"] is False
+    assert payload["target_scope"]["order_placed"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+
+
+def test_review_record_exact_phrase_records_review_only(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    before_lane = lane_path.read_text(encoding="utf-8")
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+        record_final_console_review=True,
+        confirm_final_console_review=r263.FINAL_CONSOLE_REVIEW_CONFIRMATION_PHRASE,
+    )
+    assert payload["final_console_review_recorded"] is True
+    assert payload["final_console_controls_armed"] is False
+    assert payload["safety"]["lane_controls_written"] is False
+    assert lane_path.read_text(encoding="utf-8") == before_lane
+    assert (log_dir / r263.LEDGER_FILENAME).exists()
+
+
+def test_wrong_arming_phrase_rejects(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+        arm_controls_from_final_console=True,
+        confirm_final_console_controls_arming="wrong",
+    )
+    assert payload["status"] == r263.TINY_LIVE_FINAL_CONSOLE_ARMING_REJECTED
+    assert payload["confirmation_valid"] is False
+    assert payload["final_console_controls_armed"] is False
+    assert payload["safety"]["lane_controls_written"] is False
+
+
+def test_exact_arming_phrase_records_experimental_acceptance_and_writes_only_lane_controls(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    before_risk = risk_path.read_text(encoding="utf-8")
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+        arm_controls_from_final_console=True,
+        confirm_final_console_controls_arming=r263.FINAL_CONSOLE_CONTROLS_ARMING_CONFIRMATION_PHRASE,
+        operator_id="local_operator",
+        reason="R263 acceptance test",
+    )
+    after_lane = json.loads(lane_path.read_text(encoding="utf-8"))
+    assert payload["final_console_controls_armed"] is True
+    assert payload["operator_choice_panel"]["experimental_lane_acceptance_recorded"] is True
+    assert payload["safety"]["lane_controls_written"] is True
+    assert payload["safety"]["risk_contract_config_written"] is False
+    assert payload["safety"]["submit_attempted"] is False
+    assert payload["safety"]["order_placed"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert risk_path.read_text(encoding="utf-8") == before_risk
+    assert after_lane["lanes"][0]["mode"] == "tiny_live"
+    assert after_lane["lanes"][2]["mode"] == "tiny_live"
+    assert after_lane["lanes"][2]["tiny_live_armed_by_phase"] == "R263"
+    assert after_lane["lanes"][2]["experimental_lane_acceptance_recorded"] is True
+
+
+def test_cli_exact_arming_uses_injected_temp_lane_controls(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    real_before = REAL_LANE_CONTROLS.read_text(encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            str(log_dir),
+            "tiny-live-final-console",
+            "--lane-controls-path",
+            str(lane_path),
+            "--risk-contract-config-path",
+            str(risk_path),
+            "--arm-controls-from-final-console",
+            "--confirm-final-console-controls-arming",
+            r263.FINAL_CONSOLE_CONTROLS_ARMING_CONFIRMATION_PHRASE,
+            "--operator-id",
+            "local_operator",
+            "--reason",
+            "R263 temp path isolation test",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    temp_lane = json.loads(lane_path.read_text(encoding="utf-8"))
+    assert payload["final_console_controls_armed"] is True
+    assert payload["safety"]["lane_controls_written"] is True
+    assert temp_lane["lanes"][2]["mode"] == "tiny_live"
+    assert temp_lane["lanes"][2]["tiny_live_armed_by_phase"] == "R263"
+    assert REAL_LANE_CONTROLS.read_text(encoding="utf-8") == real_before
+
+
+def test_r262b_valid_panel_loads_latest_record(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    panel = payload["contract_fit_panel"]
+    assert panel["r262b_found"] is True
+    assert panel["risk_contract_valid"] is True
+    assert panel["candidate_qty"] == 0.006
+    assert panel["fits_contract"] is True
+
+
+def test_8m_short_lane_marked_paper_only_promotion_mismatched(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    lane = payload["lane_intelligence_panel"]
+    assert lane["execution_lane_timeframe_status"] == "paper_only"
+    assert lane["execution_lane_promotion_status"] == "not_promotion_ready"
+    assert lane["execution_lane_direction_status"] == "experimental_short"
+    assert lane["operator_acceptance_required"] is True
+
+
+def test_promoted_13m_and_44m_lanes_shown(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    promoted = payload["lane_intelligence_panel"]["promoted_lanes"]
+    assert "BTCUSDT|13m|long|ladder_close_50_618" in promoted
+    assert "BTCUSDT|44m|long|ladder_close_50_618" in promoted
+
+
+def test_readiness_not_ready_shown_when_no_fresh_eligible_candidate(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    assert payload["lane_intelligence_panel"]["readiness_status"] == "NOT_READY"
+    assert payload["lane_intelligence_panel"]["fresh_eligible_count"] == 0
+    assert "no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate" in payload["promotion_readiness_panel"]["readiness_blockers"]
+
+
+def test_final_console_blocks_actual_submit(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    assert payload["final_console_go_no_go_packet"]["go_for_actual_submit_now"] is False
+    assert payload["final_console_go_no_go_packet"]["operator_should_submit_now"] is False
+    assert payload["target_scope"]["submit_allowed"] is False
+    assert payload["final_console_matrix"]["submit_allowed"] is False
+
+
+def test_api_get_final_console_returns_json() -> None:
+    from fastapi.testclient import TestClient
+
+    from src.app.hammer_radar.operator.approval_api import app
+
+    client = TestClient(app)
+    response = client.get("/tiny-live/final-console")
+    assert response.status_code == 200
+    assert response.json()["target_scope"]["submit_allowed"] is False
+
+
+def test_api_post_arm_requires_exact_phrase() -> None:
+    from fastapi.testclient import TestClient
+
+    from src.app.hammer_radar.operator.approval_api import app
+
+    client = TestClient(app)
+    response = client.post(
+        "/tiny-live/final-console/controls/arm",
+        json={"confirm_final_console_controls_arming": "wrong", "operator_id": "test"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["confirmation_valid"] is False
+    assert body["final_console_controls_armed"] is False
+
+
+def test_ui_contains_no_actual_submit_button() -> None:
+    from src.app.hammer_radar.operator.approval_api import _operator_ui_html
+
+    html = _operator_ui_html()
+    section = html.split('<section id="tinyLiveFinalConsole"', 1)[1].split("</section>", 1)[0]
+    assert "NO SUBMIT FROM THIS SCREEN" in section
+    assert "actual submit" not in section.lower()
+    assert "button onclick=\"armTinyLiveFinalConsoleControls()\"" in section
+
+
+def test_no_secrets_in_output(tmp_path: Path, monkeypatch) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    monkeypatch.setenv("BINANCE_API_KEY", SECRET_SENTINEL)
+    monkeypatch.setenv("BINANCE_API_SECRET", SECRET_SENTINEL)
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+    raw = json.dumps(payload, sort_keys=True)
+    assert SECRET_SENTINEL not in raw
+    assert "BINANCE_API_KEY" not in raw
+    assert "BINANCE_API_SECRET" not in raw
+    assert all(value not in raw for value in os.environ.values() if value == SECRET_SENTINEL)
