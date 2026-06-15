@@ -211,6 +211,8 @@ def build_tiny_live_actual_submit_reconciliation(
             freshness=freshness,
             idempotency=idempotency,
         )
+        if execute_actual_live_submit and risk.get("live_execution_enabled") is not True:
+            blocked_by = _dedupe([*blocked_by, "live_execution_not_enabled"])
         if execute_actual_live_submit and not allow_binance_order_endpoint:
             blocked_by = _dedupe([*blocked_by, "allow_binance_order_endpoint_flag_required"])
         if execute_actual_live_submit and not confirmation_valid:
@@ -446,9 +448,15 @@ def validate_contract_fit_triplet_shape(signed_triplet: Mapping[str, Any]) -> di
     take = triplet.get("take_profit_order") if isinstance(triplet.get("take_profit_order"), Mapping) else {}
     signed_requests = signed_triplet.get("signed_requests") if isinstance(signed_triplet.get("signed_requests"), Mapping) else {}
     exact_three = len(signed_requests) == 3 and all(key in signed_requests for key in _ORDER_KEYS)
-    main_valid = _upper(main.get("side")) == "SELL" and _upper(main.get("type")) == "MARKET" and _qty(main.get("quantity")) == 0.006
-    stop_valid = _exit_valid(stop, "STOP_MARKET")
-    take_valid = _exit_valid(take, "TAKE_PROFIT_MARKET")
+    main_qty = _qty(main.get("quantity"))
+    main_valid = (
+        _upper(main.get("side")) == "SELL"
+        and _upper(main.get("type")) == "MARKET"
+        and main_qty is not None
+        and main_qty > 0
+    )
+    stop_valid = _exit_valid(stop, "STOP_MARKET", expected_qty=main_qty)
+    take_valid = _exit_valid(take, "TAKE_PROFIT_MARKET", expected_qty=main_qty)
     reduce_only = stop.get("reduceOnly") is True and take.get("reduceOnly") is True
     same_symbol = all(_order_symbol(order) == "BTCUSDT" for order in (main, stop, take))
     endpoint_ok = all(
@@ -493,7 +501,7 @@ def validate_contract_fit_risk(
         candidate_reference_price=reference_price,
         candidate_notional_usdt=candidate_notional,
         candidate_estimated_loss_usdt=sizing.get("candidate_estimated_loss_usdt"),
-        require_live_execution_enabled=True,
+        require_live_execution_enabled=False,
     )
     config_valid = risk_summary.get("valid") is True
     r262b_valid = (
@@ -502,7 +510,7 @@ def validate_contract_fit_risk(
         and validation.get("risk_contract_valid_after") is True
         and sizing.get("fits_max_notional") is True
         and sizing.get("fits_max_loss") is True
-        and _qty(sizing.get("candidate_qty")) == 0.006
+        and _candidate_qty_matches_sizing(candidate_qty=candidate_qty, sizing=sizing)
     )
     blocked_by: list[str] = []
     if not latest_r262b_contract_fit:
@@ -517,6 +525,7 @@ def validate_contract_fit_risk(
         "r262b_contract_fit_valid": bool(r262b_valid),
         "risk_contract_config_valid": bool(config_valid),
         "risk_contract_interpretation": risk_summary,
+        "live_execution_enabled": risk_summary.get("live_execution_enabled") is True,
         "blocked_by": _dedupe(blocked_by),
     }
 
@@ -1028,8 +1037,23 @@ def _triplet_blockers(*flags: bool) -> list[str]:
     return [name for flag, name in zip(flags, names, strict=True) if not flag]
 
 
-def _exit_valid(order: Mapping[str, Any], expected_type: str) -> bool:
-    return _upper(order.get("side")) == "BUY" and _upper(order.get("type")) == expected_type and _qty(order.get("quantity")) == 0.006
+def _exit_valid(order: Mapping[str, Any], expected_type: str, *, expected_qty: float | None) -> bool:
+    qty = _qty(order.get("quantity"))
+    return (
+        _upper(order.get("side")) == "BUY"
+        and _upper(order.get("type")) == expected_type
+        and expected_qty is not None
+        and qty == expected_qty
+    )
+
+
+def _candidate_qty_matches_sizing(*, candidate_qty: float | None, sizing: Mapping[str, Any]) -> bool:
+    sizing_qty = _qty(sizing.get("candidate_qty"))
+    if candidate_qty is None or candidate_qty <= 0:
+        return False
+    if sizing_qty is None:
+        return True
+    return candidate_qty == sizing_qty
 
 
 def _order_symbol(order: Mapping[str, Any]) -> str | None:

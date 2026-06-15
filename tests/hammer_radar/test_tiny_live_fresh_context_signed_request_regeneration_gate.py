@@ -75,7 +75,7 @@ def test_cli_exists_and_returns_json(tmp_path: Path, monkeypatch) -> None:
     assert payload["target_scope"]["official_lane_key"] == OFFICIAL
     assert payload["input_summary"]["r253_regeneration_required"] is True
     assert payload["fresh_context_regeneration_written"] is False
-    assert "quantity_invalid" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
+    assert "exact_fresh_context_regeneration_confirmation_required" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
     assert payload["safety"]["network_allowed"] is False
     _assert_no_secret_values(payload)
 
@@ -89,7 +89,7 @@ def test_preview_writes_no_ledger_and_does_not_sign(tmp_path: Path, monkeypatch)
     assert payload["status"] == TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_BLOCKED
     assert payload["regenerate_fresh_context_signed_request_requested"] is False
     assert payload["fresh_context_regeneration_written"] is False
-    assert "quantity_invalid" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
+    assert "exact_fresh_context_regeneration_confirmation_required" in payload["fresh_regeneration_gate_matrix"]["blocked_by"]
     assert payload["safety"]["hmac_signature_created"] is False
     assert _ledger_counts(log_dir) == before
     assert not (log_dir / LEDGER_FILENAME).exists()

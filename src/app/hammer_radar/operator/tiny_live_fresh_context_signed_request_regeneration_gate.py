@@ -288,7 +288,7 @@ def build_tiny_live_fresh_context_signed_request_regeneration_gate(
                     status = TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_WRITTEN
                     overall = TINY_LIVE_FRESH_CONTEXT_REGENERATION_WRITTEN_R254_PREVIEW_REQUIRED
         else:
-            status = TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_READY
+            status = TINY_LIVE_FRESH_CONTEXT_SIGNED_REQUEST_REGENERATION_GATE_BLOCKED
             overall = TINY_LIVE_FRESH_CONTEXT_REGENERATION_READY_FOR_CONFIRMATION
 
         matrix = build_fresh_regeneration_gate_matrix(

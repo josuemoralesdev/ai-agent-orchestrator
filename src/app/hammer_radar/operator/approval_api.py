@@ -1007,9 +1007,9 @@ def trade_ticket(
     signal_id: str | None = None,
     latest_only: bool = True,
     allow_short: bool = False,
-    max_position_usd: float = Query(default=DEFAULT_MAX_POSITION_USD, gt=0),
+    max_position_usd: float | None = Query(default=None, gt=0),
     max_risk_usd: float = Query(default=5.0, gt=0),
-    max_leverage: float = Query(default=DEFAULT_MAX_LEVERAGE, gt=0),
+    max_leverage: float | None = Query(default=None, gt=0),
     fresh_minutes: int = Query(default=30, ge=0),
 ) -> dict:
     return build_trade_ticket(
@@ -3470,7 +3470,7 @@ def _operator_ui_html() -> str:
         <div><div class="label">live_execution_enabled</div><div id="readinessLive" class="value danger">false</div></div>
         <div><div class="label">order_placed</div><div id="readinessOrder" class="value danger">false</div></div>
       </div>
-      <p><strong>Protocol:</strong> 44 USDT max, 2x preferred, 3x max, isolated margin, max 1 manual tiny-live trade per day, stop after 1 loss or -5 USDT.</p>
+      <p><strong>Protocol:</strong> R267 BTCUSDT tiny live uses 80 USDT max notional, visible 10x leverage, about 8 USDT derived margin, isolated margin, max 1 manual tiny-live trade per day, stop after 1 loss or -5 USDT.</p>
       <p id="readinessReason">loading</p>
       <p><strong>Blockers:</strong> <span id="readinessBlockers">loading</span></p>
       <p><strong>Next required action:</strong> <span id="nextAction">loading</span></p>
@@ -3544,7 +3544,7 @@ def _operator_ui_html() -> str:
       <p><strong>Failed gates:</strong> <span id="liveSafetyFailed">loading</span></p>
       <p><strong>Passed gates:</strong> <span id="liveSafetyPassed">loading</span></p>
       <p><strong>Next required action:</strong> <span id="liveSafetyNext">loading</span></p>
-      <p><strong>Protocol:</strong> <span id="liveSafetyProtocol">44 USDT max, 2x preferred, 3x max, isolated margin, 1 trade/day, stop after -5 USDT or 1 loss.</span></p>
+      <p><strong>Protocol:</strong> <span id="liveSafetyProtocol">R267 BTCUSDT 80 USDT max notional, 10x visible leverage, about 8 USDT derived margin, isolated margin, 1 trade/day, stop after -5 USDT or 1 loss.</span></p>
       <p class="muted">Live execution is disabled. Kill switch is active by default. No live order can be placed from this system in the current mode. This panel is a safety pre-check only.</p>
     </section>
 

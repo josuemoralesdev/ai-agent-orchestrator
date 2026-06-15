@@ -82,12 +82,14 @@ def test_exact_confirmation_orchestrates_r262b_r263_r264_and_records(tmp_path: P
     assert payload["status"] == r264b.TINY_LIVE_JIT_LAUNCH_PACKET_RECORDED
     assert payload["jit_launch_packet_recorded"] is True
     assert payload["jit_validation"]["valid"] is True
-    assert payload["jit_go_no_go_packet"]["go_for_manual_live_submit_command"] is True
+    assert payload["jit_go_no_go_packet"]["go_for_manual_live_submit_command"] is False
+    assert payload["jit_go_no_go_packet"]["next_required_step"] == "FINAL_COMMAND_UNAVAILABLE_R267"
+    assert payload["final_live_submit_command_packet"]["available"] is False
     assert (tmp_path / "logs" / r264b.LEDGER_FILENAME).exists()
     _assert_no_submit_safety(payload)
 
 
-def test_successful_jit_packet_emits_final_manual_command(tmp_path: Path, monkeypatch) -> None:
+def test_successful_jit_packet_keeps_final_manual_command_unavailable(tmp_path: Path, monkeypatch) -> None:
     _patch_success(monkeypatch)
     payload = r264b.build_tiny_live_jit_launch_packet(
         log_dir=tmp_path / "logs",
@@ -97,13 +99,13 @@ def test_successful_jit_packet_emits_final_manual_command(tmp_path: Path, monkey
         now=NOW,
     )
     command = payload["final_live_submit_command_packet"]
-    assert command["available"] is True
+    assert command["available"] is False
     assert command["must_be_run_manually_by_operator"] is True
     assert command["do_not_run_from_codex"] is True
-    assert "tiny-live-actual-submit-reconcile" in command["command"]
-    assert "--execute-actual-live-submit" in command["command"]
+    assert command["command"] == ""
+    assert command["unavailable_reason"].startswith("R267 keeps final live submit command unavailable")
     assert r264b.LIVE_SUBMIT_CONFIRMATION_PHRASE in command["confirmation_phrase"]
-    assert command["expected_orders"]["main"] == "SELL MARKET 0.006 BTC"
+    assert "80 USDT notional cap" in command["expected_orders"]["main"]
 
 
 def test_no_binance_order_private_or_account_calls_and_no_actual_submit(tmp_path: Path, monkeypatch) -> None:
@@ -247,7 +249,7 @@ def _r262b_ok() -> dict:
         "risk_contract_valid": True,
         "signed_triplet_fresh": True,
         "candidate_qty": 0.006,
-        "candidate_notional_usdt": 384.0,
+        "candidate_notional_usdt": 64.0,
         "blocked_by": [],
         "safety": {
             "risk_contract_config_written": True,

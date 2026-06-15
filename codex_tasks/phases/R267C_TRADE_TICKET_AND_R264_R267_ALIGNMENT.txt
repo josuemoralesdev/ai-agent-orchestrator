@@ -1,0 +1,113 @@
+# R267C — Align Trade Ticket and R264 Dry Preview With R267 10x / 80 USDT Tiny Live Contract
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: WIRING / SAFETY HARDENING
+  Secondary: DIAGNOSTIC, UI CONSISTENCY, R264 VALIDATOR ALIGNMENT
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R267 set the active BTCUSDT tiny-live contract to:
+    - tiny_live_contract_mode: explicit_notional_cap_with_leverage
+    - max_position_notional_usdt: 80.0
+    - leverage: 10.0
+    - derived margin budget: 8.0
+  Final console reports this correctly:
+    - risk_contract_valid=true
+    - clears_exchange_minimum=true
+  But /trade-ticket still reports max_position_usd=44.0.
+  Also R264 dry preview still blocks with risk_contract_config_invalid and order shape invalid, despite R262B seeing a valid 80/10x contract.
+
+Hard goal:
+  Make every operator-facing surface agree on the R267 contract:
+    - /tiny-live/final-console
+    - /trade-ticket
+    - R262B
+    - R264 dry preview
+    - JIT launch packet
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT make final live submit command available.
+  - Do NOT mutate external env files.
+  - Keep order_placed=false, submit_attempted=false, binance_order_endpoint_called=false, real_order_placed=false.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/tiny_live_percentage_risk_contract_fit_regeneration.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar touching trade_ticket, actual_submit, jit_launch, final_console, risk_contract
+
+Implementation:
+  1. Trade ticket:
+     - Wire /trade-ticket to use the active shared R267 risk contract cap.
+     - Even when BLOCKED due to no fresh candidate, it must show:
+         max_position_usd: 80.0
+         active_contract_mode: explicit_notional_cap_with_leverage if such field exists or can be safely added
+         active_contract_leverage: 10.0 if such field exists or can be safely added
+     - Keep ticket_status=BLOCKED if no fresh candidate.
+
+  2. R264 dry preview:
+     - Make R264 consume the same shared risk contract interpretation as R262B/final console.
+     - A valid 80/10x contract must not produce:
+         risk_contract_config_invalid
+         r262b_contract_fit_invalid
+         main_order_shape_invalid
+         stop_order_shape_invalid
+         take_profit_order_shape_invalid
+       merely because live_execution_enabled=false.
+     - If live execution is disabled, block separately as:
+         live_execution_not_enabled
+       or equivalent existing live safety blocker.
+     - Final submit command must remain unavailable in R267C.
+
+  3. JIT:
+     - JIT should report R262B valid and R264 dry preview valid or cleanly safety-blocked.
+     - If blocked, blockers should be expected safety/freshness/live gates, not stale risk contract mismatch.
+     - Keep final_live_submit_command_packet.available=false.
+
+  4. Tests:
+     Add/update tests proving:
+       - /trade-ticket blocked state surfaces 80 not 44.
+       - R264 accepts 80/10x contract shape.
+       - live_execution_enabled=false is not mislabeled as risk_contract_config_invalid.
+       - final command remains unavailable.
+       - safety flags remain false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "trade_ticket or tiny_live or actual_submit or jit_launch or final_console"
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-jit-launch-packet \
+    --run-jit-launch-prep \
+    --record-jit-launch-packet \
+    --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+    --operator-id local_operator \
+    --reason "R267C alignment verification; no submit."
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{ticket_status,max_position_usd,suggested_leverage,blockers,live_execution_enabled,order_placed}'
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{risk_contract_interpretation,latest_r264_dry_preview,final_command_available,safety}'
+
+Report:
+  - files changed
+  - /trade-ticket cap before/after
+  - R264 blockers before/after
+  - current JIT blockers
+  - tests/smokes
+  - final command availability
+  - safety confirmation

@@ -765,6 +765,26 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
 
+    def test_trade_ticket_blocked_without_candidate_uses_active_r267_cap(self) -> None:
+        risk_path = self._write_r267_risk_contract()
+
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path):
+            response = self.client.get("/trade-ticket")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("BLOCKED", payload["ticket_status"])
+        self.assertEqual("NOT_READY", payload["readiness_status"])
+        self.assertEqual(80.0, payload["max_position_usd"])
+        self.assertEqual("explicit_notional_cap_with_leverage", payload["active_contract_mode"])
+        self.assertEqual(10.0, payload["active_contract_leverage"])
+        self.assertIsNone(payload["suggested_leverage"])
+        self.assertEqual(80.0, payload["risk_contract"]["max_position_usd"])
+        self.assertEqual(10.0, payload["risk_contract"]["suggested_leverage"])
+        self.assertTrue(payload["risk_contract"]["risk_contract_valid"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
     def test_trade_ticket_returns_proposed_with_fresh_eligible_candidate(self) -> None:
         archive.append_signal(self._eligible_signal(signal_id="eligible|ticket"), log_dir=self.log_dir)
 
@@ -783,6 +803,33 @@ class ApprovalApiTestCase(unittest.TestCase):
         self.assertEqual(44.0, payload["suggested_position_usd"])
         self.assertEqual(2.0, payload["suggested_leverage"])
         self.assertEqual("isolated", payload["margin_mode"])
+        self.assertFalse(payload["live_execution_enabled"])
+        self.assertFalse(payload["order_placed"])
+
+    def test_trade_ticket_short_r267_candidate_uses_contract_cap_and_leverage(self) -> None:
+        risk_path = self._write_r267_risk_contract()
+        archive.append_signal(
+            self._eligible_signal(
+                signal_id="eligible|r267-short-ticket",
+                timeframe="8m",
+                direction="short",
+                bias_direction="bearish",
+                trend_direction="bearish",
+                divergence_type="bearish",
+            ),
+            log_dir=self.log_dir,
+        )
+
+        with patch("src.app.hammer_radar.operator.trade_ticket.DEFAULT_RISK_CONTRACT_CONFIG_PATH", risk_path):
+            response = self.client.get("/trade-ticket?allow_short=true")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual(80.0, payload["max_position_usd"])
+        self.assertEqual(80.0, payload["suggested_position_usd"])
+        self.assertEqual(10.0, payload["suggested_leverage"])
+        self.assertEqual(80.0, payload["risk_contract"]["max_position_usd"])
+        self.assertTrue(payload["risk_contract"]["risk_contract_valid"])
         self.assertFalse(payload["live_execution_enabled"])
         self.assertFalse(payload["order_placed"])
 
@@ -1729,6 +1776,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         *,
         signal_id: str,
         symbol: str = "BTCUSDT",
+        timeframe: str = "13m",
         direction: str = "long",
         tradable: bool = True,
         reject_reason: str | None = None,
@@ -1745,7 +1793,7 @@ class ApprovalApiTestCase(unittest.TestCase):
         return SignalRecord(
             signal_id=signal_id,
             symbol=symbol,
-            timeframe="13m",
+            timeframe=timeframe,
             direction=direction,
             timestamp=timestamp or (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
             hammer_strength=hammer_strength,
@@ -1774,6 +1822,34 @@ class ApprovalApiTestCase(unittest.TestCase):
             divergence_type=divergence_type,
             divergence_confirmed=divergence_confirmed,
         )
+
+    def _write_r267_risk_contract(self) -> Path:
+        path = self.log_dir / "tiny_live_risk_contracts.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "risk_contracts": [
+                        {
+                            "official_lane_key": "BTCUSDT|8m|short|ladder_close_50_618",
+                            "symbol": "BTCUSDT",
+                            "timeframe": "8m",
+                            "direction": "short",
+                            "entry_mode": "ladder_close_50_618",
+                            "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
+                            "max_position_notional_usdt": 80.0,
+                            "max_notional_usdt": 80.0,
+                            "margin_budget_usdt": 8.0,
+                            "tiny_live_margin_usdt": 8.0,
+                            "leverage": 10.0,
+                            "max_loss_usdt": 4.44,
+                            "live_execution_enabled": False,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return path
 
 
 if __name__ == "__main__":

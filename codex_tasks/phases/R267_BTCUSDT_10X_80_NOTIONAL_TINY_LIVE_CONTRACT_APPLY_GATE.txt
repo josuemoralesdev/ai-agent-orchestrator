@@ -1,0 +1,158 @@
+# R267 — BTCUSDT 10x / 80 USDT Notional Tiny Live Contract Apply Gate
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: SAFETY HARDENING / RISK CONTRACT APPLY GATE
+  Secondary: WIRING, UI CLARITY, DIAGNOSTIC
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R265/R266 reconciled the meaning of "tiny live":
+    - 44 USDT can no longer secretly mean 44 margin at 10x = ~440 notional.
+    - 44 USDT is treated as a position/notional cap.
+    - BTCUSDT 44 USDT proper tiny is below exchange minimum.
+    - R266 observed BTCUSDT minimum order notional around 67 USDT.
+  Operator has now explicitly decided:
+    - 10x leverage is intentional.
+    - The tiny-live BTCUSDT notional cap should be 80 USDT.
+    - This means roughly 8 USDT margin at 10x.
+    - The contract must stay explicit, visible, and not hidden behind leverage semantics.
+
+Hard goal:
+  Apply an explicit BTCUSDT tiny-live risk contract:
+    - max_position_notional_usdt: 80.0
+    - max_notional_usdt: 80.0
+    - leverage: 10.0
+    - contract mode: explicit_notional_cap_with_leverage
+    - margin budget derived/surfaced around 8.0 USDT, not treated as the cap source
+    - live execution still disabled
+    - final command still unavailable
+    - no order placement
+    - no Binance order endpoint calls
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution globally.
+  - Do NOT disable kill switches.
+  - Do NOT print or persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT make the final live submit command available in this phase.
+  - Do NOT arm a live submit path from Codex.
+  - Do NOT use 10x to exceed 80 USDT notional.
+  - If any uncertainty exists, remain BLOCKED.
+
+Required capability scan first:
+  Inspect and summarize current behavior in:
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_percentage_risk_contract_fit_regeneration.py
+    - src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - R265/R266 tests touching tiny_live risk contract/final console/JIT/R264
+
+Implementation scope:
+  1. Contract semantics:
+     - Update BTCUSDT|8m|short|ladder_close_50_618 risk contract to explicitly encode:
+       tiny_live_contract_mode: "explicit_notional_cap_with_leverage"
+       max_position_notional_usdt: 80.0
+       max_notional_usdt: 80.0
+       leverage: 10.0
+       margin_budget_usdt: 8.0 or derived equivalent
+       max_notional_multiplier_of_position_margin: 10.0 only if it cannot create ambiguity
+     - Add explicit operator note:
+       "R267 operator decision: 10x is intentional, but BTCUSDT tiny live is capped at 80 USDT notional, not hidden margin expansion."
+     - Preserve max loss constraints. If existing 4.44 USDT max loss is too high/too loose for 80 notional, surface it clearly but do not silently loosen/tighten without tests.
+     - Ensure 80 notional clears exchange minimum when mark price/minimum data is available; otherwise keep a warning but do not submit.
+
+  2. Shared validator:
+     - Extend the shared validator so all R262B/R263/R264/JIT/UI paths agree that:
+       - 80 USDT is the maximum notional cap.
+       - 10x is allowed only within that explicit notional cap.
+       - margin is derived from notional/leverage.
+       - 44 is no longer the active BTCUSDT 8m short cap after R267.
+     - The validator must reject any candidate notional > 80.0.
+     - The validator must continue blocking if candidate qty rounds above the cap.
+     - The validator must continue blocking if order qty is zero/below exchange minimum.
+
+  3. UI:
+     - Extend /operator/tiny-live/final-console and JSON route to show:
+       - contract mode: explicit_notional_cap_with_leverage
+       - max notional: 80
+       - leverage: 10
+       - derived margin: about 8
+       - exchange minimum notional
+       - whether 80 clears exchange minimum
+       - final command available: false
+       - submit allowed: false
+       - order placed: false
+       - binance order endpoint called: false
+     - UI remains read-only.
+     - No submit button.
+
+  4. JIT behavior:
+     - R267 must not make final submit available.
+     - The next JIT run should be able to report:
+       - risk contract valid if 80 clears exchange minimum,
+       - still blocked by no fresh eligible candidate if no fresh candidate exists,
+       - still blocked by live_execution_not_enabled,
+       - final command unavailable.
+     - If a fresh candidate exists, R267 still must not submit. It can only report readiness improvements.
+
+  5. Tests:
+     Add/update tests proving:
+       - 10x with 80 USDT notional is accepted.
+       - 10x does not permit 800 USDT notional.
+       - candidate notional >80 is rejected.
+       - 80 clears the exchange-minimum blocker when min notional is below 80.
+       - below-exchange-minimum remains blocked if minimum >80.
+       - final console is read-only.
+       - final command unavailable in R267.
+       - safety flags remain:
+         order_placed=false
+         submit_attempted=false
+         binance_order_endpoint_called=false
+         real_order_placed=false
+         secrets_shown=false
+
+Validation:
+  Run:
+    PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or final_console or risk_contract or jit_launch or actual_submit"
+
+  Smoke:
+    systemctl is-active hammer-approval-api.service || true
+
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+      --log-dir logs/hammer_radar_forward \
+      tiny-live-jit-launch-packet \
+      --run-jit-launch-prep \
+      --record-jit-launch-packet \
+      --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+      --operator-id local_operator \
+      --reason "R267 10x 80 USDT notional tiny-live contract verification; no submit."
+
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+    curl -s http://127.0.0.1:8015/operator/tiny-live/final-console | head -120
+    curl -s http://127.0.0.1:8015/readiness | jq .
+    curl -s http://127.0.0.1:8015/trade-ticket | jq .
+
+Report back:
+  - files changed
+  - exact risk contract values after R267
+  - whether 80 USDT clears BTCUSDT exchange minimum
+  - whether 10x is visible and bounded by 80 notional
+  - current JIT blocker list
+  - whether fresh candidate is available
+  - final go/no-go
+  - tests/smokes
+  - confirm no live orders, no submit attempts, no Binance order endpoint calls

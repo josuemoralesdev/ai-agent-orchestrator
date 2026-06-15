@@ -1,0 +1,69 @@
+# R267B — Trade Ticket Alignment With R267 10x / 80 USDT Tiny Live Contract
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: WIRING / SAFETY HARDENING
+  Secondary: DIAGNOSTIC, UI CONSISTENCY
+  Duplicate risk level: LOW
+
+Why this phase exists:
+  R267 updated the BTCUSDT tiny-live risk contract to:
+    - tiny_live_contract_mode: explicit_notional_cap_with_leverage
+    - max_position_notional_usdt: 80.0
+    - leverage: 10.0
+    - derived margin budget: 8.0
+  The final console sees this correctly and reports risk_contract_valid=true.
+  However, /trade-ticket still reports max_position_usd=44.0, creating an operator-facing mismatch before live.
+
+Hard goal:
+  Make /trade-ticket and any ticket-building path use the shared R267 risk contract validator/cap so operator-facing max_position_usd reflects the active explicit 80 USDT notional cap when the relevant lane is BTCUSDT 8m short ladder_close_50_618.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switch.
+  - Do NOT make final submit command available.
+  - Do NOT mutate external env files.
+  - Keep order_placed=false, submit_attempted=false, binance_order_endpoint_called=false.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar touching trade_ticket or tiny live ticket output
+
+Implementation:
+  - Reuse the shared R267 validator/helper.
+  - Do not duplicate risk contract parsing.
+  - /trade-ticket should surface:
+      max_position_usd: 80.0
+      suggested_leverage: 10.0 only when a valid candidate exists and ticket is otherwise buildable, or include a contract panel/field if no candidate exists.
+  - If no fresh candidate exists, ticket remains BLOCKED.
+  - Even while BLOCKED, the displayed cap must reflect the active risk contract, not stale protocol default 44.
+  - Add/update tests proving:
+      - no fresh candidate keeps /trade-ticket BLOCKED
+      - max_position_usd reflects active R267 80 notional cap
+      - live_execution_enabled=false
+      - order_placed=false
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "trade_ticket or tiny_live or final_console or jit_launch"
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.risk_contract_interpretation, .latest_r264_dry_preview, .safety'
+
+Report:
+  - files changed
+  - old trade-ticket cap
+  - new trade-ticket cap
+  - whether ticket remains BLOCKED due to no fresh candidate
+  - safety confirmation

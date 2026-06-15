@@ -195,6 +195,7 @@ def build_tiny_live_live_authorization_preview(
         status = (
             TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW_READY
             if overall == TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW_READY_FOR_FUTURE_GATE
+            and record_authorization_preview
             else TINY_LIVE_LIVE_AUTHORIZATION_PREVIEW_BLOCKED
         )
         if record_authorization_preview and not confirmation_valid:

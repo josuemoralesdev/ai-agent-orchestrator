@@ -356,6 +356,46 @@ def test_r262b_valid_panel_loads_latest_record(tmp_path: Path) -> None:
     assert panel["fits_contract"] is True
 
 
+def test_r267_final_console_surfaces_80_notional_10x_and_readonly_safety(tmp_path: Path) -> None:
+    log_dir, lane_path, risk_path = _fixture(tmp_path)
+    risk = json.loads(risk_path.read_text(encoding="utf-8"))
+    row = risk["risk_contracts"][0]
+    row.update(
+        {
+            "tiny_live_contract_mode": "explicit_notional_cap_with_leverage",
+            "max_position_notional_usdt": 80.0,
+            "max_notional_usdt": 80.0,
+            "leverage": 10.0,
+            "margin_budget_usdt": 8.0,
+            "tiny_live_margin_usdt": 8.0,
+        }
+    )
+    risk_path.write_text(json.dumps(risk), encoding="utf-8")
+    _append_exchange_minimum_record(log_dir, mark_price=67000.0)
+
+    payload = r263.build_tiny_live_final_console(
+        log_dir=log_dir,
+        lane_controls_path=lane_path,
+        risk_contract_config_path=risk_path,
+    )
+
+    interpretation = payload["risk_contract_interpretation"]
+    exchange = payload["exchange_minimum_decision_packet"]
+    assert interpretation["tiny_live_contract_mode"] == "explicit_notional_cap_with_leverage"
+    assert interpretation["max_position_notional_usdt"] == 80.0
+    assert interpretation["leverage"] == 10.0
+    assert interpretation["derived_margin_budget_usdt"] == 8.0
+    assert exchange["configured_cap_clears_exchange_minimum"] is True
+    assert payload["final_command_available"] is False
+    assert payload["submit_allowed"] is False
+    assert payload["submit_attempted"] is False
+    assert payload["order_placed"] is False
+    assert payload["real_order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+    assert payload["binance_test_order_endpoint_called"] is False
+    assert payload["secrets_shown"] is False
+
+
 def test_8m_short_lane_marked_paper_only_promotion_mismatched(tmp_path: Path) -> None:
     log_dir, lane_path, risk_path = _fixture(tmp_path)
     payload = r263.build_tiny_live_final_console(

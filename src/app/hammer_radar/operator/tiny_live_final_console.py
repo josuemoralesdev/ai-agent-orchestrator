@@ -307,7 +307,10 @@ def build_tiny_live_final_console(
                     "direction": direction,
                     "final_console_only": True,
                     "submit_allowed": False,
+                    "final_command_available": False,
                     "order_placed": False,
+                    "real_order_placed": False,
+                    "submit_attempted": False,
                     "binance_order_endpoint_called": False,
                 },
                 "contract_fit_panel": contract_fit_panel,
@@ -325,8 +328,12 @@ def build_tiny_live_final_console(
                 "operator_access": build_final_console_operator_access(),
                 "trade_ticket_status": "BLOCKED" if readiness_snapshot.get("readiness_status") != "READY" else "CHECK_REQUIRED",
                 "final_command_available": False,
+                "submit_allowed": False,
+                "submit_attempted": False,
                 "order_placed": False,
+                "real_order_placed": False,
                 "binance_order_endpoint_called": False,
+                "binance_test_order_endpoint_called": False,
                 "secrets_shown": False,
                 "final_console_overall_status": overall,
                 "recommended_next_operator_move": _recommended_next_operator_move(go_no_go, overall),
@@ -484,6 +491,7 @@ def build_final_console_exchange_minimum_decision_packet(
         "symbol": _lane_parts(official_lane_key)[0] or "BTCUSDT",
         "configured_proper_tiny_cap_usdt": configured_cap,
         "configured_cap_possible": False,
+        "configured_cap_clears_exchange_minimum": False,
         "configured_cap_blocked_by": ["exchange_minimum_readonly_snapshot_missing"],
         "block_reason": "exchange_minimum_readonly_snapshot_missing",
         "min_quantity": None,
@@ -952,7 +960,8 @@ def render_tiny_live_final_console_html() -> str:
   <header>
     <h1>Tiny Live Final Console</h1>
       <div class="label">Read only · no live submit button · localhost/private tunnel only</div>
-      <div class="label">proper_tiny_live_below_exchange_minimum means the configured 44 USDT cap is smaller than the public BTCUSDT minimum valid order.</div>
+      <div class="label">R267: 80 USDT max notional, 10x visible leverage, derived margin about 8 USDT, no live submit command.</div>
+      <div class="label">proper_tiny_live_below_exchange_minimum remains the blocker when the configured notional cap is smaller than the BTCUSDT minimum valid order.</div>
   </header>
   <main>
     <section id="summary" class="panel danger"></section>
@@ -1003,10 +1012,11 @@ def render_tiny_live_final_console_html() -> str:
       ].join('');
       document.getElementById('risk').innerHTML = [
         row('contract mode', risk.tiny_live_contract_mode),
-        row('44 USDT means', risk.forty_four_usdt_meaning),
+        row('contract note', risk.forty_four_usdt_meaning),
         row('max notional', risk.max_position_notional_usdt),
         row('configured notional', risk.configured_max_position_notional_usdt),
         row('margin budget', risk.margin_budget_usdt),
+        row('derived margin', risk.derived_margin_budget_usdt),
         row('leverage', risk.leverage),
         row('estimated loss', risk.candidate_estimated_loss_usdt),
         row('stop-distance loss', risk.stop_distance_loss_usdt),
@@ -1021,6 +1031,7 @@ def render_tiny_live_final_console_html() -> str:
         row('mark price', exchange.mark_price),
         row('minimum valid quantity', exchange.minimum_valid_quantity_after_rounding),
         row('exchange minimum notional', exchange.minimum_valid_notional_after_rounding),
+        row('configured cap clears minimum', yn(exchange.configured_cap_clears_exchange_minimum), exchange.configured_cap_clears_exchange_minimum ? 'ok' : 'bad'),
         row('wallet funded context', exchange.wallet_funded_amount_usdt ?? 'unknown/not checked'),
         row('126 USDT enough', exchange.wallet_supports_exchange_minimum_tiny ?? 'unknown/not checked', exchange.wallet_supports_exchange_minimum_tiny === true ? 'ok' : 'warn'),
         row('recommended decision', exchange.recommended_operator_decision),
@@ -1044,7 +1055,10 @@ def render_tiny_live_final_console_html() -> str:
       ].join('');
       document.getElementById('safety').innerHTML = [
         row('order placed', yn(data.order_placed), 'ok'),
+        row('real order placed', yn(data.real_order_placed), 'ok'),
+        row('submit attempted', yn(data.submit_attempted), 'ok'),
         row('Binance order endpoint called', yn(data.binance_order_endpoint_called), 'ok'),
+        row('Binance test order endpoint called', yn(data.binance_test_order_endpoint_called), 'ok'),
         row('secrets shown', yn(data.secrets_shown), 'ok'),
         row('submit allowed', yn((data.final_console_matrix || {}).submit_allowed), 'ok')
       ].join('');
@@ -1211,9 +1225,10 @@ def _risk_contract_limits_valid(risk_contract: Mapping[str, Any]) -> bool:
         contract.get("symbol") == "BTCUSDT"
         and contract.get("timeframe") == "8m"
         and contract.get("direction") == "short"
-        and (_float_or_none(contract.get("tiny_live_margin_usdt") or contract.get("margin_budget_usdt")) or 0) <= 44.0
+        and contract.get("tiny_live_contract_mode") == "explicit_notional_cap_with_leverage"
+        and (_float_or_none(contract.get("tiny_live_margin_usdt") or contract.get("margin_budget_usdt")) or 0) <= 8.0
         and (_float_or_none(contract.get("max_loss_usdt")) or 0) <= 4.44
-        and (_float_or_none(contract.get("max_notional_usdt") or contract.get("max_position_notional_usdt")) or 0) >= 440.0
+        and (_float_or_none(contract.get("max_notional_usdt") or contract.get("max_position_notional_usdt")) or 0) <= 80.0
         and (_float_or_none(contract.get("leverage")) or 0) <= 10.0
     )
 

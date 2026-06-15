@@ -189,13 +189,6 @@ def build_tiny_live_live_authorization_write_gate(
             now=generated_at,
         )
         validation = validate_live_authorization_object(proposed)
-        preview = build_live_authorization_write_preview(
-            proposed_authorization=proposed,
-            authorization_valid=validation["valid"],
-            prerequisites=prerequisites,
-            latest_r231=latest_r231,
-            official_lane_key=official_lane_key,
-        )
         r231_ready = _r231_preview_ready(latest_r231, official_lane_key=official_lane_key)
         risk_ready = input_summary["risk_contract_valid"] and input_summary["risk_contract_config_ready"]
         blocked_by = _blocked_by(
@@ -203,6 +196,18 @@ def build_tiny_live_live_authorization_write_gate(
             risk_ready=risk_ready,
             validation=validation,
             prerequisites=prerequisites,
+        )
+        preview_prerequisites = (
+            prerequisites
+            if write_live_authorization
+            else {**prerequisites, "blocked_by": [*(prerequisites.get("blocked_by") or []), "write_confirmation_required"]}
+        )
+        preview = build_live_authorization_write_preview(
+            proposed_authorization=proposed,
+            authorization_valid=validation["valid"],
+            prerequisites=preview_prerequisites,
+            latest_r231=latest_r231,
+            official_lane_key=official_lane_key,
         )
         can_write = write_live_authorization and confirmation_valid and not blocked_by
 

@@ -238,7 +238,7 @@ def build_tiny_live_binance_readonly_precision_mark_price_gate(
                 "mark_price_snapshot": mark_price_snapshot,
             }
         quantity_preview = build_quantity_preview_from_readonly_data(
-            notional_cap_usdt=44,
+            notional_cap_usdt=_configured_notional_cap(risk_config),
             precision_snapshot=binance_result["precision_snapshot"],
             mark_price_snapshot=binance_result["mark_price_snapshot"],
         )
@@ -455,6 +455,14 @@ def validate_readonly_request_plan(plan: Mapping[str, Any]) -> dict[str, Any]:
     return {"valid": not errors, "errors": _dedupe(errors), "warnings": _dedupe(warnings)}
 
 
+def _configured_notional_cap(risk_config: Mapping[str, Any]) -> float:
+    return (
+        _number(risk_config.get("max_position_notional_usdt"))
+        or _number(risk_config.get("max_notional_usdt"))
+        or 44.0
+    )
+
+
 def fetch_binance_public_exchange_info_for_symbol(
     symbol: str = "BTCUSDT",
     *,
@@ -620,6 +628,7 @@ def build_exchange_minimum_tiny_live_decision_packet(
             "symbol": str(precision_snapshot.get("symbol") or mark_price_snapshot.get("symbol") or "BTCUSDT"),
             "configured_proper_tiny_cap_usdt": configured_cap,
             "configured_cap_possible": bool(cap_possible),
+            "configured_cap_clears_exchange_minimum": bool(cap_possible),
             "configured_cap_blocked_by": list(quantity_preview.get("blocked_by") or []),
             "block_reason": None if cap_possible else "proper_tiny_live_below_exchange_minimum",
             "min_quantity": precision_snapshot.get("min_qty"),
@@ -638,7 +647,7 @@ def build_exchange_minimum_tiny_live_decision_packet(
             "wallet_supports_exchange_minimum_tiny": wallet_enough,
             "recommended_operator_decision": "ACCEPT_EXCHANGE_MINIMUM_TINY_LIVE_CAP"
             if recommended_cap is not None
-            else "KEEP_44_USDT_PROPER_TINY_CAP",
+            else "KEEP_CONFIGURED_TINY_LIVE_NOTIONAL_CAP",
             "recommended_cap_usdt": recommended_cap,
             "recommended_cap_applied": False,
             "recommended_cap_warning": (

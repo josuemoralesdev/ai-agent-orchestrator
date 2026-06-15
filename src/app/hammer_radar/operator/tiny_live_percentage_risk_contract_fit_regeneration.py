@@ -4,8 +4,8 @@ This phase converts the official tiny-live contract to an equivalent
 percentage model and, only after exact confirmation, runs the existing
 R253/R253B/R254/R255/R261 review chain to regenerate a contract-fit triplet.
 It never submits, places orders, arms controls, calls private Binance
-endpoints, or loosens the resolved 44 USDT margin / 440 USDT notional /
-4.44 USDT max-loss model.
+endpoints, or loosens the R267 resolved 80 USDT notional / 10x leverage /
+derived 8 USDT margin / 4.44 USDT max-loss model.
 """
 
 from __future__ import annotations
@@ -44,7 +44,10 @@ from src.app.hammer_radar.operator.tiny_live_fresh_context_signed_request_regene
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     DEFAULT_MAX_LEVERAGE,
     DEFAULT_MAX_POSITION_NOTIONAL_USDT,
+    EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE,
     PROPER_TINY_LIVE_CONTRACT_MODE,
+    R267_MAX_LEVERAGE,
+    R267_MAX_POSITION_NOTIONAL_USDT,
     build_tiny_live_risk_contract_validation_summary,
 )
 from src.app.hammer_radar.operator.tiny_live_submit_gate_preview import (
@@ -59,7 +62,7 @@ LEDGER_FILENAME = "tiny_live_percentage_risk_contract_fit.ndjson"
 
 CONTRACT_FIT_CONFIRMATION_PHRASE = (
     "I CONFIRM TINY LIVE PERCENTAGE RISK CONTRACT FIT REGENERATION ONLY; "
-    "88 USDT ISOLATED WALLET, 44 USDT POSITION MARGIN, 10X LEVERAGE, "
+    "80 USDT NOTIONAL CAP, DERIVED 8 USDT MARGIN, 10X LEVERAGE, "
     "KEEP RISK SAME OR STRICTER; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL."
 )
 
@@ -338,20 +341,27 @@ def load_current_tiny_live_risk_contract(
 
 def derive_percentage_risk_contract_model(current_contract: Mapping[str, Any]) -> dict[str, Any]:
     contract = current_contract.get("contract") if isinstance(current_contract.get("contract"), Mapping) else current_contract
-    margin = _number(contract.get("tiny_live_margin_usdt") or contract.get("margin_budget_usdt")) or 44.0
-    isolated_wallet = _number(contract.get("isolated_risk_wallet_usdt")) or 88.0
-    leverage = min(_number(contract.get("leverage")) or DEFAULT_MAX_LEVERAGE, DEFAULT_MAX_LEVERAGE)
+    mode = str(contract.get("tiny_live_contract_mode") or PROPER_TINY_LIVE_CONTRACT_MODE)
+    configured_notional = _number(contract.get("max_position_notional_usdt") or contract.get("max_notional_usdt"))
+    leverage_cap = R267_MAX_LEVERAGE if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE else DEFAULT_MAX_LEVERAGE
+    leverage = min(_number(contract.get("leverage")) or leverage_cap, leverage_cap)
+    if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE:
+        max_notional = min(configured_notional or R267_MAX_POSITION_NOTIONAL_USDT, R267_MAX_POSITION_NOTIONAL_USDT)
+        margin = _number(contract.get("margin_budget_usdt") or contract.get("tiny_live_margin_usdt"))
+        margin = margin if margin is not None else round(max_notional / leverage, 8)
+    else:
+        max_notional = min(configured_notional or DEFAULT_MAX_POSITION_NOTIONAL_USDT, DEFAULT_MAX_POSITION_NOTIONAL_USDT)
+        margin = _number(contract.get("tiny_live_margin_usdt") or contract.get("margin_budget_usdt")) or 44.0
+    isolated_wallet = _number(contract.get("isolated_risk_wallet_usdt")) or max(margin * 2, margin)
     max_loss = _number(contract.get("max_loss_usdt")) or 4.44
     return {
         "uses_percentage_model": True,
-        "tiny_live_contract_mode": str(contract.get("tiny_live_contract_mode") or PROPER_TINY_LIVE_CONTRACT_MODE),
+        "tiny_live_contract_mode": mode,
         "isolated_wallet_reference_pct": 1.0,
         "isolated_risk_wallet_usdt": isolated_wallet,
         "position_margin_pct_of_isolated_wallet": margin / isolated_wallet if isolated_wallet else 0.5,
-        "max_notional_multiplier_of_position_margin": min(
-            leverage,
-            DEFAULT_MAX_POSITION_NOTIONAL_USDT / margin if margin else DEFAULT_MAX_LEVERAGE,
-        ),
+        "max_notional_multiplier_of_position_margin": leverage,
+        "explicit_max_notional_usdt": max_notional,
         "max_loss_pct_of_position_margin": max_loss / margin if margin else None,
         "resolved_values": {},
     }
@@ -362,14 +372,23 @@ def resolve_percentage_risk_contract_values(model: Mapping[str, Any]) -> dict[st
     margin_pct = _number(model.get("position_margin_pct_of_isolated_wallet")) or 0.5
     margin = round(isolated * margin_pct, 8)
     leverage = _number(model.get("max_notional_multiplier_of_position_margin")) or 10.0
+    explicit_max_notional = _number(model.get("explicit_max_notional_usdt"))
     max_loss_pct = _number(model.get("max_loss_pct_of_position_margin"))
     max_loss = round(margin * max_loss_pct, 8) if max_loss_pct is not None else 4.44
+    max_notional_ceiling = (
+        R267_MAX_POSITION_NOTIONAL_USDT
+        if model.get("tiny_live_contract_mode") == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+        else DEFAULT_MAX_POSITION_NOTIONAL_USDT
+    )
     return {
         "isolated_risk_wallet_usdt": isolated,
         "position_margin_pct_of_wallet": margin_pct,
         "resolved_position_margin_usdt": margin,
         "leverage": leverage,
-        "resolved_max_notional_usdt": min(round(margin * leverage, 8), DEFAULT_MAX_POSITION_NOTIONAL_USDT),
+        "resolved_max_notional_usdt": min(
+            explicit_max_notional if explicit_max_notional is not None else round(margin * leverage, 8),
+            max_notional_ceiling,
+        ),
         "wallet_buffer_usdt": round(isolated - margin, 8),
         "wallet_buffer_pct_of_wallet": round(1 - margin_pct, 8),
         "resolved_max_loss_usdt": max_loss,
@@ -384,18 +403,52 @@ def validate_percentage_contract_same_or_stricter(
     risk_interpretation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     blocked: list[str] = []
-    current_margin = _number(current_contract.get("tiny_live_margin_usdt") or current_contract.get("margin_budget_usdt") or current_contract.get("max_margin_usdt")) or 44.0
-    current_notional = _number(current_contract.get("max_notional_usdt") or current_contract.get("max_position_notional_usdt")) or DEFAULT_MAX_POSITION_NOTIONAL_USDT
+    mode = str(current_contract.get("tiny_live_contract_mode") or PROPER_TINY_LIVE_CONTRACT_MODE)
+    current_notional = _number(current_contract.get("max_notional_usdt") or current_contract.get("max_position_notional_usdt")) or (
+        R267_MAX_POSITION_NOTIONAL_USDT
+        if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+        else DEFAULT_MAX_POSITION_NOTIONAL_USDT
+    )
     current_loss = _number(current_contract.get("max_loss_usdt")) or 4.44
-    current_leverage = _number(current_contract.get("leverage")) or DEFAULT_MAX_LEVERAGE
-    if (_number(resolved_values.get("resolved_position_margin_usdt")) or 0) > min(current_margin, 44.0):
+    current_leverage = _number(current_contract.get("leverage")) or (
+        R267_MAX_LEVERAGE if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE else DEFAULT_MAX_LEVERAGE
+    )
+    derived_margin = round(current_notional / current_leverage, 8) if current_leverage else 44.0
+    current_margin = (
+        _number(
+            current_contract.get("tiny_live_margin_usdt")
+            or current_contract.get("margin_budget_usdt")
+            or current_contract.get("max_margin_usdt")
+        )
+        or derived_margin
+    )
+    margin_cap = derived_margin if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE else min(current_margin, 44.0)
+    notional_cap = (
+        min(current_notional, R267_MAX_POSITION_NOTIONAL_USDT)
+        if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+        else min(current_notional, DEFAULT_MAX_POSITION_NOTIONAL_USDT)
+    )
+    leverage_cap = (
+        min(current_leverage, R267_MAX_LEVERAGE)
+        if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+        else min(current_leverage, DEFAULT_MAX_LEVERAGE)
+    )
+    if (_number(resolved_values.get("resolved_position_margin_usdt")) or 0) > margin_cap + 0.000001:
         blocked.append("position_margin_above_current_or_44")
-    if (_number(resolved_values.get("resolved_max_notional_usdt")) or 0) > min(current_notional, DEFAULT_MAX_POSITION_NOTIONAL_USDT):
-        blocked.append("max_notional_above_current_or_44")
+    if (_number(resolved_values.get("resolved_max_notional_usdt")) or 0) > notional_cap + 0.000001:
+        blocked.append(
+            "max_notional_above_current_or_80"
+            if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+            else "max_notional_above_current_or_44"
+        )
     if (_number(resolved_values.get("resolved_max_loss_usdt")) or 0) > min(current_loss, 4.44) + 0.000001:
         blocked.append("max_loss_above_current_or_4_44")
-    if (_number(resolved_values.get("leverage")) or 0) > min(current_leverage, DEFAULT_MAX_LEVERAGE):
-        blocked.append("leverage_above_current_or_3")
+    if (_number(resolved_values.get("leverage")) or 0) > leverage_cap + 0.000001:
+        blocked.append(
+            "leverage_above_current_or_10"
+            if mode == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+            else "leverage_above_current_or_3"
+        )
     if risk_interpretation and risk_interpretation.get("valid") is not True:
         blocked.extend(str(item) for item in risk_interpretation.get("blocked_by") or [])
     return {
@@ -526,7 +579,9 @@ def apply_percentage_risk_contract_schema_update(
         if isinstance(contract, dict) and _contract_lane_key(contract) == official_lane_key:
             contract["contract_version"] = "tiny_live_percentage_risk_contract_v2"
             contract["uses_percentage_model"] = True
-            contract["tiny_live_contract_mode"] = PROPER_TINY_LIVE_CONTRACT_MODE
+            contract["tiny_live_contract_mode"] = str(
+                percentage_contract_model.get("tiny_live_contract_mode") or PROPER_TINY_LIVE_CONTRACT_MODE
+            )
             contract["isolated_risk_wallet_usdt"] = resolved_values["isolated_risk_wallet_usdt"]
             contract["position_margin_pct_of_isolated_wallet"] = resolved_values[
                 "position_margin_pct_of_wallet"
@@ -543,7 +598,11 @@ def apply_percentage_risk_contract_schema_update(
             contract["max_notional_usdt"] = resolved_values["resolved_max_notional_usdt"]
             contract["max_position_notional_usdt"] = resolved_values["resolved_max_notional_usdt"]
             contract["max_loss_usdt"] = resolved_values["resolved_max_loss_usdt"]
-            contract["updated_by_phase"] = CREATED_BY_PHASE
+            contract["updated_by_phase"] = (
+                "R267_BTCUSDT_10X_80_NOTIONAL_TINY_LIVE_CONTRACT_APPLY_GATE"
+                if contract["tiny_live_contract_mode"] == EXPLICIT_NOTIONAL_CAP_WITH_LEVERAGE_MODE
+                else CREATED_BY_PHASE
+            )
             contract["updated_at"] = (now or datetime.now(UTC)).isoformat()
             path.write_text(json.dumps(updated, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             result.update({"succeeded": True, "risk_contract_config_written": True})

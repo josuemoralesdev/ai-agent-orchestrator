@@ -207,11 +207,16 @@ def build_tiny_live_live_execution_enable_write_gate(
             validation=validation,
             prerequisites=prerequisites,
         )
+        preview_blocked_by = (
+            blocked_by
+            if write_execution_enable
+            else [*blocked_by, "write_confirmation_required"]
+        )
         preview = build_live_execution_enable_write_preview(
             proposed_execution_enable=proposed,
             execution_enable_valid=validation["valid"],
             r233_preview_ready=r233_ready,
-            blocked_by=blocked_by,
+            blocked_by=preview_blocked_by,
             official_lane_key=official_lane_key,
         )
         can_write = write_execution_enable and confirmation_valid and not blocked_by

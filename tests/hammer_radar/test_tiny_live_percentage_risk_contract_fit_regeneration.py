@@ -80,7 +80,9 @@ def test_cli_preview_returns_json() -> None:
     payload = json.loads(result.stdout)
     assert payload["status"] == r262b.TINY_LIVE_PERCENTAGE_RISK_CONTRACT_FIT_READY
     assert payload["target_scope"]["submit_allowed"] is False
-    assert payload["operator_intervention_model"]["resolved_position_margin_usdt"] == 44.0
+    assert payload["operator_intervention_model"]["resolved_position_margin_usdt"] == 8.0
+    assert payload["operator_intervention_model"]["resolved_max_notional_usdt"] == 80.0
+    assert payload["operator_intervention_model"]["leverage"] == 10.0
     assert payload["operator_intervention_model"]["full_wallet_is_not_position_margin"] is True
     assert payload["safety"]["order_placed"] is False
 

@@ -57,6 +57,9 @@ TINY_LIVE_JIT_READY_FOR_CONFIRMATION = "TINY_LIVE_JIT_READY_FOR_CONFIRMATION"
 TINY_LIVE_JIT_RECORDED_READY_FOR_MANUAL_LIVE_COMMAND = (
     "TINY_LIVE_JIT_RECORDED_READY_FOR_MANUAL_LIVE_COMMAND"
 )
+TINY_LIVE_JIT_RECORDED_R267_FINAL_COMMAND_UNAVAILABLE = (
+    "TINY_LIVE_JIT_RECORDED_R267_FINAL_COMMAND_UNAVAILABLE"
+)
 TINY_LIVE_JIT_REJECTED_BAD_CONFIRMATION = "TINY_LIVE_JIT_REJECTED_BAD_CONFIRMATION"
 TINY_LIVE_JIT_BLOCKED_BY_R262B = "TINY_LIVE_JIT_BLOCKED_BY_R262B"
 TINY_LIVE_JIT_BLOCKED_BY_R263_ARMING = "TINY_LIVE_JIT_BLOCKED_BY_R263_ARMING"
@@ -418,21 +421,15 @@ def validate_jit_launch_packet(*, jit_step_results: Mapping[str, Any]) -> dict[s
 
 
 def build_final_live_submit_command_packet(*, jit_validation: Mapping[str, Any]) -> dict[str, Any]:
-    command = (
-        "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
-        "--log-dir logs/hammer_radar_forward tiny-live-actual-submit-reconcile "
-        "--execute-actual-live-submit --allow-binance-order-endpoint "
-        f'--confirm-actual-live-submit "{LIVE_SUBMIT_CONFIRMATION_PHRASE}" '
-        '--operator-id local_operator --reason "R264 actual tiny-live submit after R264B JIT launch packet GO."'
-    )
     return {
-        "available": jit_validation.get("valid") is True,
+        "available": False,
         "must_be_run_manually_by_operator": True,
         "do_not_run_from_codex": True,
-        "command": command if jit_validation.get("valid") is True else "",
+        "command": "",
         "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE,
+        "unavailable_reason": "R267 keeps final live submit command unavailable; packet is diagnostic/readiness only.",
         "expected_orders": {
-            "main": "SELL MARKET 0.006 BTC",
+            "main": "SELL MARKET quantity must remain within 80 USDT notional cap",
             "stop": "BUY STOP_MARKET REDUCE_ONLY",
             "take_profit": "BUY TAKE_PROFIT_MARKET REDUCE_ONLY",
         },
@@ -485,7 +482,7 @@ def classify_tiny_live_jit_launch_packet_status(
     if run_requested and not confirmation_valid:
         return TINY_LIVE_JIT_REJECTED_BAD_CONFIRMATION
     if recorded and jit_validation.get("valid") is True:
-        return TINY_LIVE_JIT_RECORDED_READY_FOR_MANUAL_LIVE_COMMAND
+        return TINY_LIVE_JIT_RECORDED_R267_FINAL_COMMAND_UNAVAILABLE
     blockers = set(jit_validation.get("blocked_by") or [])
     if "prior_live_submit_exists" in blockers:
         return TINY_LIVE_JIT_BLOCKED_BY_IDEMPOTENCY
@@ -493,7 +490,9 @@ def classify_tiny_live_jit_launch_packet_status(
         {
             "risk_contract_config_invalid",
             "risk_contract_notional_cap_exceeds_44",
+            "risk_contract_notional_cap_exceeds_80",
             "risk_contract_leverage_exceeds_3",
+            "risk_contract_leverage_exceeds_10",
             "candidate_notional_exceeds_position_notional_cap",
             "proper_tiny_live_below_exchange_minimum",
         }
@@ -567,6 +566,8 @@ def _top_status(
 def _go_no_go_packet(*, jit_validation: Mapping[str, Any], final_command: Mapping[str, Any]) -> dict[str, Any]:
     if jit_validation.get("valid") is True and final_command.get("available") is True:
         next_step = "MANUAL_LIVE_COMMAND"
+    elif jit_validation.get("valid") is True:
+        next_step = "FINAL_COMMAND_UNAVAILABLE_R267"
     elif not jit_validation.get("idempotency_clean"):
         next_step = "WAIT"
     elif not jit_validation.get("r262b_valid"):
@@ -576,7 +577,7 @@ def _go_no_go_packet(*, jit_validation: Mapping[str, Any], final_command: Mappin
     else:
         next_step = "FIX_BLOCKER"
     return {
-        "go_for_manual_live_submit_command": jit_validation.get("valid") is True,
+        "go_for_manual_live_submit_command": False,
         "operator_should_submit_now": False,
         "next_required_step": next_step,
     }
@@ -601,6 +602,8 @@ def _recommended_next_operator_move(go_no_go: Mapping[str, Any], validation: Map
         return "Wait for exact R264B JIT prep confirmation; do not submit from preview."
     if go_no_go.get("next_required_step") == "MANUAL_LIVE_COMMAND":
         return "Review the R264B GO packet, then manually run the printed command only once outside Codex if you still accept real order placement."
+    if go_no_go.get("next_required_step") == "FINAL_COMMAND_UNAVAILABLE_R267":
+        return "Review readiness improvements only; R267 deliberately keeps the final live submit command unavailable."
     if go_no_go.get("next_required_step") == "RERUN_JIT":
         return "Rerun the R264B JIT prep command after fixing the listed blocker or waiting for fresh state."
     if go_no_go.get("next_required_step") == "WAIT":
@@ -613,6 +616,8 @@ def _recommended_next_operator_move(go_no_go: Mapping[str, Any], validation: Map
 def _recommended_next_engineering_move(go_no_go: Mapping[str, Any], validation: Mapping[str, Any]) -> str:
     if go_no_go.get("next_required_step") == "MANUAL_LIVE_COMMAND":
         return "No engineering move; keep Codex out of the real submit path."
+    if go_no_go.get("next_required_step") == "FINAL_COMMAND_UNAVAILABLE_R267":
+        return "Do not add or expose a final submit command in R267."
     if validation.get("blocked_by"):
         return "Inspect the child R262B/R263/R264 blocker without loosening risk or bypassing gates."
     return "Keep R264B in preview until the operator supplies the exact prep phrase."
