@@ -47,12 +47,13 @@ JIT_LAUNCH_PREP_CONFIRMATION_PHRASE = (
     "ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; "
     "NO BINANCE ORDER CALL."
 )
-R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE = (
-    "I CONFIRM R268 TINY LIVE FINAL MANUAL SUBMIT UNLOCK PACKET ONLY; "
+R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE = (
+    "I CONFIRM R271 QUALIFIED-LANE MANUAL UNLOCK PACKET ONLY; "
     "EXPOSE MANUAL COMMAND ONLY IF R262B R263 R264 IDEMPOTENCY FRESHNESS "
-    "AND 80 USDT 10X CONTRACT GATES ARE CLEAN; CODEX MUST NOT SUBMIT; "
+    "STRATEGY-QUALIFIED LANE AND 80 USDT 10X EXACT-LANE CONTRACT GATES ARE CLEAN; CODEX MUST NOT SUBMIT; "
     "NO ORDER; NO BINANCE ORDER CALL."
 )
+R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE = R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
 
 TINY_LIVE_JIT_LAUNCH_PACKET_READY = "TINY_LIVE_JIT_LAUNCH_PACKET_READY"
 TINY_LIVE_JIT_LAUNCH_PACKET_RECORDED = "TINY_LIVE_JIT_LAUNCH_PACKET_RECORDED"
@@ -107,7 +108,7 @@ def build_tiny_live_jit_launch_packet(
     lane_path = Path(lane_controls_path) if lane_controls_path is not None else LANE_CONTROLS_PATH
     confirmation_valid = confirm_jit_launch_prep == JIT_LAUNCH_PREP_CONFIRMATION_PHRASE
     final_manual_unlock_confirmation_valid = (
-        confirm_final_manual_submit_unlock == R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
+        confirm_final_manual_submit_unlock == R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
     )
     current_ticket_context = build_current_proposed_ticket_context(
         log_dir=resolved_log_dir,
@@ -121,6 +122,17 @@ def build_tiny_live_jit_launch_packet(
         if run_jit_launch_prep and not confirmation_valid:
             status = TINY_LIVE_JIT_LAUNCH_PACKET_REJECTED
             overall = TINY_LIVE_JIT_REJECTED_BAD_CONFIRMATION
+        elif run_jit_launch_prep and current_ticket_context.get("selected") is not True:
+            validation = validate_jit_launch_packet(jit_step_results=steps)
+            validation["blocked_by"] = _dedupe(
+                [
+                    "no_current_qualified_fresh_candidate",
+                    *[str(item) for item in current_ticket_context.get("blockers") or []],
+                    *[str(item) for item in current_ticket_context.get("blocked_by") or []],
+                ]
+            )
+            status = TINY_LIVE_JIT_LAUNCH_PACKET_BLOCKED
+            overall = UNKNOWN_NEEDS_MANUAL_REVIEW
         elif run_jit_launch_prep and confirmation_valid:
             steps["r262b_contract_fit_refresh"] = run_r262b_contract_fit_refresh_step(
                 log_dir=resolved_log_dir,
@@ -200,7 +212,7 @@ def build_tiny_live_jit_launch_packet(
                     final_manual_unlock_confirmation_valid
                 ),
                 "final_manual_submit_unlock_confirmation_phrase": (
-                    R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
+                    R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE
                 ),
                 "jit_launch_packet_recorded": False,
                 "operator_intent": {
@@ -634,6 +646,7 @@ def build_fresh_candidate_status(
             "strategy_qualified": ticket.get("strategy_qualified") is True,
             "strategy_win_rate_pct": ticket.get("strategy_win_rate_pct"),
             "strategy_sample_count": ticket.get("strategy_sample_count"),
+            "strategy_avg_pnl_pct": ticket.get("strategy_avg_pnl_pct"),
             "strategy_min_sample": ticket.get("strategy_min_sample"),
             "exact_risk_contract_status": ticket.get("exact_risk_contract_status")
             if isinstance(ticket.get("exact_risk_contract_status"), Mapping)
@@ -686,7 +699,7 @@ def build_final_live_submit_command_packet(
         "submit_allowed_from_codex": False,
         "command": command,
         "confirmation_phrase": LIVE_SUBMIT_CONFIRMATION_PHRASE,
-        "unlock_confirmation_phrase": R268_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        "unlock_confirmation_phrase": R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
         "unlock_confirmation_valid": bool(final_manual_unlock_confirmation_valid),
         "unavailable_reason": "" if gate["valid"] else "; ".join(gate["blocked_by"]),
         "gate_validation": gate,
@@ -696,6 +709,7 @@ def build_final_live_submit_command_packet(
         "strategy_qualification": (fresh_candidate_status or {}).get("strategy_qualification")
         if isinstance((fresh_candidate_status or {}).get("strategy_qualification"), Mapping)
         else {},
+        "strategy_evidence": _strategy_evidence_summary((fresh_candidate_status or {}).get("strategy_qualification")),
         "exact_risk_contract_status": (fresh_candidate_status or {}).get("exact_risk_contract_status")
         if isinstance((fresh_candidate_status or {}).get("exact_risk_contract_status"), Mapping)
         else {},
@@ -726,6 +740,12 @@ def validate_final_manual_submit_unlock_gate(
             if isinstance(current_ticket_context.get("signal_origin_status"), Mapping)
             else {}
         )
+    strategy_qualification = (
+        fresh_candidate_status.get("strategy_qualification")
+        if isinstance(fresh_candidate_status.get("strategy_qualification"), Mapping)
+        else {}
+    )
+    avg_pnl_pct = _float_or_none(strategy_qualification.get("avg_pnl_pct"))
     packet_symbol, packet_timeframe, packet_direction, _packet_entry_mode = _lane_parts(packet_lane_key)
     required = {
         "unlock_confirmation_exact": bool(final_manual_unlock_confirmation_valid),
@@ -738,6 +758,7 @@ def validate_final_manual_submit_unlock_gate(
         "fresh_candidate_direction_matches_packet": fresh_candidate_status.get("direction") == packet_direction,
         "fresh_candidate_lane_matches_packet": fresh_candidate_status.get("lane_key") == packet_lane_key,
         "strategy_lane_qualified": fresh_candidate_status.get("strategy_qualified") is True,
+        "strategy_avg_pnl_positive": avg_pnl_pct is not None and avg_pnl_pct > 0.0,
         "exact_lane_risk_contract_valid": fresh_candidate_status.get("exact_risk_contract_valid") is True,
         "signal_origin_allowed": origin.get("manual_unlock_allowed") is True,
         "betrayal_not_involved": origin.get("betrayal_mode_involved") is False,
@@ -890,6 +911,24 @@ def expected_orders_for_direction(direction: str) -> dict[str, str]:
         "main": f"{main_side} MARKET quantity must remain within 80 USDT notional cap",
         "stop": f"{exit_side} STOP_MARKET REDUCE_ONLY",
         "take_profit": f"{exit_side} TAKE_PROFIT_MARKET REDUCE_ONLY",
+    }
+
+
+def _strategy_evidence_summary(value: object) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {
+            "win_rate_pct": None,
+            "sample_count": None,
+            "min_sample": None,
+            "avg_pnl_pct": None,
+            "strategy_qualified": False,
+        }
+    return {
+        "win_rate_pct": value.get("win_rate_pct"),
+        "sample_count": value.get("sample_count"),
+        "min_sample": value.get("min_sample") or value.get("min_sample_count"),
+        "avg_pnl_pct": value.get("avg_pnl_pct"),
+        "strategy_qualified": value.get("strategy_qualified") is True,
     }
 
 
@@ -1076,7 +1115,7 @@ def _recommended_next_engineering_move(go_no_go: Mapping[str, Any], validation: 
     if go_no_go.get("next_required_step") == "MANUAL_LIVE_COMMAND":
         return "No engineering move; keep Codex out of the real submit path."
     if go_no_go.get("next_required_step") == "FINAL_COMMAND_UNAVAILABLE_R267":
-        return "Keep diagnostic mode blocked; expose a manual command only through the exact R268 unlock phrase and clean gates."
+        return "Keep diagnostic mode blocked; expose a manual command only through the exact R271 unlock phrase and clean gates."
     if validation.get("blocked_by"):
         return "Inspect the child R262B/R263/R264 blocker without loosening risk or bypassing gates."
     return "Keep R264B in preview until the operator supplies the exact prep phrase."
@@ -1132,7 +1171,7 @@ def _manual_live_submit_command() -> str:
         "--log-dir logs/hammer_radar_forward tiny-live-actual-submit-reconcile "
         "--execute-actual-live-submit --allow-binance-order-endpoint "
         f'--confirm-actual-live-submit "{LIVE_SUBMIT_CONFIRMATION_PHRASE}" '
-        '--operator-id local_operator --reason "R268 operator manual submit after clean unlock packet."'
+        '--operator-id local_operator --reason "R271 operator manual submit after clean unlock packet."'
     )
 
 

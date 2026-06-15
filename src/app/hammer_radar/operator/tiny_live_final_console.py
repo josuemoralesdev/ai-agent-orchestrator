@@ -622,6 +622,7 @@ def build_final_console_fresh_candidate_status(
             "strategy_qualified": ticket.get("strategy_qualified") is True,
             "strategy_win_rate_pct": ticket.get("strategy_win_rate_pct"),
             "strategy_sample_count": ticket.get("strategy_sample_count"),
+            "strategy_avg_pnl_pct": ticket.get("strategy_avg_pnl_pct"),
             "strategy_min_sample": ticket.get("strategy_min_sample"),
             "exact_risk_contract_status": ticket.get("exact_risk_contract_status")
             if isinstance(ticket.get("exact_risk_contract_status"), Mapping)
@@ -1312,7 +1313,7 @@ def render_tiny_live_final_console_html() -> str:
         row('R262B valid', yn(r262b.risk_contract_valid), r262b.risk_contract_valid ? 'ok' : 'bad'),
         row('R263 armed', yn(data.final_console_controls_armed || (data.controls_panel || {}).controls_armed)),
         row('R264 dry preview valid', yn(r264.valid), r264.valid ? 'ok' : 'bad'),
-        row('R268 unlock packet found', yn(jit.found), jit.found ? 'ok' : 'bad'),
+        row('R271 unlock packet found', yn(jit.found), jit.found ? 'ok' : 'bad'),
         row('fresh ticket signal', fresh.signal_id || 'n/a'),
         row('fresh ticket status', fresh.trade_ticket_status || 'BLOCKED', fresh.trade_ticket_status === 'PROPOSED' ? 'ok' : 'bad'),
         row('fresh ticket notional cap', fresh.max_position_usd ?? 'n/a'),

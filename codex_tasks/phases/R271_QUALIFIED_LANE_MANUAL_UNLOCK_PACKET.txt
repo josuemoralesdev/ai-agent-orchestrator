@@ -1,0 +1,196 @@
+# R271 — Qualified Lane Manual Unlock Packet
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: FINAL READINESS / MANUAL OPERATOR GATE
+  Secondary: STRATEGY QUALIFICATION, LANE SELECTION, SAFETY HARDENING
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R270 enforced the operator tiny-live policy:
+    - tiny_live_min_win_rate_pct = 55.0
+    - min sample count = 30
+    - evidence_policy_all_timeframes_enabled = true
+    - all BTCUSDT timeframes can qualify by evidence
+    - below-55 strategies are blocked from live
+    - 13m long at ~47% is blocked
+    - 44m long / 44m short / 55m long can qualify by evidence
+  The next step is to select the current eligible tiny-live candidate only if it belongs to a strategy-qualified lane, then expose a manual-only unlock packet.
+  Codex must not submit.
+
+Hard goal:
+  Build a final qualified-lane manual unlock packet that:
+    - selects the current proposed/fresh ticket only if its lane is strategy-qualified under >=55%
+    - verifies exact lane risk contract or creates a guarded exact-lane contract if allowed
+    - generates lane-specific expected order wording
+    - exposes a manual-only command packet only when all gates pass and exact manual unlock confirmation is provided
+    - keeps command unavailable in diagnostic mode
+    - never submits from Codex
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT print or persist secrets.
+  - Do NOT mutate external env files.
+  - Do NOT execute final live submit from Codex.
+  - Do NOT make final command available for below-55 lanes.
+  - Do NOT make final command available for unknown origin unless explicitly allowed by existing policy.
+  - Do NOT make final command available for Betrayal/inverse unless a future explicit acceptance gate exists.
+  - Do NOT allow cross-lane risk contract borrowing.
+  - If uncertain, remain BLOCKED.
+
+Required scan first:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/lane_controls.json
+    - tests/hammer_radar touching strategy lane selection, promotion, readiness, trade ticket, JIT, final console
+
+Scope:
+  1. Qualified lane selector:
+     - Determine current fresh/proposed candidate lane:
+         symbol
+         timeframe
+         direction
+         entry_mode
+         signal_id
+     - Fetch strategy evidence for that exact lane.
+     - Lane qualifies only if:
+         symbol == BTCUSDT
+         win_rate_pct >= 55.0
+         sample_count >= 30 or configured min_sample
+         avg_pnl_pct > 0 unless existing policy proves another positive-expectancy measure
+         entry_mode is valid
+         signal origin is allowed
+         betrayal/inverse not involved
+     - If no current fresh/proposed candidate, remain blocked:
+         no_current_qualified_fresh_candidate
+
+  2. Exact lane risk contract:
+     - Require exact match:
+         symbol + timeframe + direction + entry_mode
+     - If missing and lane is qualified, create/apply a guarded exact lane contract:
+         tiny_live_contract_mode: explicit_notional_cap_with_leverage
+         max_position_notional_usdt: 80.0
+         max_notional_usdt: 80.0
+         leverage: 10.0
+         margin_budget_usdt: 8.0
+         max_loss_usdt: 4.44 unless stricter existing policy applies
+         live_execution_enabled: false
+         live_authorized: false
+     - Config write allowed only for the exact lane.
+     - Do not mutate lane_controls in this phase unless existing R263-style arming is explicitly required and remains non-submit.
+
+  3. Lane-specific expected order packet:
+     - Long:
+         main BUY MARKET
+         stop SELL STOP_MARKET REDUCE_ONLY
+         take_profit SELL TAKE_PROFIT_MARKET REDUCE_ONLY
+     - Short:
+         main SELL MARKET
+         stop BUY STOP_MARKET REDUCE_ONLY
+         take_profit BUY TAKE_PROFIT_MARKET REDUCE_ONLY
+     - Quantity must be current exchange-valid quantity and notional <= 80.
+     - The expected order wording must not be hardcoded to 8m short.
+
+  4. Manual-only unlock packet:
+     - Diagnostic mode must keep:
+         final_live_submit_command_packet.available = false
+     - Manual unlock mode may expose a command only if:
+         exact R271 unlock phrase is supplied
+         current candidate lane is qualified
+         exact lane risk contract valid
+         R262B valid
+         R263 controls armed
+         R264 dry preview valid
+         signed triplet fresh
+         idempotency clean
+         no prior live submit
+         no order placed
+         no submit attempted
+         no Binance order endpoint called
+         no test order endpoint called
+         no private/transfer/withdraw endpoints
+     - Exposed packet must include:
+         do_not_run_from_codex=true
+         must_be_run_manually_by_operator=true
+         submit_allowed_from_codex=false
+
+  5. Final console / API:
+     - Surface:
+         current qualified lane
+         strategy evidence: win_rate/sample/min_sample/avg_pnl
+         signal origin and betrayal status
+         exact lane risk contract status
+         expected orders
+         JIT validation
+         manual unlock availability
+         exact blockers
+         safety flags
+     - No submit button.
+
+  6. Tests:
+     Add/update tests proving:
+       - below-55 lane cannot unlock.
+       - lane with >=55 and sample >=30 can pass qualification.
+       - exact lane contract is required.
+       - no cross-lane risk contract borrowing.
+       - long expected orders are BUY main / SELL exits.
+       - short expected orders are SELL main / BUY exits.
+       - betrayal/inverse blocks.
+       - diagnostic mode final command unavailable.
+       - exact unlock phrase required for availability.
+       - Codex never submits.
+       - order_placed=false.
+       - submit_attempted=false.
+       - binance_order_endpoint_called=false.
+       - secrets_shown=false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar -k "tiny_live or strategy_promotion or strategy_lane_selection or readiness or trade_ticket or jit_launch or final_console"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/strategy-promotion/status | jq .
+  curl -s http://127.0.0.1:8015/readiness | jq .
+  curl -s http://127.0.0.1:8015/trade-ticket | jq .
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-jit-launch-packet \
+    --run-jit-launch-prep \
+    --record-jit-launch-packet \
+    --confirm-jit-launch-prep "I CONFIRM TINY LIVE JIT LAUNCH PREP ONLY; REFRESH CONTRACT-FIT TRIPLET, ARM R263 EXPERIMENTAL LANE, RUN R264 DRY PREVIEW; NO SUBMIT; NO ORDER; NO BINANCE ORDER CALL." \
+    --operator-id local_operator \
+    --reason "R271 qualified-lane manual unlock diagnostic; no submit."
+
+Report:
+  - files changed
+  - current candidate lane, if any
+  - whether lane is strategy-qualified
+  - strategy evidence: win_rate, sample_count, avg_pnl
+  - exact lane risk contract status
+  - signal origin / betrayal status
+  - expected order direction
+  - final command availability in diagnostic mode
+  - exact unlock phrase for manual-only packet
+  - tests/smokes
+  - safety confirmation: no order, no submit, no Binance order endpoint

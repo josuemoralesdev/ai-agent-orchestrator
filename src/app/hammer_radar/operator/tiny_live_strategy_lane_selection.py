@@ -80,6 +80,7 @@ def build_strategy_lane_qualification(
     raw_evidence = dict(evidence) if isinstance(evidence, Mapping) else _find_strategy_evidence(resolved_log_dir, lane_key=lane_key)
     win_rate = _float_or_none(raw_evidence.get("win_rate_pct"))
     sample_count = _int_or_none(raw_evidence.get("sample_count") or raw_evidence.get("samples"))
+    avg_pnl_pct = _float_or_none(raw_evidence.get("avg_pnl_pct"))
     blockers: list[str] = []
     if str(symbol or "") != BTC_SYMBOL:
         blockers.append("strategy_lane_symbol_not_BTCUSDT")
@@ -102,6 +103,12 @@ def build_strategy_lane_qualification(
     elif sample_count < min_sample:
         blockers.append("strategy_lane_sample_count_below_minimum")
         blockers.append("strategy_sample_count_below_minimum")
+    if avg_pnl_pct is None:
+        blockers.append("strategy_lane_avg_pnl_pct_missing")
+        blockers.append("strategy_evidence_missing")
+    elif avg_pnl_pct <= 0.0:
+        blockers.append("strategy_lane_avg_pnl_pct_not_positive")
+        blockers.append("strategy_avg_pnl_pct_not_positive")
 
     return {
         **_safety_fields(),
@@ -110,6 +117,7 @@ def build_strategy_lane_qualification(
         "qualification_status": "QUALIFIED" if not blockers else "BLOCKED",
         "win_rate_pct": win_rate,
         "sample_count": sample_count,
+        "avg_pnl_pct": avg_pnl_pct,
         "min_sample": min_sample,
         "min_sample_count": min_sample,
         "min_win_rate_pct": float(min_win_rate_pct),
@@ -275,6 +283,7 @@ def build_explicit_lane_risk_contract(
             "lane_key": strategy_qualification.get("lane_key"),
             "win_rate_pct": strategy_qualification.get("win_rate_pct"),
             "sample_count": strategy_qualification.get("sample_count"),
+            "avg_pnl_pct": strategy_qualification.get("avg_pnl_pct"),
             "min_sample": strategy_qualification.get("min_sample"),
             "min_win_rate_pct": strategy_qualification.get("min_win_rate_pct"),
             "qualification_status": strategy_qualification.get("qualification_status"),

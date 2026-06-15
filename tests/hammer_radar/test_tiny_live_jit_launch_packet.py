@@ -64,6 +64,7 @@ def test_wrong_confirmation_rejects_without_child_steps(tmp_path: Path, monkeypa
 
 def test_exact_confirmation_orchestrates_r262b_r263_r264_and_records(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: calls.append("r262b") or _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: calls.append("r263") or _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: calls.append("r264") or _r264_ok())
@@ -104,6 +105,7 @@ def test_successful_jit_packet_keeps_final_manual_command_unavailable(tmp_path: 
     assert command["do_not_run_from_codex"] is True
     assert command["command"] == ""
     assert "unlock_confirmation_exact" in command["unavailable_reason"]
+    assert "I CONFIRM R271 QUALIFIED-LANE MANUAL UNLOCK PACKET ONLY" in command["unlock_confirmation_phrase"]
     assert r264b.LIVE_SUBMIT_CONFIRMATION_PHRASE in command["confirmation_phrase"]
     assert "80 USDT notional cap" in command["expected_orders"]["main"]
 
@@ -223,6 +225,29 @@ def test_final_command_unavailable_without_exact_r268_unlock_confirmation(tmp_pa
     _assert_no_submit_safety(payload)
 
 
+def test_old_r268_unlock_phrase_no_longer_unlocks(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch)
+    old_phrase = (
+        "I CONFIRM R268 TINY LIVE FINAL MANUAL SUBMIT UNLOCK PACKET ONLY; "
+        "EXPOSE MANUAL COMMAND ONLY IF R262B R263 R264 IDEMPOTENCY FRESHNESS "
+        "AND 80 USDT 10X CONTRACT GATES ARE CLEAN; CODEX MUST NOT SUBMIT; "
+        "NO ORDER; NO BINANCE ORDER CALL."
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=old_phrase,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert command["available"] is False
+    assert command["unlock_confirmation_valid"] is False
+    assert "unlock_confirmation_exact" in command["gate_validation"]["blocked_by"]
+    _assert_no_submit_safety(payload)
+
+
 def test_final_command_unavailable_without_fresh_candidate(tmp_path: Path, monkeypatch) -> None:
     _patch_success(monkeypatch, fresh_candidate=False)
     payload = r264b.build_tiny_live_jit_launch_packet(
@@ -238,6 +263,36 @@ def test_final_command_unavailable_without_fresh_candidate(tmp_path: Path, monke
     assert command["available"] is False
     assert "fresh_candidate_available" in command["gate_validation"]["blocked_by"]
     assert "no fresh ELIGIBLE_TINY_LIVE BTCUSDT candidate" in command["gate_validation"]["blocked_by"]
+    _assert_no_submit_safety(payload)
+
+
+def test_jit_prep_does_not_run_child_steps_without_current_candidate(tmp_path: Path, monkeypatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: calls.append("r262b") or _r262b_ok())
+    monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: calls.append("r263") or _r263_ok())
+    monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: calls.append("r264") or _r264_ok())
+    monkeypatch.setattr(
+        r264b,
+        "build_current_proposed_ticket_context",
+        lambda **_: {
+            **_current_ticket_context(),
+            "selected": False,
+            "lane_key": None,
+            "blockers": ["no current BTCUSDT live-checklist candidate available"],
+        },
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    assert calls == []
+    assert payload["status"] == r264b.TINY_LIVE_JIT_LAUNCH_PACKET_BLOCKED
+    assert "no_current_qualified_fresh_candidate" in payload["jit_validation"]["blocked_by"]
+    assert payload["final_live_submit_command_packet"]["available"] is False
     _assert_no_submit_safety(payload)
 
 
@@ -257,6 +312,7 @@ def test_final_command_available_only_manual_packet_when_all_gates_clean(tmp_pat
     assert command["must_be_run_manually_by_operator"] is True
     assert command["do_not_run_from_codex"] is True
     assert command["submit_allowed_from_codex"] is False
+    assert command["strategy_evidence"]["avg_pnl_pct"] == 0.1
     assert payload["jit_go_no_go_packet"]["go_for_manual_live_submit_command"] is True
     assert payload["jit_go_no_go_packet"]["operator_should_submit_now"] is False
     assert payload["target_scope"]["submit_allowed"] is False
@@ -265,6 +321,39 @@ def test_final_command_available_only_manual_packet_when_all_gates_clean(tmp_pat
     assert command["command"].count("/fapi/v1/order") == 0
     assert command["allowed_endpoint"] == "/fapi/v1/order"
     assert len(command["expected_orders"]) == 3
+    _assert_no_submit_safety(payload)
+
+
+def test_final_command_unavailable_when_strategy_avg_pnl_not_positive(tmp_path: Path, monkeypatch) -> None:
+    _patch_success(monkeypatch)
+    monkeypatch.setattr(
+        r264b,
+        "build_fresh_candidate_status",
+        lambda **_: {
+            **_fresh_candidate_ok(),
+            "strategy_qualification": {
+                **_strategy_qualification(),
+                "avg_pnl_pct": 0.0,
+                "strategy_qualified": False,
+                "blocked_by": ["strategy_lane_avg_pnl_pct_not_positive"],
+            },
+            "strategy_qualified": False,
+            "blocked_by": ["strategy_lane_avg_pnl_pct_not_positive"],
+        },
+    )
+    payload = r264b.build_tiny_live_jit_launch_packet(
+        log_dir=tmp_path / "logs",
+        run_jit_launch_prep=True,
+        record_jit_launch_packet=True,
+        confirm_jit_launch_prep=r264b.JIT_LAUNCH_PREP_CONFIRMATION_PHRASE,
+        confirm_final_manual_submit_unlock=r264b.R271_FINAL_MANUAL_SUBMIT_UNLOCK_CONFIRMATION_PHRASE,
+        now=NOW,
+    )
+    command = payload["final_live_submit_command_packet"]
+    assert command["available"] is False
+    assert "strategy_lane_qualified" in command["gate_validation"]["blocked_by"]
+    assert "strategy_avg_pnl_positive" in command["gate_validation"]["blocked_by"]
+    assert "strategy_lane_avg_pnl_pct_not_positive" in command["gate_validation"]["blocked_by"]
     _assert_no_submit_safety(payload)
 
 
@@ -284,6 +373,7 @@ def test_no_binance_order_private_or_account_calls_and_no_actual_submit(tmp_path
 
 
 def test_stale_signed_triplet_after_r262b_blocks(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok(signed_triplet_fresh=False))
@@ -294,6 +384,7 @@ def test_stale_signed_triplet_after_r262b_blocks(tmp_path: Path, monkeypatch) ->
 
 
 def test_final_command_unavailable_if_notional_exceeds_80(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok(candidate_notional=81.0))
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok(candidate_notional=81.0))
@@ -311,6 +402,7 @@ def test_final_command_unavailable_if_notional_exceeds_80(tmp_path: Path, monkey
 
 
 def test_failed_r263_arming_blocks(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_blocked())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok())
@@ -320,6 +412,7 @@ def test_failed_r263_arming_blocks(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_failed_r264_dry_preview_blocks(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_blocked())
@@ -329,6 +422,7 @@ def test_failed_r264_dry_preview_blocks(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_risk_contract_mismatch_blocks_final_command(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(
@@ -356,6 +450,7 @@ def test_risk_contract_mismatch_blocks_final_command(tmp_path: Path, monkeypatch
 
 
 def test_idempotency_dirty_blocks(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setattr(r264b, "run_r262b_contract_fit_refresh_step", lambda **_: _r262b_ok())
     monkeypatch.setattr(r264b, "run_r263_runtime_arming_step", lambda **_: _r263_ok())
     monkeypatch.setattr(r264b, "run_r264_dry_preview_step", lambda **_: _r264_ok(idempotency_clean=False))
@@ -365,6 +460,7 @@ def test_idempotency_dirty_blocks(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_secrets_not_in_output(tmp_path: Path, monkeypatch) -> None:
+    _patch_current_candidate_only(monkeypatch)
     monkeypatch.setenv("BINANCE_API_KEY", API_KEY)
     monkeypatch.setenv("BINANCE_API_SECRET", API_SECRET)
     monkeypatch.setattr(
@@ -434,6 +530,19 @@ def _patch_success(
         lambda **_: _fresh_candidate_ok(lane_key=lane_key, origin=origin or _standard_origin(lane_key=lane_key))
         if fresh_candidate
         else _fresh_candidate_blocked(),
+    )
+
+
+def _patch_current_candidate_only(monkeypatch, *, lane_key: str = OFFICIAL, origin: dict | None = None) -> None:
+    monkeypatch.setattr(
+        r264b,
+        "build_current_proposed_ticket_context",
+        lambda **_: _current_ticket_context(lane_key=lane_key, origin=origin or _standard_origin(lane_key=lane_key)),
+    )
+    monkeypatch.setattr(
+        r264b,
+        "build_fresh_candidate_status",
+        lambda **_: _fresh_candidate_ok(lane_key=lane_key, origin=origin or _standard_origin(lane_key=lane_key)),
     )
 
 
@@ -628,6 +737,7 @@ def _strategy_qualification(*, lane_key: str = OFFICIAL) -> dict:
         "qualification_status": "QUALIFIED",
         "win_rate_pct": 62.0,
         "sample_count": 40,
+        "avg_pnl_pct": 0.1,
         "min_sample": 30,
         "min_win_rate_pct": 55.0,
         "symbol": symbol,

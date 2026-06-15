@@ -446,6 +446,7 @@ def _ticket_from_check(
         "strategy_qualified": strategy_qualification.get("strategy_qualified") is True,
         "strategy_win_rate_pct": strategy_qualification.get("win_rate_pct"),
         "strategy_sample_count": strategy_qualification.get("sample_count"),
+        "strategy_avg_pnl_pct": strategy_qualification.get("avg_pnl_pct"),
         "strategy_min_sample": strategy_qualification.get("min_sample"),
         "exact_risk_contract_status": exact_risk_contract_status,
         "exact_risk_contract_found": exact_risk_contract_status.get("exact_contract_found") is True,

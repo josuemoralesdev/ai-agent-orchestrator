@@ -84,6 +84,21 @@ def test_lane_below_sample_minimum_blocks(tmp_path: Path) -> None:
     assert "strategy_sample_count_below_minimum" in payload["blocked_by"]
 
 
+def test_lane_with_non_positive_avg_pnl_blocks(tmp_path: Path) -> None:
+    payload = r270b.build_strategy_lane_qualification(
+        symbol="BTCUSDT",
+        timeframe="4m",
+        direction="long",
+        entry_mode="ladder_close_50_618",
+        log_dir=tmp_path / "logs",
+        evidence=_evidence(win_rate_pct=80.0, sample_count=40, avg_pnl_pct=0.0),
+    )
+    assert payload["strategy_qualified"] is False
+    assert payload["avg_pnl_pct"] == 0.0
+    assert "strategy_lane_avg_pnl_pct_not_positive" in payload["blocked_by"]
+    assert "strategy_avg_pnl_pct_not_positive" in payload["blocked_by"]
+
+
 def test_historical_paper_only_timeframe_can_qualify_by_evidence(tmp_path: Path) -> None:
     payload = r270b.build_strategy_lane_qualification(
         symbol="BTCUSDT",
@@ -176,7 +191,7 @@ def test_4m_long_contract_validates_when_evidence_qualifies(tmp_path: Path) -> N
     assert payload["secrets_shown"] is False
 
 
-def _evidence(*, win_rate_pct: float, sample_count: int) -> dict:
+def _evidence(*, win_rate_pct: float, sample_count: int, avg_pnl_pct: float = 0.1) -> dict:
     return {
         "strategy_key": LANE_4M_LONG,
         "symbol": "BTCUSDT",
@@ -185,6 +200,7 @@ def _evidence(*, win_rate_pct: float, sample_count: int) -> dict:
         "entry_mode": "ladder_close_50_618",
         "win_rate_pct": win_rate_pct,
         "sample_count": sample_count,
+        "avg_pnl_pct": avg_pnl_pct,
     }
 
 
@@ -196,6 +212,7 @@ def _qualification(lane_key: str) -> dict:
         "qualification_status": "QUALIFIED",
         "win_rate_pct": 62.0,
         "sample_count": 40,
+        "avg_pnl_pct": 0.1,
         "min_sample": 30,
         "min_win_rate_pct": 55.0,
         "symbol": symbol,
