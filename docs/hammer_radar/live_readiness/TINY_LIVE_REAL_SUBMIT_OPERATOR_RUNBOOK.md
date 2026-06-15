@@ -262,14 +262,55 @@ R263 must report `go_for_actual_submit_now=false`, `submit_allowed=false`, and
 `operator_should_submit_now=false`. If it arms controls successfully, the next
 step is R264 actual submit checkpoint, not real submit from R263.
 
-## R264 Manual Submit Template
+## R264 Actual Submit And Immediate Reconciliation
+
+Preview:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-actual-submit-reconcile
+```
+
+Record dry preview only:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-actual-submit-reconcile \
+  --dry-run-actual-submit-reconcile \
+  --record-actual-submit-preview \
+  --confirm-actual-submit-dry-preview "I CONFIRM TINY LIVE R264 ACTUAL SUBMIT DRY PREVIEW ONLY; NO SUBMIT; NO ORDER; NO BINANCE CALL."
+```
+
+Rejected live-submit safety check:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-actual-submit-reconcile \
+  --execute-actual-live-submit \
+  --allow-binance-order-endpoint \
+  --confirm-actual-live-submit "wrong"
+```
 
 This is a template only. It must be manually reviewed and pasted by the operator
 only after the checklist is complete:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-actual-submit-gate --execute-actual-submit --allow-real-binance-order-endpoint --confirm-tiny-live-actual-submit "<R264 must render the exact phrase with the latest regenerated quantity; do not reuse the old 0.007 BTC phrase if R262B resized the triplet.>"
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-actual-submit-reconcile \
+  --execute-actual-live-submit \
+  --allow-binance-order-endpoint \
+  --confirm-actual-live-submit "I CONFIRM TINY LIVE BTCUSDT 8M SHORT ACTUAL SUBMIT; USE LATEST R262B CONTRACT-FIT SIGNED TRIPLET ONLY; MAIN SELL MARKET 0.006 BTC; STOP BUY STOP_MARKET REDUCE_ONLY; TAKE_PROFIT BUY TAKE_PROFIT_MARKET REDUCE_ONLY; NO OTHER ORDERS." \
+  --operator-id local_operator \
+  --reason "R264 actual tiny-live submit after R262B contract-fit and R263 final console arming."
 ```
+
+R264 records all dry previews, blocked/rejected execution attempts, actual
+submit attempts, reconciliation results, and partial-success critical states in
+`logs/hammer_radar_forward/tiny_live_actual_submit_reconciliation.ndjson`.
 
 ## Reconciliation
 

@@ -105,3 +105,11 @@ When R262B is valid, signed triplet context is available, controls are armed,
 and the experimental 8m short lane has been accepted, R263 points to
 `R264_ACTUAL_SUBMIT_CHECKPOINT`. It still reports
 `go_for_actual_submit_now=false`.
+
+R264 is the next checkpoint and owns the actual-submit/reconciliation boundary:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+  --log-dir logs/hammer_radar_forward \
+  tiny-live-actual-submit-reconcile
+```
