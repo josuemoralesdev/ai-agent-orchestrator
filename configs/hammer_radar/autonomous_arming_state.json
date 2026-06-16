@@ -1,22 +1,21 @@
 {
-  "schema_version": "1.0",
-  "created_by_phase": "R275_AUTONOMOUS_ARMED_LANE_DRY_RUN",
-  "notes": [
-    "R275 autonomous arming state is dry-run only.",
-    "This config does not enable real live execution, create signed requests, call Binance, or place orders.",
-    "Autonomous dry-run requires both global_auto_live_enabled and an exact lane_auto_live_enabled match."
-  ],
-  "global_auto_live_enabled": false,
-  "auto_execute_mode": "dry_run_only",
-  "armed_lane_key": null,
   "allowed_lane_keys": [],
-  "max_position_notional_usdt": 80.0,
-  "leverage": 10.0,
-  "max_trades_per_day": 1,
+  "armed_lane_key": null,
+  "auto_execute_mode": "dry_run_only",
+  "created_by_phase": "R278_OPERATOR_DRY_RUN_ARMING_CONTROL_REAL_CANDIDATE_WATCH",
   "daily_loss_stop_usdt": 5.0,
-  "require_protective_orders": true,
-  "require_strategy_live_qualified": true,
+  "global_auto_live_enabled": false,
+  "lanes": [],
+  "last_disarm_reason": "R278 validation cleanup; return autonomous dry-run arming to OFF.",
+  "last_disarmed_at": "2026-06-16T02:37:18.506555+00:00",
+  "last_disarmed_by_operator_id": "local_operator",
+  "last_disarmed_lane_key": null,
+  "leverage": 10.0,
+  "max_position_notional_usdt": 80.0,
+  "max_trades_per_day": 1,
   "require_no_betrayal": true,
   "require_not_near_miss": true,
-  "lanes": []
+  "require_protective_orders": true,
+  "require_strategy_live_qualified": true,
+  "schema_version": "1.0"
 }

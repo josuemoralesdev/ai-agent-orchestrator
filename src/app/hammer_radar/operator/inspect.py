@@ -3262,6 +3262,55 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-autonomous-dry-run-arming-status":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+            build_autonomous_dry_run_arming_status,
+            format_tiny_live_autonomous_armed_dry_run_json,
+        )
+
+        print(
+            format_tiny_live_autonomous_armed_dry_run_json(
+                build_autonomous_dry_run_arming_status(
+                    log_dir=args.log_dir,
+                    config_path=args.config_path,
+                )
+            )
+        )
+    elif args.command == "tiny-live-autonomous-dry-run-arm-lane":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+            arm_autonomous_dry_run_lane,
+            format_tiny_live_autonomous_armed_dry_run_json,
+        )
+
+        print(
+            format_tiny_live_autonomous_armed_dry_run_json(
+                arm_autonomous_dry_run_lane(
+                    args.lane_key,
+                    args.operator_id,
+                    args.reason or "",
+                    log_dir=args.log_dir,
+                    config_path=args.config_path,
+                    confirm_dry_run_autonomous_arming=args.confirm_dry_run_autonomous_arming,
+                )
+            )
+        )
+    elif args.command == "tiny-live-autonomous-dry-run-disarm-lane":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+            disarm_autonomous_dry_run_lane,
+            format_tiny_live_autonomous_armed_dry_run_json,
+        )
+
+        print(
+            format_tiny_live_autonomous_armed_dry_run_json(
+                disarm_autonomous_dry_run_lane(
+                    args.lane_key,
+                    args.operator_id,
+                    args.reason or "",
+                    config_path=args.config_path,
+                    confirm_dry_run_autonomous_disarm=args.confirm_dry_run_autonomous_disarm,
+                )
+            )
+        )
     elif args.command == "tiny-live-risk-contract-fix":
         from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
             build_tiny_live_risk_contract_diagnostic,
@@ -5882,6 +5931,41 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_autonomous_armed_dry_run_parser.add_argument(
         "--dry-run-arm-real-candidate-lane",
         action="store_true",
+    )
+
+    tiny_live_autonomous_arming_status_parser = subparsers.add_parser(
+        "tiny-live-autonomous-dry-run-arming-status",
+        parents=[parent],
+    )
+    tiny_live_autonomous_arming_status_parser.add_argument(
+        "--config-path",
+        default=None,
+    )
+
+    tiny_live_autonomous_arm_lane_parser = subparsers.add_parser(
+        "tiny-live-autonomous-dry-run-arm-lane",
+        parents=[parent],
+    )
+    tiny_live_autonomous_arm_lane_parser.add_argument("--lane-key", required=True)
+    tiny_live_autonomous_arm_lane_parser.add_argument("--operator-id", default="local_operator")
+    tiny_live_autonomous_arm_lane_parser.add_argument("--reason", default=None)
+    tiny_live_autonomous_arm_lane_parser.add_argument("--config-path", default=None)
+    tiny_live_autonomous_arm_lane_parser.add_argument(
+        "--confirm-dry-run-autonomous-arming",
+        default=None,
+    )
+
+    tiny_live_autonomous_disarm_lane_parser = subparsers.add_parser(
+        "tiny-live-autonomous-dry-run-disarm-lane",
+        parents=[parent],
+    )
+    tiny_live_autonomous_disarm_lane_parser.add_argument("--lane-key", default="all")
+    tiny_live_autonomous_disarm_lane_parser.add_argument("--operator-id", default="local_operator")
+    tiny_live_autonomous_disarm_lane_parser.add_argument("--reason", default=None)
+    tiny_live_autonomous_disarm_lane_parser.add_argument("--config-path", default=None)
+    tiny_live_autonomous_disarm_lane_parser.add_argument(
+        "--confirm-dry-run-autonomous-disarm",
+        default=None,
     )
 
     tiny_live_risk_contract_fix_parser = subparsers.add_parser(

@@ -335,7 +335,10 @@ from src.app.hammer_radar.operator.strategy_promotion_watcher import (
     strategy_promotion_events_path,
 )
 from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+    arm_autonomous_dry_run_lane,
+    build_autonomous_dry_run_arming_status,
     build_tiny_live_autonomous_armed_dry_run,
+    disarm_autonomous_dry_run_lane,
 )
 from src.app.hammer_radar.operator.telegram_approval_challenge import (
     create_first_live_approval_challenge,
@@ -433,6 +436,20 @@ class TinyLiveTicketBuildRequest(BaseModel):
     candidate_id: str | None = None
     approval_phrase: str | None = None
     operator_note: str | None = None
+
+
+class TinyLiveAutonomousDryRunArmLaneRequest(BaseModel):
+    lane_key: str = Field(min_length=1)
+    operator_id: str = Field(default="local_operator", min_length=1)
+    reason: str = ""
+    confirm_dry_run_autonomous_arming: str | None = None
+
+
+class TinyLiveAutonomousDryRunDisarmRequest(BaseModel):
+    lane_key: str | None = "all"
+    operator_id: str = Field(default="local_operator", min_length=1)
+    reason: str = ""
+    confirm_dry_run_autonomous_disarm: str | None = None
 
 
 class LiveEnvChecklistConfirmRequest(BaseModel):
@@ -945,6 +962,32 @@ def tiny_live_qualified_candidate_watch() -> dict:
 @app.get("/tiny-live/autonomous-armed-dry-run")
 def tiny_live_autonomous_armed_dry_run() -> dict:
     return build_tiny_live_autonomous_armed_dry_run(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/autonomous-arming/status")
+def tiny_live_autonomous_arming_status() -> dict:
+    return build_autonomous_dry_run_arming_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.post("/tiny-live/autonomous-arming/arm-dry-run-lane")
+def tiny_live_autonomous_arming_arm_dry_run_lane(request: TinyLiveAutonomousDryRunArmLaneRequest) -> dict:
+    return arm_autonomous_dry_run_lane(
+        request.lane_key,
+        request.operator_id,
+        request.reason,
+        log_dir=get_log_dir(use_env=True),
+        confirm_dry_run_autonomous_arming=request.confirm_dry_run_autonomous_arming,
+    )
+
+
+@app.post("/tiny-live/autonomous-arming/disarm")
+def tiny_live_autonomous_arming_disarm(request: TinyLiveAutonomousDryRunDisarmRequest) -> dict:
+    return disarm_autonomous_dry_run_lane(
+        request.lane_key,
+        request.operator_id,
+        request.reason,
+        confirm_dry_run_autonomous_disarm=request.confirm_dry_run_autonomous_disarm,
+    )
 
 
 @app.post("/tiny-live/jit-launch-packet/run")

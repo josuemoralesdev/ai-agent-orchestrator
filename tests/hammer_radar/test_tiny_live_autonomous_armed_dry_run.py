@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -15,13 +17,22 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
     AUTO_DRY_RUN_BLOCKED,
     AUTO_DRY_RUN_READY,
     AUTO_DRY_RUN_WAIT,
+    AUTONOMOUS_DRY_RUN_ARMED,
+    AUTONOMOUS_DRY_RUN_ARMING_BLOCKED,
+    AUTONOMOUS_DRY_RUN_DISARMED,
     BLOCKED_BY_GLOBAL_ARMING,
     BLOCKED_BY_LANE_ARMING,
     BLOCKED_BY_BETRAYAL,
     BLOCKED_BY_NEAR_MISS,
+    DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+    DRY_RUN_DISARM_CONFIRMATION_PHRASE,
+    arm_autonomous_dry_run_lane,
+    build_autonomous_dry_run_arming_status,
     build_tiny_live_autonomous_armed_dry_run,
     default_autonomous_arming_state,
+    disarm_autonomous_dry_run_lane,
     load_autonomous_arming_state,
+    validate_autonomous_dry_run_lane_arming,
 )
 from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
     build_explicit_lane_risk_contract,
@@ -42,6 +53,187 @@ def test_default_arming_state_is_off(tmp_path: Path) -> None:
     assert state["armed_lane_key"] is None
     assert state["allowed_lane_keys"] == []
     assert state["any_lane_auto_armed"] is False
+
+
+def test_arming_requires_exact_confirmation_phrase(tmp_path: Path) -> None:
+    _seed_strategy_status_lane(tmp_path, lane_key=LANE_44M_LONG, win_rate_pct=62.0, sample_count=40)
+
+    payload = arm_autonomous_dry_run_lane(
+        LANE_44M_LONG,
+        "test_operator",
+        "bad phrase test",
+        log_dir=tmp_path,
+        config_path=tmp_path / "autonomous_arming_state.json",
+        confirm_dry_run_autonomous_arming="wrong",
+    )
+
+    assert payload["status"] == AUTONOMOUS_DRY_RUN_ARMING_BLOCKED
+    assert payload["arming_state_written"] is False
+    assert "bad_confirmation" in payload["blocked_by"]
+    assert not (tmp_path / "autonomous_arming_state.json").exists()
+
+
+def test_arming_unsupported_and_blocked_lanes_fails(tmp_path: Path) -> None:
+    for lane_key, win_rate, expected in (
+        (LANE_8M_SHORT, 53.33, "8m_short_arming_forbidden"),
+        (LANE_13M_LONG, 47.27, "lane_not_live_qualified"),
+        ("BTCUSDT|4m|long|ladder_close_50_618", 47.27, "lane_not_live_qualified"),
+        ("BTCUSDT|4m|short|ladder_close_50_618", 47.27, "lane_not_live_qualified"),
+        ("BTCUSDT|44m|betrayal_inverse|ladder_close_50_618", 62.0, "betrayal_inverse_lane_arming_forbidden"),
+        ("*", 62.0, "wildcard_lane_arming_forbidden"),
+    ):
+        log_dir = tmp_path / lane_key.replace("|", "_").replace("*", "wildcard")
+        log_dir.mkdir()
+        if "|" in lane_key and "betrayal_inverse" not in lane_key:
+            _seed_strategy_status_lane(log_dir, lane_key=lane_key, win_rate_pct=win_rate, sample_count=40)
+        validation = validate_autonomous_dry_run_lane_arming(
+            lane_key,
+            log_dir=log_dir,
+            confirm_dry_run_autonomous_arming=DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+        )
+
+        assert validation["valid"] is False
+        assert expected in validation["blocked_by"]
+        assert validation["submit_allowed"] is False
+        assert validation["real_order_forbidden"] is True
+
+
+def test_live_qualified_lanes_can_be_armed_and_are_dry_run_only(tmp_path: Path) -> None:
+    for lane_key in (LANE_44M_LONG, LANE_44M_SHORT, LANE_55M_LONG):
+        log_dir = tmp_path / lane_key.replace("|", "_")
+        log_dir.mkdir()
+        config_path = log_dir / "autonomous_arming_state.json"
+        _seed_strategy_status_lane(log_dir, lane_key=lane_key, win_rate_pct=62.0, sample_count=40)
+
+        payload = arm_autonomous_dry_run_lane(
+            lane_key,
+            "test_operator",
+            "R278 unit arm",
+            log_dir=log_dir,
+            config_path=config_path,
+            confirm_dry_run_autonomous_arming=DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+        )
+
+        state = load_autonomous_arming_state(config_path)
+        lane_entry = state["lanes"][0]
+        assert payload["status"] == AUTONOMOUS_DRY_RUN_ARMED
+        assert state["global_auto_live_enabled"] is True
+        assert state["auto_execute_mode"] == "dry_run_only"
+        assert state["armed_lane_key"] == lane_key
+        assert state["allowed_lane_keys"] == [lane_key]
+        assert lane_entry["dry_run_only"] is True
+        assert lane_entry["real_order_forbidden"] is True
+        assert lane_entry["live_execution_enabled"] is False
+        assert lane_entry["submit_allowed"] is False
+        assert payload["safety"]["order_placed"] is False
+        assert payload["safety"]["binance_order_endpoint_called"] is False
+        assert payload["safety"]["binance_test_order_endpoint_called"] is False
+
+
+def test_disarm_returns_config_to_off(tmp_path: Path) -> None:
+    _seed_strategy_status_lane(tmp_path, lane_key=LANE_44M_LONG, win_rate_pct=62.0, sample_count=40)
+    config_path = tmp_path / "autonomous_arming_state.json"
+    arm_autonomous_dry_run_lane(
+        LANE_44M_LONG,
+        "test_operator",
+        "arm before disarm",
+        log_dir=tmp_path,
+        config_path=config_path,
+        confirm_dry_run_autonomous_arming=DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+    )
+
+    payload = disarm_autonomous_dry_run_lane(
+        "all",
+        "test_operator",
+        "cleanup",
+        config_path=config_path,
+        confirm_dry_run_autonomous_disarm=DRY_RUN_DISARM_CONFIRMATION_PHRASE,
+    )
+
+    state = load_autonomous_arming_state(config_path)
+    assert payload["status"] == AUTONOMOUS_DRY_RUN_DISARMED
+    assert state["global_auto_live_enabled"] is False
+    assert state["armed_lane_key"] is None
+    assert state["allowed_lane_keys"] == []
+    assert state["any_lane_auto_armed"] is False
+
+    dry_run = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        config_path=config_path,
+        risk_contract_config_path=_risk_config(tmp_path, LANE_44M_LONG),
+    )
+    assert dry_run["status"] == AUTO_DRY_RUN_WAIT
+    assert "no_current_fresh_candidate" in dry_run["blockers"]
+
+
+def test_cli_arm_and_disarm_use_temp_config_path(tmp_path: Path) -> None:
+    _seed_strategy_status_lane(tmp_path, lane_key=LANE_44M_LONG, win_rate_pct=62.0, sample_count=40)
+    config_path = tmp_path / "autonomous_arming_state.json"
+
+    arm_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            str(tmp_path),
+            "tiny-live-autonomous-dry-run-arm-lane",
+            "--config-path",
+            str(config_path),
+            "--lane-key",
+            LANE_44M_LONG,
+            "--operator-id",
+            "test_operator",
+            "--reason",
+            "R278 CLI dry-run arming only",
+            "--confirm-dry-run-autonomous-arming",
+            DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    arm_payload = json.loads(arm_result.stdout)
+    assert arm_payload["status"] == AUTONOMOUS_DRY_RUN_ARMED
+    assert load_autonomous_arming_state(config_path)["armed_lane_key"] == LANE_44M_LONG
+
+    disarm_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            str(tmp_path),
+            "tiny-live-autonomous-dry-run-disarm-lane",
+            "--config-path",
+            str(config_path),
+            "--operator-id",
+            "test_operator",
+            "--reason",
+            "R278 CLI cleanup",
+            "--confirm-dry-run-autonomous-disarm",
+            DRY_RUN_DISARM_CONFIRMATION_PHRASE,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    disarm_payload = json.loads(disarm_result.stdout)
+    assert disarm_payload["status"] == AUTONOMOUS_DRY_RUN_DISARMED
+    assert load_autonomous_arming_state(config_path)["global_auto_live_enabled"] is False
+
+
+def test_arming_status_lists_live_qualified_lanes_from_evidence(tmp_path: Path) -> None:
+    _seed_strategy_status_lane(tmp_path, lane_key=LANE_44M_LONG, win_rate_pct=62.0, sample_count=40)
+
+    payload = build_autonomous_dry_run_arming_status(
+        log_dir=tmp_path,
+        config_path=tmp_path / "missing.json",
+    )
+
+    assert payload["arming_state"]["global_auto_live_enabled"] is False
+    assert LANE_44M_LONG in payload["live_qualified_lane_keys"]
+    assert LANE_8M_SHORT not in payload["live_qualified_lane_keys"]
 
 
 def test_no_current_candidate_waits(tmp_path: Path) -> None:
@@ -413,6 +605,40 @@ def test_autonomous_dry_run_endpoint_is_safe(tmp_path: Path) -> None:
     assert payload["status"] == AUTO_DRY_RUN_WAIT
     assert payload["real_order_placed"] is False
     assert payload["binance_order_endpoint_called"] is False
+
+
+def test_autonomous_arming_status_endpoint_is_safe(tmp_path: Path) -> None:
+    with patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(tmp_path)}):
+        response = TestClient(app).get("/tiny-live/autonomous-arming/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["dry_run_arming_control_supported"] is True
+    assert payload["dry_run_only"] is True
+    assert payload["real_order_forbidden"] is True
+    assert payload["submit_allowed"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+
+
+def test_autonomous_arming_api_bad_phrase_blocks_without_submit(tmp_path: Path) -> None:
+    with patch.dict("os.environ", {LOG_DIR_ENV_VAR: str(tmp_path)}):
+        response = TestClient(app).post(
+            "/tiny-live/autonomous-arming/arm-dry-run-lane",
+            json={
+                "lane_key": LANE_44M_LONG,
+                "operator_id": "test_operator",
+                "reason": "bad phrase api test",
+                "confirm_dry_run_autonomous_arming": "wrong",
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == AUTONOMOUS_DRY_RUN_ARMING_BLOCKED
+    assert "bad_confirmation" in payload["blocked_by"]
+    assert payload["submit_allowed"] is False
+    assert payload["safety"]["order_placed"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
 
 
 def _seed_ready_candidate(log_dir: Path, lane_key: str) -> None:

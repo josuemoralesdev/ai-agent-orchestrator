@@ -678,6 +678,9 @@ def test_autonomous_panel_reports_latest_rehearsal_fixture(tmp_path: Path) -> No
 
     assert recorded["status"] == "AUTO_DRY_RUN_READY"
     assert panel["rehearsal_supported"] is True
+    assert panel["dry_run_arming_control_supported"] is True
+    assert panel["dry_run_only"] is True
+    assert panel["any_lane_auto_armed"] is False
     assert panel["latest_rehearsal_status"] == "AUTO_DRY_RUN_READY"
     assert panel["latest_rehearsal_lane"] == lane_key
     assert panel["latest_rehearsal_order_triplet"]["entry_order"]["side"] == "BUY"
@@ -709,6 +712,13 @@ def test_autonomous_panel_reports_real_candidate_binding_fields(tmp_path: Path) 
     panel = r263.build_autonomous_armed_dry_run_panel(log_dir=tmp_path)
 
     assert recorded["status"] == "AUTO_DRY_RUN_READY"
+    assert panel["dry_run_arming_control_supported"] is True
+    assert panel["dry_run_arming_status"]["arming_state"]["global_auto_live_enabled"] is False
+    assert LANE_44M_LONG in panel["dry_run_arming_status"]["live_qualified_lane_keys"]
+    assert any(LANE_44M_LONG in command for command in panel["arm_next_command_templates"])
+    assert "tiny-live-autonomous-dry-run-disarm-lane" in panel["disarm_next_command"]
+    assert panel["dry_run_only"] is True
+    assert panel["submit_allowed"] is False
     assert panel["real_candidate_binding_supported"] is True
     assert panel["real_candidate_binding_status"] in {"AUTO_DRY_RUN_WAIT", "AUTO_DRY_RUN_BLOCKED"}
     assert panel["latest_real_candidate_dry_run_record"]["status"] == "AUTO_DRY_RUN_READY"

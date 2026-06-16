@@ -24,6 +24,9 @@ from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE, normalize_l
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.strategy_promotion_watcher import build_strategy_promotion_status
 from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+    DRY_RUN_ARMING_CONFIRMATION_PHRASE,
+    DRY_RUN_DISARM_CONFIRMATION_PHRASE,
+    build_autonomous_dry_run_arming_status,
     build_tiny_live_autonomous_armed_dry_run,
     load_latest_autonomous_real_candidate_record,
     load_latest_autonomous_rehearsal_record,
@@ -507,6 +510,7 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
 
 def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
     packet = build_tiny_live_autonomous_armed_dry_run(log_dir=log_dir)
+    arming_status = build_autonomous_dry_run_arming_status(log_dir=log_dir)
     latest_rehearsal = load_latest_autonomous_rehearsal_record(log_dir=log_dir)
     latest_real_candidate = load_latest_autonomous_real_candidate_record(log_dir=log_dir)
     arming = packet.get("arming_state") if isinstance(packet.get("arming_state"), Mapping) else {}
@@ -522,6 +526,12 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
     else:
         next_required_step = packet.get("next_required_step") or "CLEAR_BLOCKERS_OR_WAIT"
     return {
+        "dry_run_arming_control_supported": True,
+        "dry_run_arming_status": arming_status,
+        "armed_lane_key": arming.get("armed_lane_key"),
+        "allowed_lane_keys": list(arming.get("allowed_lane_keys") or []),
+        "any_lane_auto_armed": arming.get("any_lane_auto_armed") is True,
+        "dry_run_only": True,
         "global_auto_live_enabled": arming.get("global_auto_live_enabled") is True,
         "current_lane_auto_armed": bool(candidate.get("lane_key") and candidate.get("lane_key") in set(arming.get("lane_auto_live_enabled_keys") or [])),
         "auto_execute_mode": arming.get("auto_execute_mode") or "dry_run_only",
@@ -530,6 +540,7 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         "rehearsal_supported": True,
         "real_candidate_binding_supported": packet.get("real_candidate_binding_supported") is True,
         "real_candidate_binding_status": status,
+        "current_candidate_watch_status": packet.get("candidate_watch_status"),
         "real_candidate_lane": candidate.get("source_lane_key") or candidate.get("lane_key"),
         "real_candidate_signal_id": candidate.get("source_signal_id") or candidate.get("signal_id"),
         "real_candidate_dry_run_go_no_go": (
@@ -547,9 +558,26 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         ),
         "latest_rehearsal_order_triplet": latest_rehearsal.get("simulated_order_triplet") if latest_rehearsal else None,
         "next_required_step": next_required_step,
+        "disarm_next_command": (
+            "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+            "--log-dir logs/hammer_radar_forward tiny-live-autonomous-dry-run-disarm-lane "
+            "--operator-id local_operator --reason \"return autonomous dry-run arming to OFF\" "
+            f"--confirm-dry-run-autonomous-disarm \"{DRY_RUN_DISARM_CONFIRMATION_PHRASE}\""
+        ),
+        "arm_next_command_templates": [
+            (
+                "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+                "--log-dir logs/hammer_radar_forward tiny-live-autonomous-dry-run-arm-lane "
+                f"--lane-key \"{lane_key}\" --operator-id local_operator "
+                "--reason \"dry-run arming only; no submit; no real order; no Binance endpoint.\" "
+                f"--confirm-dry-run-autonomous-arming \"{DRY_RUN_ARMING_CONFIRMATION_PHRASE}\""
+            )
+            for lane_key in arming_status.get("live_qualified_lane_keys") or []
+        ],
         "blockers": blockers,
         "real_order_still_forbidden": True,
         "real_order_forbidden": True,
+        "submit_allowed": False,
         "final_command_available": False,
         "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
     }

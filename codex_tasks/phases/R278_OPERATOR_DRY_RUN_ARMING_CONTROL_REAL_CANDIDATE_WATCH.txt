@@ -1,0 +1,310 @@
+# R278 — Operator Dry-Run Arming Control for Real Candidate Watch
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: OPERATOR ARMING CONTROL / REAL-CANDIDATE DRY-RUN
+  Secondary: AUTONOMOUS WATCH, SAFETY HARDENING, PRE-BINANCE READINESS
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  R275 created the autonomous armed-lane dry-run gate.
+  R276 proved fixture rehearsals can reach AUTO_DRY_RUN_READY safely.
+  R277 bound the autonomous dry-run engine to real candidate watcher flow and correctly returned WAIT when no fresh real candidate existed.
+
+  The remaining missing pre-live piece is a safe operator arming control:
+    - operator can arm exact LIVE_QUALIFIED lanes in DRY-RUN ONLY mode
+    - machine waits for real fresh candidates
+    - if a real fresh candidate appears for an armed lane, machine prepares simulated execution immediately
+    - no real order is sent
+    - no Binance order endpoint is called
+
+Hard goal:
+  Add a safe operator control path to arm/disarm autonomous real-candidate dry-run lanes.
+
+  Required behavior:
+    - default remains fully OFF
+    - arming is explicit
+    - arming is dry-run only
+    - arming is exact-lane only
+    - live-qualified lanes only may be armed
+    - near-miss / paper-only / below-55 / Betrayal / inverse lanes cannot be armed
+    - after arming, the real candidate watch path can evaluate automatically
+    - if no real candidate exists, status remains WAIT
+    - if a real fresh LIVE_QUALIFIED candidate exists for armed lane, status becomes AUTO_DRY_RUN_READY
+    - final_command_available=false
+    - submit_allowed=false
+    - real_order_forbidden=true
+    - order_placed=false
+    - binance_order_endpoint_called=false
+    - binance_test_order_endpoint_called=false
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT submit signed requests.
+  - Do NOT create HMAC signatures.
+  - Do NOT expose secrets.
+  - Do NOT mutate env files.
+  - Do NOT enable real live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT make final command available.
+  - Do NOT allow arming all lanes with a wildcard.
+  - Do NOT allow 8m short arming.
+  - Do NOT allow near-miss or paper-only arming.
+  - Do NOT allow Betrayal/inverse lane arming.
+  - Do NOT persist dangerous live flags.
+  - If uncertain, keep arming rejected and return BLOCKED.
+
+Allowed arming lanes:
+  These are current live-qualified lanes from prior R274/R277 evidence:
+    - BTCUSDT|44m|long|ladder_close_50_618
+    - BTCUSDT|44m|short|ladder_close_50_618
+    - BTCUSDT|55m|long|ladder_close_50_618
+
+  If live-qualified lane detection changes, the code must use live-qualified evidence, not hardcoded exception logic.
+  However tests should include these exact lanes.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/test_tiny_live_autonomous_armed_dry_run.py
+    - tests/hammer_radar/test_tiny_live_final_console.py
+
+Implementation scope:
+  1. Arming state manager:
+     Add or extend safe arming helper functions for:
+       - load_autonomous_arming_state()
+       - build_default_autonomous_arming_state()
+       - validate_autonomous_dry_run_lane_arming(lane_key)
+       - arm_autonomous_dry_run_lane(lane_key, operator_id, reason)
+       - disarm_autonomous_dry_run_lane(lane_key or all, operator_id, reason)
+
+     Persist only safe dry-run arming fields:
+       global_auto_live_enabled=true
+       auto_execute_mode="dry_run_only"
+       armed_lane_key=<exact lane>
+       allowed_lane_keys=[<exact lane>]
+       lane entry:
+         lane_key
+         lane_auto_live_enabled=true
+         dry_run_only=true
+         real_order_forbidden=true
+         live_execution_enabled=false
+         submit_allowed=false
+         created_by_phase="R278_OPERATOR_DRY_RUN_ARMING_CONTROL_REAL_CANDIDATE_WATCH"
+         operator_id
+         reason
+         armed_at
+
+     Default state must remain OFF when no explicit arm command is run.
+
+  2. CLI control:
+     Add inspect commands or subcommands consistent with project style:
+       tiny-live-autonomous-dry-run-arm-lane
+       tiny-live-autonomous-dry-run-disarm-lane
+       tiny-live-autonomous-dry-run-arming-status
+
+     Required arm command shape:
+       PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+         --log-dir logs/hammer_radar_forward \
+         tiny-live-autonomous-dry-run-arm-lane \
+         --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+         --operator-id local_operator \
+         --reason "R278 dry-run arming only; no submit; no real order; no Binance endpoint." \
+         --confirm-dry-run-autonomous-arming "I CONFIRM AUTONOMOUS DRY-RUN ARMING ONLY; NO REAL ORDER; NO BINANCE ORDER ENDPOINT."
+
+     If confirmation phrase is wrong or missing, block.
+
+  3. API control:
+     If consistent with existing local approval API patterns, add localhost-only endpoints:
+       GET /tiny-live/autonomous-arming/status
+       POST /tiny-live/autonomous-arming/arm-dry-run-lane
+       POST /tiny-live/autonomous-arming/disarm
+
+     Requirements:
+       - must require explicit confirmation phrase
+       - must require exact lane key
+       - must never expose secrets
+       - must never enable real live execution
+       - must never make submit available
+       - must clearly return dry_run_only=true and real_order_forbidden=true
+
+     If write endpoints are too risky or inconsistent, skip POST endpoints and use CLI only.
+     GET status should be safe.
+
+  4. Real candidate watch integration:
+     After a lane is armed in dry-run mode:
+       GET /tiny-live/autonomous-armed-dry-run should reflect:
+         global_auto_live_enabled=true
+         armed_lane_key=<lane>
+         any_lane_auto_armed=true
+         auto_execute_mode=dry_run_only
+
+     If no fresh real candidate:
+       status=AUTO_DRY_RUN_WAIT
+       blockers include no_current_fresh_candidate
+
+     If fresh real candidate appears for exact armed lane:
+       status=AUTO_DRY_RUN_READY
+       rehearsal_mode=false
+       fixture_candidate=false
+       real_market_signal=true
+       simulated_order_triplet present
+       submit_allowed=false
+       final_command_available=false
+
+  5. Final console:
+     Extend autonomous panel:
+       dry_run_arming_control_supported=true
+       dry_run_arming_status
+       armed_lane_key
+       allowed_lane_keys
+       any_lane_auto_armed
+       dry_run_only=true
+       real_order_forbidden=true
+       disarm_next_command
+       arm_next_command_templates for live-qualified lanes
+       current_candidate_watch_status
+       real_candidate_binding_status
+       final_command_available=false
+
+  6. Tests:
+     Add/update tests proving:
+       - default config OFF.
+       - arming requires exact confirmation phrase.
+       - arming unsupported lane blocks.
+       - 8m short near-miss arming blocks.
+       - 13m long below-55 arming blocks.
+       - 4m long/short below-55 arming blocks.
+       - 44m long arming succeeds.
+       - 44m short arming succeeds.
+       - 55m long arming succeeds.
+       - arming writes dry_run_only=true.
+       - arming does not set live_execution_enabled.
+       - arming does not set submit_allowed.
+       - disarm returns config to OFF.
+       - default endpoint after disarm returns AUTO_DRY_RUN_WAIT.
+       - armed real-candidate path with no candidate returns WAIT.
+       - armed real-candidate fixture remains separated from real path.
+       - final console shows arming state.
+       - no real order placed.
+       - no submit attempted.
+       - no Binance order endpoint called.
+       - no Binance test order endpoint called.
+       - no secrets shown.
+       - final command remains unavailable.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous or arming or real_candidate or rehearsal or qualified_candidate or strategy_promotion or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  # Status before arming
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-dry-run-arming-status \
+    | tee /tmp/r278_arming_status_before.json \
+    | jq .
+
+  # Arm 44m long dry-run only
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-dry-run-arm-lane \
+    --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R278 dry-run arming 44m long only; no submit; no real order; no Binance order endpoint." \
+    --confirm-dry-run-autonomous-arming "I CONFIRM AUTONOMOUS DRY-RUN ARMING ONLY; NO REAL ORDER; NO BINANCE ORDER ENDPOINT." \
+    | tee /tmp/r278_arm_44m_long.json \
+    | jq '{
+      status,
+      lane_key,
+      arming_state,
+      blocked_by,
+      safety
+    }'
+
+  # Evaluate real-candidate dry-run path after arming
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-armed-dry-run | jq '{
+    status,
+    real_candidate_binding_supported,
+    arming_state,
+    selected_candidate,
+    real_candidate_dry_run_binding_matrix,
+    dry_run_go_no_go,
+    blockers,
+    safety
+  }'
+
+  # Negative arming must block
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-dry-run-arm-lane \
+    --lane-key "BTCUSDT|8m|short|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R278 negative near-miss arming test; must block." \
+    --confirm-dry-run-autonomous-arming "I CONFIRM AUTONOMOUS DRY-RUN ARMING ONLY; NO REAL ORDER; NO BINANCE ORDER ENDPOINT." \
+    | tee /tmp/r278_arm_8m_short_negative.json \
+    | jq '{
+      status,
+      lane_key,
+      blocked_by,
+      safety
+    }'
+
+  # Final console panel
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  # Disarm after test so repo/runtime returns safe default
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-dry-run-disarm-lane \
+    --operator-id local_operator \
+    --reason "R278 validation cleanup; return autonomous dry-run arming to OFF." \
+    --confirm-dry-run-autonomous-disarm "I CONFIRM AUTONOMOUS DRY-RUN DISARM; RETURN TO OFF." \
+    | tee /tmp/r278_disarm.json \
+    | jq '{
+      status,
+      arming_state,
+      safety
+    }'
+
+  # Safety grep
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - arming status before
+  - successful 44m long dry-run arming
+  - negative 8m short arming block
+  - autonomous endpoint status after arming
+  - final console arming panel
+  - disarm cleanup result
+  - proof config returns OFF
+  - proof no submit/no real order/no Binance order endpoint

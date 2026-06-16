@@ -19,6 +19,7 @@ from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.strategy_promotion_watcher import (
     WATCH_FOUND,
     build_live_qualified_fresh_candidate_watch,
+    build_strategy_promotion_status,
 )
 from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import RISK_CONTRACT_CONFIG_PATH
 from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
@@ -34,10 +35,18 @@ LEDGER_FILENAME = "tiny_live_autonomous_armed_dry_run.ndjson"
 CREATED_BY_PHASE = "R275_AUTONOMOUS_ARMED_LANE_DRY_RUN"
 REHEARSAL_CREATED_BY_PHASE = "R276_AUTONOMOUS_ARMED_LANE_REHEARSAL_FIXTURE"
 REAL_CANDIDATE_BINDING_PHASE = "R277_REAL_CANDIDATE_AUTONOMOUS_DRY_RUN_BINDING"
+OPERATOR_ARMING_CONTROL_PHASE = "R278_OPERATOR_DRY_RUN_ARMING_CONTROL_REAL_CANDIDATE_WATCH"
+DRY_RUN_ARMING_CONFIRMATION_PHRASE = (
+    "I CONFIRM AUTONOMOUS DRY-RUN ARMING ONLY; NO REAL ORDER; NO BINANCE ORDER ENDPOINT."
+)
+DRY_RUN_DISARM_CONFIRMATION_PHRASE = "I CONFIRM AUTONOMOUS DRY-RUN DISARM; RETURN TO OFF."
 
 AUTO_DRY_RUN_WAIT = "AUTO_DRY_RUN_WAIT"
 AUTO_DRY_RUN_BLOCKED = "AUTO_DRY_RUN_BLOCKED"
 AUTO_DRY_RUN_READY = "AUTO_DRY_RUN_READY"
+AUTONOMOUS_DRY_RUN_ARMED = "AUTONOMOUS_DRY_RUN_ARMED"
+AUTONOMOUS_DRY_RUN_DISARMED = "AUTONOMOUS_DRY_RUN_DISARMED"
+AUTONOMOUS_DRY_RUN_ARMING_BLOCKED = "AUTONOMOUS_DRY_RUN_ARMING_BLOCKED"
 
 BLOCKED_BY_GLOBAL_ARMING = "BLOCKED_BY_GLOBAL_ARMING"
 BLOCKED_BY_LANE_ARMING = "BLOCKED_BY_LANE_ARMING"
@@ -62,7 +71,7 @@ SUPPORTED_REHEARSAL_FIXTURE_LANES = {
 }
 
 
-def default_autonomous_arming_state() -> dict[str, Any]:
+def build_default_autonomous_arming_state() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "global_auto_live_enabled": False,
@@ -81,14 +90,240 @@ def default_autonomous_arming_state() -> dict[str, Any]:
     }
 
 
+def default_autonomous_arming_state() -> dict[str, Any]:
+    return build_default_autonomous_arming_state()
+
+
 def load_autonomous_arming_state(config_path: str | Path | None = None) -> dict[str, Any]:
     path = Path(config_path) if config_path is not None else CONFIG_PATH
-    state = default_autonomous_arming_state()
+    state = build_default_autonomous_arming_state()
     if path.exists():
         raw = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(raw, Mapping):
             state.update(dict(raw))
     return _normalize_arming_state(state, path=path)
+
+
+def build_autonomous_dry_run_arming_status(
+    *,
+    config_path: str | Path | None = None,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    state = load_autonomous_arming_state(config_path)
+    live_qualified = _live_qualified_lane_keys(log_dir=resolved_log_dir)
+    return _sanitize(
+        {
+            **_safety_fields(),
+            "status": "AUTONOMOUS_DRY_RUN_ARMING_STATUS",
+            "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+            "dry_run_arming_control_supported": True,
+            "arming_state": state,
+            "armed_lane_key": state.get("armed_lane_key"),
+            "allowed_lane_keys": list(state.get("allowed_lane_keys") or []),
+            "any_lane_auto_armed": state.get("any_lane_auto_armed") is True,
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
+            "live_execution_enabled": False,
+            "live_qualified_lane_keys": live_qualified,
+            "safety": _safety_fields(),
+        }
+    )
+
+
+def validate_autonomous_dry_run_lane_arming(
+    lane_key: str,
+    *,
+    log_dir: str | Path | None = None,
+    confirm_dry_run_autonomous_arming: str | None = None,
+) -> dict[str, Any]:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    lane = str(lane_key or "").strip()
+    live_qualified = _live_qualified_lane_keys(log_dir=resolved_log_dir)
+    blockers: list[str] = []
+    if confirm_dry_run_autonomous_arming != DRY_RUN_ARMING_CONFIRMATION_PHRASE:
+        blockers.append("bad_confirmation")
+    if not lane:
+        blockers.append("lane_key_required")
+    if "*" in lane or lane.lower() in {"all", "any"}:
+        blockers.append("wildcard_lane_arming_forbidden")
+    parts = lane.split("|")
+    if len(parts) != 4:
+        blockers.append("lane_key_must_be_exact_symbol_timeframe_direction_entry_mode")
+    else:
+        symbol, timeframe, direction, entry_mode = parts
+        if symbol != "BTCUSDT":
+            blockers.append("only_BTCUSDT_lanes_supported_for_r278")
+        if direction not in {"long", "short"}:
+            blockers.append("lane_direction_not_long_or_short")
+        if entry_mode != "ladder_close_50_618":
+            blockers.append("entry_mode_not_ladder_close_50_618")
+        if timeframe == "8m" and direction == "short":
+            blockers.append("8m_short_arming_forbidden")
+    lowered = lane.lower()
+    if "betrayal" in lowered or "inverse" in lowered:
+        blockers.append("betrayal_inverse_lane_arming_forbidden")
+    if lane not in live_qualified:
+        blockers.append("lane_not_live_qualified")
+    return _sanitize(
+        {
+            **_safety_fields(),
+            "valid": not blockers,
+            "lane_key": lane,
+            "live_qualified_lane_keys": live_qualified,
+            "confirmation_valid": (
+                confirm_dry_run_autonomous_arming == DRY_RUN_ARMING_CONFIRMATION_PHRASE
+                if confirm_dry_run_autonomous_arming is not None
+                else None
+            ),
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
+            "blocked_by": _dedupe(blockers),
+            "safety": _safety_fields(),
+        }
+    )
+
+
+def arm_autonomous_dry_run_lane(
+    lane_key: str,
+    operator_id: str,
+    reason: str,
+    *,
+    confirm_dry_run_autonomous_arming: str | None = None,
+    config_path: str | Path | None = None,
+    log_dir: str | Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    path = Path(config_path) if config_path is not None else CONFIG_PATH
+    generated_at = now or datetime.now(UTC)
+    validation = validate_autonomous_dry_run_lane_arming(
+        lane_key,
+        log_dir=log_dir,
+        confirm_dry_run_autonomous_arming=confirm_dry_run_autonomous_arming,
+    )
+    if validation["valid"] is not True:
+        return _sanitize(
+            {
+                **_safety_fields(),
+                "status": AUTONOMOUS_DRY_RUN_ARMING_BLOCKED,
+                "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+                "lane_key": str(lane_key or "").strip(),
+                "arming_state_written": False,
+                "confirmation_valid": validation.get("confirmation_valid"),
+                "blocked_by": list(validation.get("blocked_by") or []),
+                "validation": validation,
+                "dry_run_only": True,
+                "real_order_forbidden": True,
+                "submit_allowed": False,
+                "safety": _safety_fields(),
+            }
+        )
+    lane = str(validation["lane_key"])
+    state = {
+        **build_default_autonomous_arming_state(),
+        "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+        "global_auto_live_enabled": True,
+        "auto_execute_mode": "dry_run_only",
+        "armed_lane_key": lane,
+        "allowed_lane_keys": [lane],
+        "lanes": [
+            {
+                "lane_key": lane,
+                "lane_auto_live_enabled": True,
+                "dry_run_only": True,
+                "real_order_forbidden": True,
+                "live_execution_enabled": False,
+                "submit_allowed": False,
+                "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+                "operator_id": str(operator_id or ""),
+                "reason": str(reason or ""),
+                "armed_at": generated_at.isoformat(),
+            }
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    normalized = load_autonomous_arming_state(path)
+    return _sanitize(
+        {
+            **_safety_fields(),
+            "status": AUTONOMOUS_DRY_RUN_ARMED,
+            "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+            "lane_key": lane,
+            "arming_state_written": True,
+            "confirmation_valid": True,
+            "arming_state": normalized,
+            "blocked_by": [],
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
+            "safety": _safety_fields(),
+        }
+    )
+
+
+def disarm_autonomous_dry_run_lane(
+    lane_key: str | None = None,
+    operator_id: str = "local_operator",
+    reason: str = "",
+    *,
+    confirm_dry_run_autonomous_disarm: str | None = None,
+    config_path: str | Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    path = Path(config_path) if config_path is not None else CONFIG_PATH
+    lane = str(lane_key or "all").strip()
+    blockers: list[str] = []
+    if confirm_dry_run_autonomous_disarm != DRY_RUN_DISARM_CONFIRMATION_PHRASE:
+        blockers.append("bad_confirmation")
+    if "*" in lane:
+        blockers.append("wildcard_lane_disarm_forbidden")
+    if blockers:
+        return _sanitize(
+            {
+                **_safety_fields(),
+                "status": AUTONOMOUS_DRY_RUN_ARMING_BLOCKED,
+                "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+                "lane_key": lane,
+                "arming_state_written": False,
+                "confirmation_valid": False,
+                "blocked_by": _dedupe(blockers),
+                "dry_run_only": True,
+                "real_order_forbidden": True,
+                "submit_allowed": False,
+                "safety": _safety_fields(),
+            }
+        )
+    generated_at = now or datetime.now(UTC)
+    state = {
+        **build_default_autonomous_arming_state(),
+        "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+        "last_disarmed_lane_key": None if lane.lower() == "all" else lane,
+        "last_disarmed_by_operator_id": str(operator_id or ""),
+        "last_disarm_reason": str(reason or ""),
+        "last_disarmed_at": generated_at.isoformat(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    normalized = load_autonomous_arming_state(path)
+    return _sanitize(
+        {
+            **_safety_fields(),
+            "status": AUTONOMOUS_DRY_RUN_DISARMED,
+            "created_by_phase": OPERATOR_ARMING_CONTROL_PHASE,
+            "lane_key": lane,
+            "arming_state_written": True,
+            "confirmation_valid": True,
+            "arming_state": normalized,
+            "blocked_by": [],
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
+            "safety": _safety_fields(),
+        }
+    )
 
 
 def build_tiny_live_autonomous_armed_dry_run(
@@ -927,6 +1162,23 @@ def _round_down(value: float | None, *, step: str) -> float | None:
 
 def _dedupe(values: list[str]) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
+
+
+def _live_qualified_lane_keys(*, log_dir: Path) -> list[str]:
+    try:
+        status = build_strategy_promotion_status(log_dir=log_dir)
+    except Exception:
+        return []
+    keys: list[str] = []
+    for row in status.get("live_qualified_lanes") or []:
+        if not isinstance(row, Mapping):
+            continue
+        lane_key = str(row.get("strategy_key") or row.get("lane_key") or "")
+        if not lane_key:
+            lane_key = _lane_key_from_mapping(row)
+        if lane_key:
+            keys.append(lane_key)
+    return sorted(set(keys))
 
 
 def _safety_fields() -> dict[str, Any]:
