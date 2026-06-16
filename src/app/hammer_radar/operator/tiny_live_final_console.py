@@ -76,6 +76,9 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import
 from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_activation_readiness import (
     build_autonomous_trigger_scheduler_activation_readiness,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_timer_health import (
+    build_autonomous_trigger_scheduler_timer_health,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -141,8 +144,10 @@ SOURCE_SURFACES_USED = [
     "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template",
     "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md",
     "docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md",
+    "docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md",
     "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh",
     "scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh",
+    "scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh",
 ]
 
 
@@ -252,6 +257,9 @@ def build_tiny_live_final_console(
         )
         autonomous_trigger_scheduler_systemd_panel = build_autonomous_trigger_scheduler_systemd_panel()
         autonomous_trigger_scheduler_activation_panel = build_autonomous_trigger_scheduler_activation_panel()
+        autonomous_trigger_scheduler_timer_health_panel = (
+            build_autonomous_trigger_scheduler_timer_health_panel(log_dir=resolved_log_dir)
+        )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
             promotion_snapshot=promotion_snapshot,
@@ -453,6 +461,9 @@ def build_tiny_live_final_console(
                 "autonomous_trigger_scheduler_systemd_panel": autonomous_trigger_scheduler_systemd_panel,
                 "autonomous_trigger_scheduler_activation_panel": (
                     autonomous_trigger_scheduler_activation_panel
+                ),
+                "autonomous_trigger_scheduler_timer_health_panel": (
+                    autonomous_trigger_scheduler_timer_health_panel
                 ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
@@ -1028,6 +1039,37 @@ def build_autonomous_trigger_scheduler_activation_panel() -> dict[str, Any]:
             "codex_systemctl_enable_performed": False,
             "codex_sudo_performed": False,
             "dry_run_only": True,
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return _sanitize(panel)
+
+
+def build_autonomous_trigger_scheduler_timer_health_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_autonomous_trigger_scheduler_timer_health(log_dir=log_dir)
+    panel = packet.get("autonomous_trigger_scheduler_timer_health_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "timer_health_status": panel.get("timer_health_status") or packet.get("status"),
+            "timer_active": packet.get("timer_active") is True,
+            "timer_loaded": packet.get("timer_loaded") is True,
+            "timer_installed": packet.get("timer_loaded") is True
+            or packet.get("timer_list_timers_seen") is True,
+            "recent_tick_seen": packet.get("recent_tick_seen") is True,
+            "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+            "documentation_warning_seen": packet.get("documentation_warning_seen") is True,
+            "repo_template_fixed": packet.get("documentation_warning_fixed_in_repo_template") is True,
+            "installed_unit_refresh_required": packet.get("installed_unit_refresh_required") is True,
+            "manual_refresh_commands": list(packet.get("manual_refresh_commands") or []),
             "final_command_available": False,
             "submit_allowed": False,
             "real_order_forbidden": True,

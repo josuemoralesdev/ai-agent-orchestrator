@@ -1,0 +1,344 @@
+# R292 — Dry-Run Timer Operational Hardening
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: OPS HARDENING / INSTALLED TIMER HEALTH
+  Secondary: SYSTEMD DOC FIX, READ-ONLY TIMER STATUS, FINAL CONSOLE WIRING
+  Duplicate risk level: MEDIUM
+
+Operator doctrine:
+  The operator does NOT approve each signal.
+  The operator arms/disarms lanes, tunes risk, monitors alerts/logs, and can kill the system.
+  The machine auto-triggers when armed and all gates are open.
+
+Current state after R291:
+  - Operator manually installed the dry-run systemd service/timer.
+  - Timer is active and waiting.
+  - First and second ticks recorded AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED.
+  - Trigger loop status is AUTONOMOUS_TRIGGER_WAIT.
+  - No current fresh live-qualified candidate.
+  - No submit.
+  - No order.
+  - No executable payload.
+  - No Binance order endpoint.
+  - One systemd warning exists:
+      Invalid URL, ignoring: docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+
+Why this phase exists:
+  R291 proved the dry-run timer works.
+  R292 must harden operational visibility:
+    - fix repo systemd template Documentation= paths to valid file: URLs
+    - add read-only installed timer health packet
+    - expose installed timer status through CLI/API/final console
+    - document how to refresh installed unit manually after template update
+  Codex must NOT reinstall, reload, start, stop, enable, or mutate systemd.
+
+Hard goal:
+  Add operational hardening for the already manually-installed dry-run timer without touching systemd from Codex.
+
+Non-negotiable safety:
+  - Do NOT run sudo.
+  - Do NOT run systemctl start/stop/enable/disable/restart/daemon-reload.
+  - Do NOT mutate /etc/systemd/system.
+  - Do NOT install units.
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - No per-signal approval gates.
+  - R292 remains dry-run timer operational hardening only.
+
+Allowed:
+  - Modify repo-local systemd templates.
+  - Add docs/checklists.
+  - Add read-only systemctl status/list-timers parsing through subprocess if safe.
+  - Add CLI/API/final-console read-only panels.
+  - Add tests.
+  - Print manual refresh commands only.
+
+Required scan:
+  Inspect:
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template
+    - docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+    - docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_activation_readiness.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Fix repo-local systemd templates:
+     Update Documentation= lines in:
+       ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template
+       ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template
+
+     Use valid absolute file URLs:
+       Documentation=file:/home/josue/workspace/kernel/ai-agent-orchestrator-main/docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+       Documentation=file:/home/josue/workspace/kernel/ai-agent-orchestrator-main/docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md
+
+     Do not touch installed /etc unit files.
+
+  2. Add installed timer health module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+
+     Packet:
+       event_type="TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_TIMER_HEALTH"
+       created_by_phase="R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING"
+       status:
+         TIMER_HEALTH_ACTIVE
+         TIMER_HEALTH_INACTIVE
+         TIMER_HEALTH_NOT_INSTALLED
+         TIMER_HEALTH_UNKNOWN
+
+     Read-only fields:
+       - service_unit_name
+       - timer_unit_name
+       - timer_loaded
+       - timer_active
+       - timer_enabled_state if available
+       - timer_next_trigger_raw
+       - timer_last_trigger_raw
+       - timer_list_timers_seen
+       - service_loaded
+       - service_last_status_seen
+       - recent_journal_checked
+       - recent_tick_seen
+       - recent_tick_count
+       - recent_safety_flags_seen
+       - documentation_warning_seen
+       - documentation_warning_fixed_in_repo_template
+       - installed_unit_refresh_required
+       - repo_service_template_path
+       - repo_timer_template_path
+       - manual_refresh_commands
+       - manual_rollback_commands
+       - codex_systemctl_mutation_performed=false
+       - codex_sudo_performed=false
+       - codex_install_performed=false
+       - dry_run_only=true
+       - live_execution_enabled=false
+       - per_signal_operator_approval_required=false
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+       - blockers
+       - safety
+
+     It may run read-only commands only:
+       systemctl is-active hammer-autonomous-trigger-scheduler-dry-run.timer
+       systemctl is-enabled hammer-autonomous-trigger-scheduler-dry-run.timer
+       systemctl list-timers hammer-autonomous-trigger-scheduler-dry-run.timer --no-pager --all
+       systemctl status hammer-autonomous-trigger-scheduler-dry-run.timer --no-pager -l
+       journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service -n 120 --no-pager
+
+     It must not run any command containing:
+       sudo
+       start
+       stop
+       enable
+       disable
+       restart
+       daemon-reload
+       install
+       rm
+
+  3. CLI:
+     Add inspect command:
+       tiny-live-autonomous-trigger-scheduler-timer-health
+
+     It must:
+       - return timer health packet
+       - be read-only
+       - not mutate systemd
+       - not require sudo
+
+  4. API:
+     Add:
+       GET /tiny-live/autonomous-trigger-scheduler/timer-health
+
+     Default safe:
+       - read-only status only
+       - no mutation
+       - no network except local system inspection
+       - no Binance order endpoint
+       - no submit
+
+  5. Final console:
+     Add:
+       autonomous_trigger_scheduler_timer_health_panel
+
+     Include:
+       - timer health status
+       - timer active
+       - timer installed/loaded
+       - recent tick seen
+       - recent tick count
+       - documentation warning seen
+       - repo template fixed
+       - installed unit refresh required
+       - manual refresh commands
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+
+  6. Docs:
+     Add:
+       docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md
+
+     Include:
+       - what changed
+       - why Documentation warning happened
+       - how to manually refresh installed units after commit
+       - how to verify timer health
+       - how to rollback
+       - safety invariants
+
+  7. Print-only refresh script:
+     Add:
+       scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh
+
+     It must print only:
+       - stop timer
+       - install updated templates to /etc/systemd/system
+       - daemon-reload
+       - start timer
+       - status/list-timers/journal checks
+       - rollback commands
+
+     It must not execute sudo/systemctl/install/rm.
+     It must include "R292 PRINT ONLY" banner.
+
+  8. Phase index:
+     Update:
+       docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+  9. Tests:
+     Add tests:
+       - repo service/timer templates use Documentation=file:/absolute/path
+       - no invalid repo-relative Documentation remains
+       - timer health packet is read-only and safe
+       - timer health CLI exists
+       - API endpoint exists
+       - final console includes timer health panel
+       - print-only refresh script does not execute sudo/systemctl/install/rm directly
+       - final_command_available false
+       - submit_allowed false
+       - per_signal_operator_approval_required false
+       - real_order_forbidden true
+       - no Binance order/test order endpoint
+       - no executable payload
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "timer_health or activation_readiness or systemd_template or autonomous_trigger_scheduler or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  sleep 2
+  systemctl is-active hammer-approval-api.service
+  ss -ltnp | grep ':8015' || true
+
+  echo "=== TIMER HEALTH CLI ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-timer-health \
+    | tee /tmp/r292_timer_health.json \
+    | jq '{
+      event_type,
+      status,
+      timer_unit_name,
+      service_unit_name,
+      timer_loaded,
+      timer_active,
+      timer_enabled_state,
+      timer_list_timers_seen,
+      recent_journal_checked,
+      recent_tick_seen,
+      recent_tick_count,
+      recent_safety_flags_seen,
+      documentation_warning_seen,
+      documentation_warning_fixed_in_repo_template,
+      installed_unit_refresh_required,
+      codex_systemctl_mutation_performed,
+      codex_sudo_performed,
+      codex_install_performed,
+      dry_run_only,
+      live_execution_enabled,
+      per_signal_operator_approval_required,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      blockers,
+      safety
+    }'
+
+  echo "=== API TIMER HEALTH ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/autonomous-trigger-scheduler/timer-health | jq '{
+    event_type,
+    status,
+    autonomous_trigger_scheduler_timer_health_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_trigger_scheduler_timer_health_panel,
+    autonomous_trigger_scheduler_activation_panel,
+    autonomous_trigger_scheduler_systemd_panel,
+    autonomous_trigger_scheduler_panel,
+    autonomous_trigger_loop_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== PRINT ONLY REFRESH PLAN ==="
+  bash scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh | sed -n '1,260p'
+
+  echo "=== TEMPLATE DOC CHECK ==="
+  grep -R "^Documentation=" -n ops/systemd/hammer-radar
+
+  echo "=== TEMPLATE / SCRIPT / DOC SAFETY GREP ==="
+  grep -R "fapi/v1/order\|test.*order\|BINANCE_API_SECRET=\|BINANCE_API_KEY=\|final-live-submit\|submit-live\|codex_install_performed.: true\|codex_sudo_performed.: true\|codex_systemctl_mutation_performed.: true" -n \
+    ops/systemd/hammer-radar \
+    docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md \
+    scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh \
+    2>/dev/null || true
+
+  echo "=== SAFETY GREP LOGS ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"executable_payload_created\": true\|\"secrets_shown\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - timer health status
+  - documentation warning fixed in repo template
+  - installed unit refresh required yes/no
+  - proof Codex did not mutate systemd
+  - proof no submit/no order/no executable payload/no secrets
+  - exact manual refresh command source
+  - recommended next phase
