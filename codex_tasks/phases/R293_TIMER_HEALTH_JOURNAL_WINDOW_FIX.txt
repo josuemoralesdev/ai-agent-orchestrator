@@ -1,0 +1,256 @@
+# R293 — Timer Health Journal Window Fix
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: DIAGNOSTIC / HEALTH CHECK FIX
+  Secondary: OPS HARDENING / FALSE POSITIVE REDUCTION
+  Duplicate risk level: MEDIUM
+
+Current state:
+  - R292 added timer health.
+  - Operator manually refreshed installed dry-run timer/service units.
+  - Focused check proves both installed units now use valid Documentation=file:/ absolute paths:
+      /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.service
+      /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer
+  - Recent journal since "3 minutes ago" shows fresh scheduler ticks with:
+      AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED
+      AUTONOMOUS_TRIGGER_WAIT
+      no recent Invalid URL
+  - R292 health packet still reports:
+      documentation_warning_seen=true
+      installed_unit_refresh_required=true
+    because it scans too much journal history and sees stale pre-refresh warnings.
+
+Why this phase exists:
+  The installed systemd units are fixed, but the timer health checker is reporting stale historical warnings as current failures.
+  R293 must make timer-health evaluate a recent/current journal window, not ancient systemd archaeology.
+
+Operator doctrine:
+  The operator does NOT approve each signal.
+  The operator arms/disarms lanes, tunes risk, monitors health/logs, and can kill the system.
+  The machine auto-triggers when armed and all gates are open.
+
+Hard goal:
+  Fix timer health logic so:
+    - old pre-refresh Invalid URL warnings do not mark current health unhealthy
+    - installed_unit_refresh_required becomes false when installed Documentation lines are valid
+    - documentation_warning_seen only reflects the chosen current/recent journal window
+    - stale_documentation_warning_seen can be reported separately for context if useful
+
+Non-negotiable safety:
+  - Do NOT run sudo.
+  - Do NOT install, stop, start, enable, disable, restart, or reload systemd units.
+  - Do NOT mutate /etc/systemd/system.
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT mutate env files.
+  - Do NOT mutate risk contracts.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print secrets/signatures/signed URLs.
+  - This remains dry-run timer health only.
+
+Allowed:
+  - Modify repo code/docs/tests.
+  - Use read-only systemctl/journalctl inspection in implementation.
+  - Mock read-only subprocess calls in tests.
+  - Add CLI/API fields.
+  - Add docs explaining stale vs current journal warnings.
+
+Required scan:
+  Inspect before coding:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - tests/hammer_radar/test_tiny_live_autonomous_trigger_scheduler.py
+    - docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Implementation requirements:
+  1. Timer health must inspect installed Documentation lines directly:
+     - /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.service
+     - /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer
+
+     If both installed docs begin with "Documentation=file:/", then:
+       installed_unit_refresh_required=false
+
+     Do not rely only on journal history for this field.
+
+  2. Journal warning fields:
+     Add/clarify fields:
+       - documentation_warning_seen
+       - documentation_warning_window
+       - documentation_warning_window_seconds
+       - stale_documentation_warning_seen
+       - stale_documentation_warning_ignored_for_current_health
+       - current_journal_window_checked
+       - current_journal_window_command
+
+     Behavior:
+       - documentation_warning_seen should be true only if "Invalid URL" appears inside the current/recent window.
+       - stale_documentation_warning_seen may be true if old warnings exist outside the current window, but it must not force installed_unit_refresh_required=true.
+       - stale_documentation_warning_ignored_for_current_health=true when old warnings exist but installed unit docs are valid and recent window is clean.
+
+  3. Default recent window:
+     Use a safe default of 10 minutes or last 120 lines with timestamp filtering if reliable.
+     Prefer journalctl with a valid expression:
+       --since "10 minutes ago"
+     Do NOT use invalid "now - 3 min".
+
+  4. Read-only commands only:
+     Allowed command patterns:
+       systemctl is-active hammer-autonomous-trigger-scheduler-dry-run.timer
+       systemctl is-enabled hammer-autonomous-trigger-scheduler-dry-run.timer
+       systemctl list-timers hammer-autonomous-trigger-scheduler-dry-run.timer --no-pager --all
+       systemctl status hammer-autonomous-trigger-scheduler-dry-run.timer --no-pager -l
+       journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service --since "10 minutes ago" --no-pager
+       journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service -n 240 --no-pager
+
+     Forbidden:
+       sudo
+       systemctl start
+       systemctl stop
+       systemctl restart
+       systemctl enable
+       systemctl disable
+       systemctl daemon-reload
+       install/cp/rm/mv to /etc/systemd/system
+
+  5. Final status:
+     TIMER_HEALTH_ACTIVE should remain active if:
+       - timer active
+       - recent tick seen
+       - no unsafe safety flags
+       - installed Documentation=file:/ paths are valid
+       - no current-window Invalid URL
+
+  6. API:
+     Existing endpoint must keep working:
+       GET /tiny-live/autonomous-trigger-scheduler/timer-health
+
+  7. CLI:
+     Existing command must keep working:
+       tiny-live-autonomous-trigger-scheduler-timer-health
+
+  8. Final console:
+     Update panel to include current vs stale warning fields.
+
+  9. Docs:
+     Add:
+       docs/hammer_radar/live_readiness/R293_TIMER_HEALTH_JOURNAL_WINDOW_FIX.md
+
+     Update:
+       docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+     Explain:
+       - why R292 showed false positive
+       - how R293 distinguishes current warnings from stale historical warnings
+       - expected post-refresh healthy values
+
+Tests:
+  Add/extend tests for:
+    - installed docs valid + old Invalid URL outside current window => installed_unit_refresh_required=false
+    - current window Invalid URL => documentation_warning_seen=true
+    - stale warning ignored field true when old warning exists but current window clean
+    - invalid installed doc path => installed_unit_refresh_required=true
+    - timer health status active with recent tick and clean current window
+    - CLI returns new fields
+    - API returns new fields
+    - final console panel returns new fields
+    - forbidden mutation commands are never invoked
+    - final_command_available=false
+    - submit_allowed=false
+    - real_order_forbidden=true
+    - no order/test-order/leverage/margin/env mutation
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "timer_health or final_console or approval_api or autonomous_trigger_scheduler"
+
+  sudo systemctl restart hammer-approval-api.service
+  sleep 2
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== TIMER HEALTH CLI ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-timer-health \
+    | tee /tmp/r293_timer_health.json \
+    | jq '{
+      event_type,
+      status,
+      timer_active,
+      recent_tick_seen,
+      recent_tick_count,
+      documentation_warning_seen,
+      documentation_warning_window,
+      documentation_warning_window_seconds,
+      stale_documentation_warning_seen,
+      stale_documentation_warning_ignored_for_current_health,
+      current_journal_window_checked,
+      installed_unit_refresh_required,
+      documentation_warning_fixed_in_repo_template,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== RECENT JOURNAL ==="
+  journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service \
+    --since "10 minutes ago" \
+    --no-pager \
+    | grep -E "Invalid URL|Starting|Finished|AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED|AUTONOMOUS_TRIGGER_WAIT" || true
+
+  echo "=== INSTALLED DOCS ==="
+  grep -n "^Documentation=" /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.service
+  grep -n "^Documentation=" /etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer
+
+  echo "=== API TIMER HEALTH ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/autonomous-trigger-scheduler/timer-health | jq '{
+    event_type,
+    status,
+    autonomous_trigger_scheduler_timer_health_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_trigger_scheduler_timer_health_panel,
+    autonomous_trigger_scheduler_panel,
+    autonomous_trigger_loop_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== SAFETY GREP LOGS ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"executable_payload_created\": true\|\"secrets_shown\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - timer health summary
+  - current vs stale documentation warning behavior
+  - installed_unit_refresh_required final value
+  - proof no systemd mutation by Codex
+  - proof no submit/order/executable payload/secrets
+  - recommended next phase

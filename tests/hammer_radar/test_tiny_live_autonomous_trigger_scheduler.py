@@ -31,6 +31,7 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_timer_
     TIMER_HEALTH_ACTIVE,
     build_autonomous_trigger_scheduler_timer_health,
 )
+from src.app.hammer_radar.operator import tiny_live_autonomous_trigger_scheduler_timer_health as timer_health
 from tests.hammer_radar.test_tiny_live_autonomous_trigger_loop import _write_armed_state
 from tests.hammer_radar.test_tiny_live_one_shot_pre_activation_gate import (
     LANE_44M_LONG,
@@ -64,6 +65,9 @@ ACTIVATION_PRINT_ONLY_SCRIPT_PATH = (
 )
 R292_DOC_PATH = (
     REPO_ROOT / "docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md"
+)
+R293_DOC_PATH = (
+    REPO_ROOT / "docs/hammer_radar/live_readiness/R293_TIMER_HEALTH_JOURNAL_WINDOW_FIX.md"
 )
 R292_PRINT_ONLY_SCRIPT_PATH = (
     REPO_ROOT / "scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh"
@@ -382,6 +386,7 @@ def test_activation_docs_templates_and_scripts_do_not_expose_secrets_or_live_sub
         ACTIVATION_CHECKLIST_PATH,
         ACTIVATION_PRINT_ONLY_SCRIPT_PATH,
         R292_DOC_PATH,
+        R293_DOC_PATH,
         R292_PRINT_ONLY_SCRIPT_PATH,
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)
@@ -407,6 +412,7 @@ def test_activation_docs_templates_and_scripts_do_not_expose_secrets_or_live_sub
 
 def test_timer_health_packet_read_only_and_safe(tmp_path: Path) -> None:
     _write_scheduler_tick(tmp_path)
+    service_unit, timer_unit = _write_installed_unit_docs(tmp_path)
     calls: list[list[str]] = []
 
     def fake_run(command, **kwargs):
@@ -435,20 +441,25 @@ def test_timer_health_packet_read_only_and_safe(tmp_path: Path) -> None:
                 "Loaded: loaded (/etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer; disabled)\nActive: active (waiting)\n",
                 "",
             )
-        if "journalctl" in joined:
+        if "journalctl" in joined and "--since" in joined:
             return subprocess.CompletedProcess(
                 command,
                 0,
                 "AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED no submit\n",
                 "",
             )
+        if "journalctl" in joined and "-n 240" in joined:
+            return subprocess.CompletedProcess(command, 0, "old clean dry-run tick\n", "")
         raise AssertionError(joined)
 
-    payload = build_autonomous_trigger_scheduler_timer_health(
-        log_dir=tmp_path,
-        repo_root=REPO_ROOT,
-        command_runner=fake_run,
-    )
+    with patch.object(timer_health, "INSTALLED_SERVICE_UNIT_PATH", service_unit), patch.object(
+        timer_health, "INSTALLED_TIMER_UNIT_PATH", timer_unit
+    ):
+        payload = build_autonomous_trigger_scheduler_timer_health(
+            log_dir=tmp_path,
+            repo_root=REPO_ROOT,
+            command_runner=fake_run,
+        )
 
     assert payload["event_type"] == TIMER_HEALTH_EVENT_TYPE
     assert payload["created_by_phase"] == "R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING"
@@ -462,8 +473,18 @@ def test_timer_health_packet_read_only_and_safe(tmp_path: Path) -> None:
     assert payload["recent_tick_count"] == 1
     assert payload["recent_safety_flags_seen"] == []
     assert payload["documentation_warning_seen"] is False
+    assert payload["documentation_warning_window"] == "last_10_minutes"
+    assert payload["documentation_warning_window_seconds"] == 600
+    assert payload["stale_documentation_warning_seen"] is False
+    assert payload["stale_documentation_warning_ignored_for_current_health"] is False
+    assert payload["current_journal_window_checked"] is True
+    assert payload["current_journal_window_command"] == (
+        "journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service "
+        "--since '10 minutes ago' --no-pager"
+    )
     assert payload["documentation_warning_fixed_in_repo_template"] is True
     assert payload["installed_unit_refresh_required"] is False
+    assert payload["installed_documentation_file_urls_valid"] is True
     assert payload["codex_systemctl_mutation_performed"] is False
     assert payload["codex_sudo_performed"] is False
     assert payload["codex_install_performed"] is False
@@ -487,7 +508,10 @@ def test_timer_health_packet_read_only_and_safe(tmp_path: Path) -> None:
     _assert_no_submit_or_mutation(payload)
 
 
-def test_timer_health_reports_refresh_required_for_installed_doc_warning(tmp_path: Path) -> None:
+def test_timer_health_ignores_stale_doc_warning_when_installed_docs_valid(tmp_path: Path) -> None:
+    _write_scheduler_tick(tmp_path)
+    service_unit, timer_unit = _write_installed_unit_docs(tmp_path)
+
     def fake_run(command, **kwargs):
         joined = " ".join(command)
         if "is-active" in joined:
@@ -501,9 +525,16 @@ def test_timer_health_reports_refresh_required_for_installed_doc_warning(tmp_pat
                 command,
                 0,
                 "Loaded: loaded (/etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer; disabled)\n",
-                "Invalid URL, ignoring: docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md\n",
+                "",
             )
-        if "journalctl" in joined:
+        if "journalctl" in joined and "--since" in joined:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED no submit\n",
+                "",
+            )
+        if "journalctl" in joined and "-n 240" in joined:
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -512,14 +543,109 @@ def test_timer_health_reports_refresh_required_for_installed_doc_warning(tmp_pat
             )
         raise AssertionError(joined)
 
-    payload = build_autonomous_trigger_scheduler_timer_health(
-        log_dir=tmp_path,
-        repo_root=REPO_ROOT,
-        command_runner=fake_run,
-    )
+    with patch.object(timer_health, "INSTALLED_SERVICE_UNIT_PATH", service_unit), patch.object(
+        timer_health, "INSTALLED_TIMER_UNIT_PATH", timer_unit
+    ):
+        payload = build_autonomous_trigger_scheduler_timer_health(
+            log_dir=tmp_path,
+            repo_root=REPO_ROOT,
+            command_runner=fake_run,
+        )
+
+    assert payload["status"] == TIMER_HEALTH_ACTIVE
+    assert payload["documentation_warning_seen"] is False
+    assert payload["stale_documentation_warning_seen"] is True
+    assert payload["stale_documentation_warning_ignored_for_current_health"] is True
+    assert payload["documentation_warning_fixed_in_repo_template"] is True
+    assert payload["installed_documentation_file_urls_valid"] is True
+    assert payload["installed_unit_refresh_required"] is False
+
+
+def test_timer_health_current_window_doc_warning_blocks_active(tmp_path: Path) -> None:
+    _write_scheduler_tick(tmp_path)
+    service_unit, timer_unit = _write_installed_unit_docs(tmp_path)
+
+    def fake_run(command, **kwargs):
+        joined = " ".join(command)
+        if "is-active" in joined:
+            return subprocess.CompletedProcess(command, 0, "active\n", "")
+        if "is-enabled" in joined:
+            return subprocess.CompletedProcess(command, 1, "disabled\n", "")
+        if "list-timers" in joined:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "NEXT LEFT LAST PASSED UNIT ACTIVATES\nhammer-autonomous-trigger-scheduler-dry-run.timer\n",
+                "",
+            )
+        if "status" in joined:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "Loaded: loaded (/etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer; disabled)\n",
+                "",
+            )
+        if "journalctl" in joined and "--since" in joined:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "Invalid URL, ignoring: docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md\n",
+                "",
+            )
+        if "journalctl" in joined and "-n 240" in joined:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        raise AssertionError(joined)
+
+    with patch.object(timer_health, "INSTALLED_SERVICE_UNIT_PATH", service_unit), patch.object(
+        timer_health, "INSTALLED_TIMER_UNIT_PATH", timer_unit
+    ):
+        payload = build_autonomous_trigger_scheduler_timer_health(
+            log_dir=tmp_path,
+            repo_root=REPO_ROOT,
+            command_runner=fake_run,
+        )
 
     assert payload["documentation_warning_seen"] is True
-    assert payload["documentation_warning_fixed_in_repo_template"] is True
+    assert payload["stale_documentation_warning_seen"] is False
+    assert payload["stale_documentation_warning_ignored_for_current_health"] is False
+    assert payload["installed_unit_refresh_required"] is False
+    assert "current_journal_documentation_warning_seen" in payload["blockers"]
+    assert payload["status"] != TIMER_HEALTH_ACTIVE
+
+
+def test_timer_health_reports_refresh_required_for_invalid_installed_doc(tmp_path: Path) -> None:
+    service_unit, timer_unit = _write_installed_unit_docs(tmp_path, valid=False)
+
+    def fake_run(command, **kwargs):
+        joined = " ".join(command)
+        if "is-active" in joined:
+            return subprocess.CompletedProcess(command, 0, "active\n", "")
+        if "is-enabled" in joined:
+            return subprocess.CompletedProcess(command, 1, "disabled\n", "")
+        if "list-timers" in joined:
+            return subprocess.CompletedProcess(command, 0, "NEXT LEFT LAST PASSED UNIT ACTIVATES\n", "")
+        if "status" in joined:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "Loaded: loaded (/etc/systemd/system/hammer-autonomous-trigger-scheduler-dry-run.timer; disabled)\n",
+                "",
+            )
+        if "journalctl" in joined:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        raise AssertionError(joined)
+
+    with patch.object(timer_health, "INSTALLED_SERVICE_UNIT_PATH", service_unit), patch.object(
+        timer_health, "INSTALLED_TIMER_UNIT_PATH", timer_unit
+    ):
+        payload = build_autonomous_trigger_scheduler_timer_health(
+            log_dir=tmp_path,
+            repo_root=REPO_ROOT,
+            command_runner=fake_run,
+        )
+
+    assert payload["documentation_warning_seen"] is False
+    assert payload["installed_documentation_file_urls_valid"] is False
     assert payload["installed_unit_refresh_required"] is True
     assert "sudo systemctl stop hammer-autonomous-trigger-scheduler-dry-run.timer" in payload[
         "manual_refresh_commands"
@@ -545,6 +671,12 @@ def test_timer_health_cli_and_api_exist_and_are_safe(tmp_path: Path, monkeypatch
     )
     cli_payload = json.loads(result.stdout)
     assert cli_payload["event_type"] == TIMER_HEALTH_EVENT_TYPE
+    assert "documentation_warning_window" in cli_payload
+    assert "documentation_warning_window_seconds" in cli_payload
+    assert "stale_documentation_warning_seen" in cli_payload
+    assert "stale_documentation_warning_ignored_for_current_health" in cli_payload
+    assert "current_journal_window_checked" in cli_payload
+    assert "current_journal_window_command" in cli_payload
     assert cli_payload["codex_systemctl_mutation_performed"] is False
     assert cli_payload["codex_sudo_performed"] is False
     assert cli_payload["codex_install_performed"] is False
@@ -560,6 +692,12 @@ def test_timer_health_cli_and_api_exist_and_are_safe(tmp_path: Path, monkeypatch
     assert response.status_code == 200
     assert api_payload["event_type"] == TIMER_HEALTH_EVENT_TYPE
     assert api_payload["autonomous_trigger_scheduler_timer_health_panel"]
+    assert "documentation_warning_window" in api_payload
+    assert "documentation_warning_window_seconds" in api_payload
+    assert "stale_documentation_warning_seen" in api_payload
+    assert "stale_documentation_warning_ignored_for_current_health" in api_payload
+    assert "current_journal_window_checked" in api_payload
+    assert "current_journal_window_command" in api_payload
     assert api_payload["final_command_available"] is False
     assert api_payload["submit_allowed"] is False
     assert api_payload["real_order_forbidden"] is True
@@ -578,8 +716,15 @@ def test_final_console_includes_scheduler_timer_health_panel(tmp_path: Path) -> 
     assert "recent_tick_seen" in panel
     assert "recent_tick_count" in panel
     assert "documentation_warning_seen" in panel
+    assert "documentation_warning_window" in panel
+    assert "documentation_warning_window_seconds" in panel
+    assert "stale_documentation_warning_seen" in panel
+    assert "stale_documentation_warning_ignored_for_current_health" in panel
+    assert "current_journal_window_checked" in panel
+    assert "current_journal_window_command" in panel
     assert "repo_template_fixed" in panel
     assert "installed_unit_refresh_required" in panel
+    assert "installed_documentation_file_urls_valid" in panel
     assert "manual_refresh_commands" in panel
     assert panel["final_command_available"] is False
     assert panel["submit_allowed"] is False
@@ -802,6 +947,26 @@ def _assert_template_text_safe(text: str) -> None:
     )
     for token in forbidden:
         assert token not in text
+
+
+def _write_installed_unit_docs(tmp_path: Path, *, valid: bool = True) -> tuple[Path, Path]:
+    service_line = (
+        "Documentation=file:/home/josue/workspace/kernel/ai-agent-orchestrator-main/"
+        "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
+        if valid
+        else "Documentation=docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
+    )
+    timer_line = (
+        "Documentation=file:/home/josue/workspace/kernel/ai-agent-orchestrator-main/"
+        "docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md"
+        if valid
+        else "Documentation=docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md"
+    )
+    service_unit = tmp_path / "hammer-autonomous-trigger-scheduler-dry-run.service"
+    timer_unit = tmp_path / "hammer-autonomous-trigger-scheduler-dry-run.timer"
+    service_unit.write_text(f"[Unit]\n{service_line}\n", encoding="utf-8")
+    timer_unit.write_text(f"[Unit]\n{timer_line}\n", encoding="utf-8")
+    return service_unit, timer_unit
 
 
 def _write_scheduler_tick(log_dir: Path) -> None:

@@ -1067,8 +1067,25 @@ def build_autonomous_trigger_scheduler_timer_health_panel(
             "recent_tick_seen": packet.get("recent_tick_seen") is True,
             "recent_tick_count": int(packet.get("recent_tick_count") or 0),
             "documentation_warning_seen": packet.get("documentation_warning_seen") is True,
+            "documentation_warning_window": packet.get("documentation_warning_window"),
+            "documentation_warning_window_seconds": packet.get(
+                "documentation_warning_window_seconds"
+            ),
+            "stale_documentation_warning_seen": (
+                packet.get("stale_documentation_warning_seen") is True
+            ),
+            "stale_documentation_warning_ignored_for_current_health": (
+                packet.get("stale_documentation_warning_ignored_for_current_health") is True
+            ),
+            "current_journal_window_checked": (
+                packet.get("current_journal_window_checked") is True
+            ),
+            "current_journal_window_command": packet.get("current_journal_window_command"),
             "repo_template_fixed": packet.get("documentation_warning_fixed_in_repo_template") is True,
             "installed_unit_refresh_required": packet.get("installed_unit_refresh_required") is True,
+            "installed_documentation_file_urls_valid": (
+                packet.get("installed_documentation_file_urls_valid") is True
+            ),
             "manual_refresh_commands": list(packet.get("manual_refresh_commands") or []),
             "final_command_available": False,
             "submit_allowed": False,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -26,6 +27,7 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import
 
 EVENT_TYPE = "TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_TIMER_HEALTH"
 CREATED_BY_PHASE = "R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING"
+UPDATED_BY_PHASE = "R293_TIMER_HEALTH_JOURNAL_WINDOW_FIX"
 
 TIMER_HEALTH_ACTIVE = "TIMER_HEALTH_ACTIVE"
 TIMER_HEALTH_INACTIVE = "TIMER_HEALTH_INACTIVE"
@@ -34,6 +36,12 @@ TIMER_HEALTH_UNKNOWN = "TIMER_HEALTH_UNKNOWN"
 
 SERVICE_UNIT_NAME = "hammer-autonomous-trigger-scheduler-dry-run.service"
 TIMER_UNIT_NAME = "hammer-autonomous-trigger-scheduler-dry-run.timer"
+CURRENT_JOURNAL_WINDOW = "10 minutes ago"
+CURRENT_JOURNAL_WINDOW_SECONDS = 600
+STALE_JOURNAL_LINE_LIMIT = 240
+
+INSTALLED_SERVICE_UNIT_PATH = Path(f"/etc/systemd/system/{SERVICE_UNIT_NAME}")
+INSTALLED_TIMER_UNIT_PATH = Path(f"/etc/systemd/system/{TIMER_UNIT_NAME}")
 
 R292_DOC_PATH = Path("docs/hammer_radar/live_readiness/R292_DRY_RUN_TIMER_OPERATIONAL_HARDENING.md")
 PRINT_ONLY_REFRESH_SCRIPT_PATH = Path(
@@ -54,7 +62,8 @@ READ_ONLY_COMMANDS: tuple[tuple[str, ...], ...] = (
     ("systemctl", "is-enabled", TIMER_UNIT_NAME),
     ("systemctl", "list-timers", TIMER_UNIT_NAME, "--no-pager", "--all"),
     ("systemctl", "status", TIMER_UNIT_NAME, "--no-pager", "-l"),
-    ("journalctl", "-u", SERVICE_UNIT_NAME, "-n", "120", "--no-pager"),
+    ("journalctl", "-u", SERVICE_UNIT_NAME, "--since", CURRENT_JOURNAL_WINDOW, "--no-pager"),
+    ("journalctl", "-u", SERVICE_UNIT_NAME, "-n", str(STALE_JOURNAL_LINE_LIMIT), "--no-pager"),
 )
 
 FORBIDDEN_COMMAND_TOKENS = {
@@ -109,36 +118,55 @@ def build_autonomous_trigger_scheduler_timer_health(
     command_results = _run_read_only_commands(command_runner=command_runner)
     timer_status = command_results.get("timer_status", {})
     timer_list = command_results.get("timer_list", {})
-    journal = command_results.get("journal", {})
+    current_journal = command_results.get("current_journal", {})
+    stale_journal = command_results.get("stale_journal", {})
+    installed_documentation = _installed_documentation_status()
     timer_active = _stdout(command_results.get("timer_active")).strip() == "active"
     enabled_state = _stdout(command_results.get("timer_enabled")).strip() or None
     timer_loaded = _loaded_seen(_stdout(timer_status), TIMER_UNIT_NAME)
-    service_loaded = _journal_checked(journal) or _service_seen_in_journal(_stdout(journal))
+    service_loaded = _journal_checked(current_journal) or _service_seen_in_journal(_stdout(current_journal))
     timer_list_text = _stdout(timer_list)
-    journal_text = _stdout(journal)
+    current_journal_text = _stdout(current_journal)
+    stale_journal_text = _stdout(stale_journal)
     timer_list_timers_seen = TIMER_UNIT_NAME in timer_list_text
     next_trigger, last_trigger = _parse_list_timers(timer_list_text)
     recent_records = _recent_scheduler_records(log_dir=log_dir)
     recent_tick_count = len(recent_records)
-    recent_tick_seen = recent_tick_count > 0 or "AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED" in journal_text
+    recent_tick_seen = (
+        recent_tick_count > 0
+        or "AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED" in current_journal_text
+    )
     recent_safety_flags_seen = _recent_safety_flags(recent_records)
-    documentation_warning_seen = "Invalid URL" in journal_text or "invalid url" in _stdout(timer_status).lower()
+    documentation_warning_seen = _documentation_warning_seen(current_journal_text)
+    stale_documentation_warning_seen = (
+        _documentation_warning_seen(stale_journal_text) and not documentation_warning_seen
+    )
     documentation_warning_fixed_in_repo_template = _repo_templates_have_file_urls(root)
-    installed_unit_refresh_required = bool(
-        documentation_warning_seen and documentation_warning_fixed_in_repo_template
+    installed_unit_refresh_required = not installed_documentation["installed_documentation_file_urls_valid"]
+    stale_documentation_warning_ignored_for_current_health = bool(
+        stale_documentation_warning_seen
+        and not documentation_warning_seen
+        and installed_documentation["installed_documentation_file_urls_valid"]
     )
     blockers = _blockers(
         command_results=command_results,
         timer_loaded=timer_loaded,
         timer_active=timer_active,
+        recent_tick_seen=recent_tick_seen,
         recent_safety_flags_seen=recent_safety_flags_seen,
         documentation_warning_fixed_in_repo_template=documentation_warning_fixed_in_repo_template,
+        installed_unit_refresh_required=installed_unit_refresh_required,
+        documentation_warning_seen=documentation_warning_seen,
     )
     status = _status(
         command_results=command_results,
         timer_loaded=timer_loaded,
         timer_active=timer_active,
         timer_list_timers_seen=timer_list_timers_seen,
+        recent_tick_seen=recent_tick_seen,
+        recent_safety_flags_seen=recent_safety_flags_seen,
+        installed_unit_refresh_required=installed_unit_refresh_required,
+        documentation_warning_seen=documentation_warning_seen,
     )
     safety = _safety()
     packet = {
@@ -155,14 +183,23 @@ def build_autonomous_trigger_scheduler_timer_health(
         "timer_last_trigger_raw": last_trigger,
         "timer_list_timers_seen": timer_list_timers_seen,
         "service_loaded": service_loaded,
-        "service_last_status_seen": _service_last_status_seen(journal_text),
-        "recent_journal_checked": _journal_checked(journal),
+        "service_last_status_seen": _service_last_status_seen(current_journal_text),
+        "recent_journal_checked": _journal_checked(current_journal),
+        "current_journal_window_checked": _journal_checked(current_journal),
+        "current_journal_window_command": current_journal.get("command"),
         "recent_tick_seen": recent_tick_seen,
         "recent_tick_count": recent_tick_count,
         "recent_safety_flags_seen": recent_safety_flags_seen,
         "documentation_warning_seen": documentation_warning_seen,
+        "documentation_warning_window": "last_10_minutes",
+        "documentation_warning_window_seconds": CURRENT_JOURNAL_WINDOW_SECONDS,
+        "stale_documentation_warning_seen": stale_documentation_warning_seen,
+        "stale_documentation_warning_ignored_for_current_health": (
+            stale_documentation_warning_ignored_for_current_health
+        ),
         "documentation_warning_fixed_in_repo_template": documentation_warning_fixed_in_repo_template,
         "installed_unit_refresh_required": installed_unit_refresh_required,
+        **installed_documentation,
         "repo_service_template_path": str(SERVICE_TEMPLATE_PATH),
         "repo_timer_template_path": str(TIMER_TEMPLATE_PATH),
         "manual_refresh_commands": _manual_refresh_commands(),
@@ -177,7 +214,7 @@ def build_autonomous_trigger_scheduler_timer_health(
         "submit_allowed": False,
         "real_order_forbidden": True,
         "blockers": blockers,
-        "read_only_commands_checked": [" ".join(command) for command in READ_ONLY_COMMANDS],
+        "read_only_commands_checked": [shlex.join(command) for command in READ_ONLY_COMMANDS],
         "command_results": _public_command_results(command_results),
         "autonomous_trigger_scheduler_timer_health_panel": {
             "timer_health_status": status,
@@ -187,8 +224,19 @@ def build_autonomous_trigger_scheduler_timer_health(
             "recent_tick_seen": recent_tick_seen,
             "recent_tick_count": recent_tick_count,
             "documentation_warning_seen": documentation_warning_seen,
+            "documentation_warning_window": "last_10_minutes",
+            "documentation_warning_window_seconds": CURRENT_JOURNAL_WINDOW_SECONDS,
+            "stale_documentation_warning_seen": stale_documentation_warning_seen,
+            "stale_documentation_warning_ignored_for_current_health": (
+                stale_documentation_warning_ignored_for_current_health
+            ),
+            "current_journal_window_checked": _journal_checked(current_journal),
+            "current_journal_window_command": current_journal.get("command"),
             "repo_template_fixed": documentation_warning_fixed_in_repo_template,
             "installed_unit_refresh_required": installed_unit_refresh_required,
+            "installed_documentation_file_urls_valid": installed_documentation[
+                "installed_documentation_file_urls_valid"
+            ],
             "manual_refresh_commands": _manual_refresh_commands(),
             "final_command_available": False,
             "submit_allowed": False,
@@ -208,7 +256,14 @@ def _run_read_only_commands(
     command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     runner = command_runner or subprocess.run
-    names = ("timer_active", "timer_enabled", "timer_list", "timer_status", "journal")
+    names = (
+        "timer_active",
+        "timer_enabled",
+        "timer_list",
+        "timer_status",
+        "current_journal",
+        "stale_journal",
+    )
     results: dict[str, dict[str, Any]] = {}
     for name, command in zip(names, READ_ONLY_COMMANDS, strict=True):
         _assert_read_only_command(command)
@@ -221,7 +276,7 @@ def _run_read_only_commands(
                 timeout=8,
             )
             results[name] = {
-                "command": " ".join(command),
+                "command": shlex.join(command),
                 "returncode": completed.returncode,
                 "stdout": completed.stdout or "",
                 "stderr": completed.stderr or "",
@@ -229,7 +284,7 @@ def _run_read_only_commands(
             }
         except Exception as exc:  # pragma: no cover - defensive local inspection
             results[name] = {
-                "command": " ".join(command),
+                "command": shlex.join(command),
                 "returncode": None,
                 "stdout": "",
                 "stderr": exc.__class__.__name__,
@@ -292,13 +347,49 @@ def _repo_templates_have_file_urls(root: Path) -> bool:
     )
 
 
+def _installed_documentation_status() -> dict[str, Any]:
+    service_line = _first_documentation_line(INSTALLED_SERVICE_UNIT_PATH)
+    timer_line = _first_documentation_line(INSTALLED_TIMER_UNIT_PATH)
+    service_valid = _documentation_line_has_file_url(service_line)
+    timer_valid = _documentation_line_has_file_url(timer_line)
+    return {
+        "installed_service_unit_path": str(INSTALLED_SERVICE_UNIT_PATH),
+        "installed_timer_unit_path": str(INSTALLED_TIMER_UNIT_PATH),
+        "installed_service_documentation_line": service_line,
+        "installed_timer_documentation_line": timer_line,
+        "installed_service_documentation_file_url_valid": service_valid,
+        "installed_timer_documentation_file_url_valid": timer_valid,
+        "installed_documentation_file_urls_valid": service_valid and timer_valid,
+    }
+
+
+def _first_documentation_line(path: Path) -> str | None:
+    text = _read_text(path)
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("Documentation="):
+            return stripped
+    return None
+
+
+def _documentation_line_has_file_url(line: str | None) -> bool:
+    return bool(line and line.startswith("Documentation=file:/"))
+
+
+def _documentation_warning_seen(text: str) -> bool:
+    return "invalid url" in text.lower()
+
+
 def _blockers(
     *,
     command_results: Mapping[str, Mapping[str, Any]],
     timer_loaded: bool,
     timer_active: bool,
+    recent_tick_seen: bool,
     recent_safety_flags_seen: Sequence[str],
     documentation_warning_fixed_in_repo_template: bool,
+    installed_unit_refresh_required: bool,
+    documentation_warning_seen: bool,
 ) -> list[str]:
     blockers: list[str] = []
     if not _any_command_checked(command_results):
@@ -307,10 +398,16 @@ def _blockers(
         blockers.append("timer_not_loaded")
     if timer_loaded and not timer_active:
         blockers.append("timer_not_active")
+    if timer_loaded and timer_active and not recent_tick_seen:
+        blockers.append("recent_scheduler_tick_missing")
     if recent_safety_flags_seen:
         blockers.extend(f"unsafe_recent_safety_flag:{flag}" for flag in recent_safety_flags_seen)
     if not documentation_warning_fixed_in_repo_template:
         blockers.append("repo_template_documentation_file_url_missing")
+    if installed_unit_refresh_required:
+        blockers.append("installed_unit_documentation_file_url_missing")
+    if documentation_warning_seen:
+        blockers.append("current_journal_documentation_warning_seen")
     return blockers
 
 
@@ -320,10 +417,21 @@ def _status(
     timer_loaded: bool,
     timer_active: bool,
     timer_list_timers_seen: bool,
+    recent_tick_seen: bool,
+    recent_safety_flags_seen: Sequence[str],
+    installed_unit_refresh_required: bool,
+    documentation_warning_seen: bool,
 ) -> str:
     if not _any_command_checked(command_results):
         return TIMER_HEALTH_UNKNOWN
-    if timer_loaded and timer_active:
+    if (
+        timer_loaded
+        and timer_active
+        and recent_tick_seen
+        and not recent_safety_flags_seen
+        and not installed_unit_refresh_required
+        and not documentation_warning_seen
+    ):
         return TIMER_HEALTH_ACTIVE
     if not timer_loaded and not timer_list_timers_seen:
         return TIMER_HEALTH_NOT_INSTALLED
