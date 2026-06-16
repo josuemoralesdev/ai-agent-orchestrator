@@ -1,0 +1,177 @@
+# R296B — Safe API Default For Test-Only Trigger Certificate
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: SAFETY FIX
+  Secondary: API DEFAULT HARDENING / TEST-ONLY SIMULATION GUARD
+  Duplicate risk level: LOW
+
+Current R296 issue:
+  R296 mostly passes, but verification showed that:
+    GET /tiny-live/test-only-matching-candidate-trigger-certificate/status
+  returns a simulated matching certificate by default, with:
+    status=TEST_ONLY_MATCHING_CANDIDATE_TRIGGER_CERTIFIED
+    simulation_flag_required=false
+    test_only_matching_requested=true
+    record_test_only_matching_candidate_trigger_certificate_requested=true
+    recorded_at_utc present
+
+Why this must be fixed:
+  The API status endpoint must be safe/read-only by default.
+  A plain GET status must not inject a simulated candidate, must not record a certificate, and must not imply a matching trigger was requested.
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance order/test-order/leverage/margin endpoints.
+  - Do NOT enable live execution.
+  - Do NOT mutate env/config/risk contracts.
+  - Do NOT make final command available.
+  - Do NOT create executable payloads.
+  - Do NOT run sudo/systemctl/install commands.
+
+Required behavior:
+  1. Plain GET:
+     /tiny-live/test-only-matching-candidate-trigger-certificate/status
+
+     Must return safe default:
+       status = TEST_ONLY_MATCHING_CANDIDATE_TRIGGER_BLOCKED
+       blockers includes missing_test_only_simulation_flag
+       simulation_flag_required = true
+       test_only_matching_requested = false
+       test_only_nonmatching_requested = false
+       simulated_fresh_candidate_injected = false
+       simulated_trigger_recorded = false
+       record_test_only_matching_candidate_trigger_certificate_requested = false
+       test_only_matching_candidate_trigger_certificate_recorded = false
+       recorded_at_utc absent/null
+       final_command_available = false
+       submit_allowed = false
+       real_order_forbidden = true
+       executable_payload_created = false
+       order_payload_created = false
+       order_placed = false
+
+  2. Explicit API query param may simulate but must not record:
+     /tiny-live/test-only-matching-candidate-trigger-certificate/status?simulate_matching_for_tests_only=true
+
+     Allowed:
+       returns TEST_ONLY_MATCHING_CANDIDATE_TRIGGER_CERTIFIED
+       test_only_matching_requested=true
+       simulated_trigger_recorded=true
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+     Not allowed:
+       no ledger write
+       no record flag true
+       no recorded_at_utc
+       no live/order/executable payload
+
+  3. CLI behavior from R296 must remain unchanged:
+     explicit CLI record flag may record repo-local R296 ledger.
+     CLI matching simulation should still certify.
+     CLI nonmatching simulation should still no-trigger.
+
+Files to inspect/update:
+  - src/app/hammer_radar/operator/tiny_live_test_only_matching_candidate_trigger_certificate.py
+  - src/app/hammer_radar/operator/approval_api.py
+  - src/app/hammer_radar/operator/tiny_live_final_console.py
+  - tests/hammer_radar/test_tiny_live_test_only_matching_candidate_trigger_certificate.py
+  - docs/hammer_radar/live_readiness/R296_TEST_ONLY_MATCHING_CANDIDATE_TRIGGER_CERTIFICATE.md
+  - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+Tests:
+  Add/adjust tests proving:
+    - plain API GET does not simulate
+    - plain API GET does not record
+    - explicit API query param simulation can certify but does not record
+    - CLI explicit record still records
+    - final console does not accidentally record
+    - all safety fields remain false/forbidden
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "test_only_matching_candidate_trigger_certificate or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  sleep 2
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== PLAIN API MUST NOT SIMULATE OR RECORD ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/test-only-matching-candidate-trigger-certificate/status | jq '{
+    event_type,
+    status,
+    simulation_flag_required,
+    test_only_matching_candidate_trigger_certificate_panel,
+    record_test_only_matching_candidate_trigger_certificate_requested,
+    test_only_matching_candidate_trigger_certificate_recorded,
+    recorded_at_utc,
+    simulated_fresh_candidate_injected,
+    simulated_trigger_recorded,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    executable_payload_created,
+    order_payload_created,
+    order_placed,
+    safety
+  }'
+
+  echo "=== EXPLICIT API SIMULATION MAY CERTIFY BUT MUST NOT RECORD ==="
+  curl -sS "http://127.0.0.1:8015/tiny-live/test-only-matching-candidate-trigger-certificate/status?simulate_matching_for_tests_only=true" | jq '{
+    event_type,
+    status,
+    test_only_matching_requested,
+    record_test_only_matching_candidate_trigger_certificate_requested,
+    test_only_matching_candidate_trigger_certificate_recorded,
+    recorded_at_utc,
+    simulated_trigger_recorded,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    executable_payload_created,
+    order_payload_created,
+    order_placed,
+    safety
+  }'
+
+  echo "=== CLI MATCHING RECORD STILL WORKS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-test-only-matching-candidate-trigger-certificate \
+    --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R296B CLI record check; no submit; no order." \
+    --simulate-matching-fresh-candidate-for-tests-only \
+    --record-test-only-matching-candidate-trigger-certificate \
+    | jq '{
+      status,
+      test_only_matching_candidate_trigger_certificate_recorded,
+      recorded_at_utc,
+      simulated_trigger_recorded,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"executable_payload_created\": true\|\"secrets_shown\": true\|\"live_execution_enabled\": true\|\"allow_live_orders\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - plain API safe-default result
+  - explicit API simulation result
+  - CLI record result
+  - safety proof

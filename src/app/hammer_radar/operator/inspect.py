@@ -3029,6 +3029,31 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-test-only-matching-candidate-trigger-certificate":
+        from src.app.hammer_radar.operator.tiny_live_test_only_matching_candidate_trigger_certificate import (
+            build_tiny_live_test_only_matching_candidate_trigger_certificate,
+            format_tiny_live_test_only_matching_candidate_trigger_certificate_json,
+        )
+
+        print(
+            format_tiny_live_test_only_matching_candidate_trigger_certificate_json(
+                build_tiny_live_test_only_matching_candidate_trigger_certificate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    simulate_matching_fresh_candidate_for_tests_only=(
+                        args.simulate_matching_fresh_candidate_for_tests_only
+                    ),
+                    simulate_nonmatching_fresh_candidate_for_tests_only=(
+                        args.simulate_nonmatching_fresh_candidate_for_tests_only
+                    ),
+                    record_test_only_matching_candidate_trigger_certificate=(
+                        args.record_test_only_matching_candidate_trigger_certificate
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6053,6 +6078,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument(
         "--simulate-matching-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser = subparsers.add_parser(
+        "tiny-live-test-only-matching-candidate-trigger-certificate",
+        parents=[parent],
+    )
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument("--lane-key", default=None)
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument("--reason", default=None)
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument(
+        "--simulate-matching-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument(
+        "--simulate-nonmatching-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+    tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument(
+        "--record-test-only-matching-candidate-trigger-certificate",
         action="store_true",
     )
 

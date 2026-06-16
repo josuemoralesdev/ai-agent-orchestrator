@@ -123,6 +123,10 @@ from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal impor
 from src.app.hammer_radar.operator.tiny_live_timer_observed_armed_lane_wait_certificate import (
     build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate,
 )
+from src.app.hammer_radar.operator.tiny_live_test_only_matching_candidate_trigger_certificate import (
+    build_status_tiny_live_test_only_matching_candidate_trigger_certificate,
+    build_tiny_live_test_only_matching_candidate_trigger_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1078,6 +1082,25 @@ def tiny_live_dry_run_lane_arming_rehearsal_status() -> dict:
 @app.get("/tiny-live/timer-observed-armed-lane-wait-certificate/status")
 def tiny_live_timer_observed_armed_lane_wait_certificate_status() -> dict:
     return build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate(
+        log_dir=get_log_dir(use_env=True)
+    )
+
+
+@app.get("/tiny-live/test-only-matching-candidate-trigger-certificate/status")
+def tiny_live_test_only_matching_candidate_trigger_certificate_status(
+    lane_key: str | None = None,
+    simulate_matching_for_tests_only: bool = Query(False),
+) -> dict:
+    if simulate_matching_for_tests_only:
+        return build_tiny_live_test_only_matching_candidate_trigger_certificate(
+            log_dir=get_log_dir(use_env=True),
+            lane_key=lane_key,
+            operator_id="api_status_read_model",
+            reason="R296 API test-only read-model simulation; no record; no submit; no order.",
+            simulate_matching_fresh_candidate_for_tests_only=True,
+            record_test_only_matching_candidate_trigger_certificate=False,
+        )
+    return build_status_tiny_live_test_only_matching_candidate_trigger_certificate(
         log_dir=get_log_dir(use_env=True)
     )
 
