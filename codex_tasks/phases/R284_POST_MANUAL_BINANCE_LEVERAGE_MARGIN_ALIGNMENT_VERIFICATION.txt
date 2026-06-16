@@ -1,0 +1,342 @@
+# R284 — Post-Manual Binance Leverage/Margin Alignment Verification
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: POST-MANUAL EXCHANGE SETTINGS VERIFICATION
+  Secondary: BINANCE READ-ONLY, ONE-SHOT TINY LIVE GATE PREP, SAFETY HARDENING
+  Duplicate risk level: MEDIUM
+
+Operator context:
+  Operator manually changed BTCUSDT settings in Binance UI/app:
+    - leverage: 10x
+    - margin mode: isolated
+
+Why this phase exists:
+  R283 correctly blocked one-shot readiness because Binance read-only metadata showed:
+    - current_leverage = 20x
+    - current_margin_mode = cross
+    - expected_leverage = 10x
+    - expected_margin_mode = isolated
+    - BTCUSDT position = 0.0
+
+  Operator has now manually adjusted Binance UI/app to 10x isolated.
+  R284 must verify the manual adjustment using read-only checks only.
+
+Hard goal:
+  Prove BTCUSDT Binance settings now match the tiny-live contract:
+    - current_leverage == 10
+    - current_margin_mode == isolated
+    - BTCUSDT position amount == 0.0
+    - no open position conflict
+    - wallet still supports configured tiny-live margin budget
+    - no live order allowed yet
+    - no final command available yet
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage mutation endpoint.
+  - Do NOT call Binance margin type mutation endpoint.
+  - Do NOT call any mutation endpoint.
+  - Do NOT change leverage.
+  - Do NOT change margin mode.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT make final submit command available.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - Do NOT mutate env files.
+  - Do NOT mutate lane controls.
+  - Do NOT mutate risk contracts.
+  - This phase is verification only.
+
+Allowed:
+  - Use R282 CLI env loader.
+  - Use Binance private read-only endpoints already allowlisted:
+      /fapi/v2/balance
+      /fapi/v2/positionRisk
+      /fapi/v2/account if already supported
+  - Use public/read-only exchange info and mark price.
+  - Write read-only audit records.
+  - Add docs/tests/code for verification packet.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_leverage_margin_readiness.py
+    - src/app/hammer_radar/operator/binance_account_position_readonly.py
+    - src/app/hammer_radar/operator/tiny_live_binance_autonomous_readiness_binding.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Post-manual verification packet:
+     Extend or add packet in:
+       src/app/hammer_radar/operator/tiny_live_leverage_margin_readiness.py
+
+     It should clearly identify:
+       event_type="TINY_LIVE_POST_MANUAL_LEVERAGE_MARGIN_ALIGNMENT_VERIFICATION"
+       created_by_phase="R284_POST_MANUAL_BINANCE_LEVERAGE_MARGIN_ALIGNMENT_VERIFICATION"
+       operator_reported_manual_adjustment=true
+       expected_leverage=10
+       expected_margin_mode="isolated"
+       actual/current leverage from read-only metadata
+       actual/current margin mode from read-only metadata
+       leverage_matches_expectation
+       margin_mode_matches_expectation
+       zero_position
+       open_position_conflict
+       wallet_supports_configured_margin_budget
+       status:
+         POST_MANUAL_LEVERAGE_MARGIN_VERIFIED
+         POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED
+         POST_MANUAL_LEVERAGE_MARGIN_NOT_CHECKED
+         POST_MANUAL_LEVERAGE_MARGIN_BLOCKED
+
+  2. Readiness interpretation:
+     If current_leverage == 10 and current_margin_mode == isolated and zero position and no position conflict:
+       - leverage_margin_status = LEVERAGE_MARGIN_READY
+       - post_manual_alignment_status = POST_MANUAL_LEVERAGE_MARGIN_VERIFIED
+       - leverage_margin_blocks_one_shot = false
+       - leverage_margin_ready = true
+
+     If mismatch remains:
+       - keep blocked
+       - no submit
+       - recommend manual UI recheck
+
+     Always:
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+       - mutation_performed=false
+       - leverage_change_called=false
+       - margin_change_called=false
+
+  3. CLI:
+     Add/extend inspect command:
+       tiny-live-post-manual-leverage-margin-verification
+
+     Required options:
+       --load-discovered-binance-readonly-env
+       --fetch-binance-readonly-account-position
+       confirmation phrase:
+         "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+
+     It should output a compact verification packet and record it to logs.
+
+  4. Integrate autonomous readiness:
+     Update:
+       src/app/hammer_radar/operator/tiny_live_binance_autonomous_readiness_binding.py
+
+     When private read-only fetch is requested:
+       - include post_manual_leverage_margin_verification
+       - include leverage_margin_ready=true if verified
+       - include leverage_margin_blocks_one_shot=false if verified
+       - keep one_shot_live_allowed=false in R284
+       - keep final_command_available=false
+
+  5. API:
+     Add safe endpoint:
+       GET /tiny-live/post-manual-leverage-margin-verification
+
+     Default should be no-network / NOT_CHECKED unless service already has cached latest record.
+     It may surface latest recorded verification safely.
+
+  6. Final console:
+     Add/update:
+       leverage_margin_readiness_panel
+       post_manual_leverage_margin_verification_panel
+
+     Show:
+       current leverage/margin
+       expected leverage/margin
+       verification status
+       remaining blockers
+       safe next CLI verification command
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  7. Tests:
+     Add/update tests:
+       - post-manual exact match => verified.
+       - exact match flips leverage_margin_ready true.
+       - mismatch remains blocked.
+       - zero position exact match ready.
+       - nonzero position still blocks.
+       - no mutation endpoints.
+       - no order/test-order endpoints.
+       - no secrets/signed URLs/signatures shown.
+       - final command unavailable.
+       - autonomous one-shot matrix includes leverage_margin_ready true but one_shot_live_allowed false.
+       - final console includes post-manual verification panel.
+       - API default no-network safe.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "post_manual or leverage_margin or account_read_env or binance_account_position or binance_autonomous or binance_readonly or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== POST-MANUAL LEVERAGE/MARGIN VERIFICATION ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-post-manual-leverage-margin-verification \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r284_post_manual_leverage_margin_verification.json \
+    | jq '{
+      event_type,
+      status,
+      operator_reported_manual_adjustment,
+      symbol,
+      expected_leverage,
+      expected_margin_mode,
+      current_leverage,
+      current_margin_mode,
+      leverage_matches_expectation,
+      margin_mode_matches_expectation,
+      zero_position,
+      open_position_conflict,
+      wallet_supports_configured_margin_budget,
+      post_manual_alignment_verified,
+      leverage_margin_ready,
+      leverage_margin_blocks_one_shot,
+      readiness_blockers,
+      recommended_operator_move,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== LEVERAGE/MARGIN READINESS AFTER MANUAL ALIGNMENT ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-leverage-margin-readiness \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r284_leverage_margin_readiness_after_manual.json \
+    | jq '{
+      event_type,
+      status,
+      configured_leverage,
+      configured_margin_mode,
+      current_leverage,
+      current_margin_mode,
+      leverage_matches_expectation,
+      margin_mode_matches_expectation,
+      zero_position,
+      open_position_conflict,
+      mismatch_classification,
+      manual_only_adjustment_required,
+      mutation_required,
+      mutation_performed,
+      live_submit_blocked_by_leverage_margin,
+      readiness_blockers,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== BINANCE AUTONOMOUS READINESS AFTER MANUAL ALIGNMENT ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r284_binance_autonomous_readiness_after_manual.json \
+    | jq '{
+      event_type,
+      status,
+      exchange_info_checked,
+      mark_price_checked,
+      account_balance_checked,
+      position_risk_checked,
+      wallet_supports_configured_margin_budget,
+      open_position_conflict,
+      account_position_readiness_status,
+      leverage_margin_readiness,
+      post_manual_leverage_margin_verification,
+      autonomous_one_shot_readiness_matrix,
+      readiness_blockers,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== API POST-MANUAL DEFAULT SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/post-manual-leverage-margin-verification | jq '{
+    event_type,
+    status,
+    post_manual_leverage_margin_verification_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    binance_autonomous_readiness_panel,
+    leverage_margin_readiness_panel,
+    post_manual_leverage_margin_verification_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/post-manual-leverage-margin-verification \
+    /tiny-live/leverage-margin-readiness \
+    /tiny-live/binance-account-read-env-discovery \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,120p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - whether Binance now reports 10x isolated
+  - whether post-manual alignment verified
+  - whether leverage_margin_ready is true
+  - remaining blockers if any
+  - proof no mutation endpoints/no orders/no secrets
+  - recommended next phase

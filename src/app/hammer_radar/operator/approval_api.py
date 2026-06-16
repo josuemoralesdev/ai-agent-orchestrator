@@ -104,6 +104,7 @@ from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_bindin
     build_tiny_live_binance_autonomous_readiness_binding,
 )
 from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+    build_post_manual_leverage_margin_alignment_verification,
     build_tiny_live_leverage_margin_readiness,
 )
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
@@ -993,6 +994,11 @@ def tiny_live_binance_autonomous_readiness(
 @app.get("/tiny-live/leverage-margin-readiness")
 def tiny_live_leverage_margin_readiness() -> dict:
     return build_tiny_live_leverage_margin_readiness(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/post-manual-leverage-margin-verification")
+def tiny_live_post_manual_leverage_margin_verification() -> dict:
+    return build_post_manual_leverage_margin_alignment_verification(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

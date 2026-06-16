@@ -2810,6 +2810,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-post-manual-leverage-margin-verification":
+        from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+            build_post_manual_leverage_margin_alignment_verification,
+            format_post_manual_leverage_margin_verification_json,
+        )
+
+        print(
+            format_post_manual_leverage_margin_verification_json(
+                build_post_manual_leverage_margin_alignment_verification(
+                    log_dir=args.log_dir,
+                    fetch_binance_readonly_account_position=(
+                        args.fetch_binance_readonly_account_position
+                    ),
+                    confirm_binance_readonly_account_position=(
+                        args.confirm_binance_readonly_account_position
+                    ),
+                    load_discovered_binance_readonly_env=args.load_discovered_binance_readonly_env,
+                    binance_readonly_env_file=args.binance_readonly_env_file,
+                )
+            )
+        )
     elif args.command == "tiny-live-leverage-notional-adjustment-preview":
         from src.app.hammer_radar.operator.tiny_live_leverage_notional_adjustment_preview import (
             build_tiny_live_leverage_notional_adjustment_preview,
@@ -5562,6 +5583,27 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
     )
     tiny_live_leverage_margin_readiness_parser.add_argument(
+        "--binance-readonly-env-file",
+        default=None,
+    )
+
+    tiny_live_post_manual_leverage_margin_verification_parser = subparsers.add_parser(
+        "tiny-live-post-manual-leverage-margin-verification",
+        parents=[parent],
+    )
+    tiny_live_post_manual_leverage_margin_verification_parser.add_argument(
+        "--fetch-binance-readonly-account-position",
+        action="store_true",
+    )
+    tiny_live_post_manual_leverage_margin_verification_parser.add_argument(
+        "--confirm-binance-readonly-account-position",
+        default=None,
+    )
+    tiny_live_post_manual_leverage_margin_verification_parser.add_argument(
+        "--load-discovered-binance-readonly-env",
+        action="store_true",
+    )
+    tiny_live_post_manual_leverage_margin_verification_parser.add_argument(
         "--binance-readonly-env-file",
         default=None,
     )

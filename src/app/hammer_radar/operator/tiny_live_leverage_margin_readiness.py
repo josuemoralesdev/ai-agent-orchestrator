@@ -31,7 +31,10 @@ from src.app.hammer_radar.operator.tiny_live_live_authorization_write_gate impor
 
 EVENT_TYPE = "TINY_LIVE_LEVERAGE_MARGIN_READINESS"
 CREATED_BY_PHASE = "R283_LEVERAGE_MARGIN_READINESS_INTERPRETATION_FOR_ONE_SHOT_TINY_LIVE"
+POST_MANUAL_EVENT_TYPE = "TINY_LIVE_POST_MANUAL_LEVERAGE_MARGIN_ALIGNMENT_VERIFICATION"
+POST_MANUAL_CREATED_BY_PHASE = "R284_POST_MANUAL_BINANCE_LEVERAGE_MARGIN_ALIGNMENT_VERIFICATION"
 LEDGER_FILENAME = "tiny_live_leverage_margin_readiness.ndjson"
+POST_MANUAL_LEDGER_FILENAME = "tiny_live_post_manual_leverage_margin_verification.ndjson"
 SYMBOL = "BTCUSDT"
 OFFICIAL_LANE_KEY = "BTCUSDT|8m|short|ladder_close_50_618"
 CONFIRM_BINANCE_READONLY_ACCOUNT_POSITION_PHRASE = (
@@ -50,6 +53,11 @@ NONZERO_POSITION_MISMATCH = "NONZERO_POSITION_MISMATCH"
 UNKNOWN_FIELDS = "UNKNOWN_FIELDS"
 MUTATION_REQUIRED = "MUTATION_REQUIRED"
 NOT_CHECKED = "NOT_CHECKED"
+
+POST_MANUAL_LEVERAGE_MARGIN_VERIFIED = "POST_MANUAL_LEVERAGE_MARGIN_VERIFIED"
+POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED = "POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED"
+POST_MANUAL_LEVERAGE_MARGIN_NOT_CHECKED = "POST_MANUAL_LEVERAGE_MARGIN_NOT_CHECKED"
+POST_MANUAL_LEVERAGE_MARGIN_BLOCKED = "POST_MANUAL_LEVERAGE_MARGIN_BLOCKED"
 
 SAFETY = {
     **SAFETY_FALSE,
@@ -150,6 +158,107 @@ def build_tiny_live_leverage_margin_readiness(
     return payload
 
 
+def build_post_manual_leverage_margin_alignment_verification(
+    *,
+    log_dir: str | Path | None = None,
+    fetch_binance_readonly_account_position: bool = False,
+    confirm_binance_readonly_account_position: str | None = None,
+    load_discovered_binance_readonly_env: bool = False,
+    binance_readonly_env_file: str | Path | None = None,
+    account_position_snapshot: Mapping[str, Any] | None = None,
+    risk_contract_config_path: str | Path | None = None,
+    env: Mapping[str, str] | None = None,
+    now: datetime | None = None,
+    urlopen_func: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
+    generated_at = now or datetime.now(UTC)
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    readiness = build_tiny_live_leverage_margin_readiness(
+        log_dir=resolved_log_dir,
+        fetch_binance_readonly_account_position=fetch_binance_readonly_account_position,
+        confirm_binance_readonly_account_position=confirm_binance_readonly_account_position,
+        load_discovered_binance_readonly_env=load_discovered_binance_readonly_env,
+        binance_readonly_env_file=binance_readonly_env_file,
+        account_position_snapshot=account_position_snapshot,
+        risk_contract_config_path=risk_contract_config_path,
+        env=env,
+        now=generated_at,
+        urlopen_func=urlopen_func,
+    )
+    if readiness.get("status") == LEVERAGE_MARGIN_READY:
+        status = POST_MANUAL_LEVERAGE_MARGIN_VERIFIED
+    elif readiness.get("status") == LEVERAGE_MARGIN_NOT_CHECKED:
+        status = POST_MANUAL_LEVERAGE_MARGIN_NOT_CHECKED
+    elif readiness.get("mismatch_classification") in {ZERO_POSITION_METADATA_MISMATCH, NONZERO_POSITION_MISMATCH}:
+        status = POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED
+    else:
+        status = POST_MANUAL_LEVERAGE_MARGIN_BLOCKED
+
+    verified = status == POST_MANUAL_LEVERAGE_MARGIN_VERIFIED
+    blockers = list(readiness.get("readiness_blockers") or [])
+    if status == POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED:
+        blockers.append("manual_binance_ui_recheck_required")
+    payload = _sanitize(
+        {
+            "event_type": POST_MANUAL_EVENT_TYPE,
+            "created_by_phase": POST_MANUAL_CREATED_BY_PHASE,
+            "generated_at": generated_at.isoformat(),
+            "operator_reported_manual_adjustment": True,
+            "symbol": SYMBOL,
+            "expected_leverage": float(readiness.get("configured_leverage") or 10.0),
+            "expected_margin_mode": readiness.get("configured_margin_mode") or "isolated",
+            "current_leverage": readiness.get("current_leverage"),
+            "current_margin_mode": readiness.get("current_margin_mode"),
+            "leverage_matches_expectation": readiness.get("leverage_matches_expectation"),
+            "margin_mode_matches_expectation": readiness.get("margin_mode_matches_expectation"),
+            "zero_position": readiness.get("zero_position"),
+            "open_position_conflict": readiness.get("open_position_conflict"),
+            "wallet_supports_configured_margin_budget": (
+                readiness.get("account_position_binding", {}).get("wallet_supports_configured_margin_budget")
+                if isinstance(readiness.get("account_position_binding"), Mapping)
+                else None
+            ),
+            "status": status,
+            "post_manual_alignment_verified": verified,
+            "post_manual_alignment_status": status,
+            "leverage_margin_status": LEVERAGE_MARGIN_READY if verified else readiness.get("status"),
+            "leverage_margin_ready": verified,
+            "leverage_margin_blocks_one_shot": not verified,
+            "readiness_blockers": _dedupe(blockers),
+            "recommended_operator_move": _post_manual_recommended_operator_move(status),
+            "safe_next_cli_command": safe_post_manual_leverage_margin_verification_cli_command(),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+            "mutation_performed": False,
+            "leverage_change_called": False,
+            "margin_change_called": False,
+            "leverage_margin_readiness": readiness,
+            "safety": {
+                **dict(readiness.get("safety") if isinstance(readiness.get("safety"), Mapping) else SAFETY),
+                "final_command_available": False,
+                "submit_allowed": False,
+                "real_order_forbidden": True,
+                "mutation_performed": False,
+                "leverage_change_called": False,
+                "margin_change_called": False,
+                "binance_order_endpoint_called": False,
+                "binance_test_order_endpoint_called": False,
+                "signed_trading_request_created": False,
+                "signed_order_request_created": False,
+                "secrets_shown": False,
+                "secret_values_in_output": False,
+                "signature_shown": False,
+                "signed_url_shown": False,
+            },
+        }
+    )
+    payload["post_manual_leverage_margin_verification_panel"] = _post_manual_verification_panel(payload)
+    if fetch_binance_readonly_account_position or account_position_snapshot is not None:
+        payload = append_post_manual_leverage_margin_verification(payload, log_dir=resolved_log_dir)
+    return payload
+
+
 def interpret_leverage_margin_readiness(
     *,
     account_position: Mapping[str, Any],
@@ -205,15 +314,13 @@ def interpret_leverage_margin_readiness(
         blockers.append("leverage_or_margin_fields_unavailable")
         manual_only_adjustment_required = True
         mutation_required = True
-    elif not mismatch:
-        status = LEVERAGE_MARGIN_READY
-        classification = EXACT_MATCH
     elif open_conflict is True or zero_position is False:
         status = LEVERAGE_MARGIN_BLOCKED
         classification = NONZERO_POSITION_MISMATCH
-        blockers.append("nonzero_btcusdt_position_with_leverage_margin_mismatch")
-        manual_only_adjustment_required = True
-        mutation_required = True
+        blockers.append("nonzero_btcusdt_position_blocks_leverage_margin_readiness")
+    elif not mismatch:
+        status = LEVERAGE_MARGIN_READY
+        classification = EXACT_MATCH
     elif zero_position is True:
         status = LEVERAGE_MARGIN_REQUIRES_MANUAL_OPERATOR_REVIEW
         classification = ZERO_POSITION_METADATA_MISMATCH
@@ -275,6 +382,17 @@ def safe_leverage_margin_readiness_cli_command() -> str:
     )
 
 
+def safe_post_manual_leverage_margin_verification_cli_command() -> str:
+    return (
+        "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+        "--log-dir logs/hammer_radar_forward tiny-live-post-manual-leverage-margin-verification "
+        "--load-discovered-binance-readonly-env --fetch-binance-readonly-account-position "
+        "--confirm-binance-readonly-account-position "
+        "\"I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; "
+        "NO LEVERAGE CHANGE; NO MARGIN CHANGE.\""
+    )
+
+
 def append_tiny_live_leverage_margin_readiness(
     record: Mapping[str, Any],
     *,
@@ -319,11 +437,63 @@ def load_latest_tiny_live_leverage_margin_readiness(
     return records[0] if records else {}
 
 
+def append_post_manual_leverage_margin_verification(
+    record: Mapping[str, Any],
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    path = post_manual_leverage_margin_verification_records_path(get_log_dir(log_dir, use_env=True))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _sanitize(
+        {
+            **dict(record),
+            "verification_record_id": record.get("verification_record_id")
+            or f"r284_post_manual_leverage_margin_verification_{uuid4().hex}",
+            "recorded_at_utc": datetime.now(UTC).isoformat(),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+    return payload
+
+
+def load_post_manual_leverage_margin_verification_records(
+    *,
+    log_dir: str | Path | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    path = post_manual_leverage_margin_verification_records_path(get_log_dir(log_dir, use_env=True))
+    if not path.exists():
+        return []
+    if limit <= 0:
+        with path.open("r", encoding="utf-8") as handle:
+            return [_sanitize(json.loads(line)) for line in handle if line.strip()]
+    return [_sanitize(record) for record in read_recent_ndjson_records(path, limit=limit, max_bytes=8_388_608)]
+
+
+def load_latest_post_manual_leverage_margin_verification(
+    *, log_dir: str | Path | None = None
+) -> dict[str, Any]:
+    records = load_post_manual_leverage_margin_verification_records(log_dir=log_dir, limit=1)
+    return records[0] if records else {}
+
+
 def tiny_live_leverage_margin_readiness_records_path(log_dir: str | Path) -> Path:
     return Path(log_dir) / LEDGER_FILENAME
 
 
+def post_manual_leverage_margin_verification_records_path(log_dir: str | Path) -> Path:
+    return Path(log_dir) / POST_MANUAL_LEDGER_FILENAME
+
+
 def format_tiny_live_leverage_margin_readiness_json(payload: Mapping[str, Any]) -> str:
+    return json.dumps(_sanitize(payload), sort_keys=True, separators=(",", ":"))
+
+
+def format_post_manual_leverage_margin_verification_json(payload: Mapping[str, Any]) -> str:
     return json.dumps(_sanitize(payload), sort_keys=True, separators=(",", ":"))
 
 
@@ -391,6 +561,41 @@ def _recommended_operator_move(status: str, classification: str) -> str:
     if classification == NOT_CHECKED:
         return "RUN_SAFE_READONLY_ACCOUNT_POSITION_CHECK_BEFORE_ONE_SHOT_REVIEW"
     return "BLOCK_ONE_SHOT_LIVE_UNTIL_LEVERAGE_MARGIN_EXPECTATION_IS_PROVEN_WITHOUT_CODE_MUTATION"
+
+
+def _post_manual_recommended_operator_move(status: str) -> str:
+    if status == POST_MANUAL_LEVERAGE_MARGIN_VERIFIED:
+        return "POST_MANUAL_ALIGNMENT_VERIFIED_CONTINUE_READINESS_REVIEW_ONLY"
+    if status == POST_MANUAL_LEVERAGE_MARGIN_STILL_MISMATCHED:
+        return "RECHECK_BINANCE_UI_MANUAL_LEVERAGE_MARGIN_SETTINGS_AND_RERUN_READONLY_VERIFICATION"
+    if status == POST_MANUAL_LEVERAGE_MARGIN_NOT_CHECKED:
+        return "RUN_SAFE_POST_MANUAL_READONLY_ACCOUNT_POSITION_VERIFICATION"
+    return "BLOCK_ONE_SHOT_LIVE_AND_REVIEW_READONLY_ACCOUNT_POSITION_BLOCKERS"
+
+
+def _post_manual_verification_panel(packet: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "status": packet.get("status"),
+        "operator_reported_manual_adjustment": packet.get("operator_reported_manual_adjustment") is True,
+        "expected_leverage": packet.get("expected_leverage"),
+        "expected_margin_mode": packet.get("expected_margin_mode"),
+        "current_leverage": packet.get("current_leverage"),
+        "current_margin_mode": packet.get("current_margin_mode"),
+        "leverage_matches_expectation": packet.get("leverage_matches_expectation"),
+        "margin_mode_matches_expectation": packet.get("margin_mode_matches_expectation"),
+        "zero_position": packet.get("zero_position"),
+        "open_position_conflict": packet.get("open_position_conflict"),
+        "wallet_supports_configured_margin_budget": packet.get("wallet_supports_configured_margin_budget"),
+        "post_manual_alignment_verified": packet.get("post_manual_alignment_verified") is True,
+        "leverage_margin_ready": packet.get("leverage_margin_ready") is True,
+        "leverage_margin_blocks_one_shot": packet.get("leverage_margin_blocks_one_shot") is True,
+        "readiness_blockers": list(packet.get("readiness_blockers") or []),
+        "recommended_operator_move": packet.get("recommended_operator_move"),
+        "safe_next_cli_command": packet.get("safe_next_cli_command"),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
+    }
 
 
 def _safe_manual_next_steps(status: str, classification: str) -> list[str]:

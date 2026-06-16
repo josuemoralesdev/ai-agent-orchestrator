@@ -55,7 +55,9 @@ from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_bindin
     build_tiny_live_binance_autonomous_readiness_binding,
 )
 from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+    build_post_manual_leverage_margin_alignment_verification,
     build_tiny_live_leverage_margin_readiness,
+    load_latest_post_manual_leverage_margin_verification,
     load_latest_tiny_live_leverage_margin_readiness,
 )
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
@@ -208,6 +210,9 @@ def build_tiny_live_final_console(
         )
         leverage_margin_readiness_panel = build_leverage_margin_readiness_panel(
             log_dir=resolved_log_dir,
+        )
+        post_manual_leverage_margin_verification_panel = (
+            build_post_manual_leverage_margin_verification_panel(log_dir=resolved_log_dir)
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -400,6 +405,9 @@ def build_tiny_live_final_console(
                 "autonomous_armed_dry_run_panel": autonomous_armed_dry_run_panel,
                 "binance_autonomous_readiness_panel": binance_autonomous_readiness_panel,
                 "leverage_margin_readiness_panel": leverage_margin_readiness_panel,
+                "post_manual_leverage_margin_verification_panel": (
+                    post_manual_leverage_margin_verification_panel
+                ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -707,6 +715,39 @@ def build_leverage_margin_readiness_panel(*, log_dir: str | Path | None = None) 
         "margin_change_called": False,
         "live_submit_blocked_by_leverage_margin": packet.get("live_submit_blocked_by_leverage_margin"),
         "readiness_blockers": list(packet.get("readiness_blockers") or []),
+        "safe_next_cli_command": packet.get("safe_next_cli_command"),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
+        "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
+    }
+
+
+def build_post_manual_leverage_margin_verification_panel(
+    *, log_dir: str | Path | None = None
+) -> dict[str, Any]:
+    packet = load_latest_post_manual_leverage_margin_verification(log_dir=log_dir)
+    if not packet:
+        packet = build_post_manual_leverage_margin_alignment_verification(log_dir=log_dir)
+    return {
+        "status": packet.get("status"),
+        "operator_reported_manual_adjustment": packet.get("operator_reported_manual_adjustment") is True,
+        "expected_leverage": packet.get("expected_leverage"),
+        "expected_margin_mode": packet.get("expected_margin_mode"),
+        "current_leverage": packet.get("current_leverage"),
+        "current_margin_mode": packet.get("current_margin_mode"),
+        "leverage_matches_expectation": packet.get("leverage_matches_expectation"),
+        "margin_mode_matches_expectation": packet.get("margin_mode_matches_expectation"),
+        "zero_position": packet.get("zero_position"),
+        "open_position_conflict": packet.get("open_position_conflict"),
+        "wallet_supports_configured_margin_budget": packet.get(
+            "wallet_supports_configured_margin_budget"
+        ),
+        "post_manual_alignment_verified": packet.get("post_manual_alignment_verified") is True,
+        "leverage_margin_ready": packet.get("leverage_margin_ready") is True,
+        "leverage_margin_blocks_one_shot": packet.get("leverage_margin_blocks_one_shot") is True,
+        "readiness_blockers": list(packet.get("readiness_blockers") or []),
+        "recommended_operator_move": packet.get("recommended_operator_move"),
         "safe_next_cli_command": packet.get("safe_next_cli_command"),
         "final_command_available": False,
         "submit_allowed": False,

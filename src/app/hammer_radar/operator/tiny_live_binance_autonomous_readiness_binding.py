@@ -41,6 +41,7 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
 )
 from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
     LEVERAGE_MARGIN_READY,
+    build_post_manual_leverage_margin_alignment_verification,
     build_tiny_live_leverage_margin_readiness,
 )
 from src.app.hammer_radar.operator.tiny_live_live_authorization_write_gate import (
@@ -191,6 +192,15 @@ def build_tiny_live_binance_autonomous_readiness_binding(
         env=source_env,
         now=generated_at,
     )
+    post_manual_leverage_margin_verification = build_post_manual_leverage_margin_alignment_verification(
+        log_dir=resolved_log_dir,
+        account_position_snapshot=account_position if account_position.get("position_risk_checked") is True else None,
+        fetch_binance_readonly_account_position=fetch_binance_readonly_account_position,
+        confirm_binance_readonly_account_position=confirm_binance_readonly_account_position,
+        risk_contract_config_path=risk_path,
+        env=source_env,
+        now=generated_at,
+    )
     exchange = _exchange_minimum_summary(
         precision_binding["precision_snapshot"],
         precision_binding["mark_price_snapshot"],
@@ -303,6 +313,11 @@ def build_tiny_live_binance_autonomous_readiness_binding(
             "current_leverage": account_position.get("current_leverage"),
             "current_margin_mode": account_position.get("current_margin_mode"),
             "leverage_margin_readiness": leverage_margin_readiness,
+            "post_manual_leverage_margin_verification": post_manual_leverage_margin_verification,
+            "post_manual_alignment_status": post_manual_leverage_margin_verification.get("status"),
+            "post_manual_alignment_verified": (
+                post_manual_leverage_margin_verification.get("post_manual_alignment_verified") is True
+            ),
             "leverage_margin_ready": leverage_margin_readiness.get("status") == LEVERAGE_MARGIN_READY,
             "leverage_margin_status": leverage_margin_readiness.get("status"),
             "leverage_margin_blocks_one_shot": (
