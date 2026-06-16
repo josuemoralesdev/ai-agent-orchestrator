@@ -103,6 +103,9 @@ from src.app.hammer_radar.operator.tiny_live_jit_launch_packet import (
 from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
     build_tiny_live_binance_autonomous_readiness_binding,
 )
+from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+    build_tiny_live_leverage_margin_readiness,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -985,6 +988,11 @@ def tiny_live_binance_autonomous_readiness(
         fetch_binance_readonly_precision_mark_price=fetch_readonly_precision,
         confirm_tiny_live_binance_readonly_fetch=confirm,
     )
+
+
+@app.get("/tiny-live/leverage-margin-readiness")
+def tiny_live_leverage_margin_readiness() -> dict:
+    return build_tiny_live_leverage_margin_readiness(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

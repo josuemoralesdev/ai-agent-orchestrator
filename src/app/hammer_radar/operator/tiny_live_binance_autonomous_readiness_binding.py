@@ -39,6 +39,10 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
     build_tiny_live_binance_readonly_precision_mark_price_gate,
     load_tiny_live_binance_readonly_precision_mark_price_records,
 )
+from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+    LEVERAGE_MARGIN_READY,
+    build_tiny_live_leverage_margin_readiness,
+)
 from src.app.hammer_radar.operator.tiny_live_live_authorization_write_gate import (
     load_tiny_live_risk_contract_config,
 )
@@ -178,6 +182,15 @@ def build_tiny_live_binance_autonomous_readiness_binding(
         urlopen_func=urlopen_func,
     )
     safety.update(_account_position_safety_delta(account_position))
+    leverage_margin_readiness = build_tiny_live_leverage_margin_readiness(
+        log_dir=resolved_log_dir,
+        account_position_snapshot=account_position if account_position.get("position_risk_checked") is True else None,
+        fetch_binance_readonly_account_position=fetch_binance_readonly_account_position,
+        confirm_binance_readonly_account_position=confirm_binance_readonly_account_position,
+        risk_contract_config_path=risk_path,
+        env=source_env,
+        now=generated_at,
+    )
     exchange = _exchange_minimum_summary(
         precision_binding["precision_snapshot"],
         precision_binding["mark_price_snapshot"],
@@ -189,6 +202,7 @@ def build_tiny_live_binance_autonomous_readiness_binding(
         precision_confirmation_valid=precision_confirmation_valid,
         fetch_binance_readonly_account_position=fetch_binance_readonly_account_position,
         account_position=account_position,
+        leverage_margin_readiness=leverage_margin_readiness,
         exchange=exchange,
         risk_contract=risk_contract,
     )
@@ -198,6 +212,7 @@ def build_tiny_live_binance_autonomous_readiness_binding(
         binance_readiness_ready=not readiness_blockers and readonly_requested,
         exchange=exchange,
         account_position=account_position,
+        leverage_margin_readiness=leverage_margin_readiness,
     )
     if not readonly_requested:
         status = BINANCE_READINESS_NOT_REQUESTED
@@ -285,6 +300,14 @@ def build_tiny_live_binance_autonomous_readiness_binding(
             "btcusdt_position_notional": account_position.get("btcusdt_position_notional"),
             "leverage_matches_expectation": account_position.get("leverage_matches_expectation"),
             "margin_mode_matches_expectation": account_position.get("margin_mode_matches_expectation"),
+            "current_leverage": account_position.get("current_leverage"),
+            "current_margin_mode": account_position.get("current_margin_mode"),
+            "leverage_margin_readiness": leverage_margin_readiness,
+            "leverage_margin_ready": leverage_margin_readiness.get("status") == LEVERAGE_MARGIN_READY,
+            "leverage_margin_status": leverage_margin_readiness.get("status"),
+            "leverage_margin_blocks_one_shot": (
+                leverage_margin_readiness.get("live_submit_blocked_by_leverage_margin") is True
+            ),
             "account_position_readiness_status": account_position["account_position_readiness_status"],
             "readiness_blockers": readiness_blockers,
             "latest_record": latest_record,
@@ -389,6 +412,11 @@ def load_latest_binance_autonomous_readiness_binding(
         "btcusdt_position_amt": record.get("btcusdt_position_amt"),
         "btcusdt_position_side": record.get("btcusdt_position_side"),
         "btcusdt_position_notional": record.get("btcusdt_position_notional"),
+        "current_leverage": record.get("current_leverage"),
+        "current_margin_mode": record.get("current_margin_mode"),
+        "leverage_margin_status": record.get("leverage_margin_status"),
+        "leverage_margin_ready": record.get("leverage_margin_ready") is True,
+        "leverage_margin_blocks_one_shot": record.get("leverage_margin_blocks_one_shot") is True,
         "readiness_blockers": list(record.get("readiness_blockers") or []),
         "final_command_available": False,
         "submit_allowed": False,
@@ -548,6 +576,14 @@ def _account_position_binding(
             "btcusdt_position_amt": account_position_snapshot.get("btcusdt_position_amt", 0.0),
             "btcusdt_position_side": account_position_snapshot.get("btcusdt_position_side", "BOTH"),
             "btcusdt_position_notional": account_position_snapshot.get("btcusdt_position_notional", 0.0),
+            "current_leverage": account_position_snapshot.get(
+                "current_leverage",
+                10.0 if account_position_snapshot.get("leverage_matches_expectation") is True else None,
+            ),
+            "current_margin_mode": account_position_snapshot.get(
+                "current_margin_mode",
+                "isolated" if account_position_snapshot.get("margin_mode_matches_expectation") is True else None,
+            ),
             "leverage_matches_expectation": account_position_snapshot.get("leverage_matches_expectation") is True,
             "margin_mode_matches_expectation": account_position_snapshot.get("margin_mode_matches_expectation") is True,
             "readiness_blockers": [str(item) for item in account_position_snapshot.get("readiness_blockers") or []],
@@ -598,6 +634,7 @@ def _readiness_blockers(
     precision_confirmation_valid: bool,
     fetch_binance_readonly_account_position: bool,
     account_position: Mapping[str, Any],
+    leverage_margin_readiness: Mapping[str, Any],
     exchange: Mapping[str, Any],
     risk_contract: Mapping[str, Any],
 ) -> list[str]:
@@ -617,6 +654,9 @@ def _readiness_blockers(
         blockers.append("wallet_supports_configured_margin_budget_not_verified")
     if account_position.get("open_position_conflict") is not False:
         blockers.append("no_conflicting_position_not_verified")
+    if leverage_margin_readiness.get("status") != LEVERAGE_MARGIN_READY:
+        blockers.extend(str(item) for item in leverage_margin_readiness.get("readiness_blockers") or [])
+        blockers.append("leverage_margin_readiness_not_ready")
     if risk_contract.get("configured_notional_cap_usdt") != 80.0:
         blockers.append("configured_notional_cap_not_80")
     if risk_contract.get("configured_leverage") != 10.0:
@@ -633,6 +673,7 @@ def _autonomous_one_shot_matrix(
     binance_readiness_ready: bool,
     exchange: Mapping[str, Any],
     account_position: Mapping[str, Any],
+    leverage_margin_readiness: Mapping[str, Any],
 ) -> dict[str, Any]:
     arming = build_autonomous_dry_run_arming_status(log_dir=log_dir, config_path=arming_config_path)
     live_qualified = list(arming.get("live_qualified_lane_keys") or [])
@@ -650,6 +691,11 @@ def _autonomous_one_shot_matrix(
         )
         is True,
         "no_conflicting_position": account_position.get("open_position_conflict") is False,
+        "leverage_margin_ready": leverage_margin_readiness.get("status") == LEVERAGE_MARGIN_READY,
+        "leverage_margin_blocks_one_shot": (
+            leverage_margin_readiness.get("live_submit_blocked_by_leverage_margin") is True
+        ),
+        "leverage_margin_status": leverage_margin_readiness.get("status"),
         "no_prior_live_submit": True,
         "final_command_available": False,
         "one_shot_live_allowed": False,

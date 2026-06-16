@@ -54,6 +54,10 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
 from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
     build_tiny_live_binance_autonomous_readiness_binding,
 )
+from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
+    build_tiny_live_leverage_margin_readiness,
+    load_latest_tiny_live_leverage_margin_readiness,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -200,6 +204,9 @@ def build_tiny_live_final_console(
             log_dir=resolved_log_dir,
         )
         binance_autonomous_readiness_panel = build_binance_autonomous_readiness_panel(
+            log_dir=resolved_log_dir,
+        )
+        leverage_margin_readiness_panel = build_leverage_margin_readiness_panel(
             log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
@@ -392,6 +399,7 @@ def build_tiny_live_final_console(
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "autonomous_armed_dry_run_panel": autonomous_armed_dry_run_panel,
                 "binance_autonomous_readiness_panel": binance_autonomous_readiness_panel,
+                "leverage_margin_readiness_panel": leverage_margin_readiness_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -420,6 +428,7 @@ def build_tiny_live_final_console(
                 "submit_attempted": False,
                 "order_placed": False,
                 "real_order_placed": False,
+                "real_order_forbidden": True,
                 "binance_order_endpoint_called": False,
                 "binance_test_order_endpoint_called": False,
                 "secrets_shown": False,
@@ -676,6 +685,33 @@ def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = Non
         "final_command_available": False,
         "submit_allowed": False,
         "real_order_forbidden": True,
+    }
+
+
+def build_leverage_margin_readiness_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    packet = load_latest_tiny_live_leverage_margin_readiness(log_dir=log_dir)
+    if not packet:
+        packet = build_tiny_live_leverage_margin_readiness(log_dir=log_dir)
+    return {
+        "status": packet.get("status"),
+        "mismatch_classification": packet.get("mismatch_classification"),
+        "current_leverage": packet.get("current_leverage"),
+        "current_margin_mode": packet.get("current_margin_mode"),
+        "configured_leverage": packet.get("configured_leverage"),
+        "configured_margin_mode": packet.get("configured_margin_mode"),
+        "zero_position": packet.get("zero_position"),
+        "manual_only_adjustment_required": packet.get("manual_only_adjustment_required"),
+        "mutation_required": packet.get("mutation_required"),
+        "mutation_performed": False,
+        "leverage_change_called": False,
+        "margin_change_called": False,
+        "live_submit_blocked_by_leverage_margin": packet.get("live_submit_blocked_by_leverage_margin"),
+        "readiness_blockers": list(packet.get("readiness_blockers") or []),
+        "safe_next_cli_command": packet.get("safe_next_cli_command"),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
+        "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
     }
 
 

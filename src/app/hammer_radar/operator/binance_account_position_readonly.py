@@ -303,6 +303,7 @@ def build_account_position_readiness(
     wallet_supports_minimum = wallet_supports_margin
     leverage = _number(position.get("leverage"))
     margin_type = str(position.get("margin_type") or "").lower()
+    current_margin_mode = margin_type.upper() if margin_type else None
     leverage_checked = leverage is not None
     margin_mode_checked = bool(margin_type)
     leverage_matches = None if leverage is None else leverage == float(configured_leverage)
@@ -347,6 +348,10 @@ def build_account_position_readiness(
             "btcusdt_position_amt": position_amt,
             "btcusdt_position_side": position.get("btcusdt_position_side"),
             "btcusdt_position_notional": position_notional,
+            "current_leverage": leverage,
+            "current_margin_mode": current_margin_mode,
+            "leverage": leverage,
+            "margin_type": margin_type or None,
             "leverage_matches_expectation": leverage_matches,
             "margin_mode_matches_expectation": margin_matches,
             "readiness_blockers": blockers,
@@ -535,6 +540,10 @@ def _empty_readiness(
             "btcusdt_position_amt": None,
             "btcusdt_position_side": None,
             "btcusdt_position_notional": None,
+            "current_leverage": None,
+            "current_margin_mode": None,
+            "leverage": None,
+            "margin_type": None,
             "leverage_matches_expectation": None,
             "margin_mode_matches_expectation": None,
             "readiness_blockers": blockers,
