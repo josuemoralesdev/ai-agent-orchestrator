@@ -134,6 +134,9 @@ from src.app.hammer_radar.operator.tiny_live_timer_integrated_test_only_matching
 from src.app.hammer_radar.operator.tiny_live_real_candidate_dry_run_trigger_bridge import (
     build_status_tiny_live_real_candidate_dry_run_trigger_bridge,
 )
+from src.app.hammer_radar.operator.tiny_live_real_candidate_timer_observation_certificate import (
+    build_status_tiny_live_real_candidate_timer_observation_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1139,6 +1142,16 @@ def tiny_live_real_candidate_dry_run_trigger_bridge_status(
     lane_key: str | None = None,
 ) -> dict:
     return build_status_tiny_live_real_candidate_dry_run_trigger_bridge(
+        log_dir=get_log_dir(use_env=True),
+        lane_key=lane_key,
+    )
+
+
+@app.get("/tiny-live/real-candidate-timer-observation-certificate/status")
+def tiny_live_real_candidate_timer_observation_certificate_status(
+    lane_key: str | None = None,
+) -> dict:
+    return build_status_tiny_live_real_candidate_timer_observation_certificate(
         log_dir=get_log_dir(use_env=True),
         lane_key=lane_key,
     )

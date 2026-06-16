@@ -94,6 +94,9 @@ from src.app.hammer_radar.operator.tiny_live_timer_integrated_test_only_matching
 from src.app.hammer_radar.operator.tiny_live_real_candidate_dry_run_trigger_bridge import (
     build_status_tiny_live_real_candidate_dry_run_trigger_bridge,
 )
+from src.app.hammer_radar.operator.tiny_live_real_candidate_timer_observation_certificate import (
+    build_status_tiny_live_real_candidate_timer_observation_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -167,10 +170,13 @@ SOURCE_SURFACES_USED = [
     "src/app/hammer_radar/operator/tiny_live_timer_observed_armed_lane_wait_certificate.py",
     "src/app/hammer_radar/operator/tiny_live_test_only_matching_candidate_trigger_certificate.py",
     "src/app/hammer_radar/operator/tiny_live_timer_integrated_test_only_matching_trigger_rehearsal.py",
+    "src/app/hammer_radar/operator/tiny_live_real_candidate_dry_run_trigger_bridge.py",
+    "src/app/hammer_radar/operator/tiny_live_real_candidate_timer_observation_certificate.py",
     "scripts/hammer_print_r294_dry_run_lane_arming_rehearsal_plan.sh",
     "scripts/hammer_print_r295_timer_observed_armed_lane_wait_certificate_plan.sh",
     "scripts/hammer_print_r296_test_only_matching_candidate_trigger_certificate_plan.sh",
     "scripts/hammer_print_r297_timer_integrated_test_only_matching_trigger_rehearsal_plan.sh",
+    "scripts/hammer_print_r299_real_candidate_timer_observation_certificate_plan.sh",
 ]
 
 
@@ -297,6 +303,9 @@ def build_tiny_live_final_console(
         )
         real_candidate_dry_run_trigger_bridge_panel = (
             build_real_candidate_dry_run_trigger_bridge_panel(log_dir=resolved_log_dir)
+        )
+        real_candidate_timer_observation_certificate_panel = (
+            build_real_candidate_timer_observation_certificate_panel(log_dir=resolved_log_dir)
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -515,6 +524,9 @@ def build_tiny_live_final_console(
                 ),
                 "real_candidate_dry_run_trigger_bridge_panel": (
                     real_candidate_dry_run_trigger_bridge_panel
+                ),
+                "real_candidate_timer_observation_certificate_panel": (
+                    real_candidate_timer_observation_certificate_panel
                 ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
@@ -1435,6 +1447,86 @@ def build_real_candidate_dry_run_trigger_bridge_panel(
                 "recent_tick_seen": packet.get("recent_tick_seen") is True,
                 "recent_tick_count": int(packet.get("recent_tick_count") or 0),
             },
+            "recommended_next_operator_move": panel.get("recommended_next_operator_move")
+            or packet.get("recommended_next_operator_move"),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return _sanitize(panel)
+
+
+def build_real_candidate_timer_observation_certificate_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_status_tiny_live_real_candidate_timer_observation_certificate(
+        log_dir=log_dir
+    )
+    panel = packet.get("real_candidate_timer_observation_certificate_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "status": panel.get("status") or packet.get("status"),
+            "requested_lane_key": panel.get("requested_lane_key")
+            or packet.get("requested_lane_key"),
+            "timer_scheduler_observation_summary": panel.get(
+                "timer_scheduler_observation_summary"
+            )
+            or {
+                "timer_health_status": packet.get("timer_health_status"),
+                "timer_active": packet.get("timer_active") is True,
+                "timer_loaded": packet.get("timer_loaded") is True,
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+                "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+                "scheduler_latest_status": packet.get("scheduler_latest_status"),
+                "scheduler_latest_trigger_loop_status": packet.get(
+                    "scheduler_latest_trigger_loop_status"
+                ),
+                "scheduler_latest_candidate_lane_key": packet.get(
+                    "scheduler_latest_candidate_lane_key"
+                ),
+            },
+            "r298_bridge_summary": panel.get("r298_bridge_summary")
+            or {
+                "status": packet.get("r298_bridge_status"),
+                "record_seen": packet.get("r298_bridge_record_seen") is True,
+                "source": packet.get("real_candidate_source"),
+                "test_only": False,
+                "fake_candidate_used": False,
+            },
+            "real_candidate_summary": panel.get("real_candidate_summary")
+            or {
+                "exists": packet.get("current_real_candidate_exists") is True,
+                "lane_key": packet.get("current_real_candidate_lane_key"),
+                "signal_id": packet.get("current_real_candidate_signal_id"),
+                "freshness_status": packet.get("current_real_candidate_freshness_status"),
+                "live_qualification_class": packet.get(
+                    "current_real_candidate_live_qualification_class"
+                ),
+                "candidate_matches_requested_lane": packet.get(
+                    "candidate_matches_requested_lane"
+                )
+                is True,
+            },
+            "simulated_lifecycle_summary": panel.get("simulated_lifecycle_summary")
+            or {
+                "simulated_dry_run_trigger_recorded": packet.get(
+                    "simulated_dry_run_trigger_recorded"
+                )
+                is True,
+                "simulated_lifecycle_status": packet.get("simulated_lifecycle_status"),
+                "simulated_open_record": packet.get("simulated_open_record"),
+                "simulated_protective_orders": packet.get(
+                    "simulated_protective_orders"
+                ),
+                "simulated_close_plan": packet.get("simulated_close_plan"),
+            },
+            "blockers": list(panel.get("blockers") or packet.get("blockers") or []),
             "recommended_next_operator_move": panel.get("recommended_next_operator_move")
             or packet.get("recommended_next_operator_move"),
             "final_command_available": False,
