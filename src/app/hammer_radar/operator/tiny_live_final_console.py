@@ -371,6 +371,9 @@ def build_tiny_live_final_console(
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
+                "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
+                if isinstance(promotion_readiness_panel.get("qualified_candidate_watch"), Mapping)
+                else {},
                 "operator_choice_panel": operator_choice_panel,
                 "controls_arming_result": controls_arming_result,
                 "final_console_go_no_go_packet": go_no_go,

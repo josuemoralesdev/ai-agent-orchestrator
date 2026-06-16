@@ -328,6 +328,7 @@ from src.app.hammer_radar.operator.strategy_performance import (
     build_strategy_timeframe_summary,
 )
 from src.app.hammer_radar.operator.strategy_promotion_watcher import (
+    build_live_qualified_fresh_candidate_watch,
     build_strategy_promotion_status,
     check_strategy_promotions,
     load_strategy_promotion_events,
@@ -931,6 +932,11 @@ def tiny_live_actual_submit_execute(request: TinyLiveActualSubmitExecuteRequest)
 @app.get("/tiny-live/jit-launch-packet")
 def tiny_live_jit_launch_packet() -> dict:
     return build_tiny_live_jit_launch_packet(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/qualified-candidate-watch")
+def tiny_live_qualified_candidate_watch() -> dict:
+    return build_live_qualified_fresh_candidate_watch(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/tiny-live/jit-launch-packet/run")

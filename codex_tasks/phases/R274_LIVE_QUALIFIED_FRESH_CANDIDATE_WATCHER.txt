@@ -1,0 +1,221 @@
+# R274 — Live-Qualified Fresh Candidate Watcher / Operator Alert
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: FINAL READINESS / WATCHER
+  Secondary: OPERATOR ALERTING, STRATEGY POLICY ENFORCEMENT, SAFETY HARDENING
+  Duplicate risk level: LOW-MEDIUM
+
+Why this phase exists:
+  R270-R273 established:
+    - tiny-live live qualification requires win_rate_pct >= 55.0
+    - min sample count >= 30
+    - avg_pnl_pct > 0
+    - all timeframes can qualify by evidence
+    - near-miss lanes such as BTCUSDT 8m short remain incubator only
+    - stale final-console wording is cleaned when no current ticket exists
+    - final command remains unavailable without current live-qualified ticket and manual unlock
+  The system now needs a watcher that detects when a fresh candidate belongs to a LIVE_QUALIFIED strategy lane and presents a clean operator alert packet.
+
+Hard goal:
+  Create a live-qualified fresh candidate watcher that:
+    - scans current/fresh BTCUSDT candidates
+    - checks exact lane against the R272 LIVE_QUALIFIED set
+    - ignores/blocks near-miss and paper-only lanes
+    - surfaces an operator alert packet only for fresh LIVE_QUALIFIED candidates
+    - does not submit, sign live orders, or call Binance order endpoints
+    - integrates with existing readiness/trade-ticket/final-console surfaces
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable kill switches.
+  - Do NOT expose secrets.
+  - Do NOT mutate env files.
+  - Do NOT make final command available in diagnostic mode.
+  - Do NOT allow near-miss lanes to unlock.
+  - Do NOT allow Betrayal/inverse lanes to unlock.
+  - Do NOT create an exception for 8m short.
+  - If uncertain, return WAIT / BLOCKED.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/notification_watcher.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - tests/hammer_radar/test_strategy_promotion_watcher.py
+    - tests/hammer_radar/test_tiny_live_strategy_lane_selection.py
+    - tests/hammer_radar/test_notification_watcher.py
+    - tests/hammer_radar/test_approval_api.py
+    - tests/hammer_radar/test_tiny_live_final_console.py
+    - tests/hammer_radar/test_tiny_live_jit_launch_packet.py
+
+Scope:
+  1. Watcher module:
+     - Add or extend a watcher that returns a structured packet:
+       event_type: LIVE_QUALIFIED_FRESH_CANDIDATE_WATCH
+       status:
+         WAIT
+         LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND
+         BLOCKED_NEAR_MISS
+         BLOCKED_PAPER_ONLY
+         BLOCKED_BETRAYAL
+       current_candidate:
+         signal_id
+         symbol
+         timeframe
+         direction
+         entry_mode
+         lane_key
+         age_minutes
+         freshness_status
+       strategy_evidence:
+         win_rate_pct
+         sample_count
+         min_sample_count
+         avg_pnl_pct
+         live_qualification_class
+       operator_packet:
+         recommended_action
+         manual_unlock_next_step
+         final_command_available=false
+         submit_allowed_from_codex=false
+
+  2. Candidate rules:
+     - Candidate qualifies only if:
+       symbol == BTCUSDT
+       freshness_status is fresh or age is inside existing freshness window
+       lane_key is in LIVE_QUALIFIED
+       win_rate_pct >= 55.0
+       sample_count >= 30
+       avg_pnl_pct > 0
+       not near-miss
+       not paper-only
+       not Betrayal/inverse
+       trade ticket can be proposed under exact lane policy
+     - Near-miss, including 8m short, must return WATCHLIST/INCUBATOR only:
+       strategy_near_miss_not_live_eligible
+       recommended_action=STRATEGY_LAB_PAPER_REVIEW
+
+  3. API surface:
+     - Add endpoint if appropriate:
+       GET /tiny-live/qualified-candidate-watch
+     - Or extend existing endpoint cleanly if a matching surface already exists.
+     - Output must include:
+       live_qualified_lanes
+       near_miss_incubator_lanes
+       current_fresh_candidate_status
+       candidate_alert_packet
+       safety
+
+  4. Notification compatibility:
+     - Prepare a telegram-compatible message payload but do not send by default.
+     - The message should say:
+       LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND only when true.
+       Include lane, win rate, sample count, direction, entry/stop/TP if available.
+       Include "operator review only; no live order placed."
+     - When WAIT, do not spam.
+
+  5. Final console / trade ticket integration:
+     - Final console should show:
+       qualified_candidate_watch.status
+       qualified_candidate_watch.next_action
+       live-qualified lanes
+       near-miss lanes
+       current fresh qualified candidate, if any.
+     - Trade ticket remains BLOCKED unless current candidate is live-qualified and fresh.
+     - Final command still unavailable unless manual unlock phrase and all gates are satisfied.
+
+  6. Tests:
+     Add/update tests proving:
+       - 44m long fresh candidate with valid evidence creates candidate alert packet.
+       - 44m short fresh candidate with valid evidence creates candidate alert packet.
+       - 55m long fresh candidate with valid evidence creates candidate alert packet.
+       - 8m short near-miss does NOT create live alert packet.
+       - 13m / 4m below-55 lanes do NOT create live alert packet.
+       - Betrayal/inverse candidate blocks.
+       - No current candidate returns WAIT.
+       - final_command_available=false in watcher packet.
+       - order_placed=false.
+       - submit_attempted=false.
+       - binance_order_endpoint_called=false.
+       - telegram-compatible payload does not send by default.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "qualified_candidate or strategy_promotion or tiny_live_strategy_lane_selection or notification_watcher or approval_api or trade_ticket or final_console or jit_launch"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/strategy-promotion/status | jq '{
+    config,
+    live_qualified_lanes,
+    near_miss_incubator_lanes,
+    qualified_candidate_watch
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq . 2>/dev/null || true
+
+  curl -s http://127.0.0.1:8015/readiness | jq '{
+    readiness_status,
+    allowed_now,
+    blockers,
+    current_state,
+    strategy_policy,
+    strategy_checked_candidates,
+    live_execution_enabled,
+    order_placed
+  }'
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    signal_id,
+    lane_key,
+    symbol,
+    timeframe,
+    direction,
+    entry_mode,
+    strategy_qualification,
+    strategy_watchlist_status,
+    blockers,
+    live_execution_enabled,
+    order_placed,
+    submit_attempted,
+    binance_order_endpoint_called
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    current_proposed_ticket_lane,
+    qualified_candidate_watch,
+    lane_intelligence_panel,
+    final_live_submit_command_packet,
+    final_console_go_no_go_packet,
+    recommended_next_operator_move,
+    final_command_available,
+    safety
+  }'
+
+Report:
+  - files changed
+  - tests run
+  - endpoint added or extended
+  - current live-qualified lanes
+  - near-miss incubator lanes
+  - whether a fresh live-qualified candidate exists
+  - candidate alert packet status
+  - telegram-compatible payload behavior
+  - proof no submit/no order/no Binance order endpoint

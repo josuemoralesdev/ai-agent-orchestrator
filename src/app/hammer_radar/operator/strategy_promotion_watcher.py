@@ -26,10 +26,12 @@ from src.app.hammer_radar.operator.strategy_performance import (
     load_strategy_audit_config,
 )
 from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
+    BTC_SYMBOL as TINY_LIVE_BTC_SYMBOL,
     LIVE_QUALIFIED,
     NEAR_MISS_INCUBATOR,
     NEAR_MISS_MIN_WIN_RATE_PCT,
     PAPER_ONLY,
+    build_lane_key,
 )
 
 STRATEGY_PROMOTION_EVENTS_FILENAME = "strategy_promotion_events.ndjson"
@@ -45,7 +47,17 @@ ORDER_PLACED = False
 EXECUTION_ATTEMPTED = False
 ORDER_PAYLOAD_CREATED = False
 SECRETS_SHOWN = False
+SUBMIT_ATTEMPTED = False
+BINANCE_ORDER_ENDPOINT_CALLED = False
+BINANCE_TEST_ORDER_ENDPOINT_CALLED = False
+REAL_ORDER_PLACED = False
 DEFAULT_NEAR_PROMOTION_SAMPLE_GAP = 5
+QUALIFIED_CANDIDATE_EVENT_TYPE = "LIVE_QUALIFIED_FRESH_CANDIDATE_WATCH"
+WATCH_WAIT = "WAIT"
+WATCH_FOUND = "LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND"
+WATCH_BLOCKED_NEAR_MISS = "BLOCKED_NEAR_MISS"
+WATCH_BLOCKED_PAPER_ONLY = "BLOCKED_PAPER_ONLY"
+WATCH_BLOCKED_BETRAYAL = "BLOCKED_BETRAYAL"
 
 
 def build_strategy_promotion_status(
@@ -100,6 +112,34 @@ def build_strategy_promotion_status(
         "current_fresh_candidate_status": candidate_watch["current_fresh_candidate_status"],
         "latest_promotion_event": events[0] if events else None,
         "message_payloads": [build_promotion_message(row) for row in [*eligible, *near]],
+    }
+
+
+def build_live_qualified_fresh_candidate_watch(
+    *,
+    log_dir: str | Path | None = None,
+    config: StrategyAuditConfig | None = None,
+    near_sample_gap: int = DEFAULT_NEAR_PROMOTION_SAMPLE_GAP,
+) -> dict[str, Any]:
+    status = build_strategy_promotion_status(
+        log_dir=log_dir,
+        config=config,
+        near_sample_gap=near_sample_gap,
+    )
+    watch = dict(status.get("qualified_candidate_watch") or {})
+    return {
+        **_safety_fields(),
+        "event_type": QUALIFIED_CANDIDATE_EVENT_TYPE,
+        "generated_at": status.get("generated_at"),
+        "archive_log_dir": status.get("archive_log_dir"),
+        "live_qualified_lanes": list(status.get("live_qualified_lanes") or []),
+        "near_miss_incubator_lanes": list(status.get("near_miss_incubator_lanes") or []),
+        "paper_only_lanes": list(status.get("paper_only_lanes") or []),
+        "current_fresh_candidate_status": watch.get("current_fresh_candidate_status") or {},
+        "candidate_alert_packet": watch.get("candidate_alert_packet") or _empty_candidate_alert_packet(),
+        "telegram_compatible_payload": watch.get("telegram_compatible_payload")
+        or _watch_telegram_payload(None, status=WATCH_WAIT),
+        "safety": _watch_safety(),
     }
 
 
@@ -302,18 +342,32 @@ def _qualified_candidate_watch(rows: list[dict[str, Any]], *, config: StrategyAu
         else:
             paper_only.append(payload)
     fresh_status = _current_fresh_candidate_status(
-        live_qualified_lane_keys={str(row["strategy_key"]) for row in live_qualified},
+        lane_payloads={
+            str(row["strategy_key"]): row
+            for row in [*live_qualified, *near_miss, *paper_only]
+        },
         log_dir=log_dir,
     )
+    alert_packet = fresh_status.get("candidate_alert_packet") if isinstance(fresh_status.get("candidate_alert_packet"), dict) else _empty_candidate_alert_packet()
     return {
+        "event_type": QUALIFIED_CANDIDATE_EVENT_TYPE,
+        "status": alert_packet.get("status", WATCH_WAIT),
         "live_qualified_lanes": live_qualified,
         "near_miss_incubator_lanes": near_miss,
         "paper_only_lanes": paper_only,
         "current_fresh_candidate_status": fresh_status,
-        "next_action": "WAIT" if fresh_status["qualified_fresh_candidate_exists"] is not True else "REVIEW_MANUAL_ONLY_UNLOCK_PACKET",
+        "candidate_alert_packet": alert_packet,
+        "operator_packet": alert_packet.get("operator_packet") or {},
+        "telegram_compatible_payload": _watch_telegram_payload(
+            alert_packet,
+            status=str(alert_packet.get("status") or WATCH_WAIT),
+        ),
+        "next_action": alert_packet.get("operator_packet", {}).get("recommended_action")
+        or ("WAIT" if fresh_status["qualified_fresh_candidate_exists"] is not True else "REVIEW_MANUAL_ONLY_UNLOCK_PACKET"),
         "manual_unlock_available_only_for": LIVE_QUALIFIED,
         "near_miss_manual_unlock_available": False,
         "strategy_lab_recommendation": "Use NEAR_MISS_INCUBATOR lanes for future Strategy Lab work; do not unlock live.",
+        "safety": _watch_safety(),
         **_safety_fields(),
     }
 
@@ -354,34 +408,294 @@ def _watch_lane_payload(row: dict[str, Any], *, config: StrategyAuditConfig) -> 
     }
 
 
-def _current_fresh_candidate_status(*, live_qualified_lane_keys: set[str], log_dir: Path) -> dict[str, Any]:
+def _current_fresh_candidate_status(*, lane_payloads: dict[str, dict[str, Any]], log_dir: Path) -> dict[str, Any]:
     try:
-        from src.app.hammer_radar.operator.readiness import build_readiness_payload
+        from src.app.hammer_radar.operator.inspect import build_live_candidate_snapshot
+        from src.app.hammer_radar.operator.readiness import PROTOCOL
 
-        readiness = build_readiness_payload(log_dir=log_dir)
+        snapshot = build_live_candidate_snapshot(
+            limit=10,
+            since_hours=24,
+            min_score=90,
+            symbol=TINY_LIVE_BTC_SYMBOL,
+            allow_short=True,
+            allow_oversold=False,
+            allow_trigger_flags=False,
+            max_risk_usd=5.0,
+            max_leverage=float(PROTOCOL["max_leverage"]),
+            max_position_usd=float(PROTOCOL["max_position_usd"]),
+            fresh_minutes=30,
+            allow_expired=False,
+            latest_only=False,
+            log_dir=log_dir,
+        )
     except Exception as exc:  # pragma: no cover - defensive status surface
         return {
             "qualified_fresh_candidate_exists": False,
             "fresh_candidate_lane_keys": [],
             "qualified_fresh_candidate_lane_keys": [],
             "next_action": "WAIT",
+            "candidate_alert_packet": _empty_candidate_alert_packet(blocked_by=[f"candidate_snapshot_unavailable_{exc.__class__.__name__}"]),
             "blocked_by": [f"readiness_status_unavailable_{exc.__class__.__name__}"],
             **_safety_fields(),
         }
-    fresh_lanes = [
-        str(row.get("lane_key"))
-        for row in readiness.get("strategy_checked_candidates") or []
-        if isinstance(row, dict) and row.get("lane_key")
+    checks = list(snapshot.get("checks") or [])
+    fresh_checks = [
+        check
+        for check in checks
+        if getattr(check, "freshness_status", None) == "fresh"
+        and getattr(getattr(check, "candidate", None), "signal", None) is not None
+        and getattr(check.candidate.signal, "symbol", None) == TINY_LIVE_BTC_SYMBOL
     ]
-    qualified_fresh = [lane for lane in fresh_lanes if lane in live_qualified_lane_keys]
+    fresh_lanes = [_lane_key_for_check(check) for check in fresh_checks]
+    qualified_fresh = [lane for lane in fresh_lanes if (lane_payloads.get(lane) or {}).get("watch_category") == LIVE_QUALIFIED]
+    current = fresh_checks[0] if fresh_checks else None
+    alert_packet = _candidate_alert_packet(current, lane_payloads=lane_payloads, log_dir=log_dir)
     return {
         "qualified_fresh_candidate_exists": bool(qualified_fresh),
         "fresh_candidate_lane_keys": fresh_lanes,
         "qualified_fresh_candidate_lane_keys": qualified_fresh,
-        "readiness_status": readiness.get("readiness_status"),
-        "next_action": "REVIEW_MANUAL_ONLY_UNLOCK_PACKET" if qualified_fresh else "WAIT",
-        "blocked_by": [] if qualified_fresh else ["no_qualified_fresh_candidate"],
+        "current_candidate_lane_key": _lane_key_for_check(current) if current is not None else None,
+        "current_fresh_candidate_status": alert_packet.get("status"),
+        "candidate_alert_packet": alert_packet,
+        "next_action": alert_packet.get("operator_packet", {}).get("recommended_action") or "WAIT",
+        "blocked_by": [] if alert_packet.get("status") == WATCH_FOUND else list(alert_packet.get("blocked_by") or ["no_qualified_fresh_candidate"]),
         **_safety_fields(),
+    }
+
+
+def _candidate_alert_packet(check: Any | None, *, lane_payloads: dict[str, dict[str, Any]], log_dir: Path) -> dict[str, Any]:
+    if check is None:
+        return _empty_candidate_alert_packet()
+    lane_key = _lane_key_for_check(check)
+    lane = lane_payloads.get(lane_key) or {}
+    category = str(lane.get("watch_category") or PAPER_ONLY)
+    current_candidate = _current_candidate_payload(check, lane_key=lane_key)
+    evidence = _strategy_evidence_payload(lane, category=category)
+    blocked_by: list[str] = []
+    status = WATCH_WAIT
+    recommended_action = "WAIT"
+    manual_unlock_next_step = "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE"
+    if _candidate_is_betrayal_or_inverse(check):
+        status = WATCH_BLOCKED_BETRAYAL
+        blocked_by.append("betrayal_inverse_candidate_not_live_eligible")
+        recommended_action = "WAIT"
+        manual_unlock_next_step = "BLOCKED_BETRAYAL_OR_INVERSE"
+    elif category == NEAR_MISS_INCUBATOR:
+        status = WATCH_BLOCKED_NEAR_MISS
+        blocked_by.append("strategy_near_miss_not_live_eligible")
+        recommended_action = "STRATEGY_LAB_PAPER_REVIEW"
+        manual_unlock_next_step = "WATCHLIST_INCUBATOR_ONLY"
+    elif category != LIVE_QUALIFIED:
+        status = WATCH_BLOCKED_PAPER_ONLY
+        blocked_by.append("strategy_paper_only_not_live_eligible")
+        recommended_action = "STRATEGY_LAB_PAPER_REVIEW"
+        manual_unlock_next_step = "PAPER_ONLY_REVIEW"
+    else:
+        blocked_by.extend(_live_qualified_evidence_blockers(lane))
+        blocked_by.extend(_candidate_field_blockers(check, lane_key=lane_key))
+        if blocked_by:
+            status = WATCH_BLOCKED_PAPER_ONLY
+            recommended_action = "STRATEGY_LAB_PAPER_REVIEW"
+            manual_unlock_next_step = "BLOCKED_UNTIL_EXACT_LANE_POLICY_CLEAN"
+        else:
+            status = WATCH_FOUND
+            recommended_action = "REVIEW_MANUAL_ONLY_UNLOCK_PACKET"
+            manual_unlock_next_step = "RUN_FINAL_CONSOLE_AND_MANUAL_UNLOCK_REVIEW"
+    if category in {NEAR_MISS_INCUBATOR, PAPER_ONLY} and "strategy_near_miss_not_live_eligible" in (lane.get("blockers") or []):
+        blocked_by.append("strategy_near_miss_not_live_eligible")
+    operator_packet = {
+        "recommended_action": recommended_action,
+        "manual_unlock_next_step": manual_unlock_next_step,
+        "final_command_available": False,
+        "submit_allowed_from_codex": False,
+        "operator_review_only": True,
+        "no_live_order_placed": True,
+    }
+    return {
+        **_safety_fields(),
+        "event_type": QUALIFIED_CANDIDATE_EVENT_TYPE,
+        "status": status,
+        "current_candidate": current_candidate,
+        "strategy_evidence": evidence,
+        "operator_packet": operator_packet,
+        "blocked_by": _dedupe(blocked_by),
+        "final_command_available": False,
+        "submit_allowed_from_codex": False,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "binance_test_order_endpoint_called": BINANCE_TEST_ORDER_ENDPOINT_CALLED,
+        "real_order_placed": REAL_ORDER_PLACED,
+        "telegram_compatible_payload": _watch_telegram_payload({"current_candidate": current_candidate, "strategy_evidence": evidence}, status=status),
+        "safety": _watch_safety(),
+    }
+
+
+def _empty_candidate_alert_packet(*, blocked_by: list[str] | None = None) -> dict[str, Any]:
+    return {
+        **_safety_fields(),
+        "event_type": QUALIFIED_CANDIDATE_EVENT_TYPE,
+        "status": WATCH_WAIT,
+        "current_candidate": None,
+        "strategy_evidence": None,
+        "operator_packet": {
+            "recommended_action": "WAIT",
+            "manual_unlock_next_step": "WAIT_FOR_LIVE_QUALIFIED_FRESH_CANDIDATE",
+            "final_command_available": False,
+            "submit_allowed_from_codex": False,
+            "operator_review_only": True,
+            "no_live_order_placed": True,
+        },
+        "blocked_by": blocked_by or ["no_current_fresh_candidate"],
+        "final_command_available": False,
+        "submit_allowed_from_codex": False,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "binance_test_order_endpoint_called": BINANCE_TEST_ORDER_ENDPOINT_CALLED,
+        "real_order_placed": REAL_ORDER_PLACED,
+        "safety": _watch_safety(),
+    }
+
+
+def _current_candidate_payload(check: Any, *, lane_key: str) -> dict[str, Any]:
+    signal = check.candidate.signal
+    return {
+        "signal_id": signal.signal_id,
+        "symbol": signal.symbol,
+        "timeframe": signal.timeframe,
+        "direction": signal.direction,
+        "entry_mode": PREFERRED_ENTRY_MODE,
+        "lane_key": lane_key,
+        "age_minutes": check.age_minutes,
+        "freshness_status": check.freshness_status,
+        "entry": check.entry,
+        "stop": check.stop,
+        "take_profit": check.take_profit,
+    }
+
+
+def _strategy_evidence_payload(lane: dict[str, Any], *, category: str) -> dict[str, Any]:
+    return {
+        "win_rate_pct": lane.get("win_rate_pct"),
+        "sample_count": lane.get("sample_count"),
+        "min_sample_count": lane.get("required_sample_count"),
+        "avg_pnl_pct": lane.get("avg_pnl_pct"),
+        "live_qualification_class": category,
+    }
+
+
+def _live_qualified_evidence_blockers(lane: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if str(lane.get("strategy_key") or "") == "":
+        blockers.append("strategy_evidence_missing")
+    if float(lane.get("win_rate_pct") or 0.0) < TINY_LIVE_MIN_WIN_RATE:
+        blockers.append("win_rate_below_operator_55_policy")
+    if int(lane.get("sample_count") or 0) < int(lane.get("required_sample_count") or 30):
+        blockers.append("strategy_sample_count_below_minimum")
+    if float(lane.get("avg_pnl_pct") or 0.0) <= 0.0:
+        blockers.append("strategy_avg_pnl_pct_not_positive")
+    return blockers
+
+
+def _candidate_field_blockers(check: Any, *, lane_key: str) -> list[str]:
+    signal = check.candidate.signal
+    blockers: list[str] = []
+    if signal.symbol != TINY_LIVE_BTC_SYMBOL:
+        blockers.append("candidate_symbol_not_BTCUSDT")
+    if check.freshness_status != "fresh":
+        blockers.append("candidate_not_fresh")
+    if check.entry is None:
+        blockers.append("candidate_entry_missing")
+    if check.stop is None:
+        blockers.append("candidate_stop_missing")
+    if check.take_profit is None:
+        blockers.append("candidate_take_profit_missing")
+    if lane_key != build_lane_key(
+        symbol=signal.symbol,
+        timeframe=signal.timeframe,
+        direction=signal.direction,
+        entry_mode=PREFERRED_ENTRY_MODE,
+    ):
+        blockers.append("candidate_lane_key_mismatch")
+    return blockers
+
+
+def _candidate_is_betrayal_or_inverse(check: Any) -> bool:
+    signal = check.candidate.signal
+    text = " ".join(
+        str(value or "")
+        for value in (
+            signal.signal_id,
+            getattr(signal, "signal_origin_family", None),
+            getattr(signal, "origin_family", None),
+            getattr(signal, "source_type", None),
+            signal.direction,
+        )
+    ).lower()
+    return "betrayal" in text or "inverse" in text or signal.direction == "inverse"
+
+
+def _lane_key_for_check(check: Any | None) -> str:
+    if check is None:
+        return ""
+    signal = check.candidate.signal
+    return build_lane_key(
+        symbol=signal.symbol,
+        timeframe=signal.timeframe,
+        direction=signal.direction,
+        entry_mode=PREFERRED_ENTRY_MODE,
+    )
+
+
+def _watch_telegram_payload(packet: dict[str, Any] | None, *, status: str) -> dict[str, Any]:
+    candidate = (packet or {}).get("current_candidate") or {}
+    evidence = (packet or {}).get("strategy_evidence") or {}
+    if status != WATCH_FOUND:
+        message = "\n".join(
+            [
+                "Hammer Radar live-qualified fresh candidate watcher",
+                f"status: {status}",
+                "No Telegram send by default.",
+                "operator review only; no live order placed.",
+            ]
+        )
+    else:
+        message = "\n".join(
+            [
+                "LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND",
+                f"lane: {candidate.get('lane_key') or 'n/a'}",
+                f"win_rate_pct: {evidence.get('win_rate_pct')}",
+                f"sample_count: {evidence.get('sample_count')}/{evidence.get('min_sample_count')}",
+                f"direction: {candidate.get('direction') or 'n/a'}",
+                f"entry: {candidate.get('entry')}",
+                f"stop: {candidate.get('stop')}",
+                f"take_profit: {candidate.get('take_profit')}",
+                "operator review only; no live order placed.",
+            ]
+        )
+    return {
+        "channel": "telegram_compatible",
+        "send_enabled": False,
+        "sent": False,
+        "status": "prepared_not_sent",
+        "message": message,
+        "secrets_shown": SECRETS_SHOWN,
+    }
+
+
+def _watch_safety() -> dict[str, Any]:
+    return {
+        "live_execution_enabled": LIVE_EXECUTION_ENABLED,
+        "allow_live_orders": ALLOW_LIVE_ORDERS,
+        "global_kill_switch": GLOBAL_KILL_SWITCH,
+        "order_placed": ORDER_PLACED,
+        "real_order_placed": REAL_ORDER_PLACED,
+        "execution_attempted": EXECUTION_ATTEMPTED,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "binance_test_order_endpoint_called": BINANCE_TEST_ORDER_ENDPOINT_CALLED,
+        "order_payload_created": ORDER_PAYLOAD_CREATED,
+        "secrets_shown": SECRETS_SHOWN,
     }
 
 
@@ -504,7 +818,11 @@ def _safety_fields() -> dict[str, Any]:
         "allow_live_orders": ALLOW_LIVE_ORDERS,
         "global_kill_switch": GLOBAL_KILL_SWITCH,
         "order_placed": ORDER_PLACED,
+        "real_order_placed": REAL_ORDER_PLACED,
         "execution_attempted": EXECUTION_ATTEMPTED,
+        "submit_attempted": SUBMIT_ATTEMPTED,
+        "binance_order_endpoint_called": BINANCE_ORDER_ENDPOINT_CALLED,
+        "binance_test_order_endpoint_called": BINANCE_TEST_ORDER_ENDPOINT_CALLED,
         "order_payload_created": ORDER_PAYLOAD_CREATED,
         "secrets_shown": SECRETS_SHOWN,
     }

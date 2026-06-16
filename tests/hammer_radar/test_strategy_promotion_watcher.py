@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -14,8 +15,14 @@ from src.app.hammer_radar.operator.models import OutcomeRecord, SignalRecord
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 from src.app.hammer_radar.operator.strategy_performance import StrategyAuditConfig
 from src.app.hammer_radar.operator.strategy_promotion_watcher import (
+    WATCH_BLOCKED_BETRAYAL,
+    WATCH_BLOCKED_NEAR_MISS,
+    WATCH_BLOCKED_PAPER_ONLY,
+    WATCH_FOUND,
+    WATCH_WAIT,
     STRATEGY_NEAR_PROMOTION,
     STRATEGY_PROMOTION_READY,
+    build_live_qualified_fresh_candidate_watch,
     build_strategy_promotion_status,
     check_strategy_promotions,
     load_strategy_promotion_events,
@@ -259,6 +266,141 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
         self.assertFalse(payload["order_payload_created"])
         self.assertFalse(payload["recorded_events"][0]["order_payload_created"])
 
+    def test_44m_long_fresh_live_qualified_candidate_creates_alert_packet(self) -> None:
+        self._seed_strategy_status_lane(timeframe="44m", direction="long", win_rate_pct=58.57, sample_count=70)
+        archive.append_signal(
+            self._eligible_signal(signal_id="fresh|44m|long", timeframe="44m", direction="long"),
+            log_dir=self.log_dir,
+        )
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_FOUND, packet["status"])
+        self.assertEqual("BTCUSDT|44m|long|ladder_close_50_618", packet["current_candidate"]["lane_key"])
+        self.assertEqual(58.57, packet["strategy_evidence"]["win_rate_pct"])
+        self.assertEqual(70, packet["strategy_evidence"]["sample_count"])
+        self.assertEqual("LIVE_QUALIFIED", packet["strategy_evidence"]["live_qualification_class"])
+        self.assertEqual("REVIEW_MANUAL_ONLY_UNLOCK_PACKET", packet["operator_packet"]["recommended_action"])
+        self.assertFalse(packet["operator_packet"]["final_command_available"])
+        self.assertFalse(packet["operator_packet"]["submit_allowed_from_codex"])
+        self.assertFalse(packet["order_placed"])
+        self.assertFalse(packet["submit_attempted"])
+        self.assertFalse(packet["binance_order_endpoint_called"])
+        self.assertFalse(packet["binance_test_order_endpoint_called"])
+        self.assertFalse(packet["real_order_placed"])
+        self.assertFalse(payload["telegram_compatible_payload"]["send_enabled"])
+        self.assertFalse(payload["telegram_compatible_payload"]["sent"])
+        self.assertIn("LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND", payload["telegram_compatible_payload"]["message"])
+        self.assertIn("operator review only; no live order placed.", payload["telegram_compatible_payload"]["message"])
+
+    def test_44m_short_fresh_live_qualified_candidate_creates_alert_packet(self) -> None:
+        self._seed_strategy_status_lane(timeframe="44m", direction="short", win_rate_pct=62.0, sample_count=40)
+        archive.append_signal(
+            self._eligible_signal(signal_id="fresh|44m|short", timeframe="44m", direction="short"),
+            log_dir=self.log_dir,
+        )
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_FOUND, packet["status"])
+        self.assertEqual("BTCUSDT|44m|short|ladder_close_50_618", packet["current_candidate"]["lane_key"])
+        self.assertEqual("short", packet["current_candidate"]["direction"])
+        self.assertFalse(packet["final_command_available"])
+        self.assertFalse(packet["submit_allowed_from_codex"])
+
+    def test_55m_long_fresh_live_qualified_candidate_creates_alert_packet(self) -> None:
+        self._seed_strategy_status_lane(timeframe="55m", direction="long", win_rate_pct=62.0, sample_count=40)
+        archive.append_signal(
+            self._eligible_signal(signal_id="fresh|55m|long", timeframe="55m", direction="long"),
+            log_dir=self.log_dir,
+        )
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_FOUND, packet["status"])
+        self.assertEqual("BTCUSDT|55m|long|ladder_close_50_618", packet["current_candidate"]["lane_key"])
+        self.assertEqual(62.0, packet["strategy_evidence"]["win_rate_pct"])
+
+    def test_8m_short_near_miss_returns_incubator_only_no_live_alert(self) -> None:
+        self._seed_strategy_status_lane(timeframe="8m", direction="short", win_rate_pct=53.33, sample_count=30)
+        archive.append_signal(
+            self._eligible_signal(signal_id="fresh|8m|short", timeframe="8m", direction="short"),
+            log_dir=self.log_dir,
+        )
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_BLOCKED_NEAR_MISS, packet["status"])
+        self.assertIn("strategy_near_miss_not_live_eligible", packet["blocked_by"])
+        self.assertEqual("STRATEGY_LAB_PAPER_REVIEW", packet["operator_packet"]["recommended_action"])
+        self.assertFalse(packet["operator_packet"]["final_command_available"])
+        self.assertFalse(packet["order_placed"])
+
+    def test_below_55_13m_and_4m_lanes_do_not_create_live_alert_packet(self) -> None:
+        for timeframe in ("13m", "4m"):
+            with self.subTest(timeframe=timeframe):
+                self.log_dir = Path(self.temp_dir.name) / f"below-{timeframe}"
+                self.log_dir.mkdir()
+                self._seed_strategy_status_lane(timeframe=timeframe, direction="long", win_rate_pct=47.27, sample_count=55)
+                archive.append_signal(
+                    self._eligible_signal(signal_id=f"fresh|{timeframe}|long", timeframe=timeframe, direction="long"),
+                    log_dir=self.log_dir,
+                )
+
+                payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+                packet = payload["candidate_alert_packet"]
+                self.assertEqual(WATCH_BLOCKED_PAPER_ONLY, packet["status"])
+                self.assertEqual("STRATEGY_LAB_PAPER_REVIEW", packet["operator_packet"]["recommended_action"])
+                self.assertFalse(packet["operator_packet"]["final_command_available"])
+
+    def test_betrayal_inverse_candidate_blocks(self) -> None:
+        self._seed_strategy_status_lane(timeframe="44m", direction="long", win_rate_pct=62.0, sample_count=40)
+        archive.append_signal(
+            self._eligible_signal(signal_id="betrayal|inverse|fresh", timeframe="44m", direction="long"),
+            log_dir=self.log_dir,
+        )
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_BLOCKED_BETRAYAL, packet["status"])
+        self.assertIn("betrayal_inverse_candidate_not_live_eligible", packet["blocked_by"])
+        self.assertFalse(packet["operator_packet"]["final_command_available"])
+
+    def test_no_current_candidate_returns_wait(self) -> None:
+        self._seed_strategy_status_lane(timeframe="44m", direction="long", win_rate_pct=62.0, sample_count=40)
+
+        payload = build_live_qualified_fresh_candidate_watch(log_dir=self.log_dir, config=self.config)
+
+        packet = payload["candidate_alert_packet"]
+        self.assertEqual(WATCH_WAIT, packet["status"])
+        self.assertEqual("WAIT", packet["operator_packet"]["recommended_action"])
+        self.assertFalse(packet["operator_packet"]["final_command_available"])
+        self.assertFalse(packet["order_placed"])
+
+    def test_qualified_candidate_watch_endpoint_returns_read_only_packet(self) -> None:
+        self._seed_strategy_status_lane(timeframe="44m", direction="long", win_rate_pct=62.0, sample_count=40)
+        archive.append_signal(
+            self._eligible_signal(signal_id="fresh|endpoint|44m|long", timeframe="44m", direction="long"),
+            log_dir=self.log_dir,
+        )
+
+        response = self.client.get("/tiny-live/qualified-candidate-watch")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("LIVE_QUALIFIED_FRESH_CANDIDATE_WATCH", payload["event_type"])
+        self.assertEqual(WATCH_FOUND, payload["candidate_alert_packet"]["status"])
+        self.assertFalse(payload["candidate_alert_packet"]["final_command_available"])
+        self.assertFalse(payload["candidate_alert_packet"]["submit_attempted"])
+        self.assertFalse(payload["candidate_alert_packet"]["binance_order_endpoint_called"])
+        self.assertFalse(payload["telegram_compatible_payload"]["send_enabled"])
+
     def _seed_group(
         self,
         prefix: str,
@@ -316,6 +458,79 @@ class StrategyPromotionWatcherTestCase(unittest.TestCase):
             )
             archive.append_signal(signal, log_dir=self.log_dir)
             archive.append_outcome(outcome, log_dir=self.log_dir)
+
+    @staticmethod
+    def _eligible_signal(
+        *,
+        signal_id: str,
+        timeframe: str,
+        direction: str,
+    ) -> SignalRecord:
+        bearish = direction == "short"
+        return SignalRecord(
+            signal_id=signal_id,
+            symbol="BTCUSDT",
+            timeframe=timeframe,
+            direction=direction,
+            timestamp=(datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+            hammer_strength=100.0,
+            hammer_high=101.0,
+            hammer_low=94.0,
+            fib_50=100.5,
+            fib_618=100.0,
+            fib_650=99.5,
+            fib_786=98.5,
+            invalidation=105.0 if bearish else 95.0,
+            bias_timeframe="4H",
+            bias_direction="bearish" if bearish else "bullish",
+            bias_aligned=True,
+            same_direction_streak=0,
+            opposite_direction_streak=0,
+            tradable=True,
+            trend_direction="bearish" if bearish else "bullish",
+            trend_strength_score=0.6,
+            rsi_state="overbought" if bearish else "neutral",
+            rsi_value=70.0 if bearish else 50.0,
+            divergence_type="bearish" if bearish else "bullish",
+            divergence_confirmed=True,
+        )
+
+    def _seed_strategy_status_lane(
+        self,
+        *,
+        timeframe: str,
+        direction: str,
+        win_rate_pct: float,
+        sample_count: int,
+        avg_pnl_pct: float = 0.1,
+    ) -> None:
+        lane_key = f"BTCUSDT|{timeframe}|{direction}|ladder_close_50_618"
+        record = {
+            "qualified_candidate_watch": {
+                "live_qualified_lanes": [],
+                "near_miss_incubator_lanes": [],
+                "paper_only_lanes": [],
+            }
+        }
+        row = {
+            "strategy_key": lane_key,
+            "sample_count": sample_count,
+            "required_sample_count": 30,
+            "win_rate_pct": win_rate_pct,
+            "avg_pnl_pct": avg_pnl_pct,
+            "total_pnl_pct": round(avg_pnl_pct * sample_count, 4),
+            "entry_mode": "ladder_close_50_618",
+            "timeframe": timeframe,
+            "direction": direction,
+        }
+        if sample_count >= 30 and avg_pnl_pct > 0 and win_rate_pct >= 55.0:
+            record["qualified_candidate_watch"]["live_qualified_lanes"].append(row)
+        elif sample_count >= 30 and avg_pnl_pct > 0 and win_rate_pct >= 53.0:
+            record["qualified_candidate_watch"]["near_miss_incubator_lanes"].append(row)
+        else:
+            record["qualified_candidate_watch"]["paper_only_lanes"].append(row)
+        with (self.log_dir / "strategy_promotion_status.ndjson").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":
