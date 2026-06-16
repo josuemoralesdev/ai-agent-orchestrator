@@ -23,6 +23,9 @@ from src.app.hammer_radar.operator.full_spectrum_lane_scoreboard import DEFAULT_
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE, normalize_lane_key
 from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.strategy_promotion_watcher import build_strategy_promotion_status
+from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+    build_tiny_live_autonomous_armed_dry_run,
+)
 from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import (
     LANE_CONTROLS_PATH,
     RISK_CONTRACT_CONFIG_PATH,
@@ -180,6 +183,9 @@ def build_tiny_live_final_console(
             log_dir=resolved_log_dir,
             risk_contract=risk_contract,
             official_lane_key=official_lane_key,
+        )
+        autonomous_armed_dry_run_panel = build_autonomous_armed_dry_run_panel(
+            log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -369,6 +375,7 @@ def build_tiny_live_final_console(
                 "signal_origin_status": fresh_candidate_status.get("signal_origin_status"),
                 "latest_jit_launch_packet": latest_jit_launch_packet,
                 "lane_intelligence_panel": lane_intelligence_panel,
+                "autonomous_armed_dry_run_panel": autonomous_armed_dry_run_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -494,6 +501,33 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
         snapshot = {}
     fallback = _latest_file_record(Path(resolved_log_dir) / "readiness_status.ndjson")
     return _sanitize(snapshot or fallback)
+
+
+def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    packet = build_tiny_live_autonomous_armed_dry_run(log_dir=log_dir)
+    arming = packet.get("arming_state") if isinstance(packet.get("arming_state"), Mapping) else {}
+    candidate = packet.get("selected_candidate") if isinstance(packet.get("selected_candidate"), Mapping) else {}
+    status = str(packet.get("status") or "AUTO_DRY_RUN_WAIT")
+    blockers = [str(item) for item in packet.get("blockers") or []]
+    if status == "AUTO_DRY_RUN_WAIT":
+        next_required_step = "WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE"
+    elif "BLOCKED_BY_GLOBAL_ARMING" in blockers or "BLOCKED_BY_LANE_ARMING" in blockers:
+        next_required_step = "BLOCKED_BY_ARMING"
+    elif status == "AUTO_DRY_RUN_READY":
+        next_required_step = "REVIEW_AUTONOMOUS_DRY_RUN_PACKET_REAL_ORDER_FORBIDDEN"
+    else:
+        next_required_step = packet.get("next_required_step") or "CLEAR_BLOCKERS_OR_WAIT"
+    return {
+        "global_auto_live_enabled": arming.get("global_auto_live_enabled") is True,
+        "current_lane_auto_armed": bool(candidate.get("lane_key") and candidate.get("lane_key") in set(arming.get("lane_auto_live_enabled_keys") or [])),
+        "auto_execute_mode": arming.get("auto_execute_mode") or "dry_run_only",
+        "selected_candidate_lane": candidate.get("lane_key"),
+        "auto_dry_run_status": status,
+        "next_required_step": next_required_step,
+        "blockers": blockers,
+        "real_order_still_forbidden": True,
+        "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
+    }
 
 
 def load_latest_r264_dry_preview_summary(

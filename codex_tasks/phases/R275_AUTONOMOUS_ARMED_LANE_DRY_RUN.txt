@@ -1,0 +1,276 @@
+# R275 — Autonomous Armed Lane Dry-Run
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: AUTONOMOUS EXECUTION ARCHITECTURE / DRY-RUN
+  Secondary: FINAL READINESS, OPERATOR ARMING, SAFETY HARDENING
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  R274 added a live-qualified fresh candidate watcher. That is useful for visibility, but the final architecture must not depend on the operator reading a notification quickly enough.
+  The action window is too narrow.
+  Target architecture:
+    - operator arms or disarms machine/lane
+    - when a fresh LIVE_QUALIFIED signal appears and all gates pass, machine executes automatically
+    - notifications are for visibility/audit, not the timing-critical trigger
+  R275 must build the autonomous armed-lane dry-run path only.
+  No real order is allowed in this phase.
+
+Hard goal:
+  Build an autonomous dry-run executor that:
+    - remains OFF by default
+    - requires explicit global auto-live arming and exact lane arming
+    - scans live-qualified fresh candidates
+    - if armed and all gates pass, creates an autonomous execution dry-run packet
+    - never calls Binance order/test-order endpoints
+    - never places real orders
+    - produces clear audit records and operator visibility
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable real live execution.
+  - Do NOT disable global kill switches.
+  - Do NOT expose secrets.
+  - Do NOT mutate external env files.
+  - Do NOT make real final command available.
+  - Do NOT allow near-miss lanes to execute.
+  - Do NOT allow Betrayal/inverse lanes to execute.
+  - Do NOT create an exception for 8m short.
+  - Do NOT allow autonomous execution unless BOTH global and exact-lane arming are true.
+  - If uncertain, return WAIT / BLOCKED / DRY_RUN_BLOCKED.
+
+Operator architecture:
+  Human controls:
+    - global_auto_live_enabled
+    - lane_auto_live_enabled per exact lane
+    - timeframe/direction/entry_mode lane arming
+    - max notional
+    - max daily trades
+    - daily loss stop
+    - kill switch
+  Machine controls:
+    - candidate freshness
+    - strategy evidence
+    - exact lane qualification
+    - risk contract
+    - exchange minimum
+    - duplicate/idempotency
+    - no prior live submit
+    - no daily loss breach
+    - order payload construction
+    - protective stop/take-profit pairing
+    - audit + notification
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/exchange_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_controls_arming.py
+    - configs/hammer_radar/lane_controls.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. New autonomous arming state model:
+     Add a safe config/ledger-backed model, preferably not env-based:
+       global_auto_live_enabled: false by default
+       auto_execute_mode: "dry_run_only" for R275
+       lane_auto_live_enabled: false by default for every lane
+       armed_lane_key: null unless explicitly armed
+       allowed_lane_keys: exact list only
+       max_position_notional_usdt: 80.0
+       leverage: 10.0
+       max_trades_per_day: 1
+       daily_loss_stop_usdt: 5.0
+       require_protective_orders: true
+       require_strategy_live_qualified: true
+       require_no_betrayal: true
+       require_not_near_miss: true
+
+     Store this in a safe config file or existing lane_controls structure only if consistent with prior design.
+     Default must be fully OFF.
+
+  2. Autonomous dry-run executor:
+     Add an operator module/function, e.g.:
+       tiny_live_autonomous_armed_dry_run.py
+
+     It should:
+       - load auto arming state
+       - load live-qualified fresh candidate watcher packet
+       - select current fresh LIVE_QUALIFIED candidate only
+       - verify exact lane is armed
+       - verify global auto live is armed
+       - verify strategy evidence:
+           win_rate >= 55
+           sample_count >= 30
+           avg_pnl > 0
+       - verify not near-miss
+       - verify not paper-only
+       - verify not Betrayal/inverse
+       - verify risk contract:
+           explicit_notional_cap_with_leverage
+           max notional <= 80
+           leverage == 10
+           margin budget ~= 8
+       - verify exchange minimum can clear
+       - verify no duplicate and no prior live submit
+       - build simulated order triplet:
+           long: BUY market, SELL stop reduce-only, SELL TP reduce-only
+           short: SELL market, BUY stop reduce-only, BUY TP reduce-only
+       - record autonomous dry-run packet
+       - return:
+           status:
+             AUTO_DRY_RUN_WAIT
+             AUTO_DRY_RUN_BLOCKED
+             AUTO_DRY_RUN_READY
+           real_order_placed=false
+           submit_attempted=false
+           binance_order_endpoint_called=false
+           binance_test_order_endpoint_called=false
+
+  3. API surface:
+     Add endpoint:
+       GET /tiny-live/autonomous-armed-dry-run
+
+     Optional write/review endpoint only if already consistent with project patterns:
+       POST /tiny-live/autonomous-arming/review
+     But do NOT make it enable real live. R275 only dry-run mode.
+
+     Output should include:
+       arming_state
+       candidate_watch_status
+       selected_candidate
+       strategy_evidence
+       exact_lane_risk_contract
+       simulated_order_triplet
+       dry_run_go_no_go
+       blockers
+       safety
+
+  4. CLI surface:
+     Add inspect command if project pattern supports it:
+       tiny-live-autonomous-armed-dry-run
+
+     It should support:
+       --record-autonomous-dry-run
+       --operator-id
+       --reason
+       optional explicit confirmation phrase for dry-run arming review only
+
+     It must not submit.
+
+  5. Final console integration:
+     Add panel:
+       autonomous_armed_dry_run_panel
+
+     It must show:
+       global_auto_live_enabled
+       current_lane_auto_armed
+       auto_execute_mode
+       selected_candidate_lane
+       auto_dry_run_status
+       next_required_step
+       safety
+
+     If no fresh live-qualified candidate:
+       status WAIT
+     If candidate exists but not armed:
+       status BLOCKED_BY_ARMING
+     If armed and all gates pass:
+       status AUTO_DRY_RUN_READY
+       real order still forbidden
+
+  6. Notification semantics:
+     Notifications are audit/visibility only.
+     Add message payload:
+       "autonomous dry-run ready/blocked/wait"
+     No send by default unless existing notification mechanism explicitly requests send.
+     Do not frame notification as human trigger.
+
+  7. Tests:
+     Add/update tests proving:
+       - default arming state is OFF.
+       - no current candidate => AUTO_DRY_RUN_WAIT.
+       - candidate live-qualified but global auto off => BLOCKED_BY_GLOBAL_ARMING.
+       - global on but exact lane off => BLOCKED_BY_LANE_ARMING.
+       - near-miss 8m short cannot auto-dry-run.
+       - below-55 13m/4m cannot auto-dry-run.
+       - Betrayal/inverse cannot auto-dry-run.
+       - exact live-qualified armed lane can produce AUTO_DRY_RUN_READY in test fixture.
+       - long simulated order sides are correct.
+       - short simulated order sides are correct.
+       - no real order placed.
+       - no submit attempted.
+       - no Binance order endpoint called.
+       - no Binance test order endpoint called.
+       - secrets_shown=false.
+       - final command remains unavailable.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous or qualified_candidate or strategy_promotion or tiny_live_strategy_lane_selection or trade_ticket or final_console or jit_launch or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq '{
+    event_type,
+    status,
+    current_fresh_candidate_status,
+    candidate_alert_packet,
+    live_qualified_lanes,
+    near_miss_incubator_lanes,
+    safety
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-armed-dry-run | jq . 2>/dev/null || true
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    qualified_candidate_watch,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    signal_id,
+    lane_key,
+    strategy_qualification,
+    strategy_watchlist_status,
+    blockers,
+    live_execution_enabled,
+    order_placed,
+    submit_attempted,
+    binance_order_endpoint_called
+  }'
+
+Report:
+  - files changed
+  - tests run
+  - endpoint added
+  - default arming state
+  - current candidate watch status
+  - autonomous dry-run status
+  - blockers
+  - whether any lane is armed
+  - whether any simulated order triplet was created
+  - proof notification is audit only
+  - proof no submit/no order/no Binance order endpoint

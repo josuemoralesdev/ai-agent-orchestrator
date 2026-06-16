@@ -334,6 +334,9 @@ from src.app.hammer_radar.operator.strategy_promotion_watcher import (
     load_strategy_promotion_events,
     strategy_promotion_events_path,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+    build_tiny_live_autonomous_armed_dry_run,
+)
 from src.app.hammer_radar.operator.telegram_approval_challenge import (
     create_first_live_approval_challenge,
     load_telegram_approval_challenges,
@@ -937,6 +940,11 @@ def tiny_live_jit_launch_packet() -> dict:
 @app.get("/tiny-live/qualified-candidate-watch")
 def tiny_live_qualified_candidate_watch() -> dict:
     return build_live_qualified_fresh_candidate_watch(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/autonomous-armed-dry-run")
+def tiny_live_autonomous_armed_dry_run() -> dict:
+    return build_tiny_live_autonomous_armed_dry_run(log_dir=get_log_dir(use_env=True))
 
 
 @app.post("/tiny-live/jit-launch-packet/run")

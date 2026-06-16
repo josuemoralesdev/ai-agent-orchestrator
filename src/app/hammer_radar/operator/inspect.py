@@ -3240,6 +3240,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-autonomous-armed-dry-run":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+            build_tiny_live_autonomous_armed_dry_run,
+            format_tiny_live_autonomous_armed_dry_run_json,
+        )
+
+        print(
+            format_tiny_live_autonomous_armed_dry_run_json(
+                build_tiny_live_autonomous_armed_dry_run(
+                    log_dir=args.log_dir,
+                    config_path=args.config_path,
+                    risk_contract_config_path=args.risk_contract_config_path,
+                    record_autonomous_dry_run=args.record_autonomous_dry_run,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-risk-contract-fix":
         from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
             build_tiny_live_risk_contract_diagnostic,
@@ -5818,6 +5836,31 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_jit_launch_packet_parser.add_argument(
         "--reason",
+        default=None,
+    )
+
+    tiny_live_autonomous_armed_dry_run_parser = subparsers.add_parser(
+        "tiny-live-autonomous-armed-dry-run",
+        parents=[parent],
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--record-autonomous-dry-run",
+        action="store_true",
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--config-path",
+        default=None,
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--risk-contract-config-path",
         default=None,
     )
 
