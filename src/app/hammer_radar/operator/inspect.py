@@ -3080,6 +3080,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-real-candidate-dry-run-trigger-bridge":
+        from src.app.hammer_radar.operator.tiny_live_real_candidate_dry_run_trigger_bridge import (
+            build_tiny_live_real_candidate_dry_run_trigger_bridge,
+            format_tiny_live_real_candidate_dry_run_trigger_bridge_json,
+        )
+
+        print(
+            format_tiny_live_real_candidate_dry_run_trigger_bridge_json(
+                build_tiny_live_real_candidate_dry_run_trigger_bridge(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_real_candidate_dry_run_trigger_bridge=(
+                        args.record_real_candidate_dry_run_trigger_bridge
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6161,6 +6180,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
         "--record-timer-integrated-test-only-matching-trigger-rehearsal",
+        action="store_true",
+    )
+
+    tiny_live_real_candidate_dry_run_trigger_bridge_parser = subparsers.add_parser(
+        "tiny-live-real-candidate-dry-run-trigger-bridge",
+        parents=[parent],
+    )
+    tiny_live_real_candidate_dry_run_trigger_bridge_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_real_candidate_dry_run_trigger_bridge_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_real_candidate_dry_run_trigger_bridge_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_real_candidate_dry_run_trigger_bridge_parser.add_argument(
+        "--record-real-candidate-dry-run-trigger-bridge",
         action="store_true",
     )
 
