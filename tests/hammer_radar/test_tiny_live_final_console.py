@@ -685,6 +685,41 @@ def test_autonomous_panel_reports_latest_rehearsal_fixture(tmp_path: Path) -> No
     assert panel["final_command_available"] is False
 
 
+def test_autonomous_panel_reports_real_candidate_binding_fields(tmp_path: Path) -> None:
+    from tests.hammer_radar.test_tiny_live_autonomous_armed_dry_run import (
+        LANE_44M_LONG,
+        _risk_config,
+        _seed_ready_candidate,
+    )
+    from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+        build_tiny_live_autonomous_armed_dry_run,
+    )
+
+    _seed_ready_candidate(tmp_path, LANE_44M_LONG)
+    recorded = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        config_path=tmp_path / "missing_arming_config.json",
+        risk_contract_config_path=_risk_config(tmp_path, LANE_44M_LONG),
+        real_candidate_dry_run_bind=True,
+        dry_run_arm_real_candidate_lane=True,
+        record_autonomous_dry_run=True,
+        reason="final console real candidate visibility",
+    )
+
+    panel = r263.build_autonomous_armed_dry_run_panel(log_dir=tmp_path)
+
+    assert recorded["status"] == "AUTO_DRY_RUN_READY"
+    assert panel["real_candidate_binding_supported"] is True
+    assert panel["real_candidate_binding_status"] in {"AUTO_DRY_RUN_WAIT", "AUTO_DRY_RUN_BLOCKED"}
+    assert panel["latest_real_candidate_dry_run_record"]["status"] == "AUTO_DRY_RUN_READY"
+    assert panel["latest_real_candidate_dry_run_record"]["lane_key"] == LANE_44M_LONG
+    assert panel["latest_real_candidate_dry_run_record"]["real_market_signal"] is True
+    assert panel["latest_real_candidate_dry_run_record"]["fixture_candidate"] is False
+    assert panel["latest_real_candidate_dry_run_record"]["final_command_available"] is False
+    assert panel["final_command_available"] is False
+    assert panel["real_order_forbidden"] is True
+
+
 def test_operator_final_console_route_is_read_only_html() -> None:
     from fastapi.testclient import TestClient
 

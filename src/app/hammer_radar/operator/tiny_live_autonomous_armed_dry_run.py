@@ -33,6 +33,7 @@ CONFIG_PATH = Path("configs/hammer_radar/autonomous_arming_state.json")
 LEDGER_FILENAME = "tiny_live_autonomous_armed_dry_run.ndjson"
 CREATED_BY_PHASE = "R275_AUTONOMOUS_ARMED_LANE_DRY_RUN"
 REHEARSAL_CREATED_BY_PHASE = "R276_AUTONOMOUS_ARMED_LANE_REHEARSAL_FIXTURE"
+REAL_CANDIDATE_BINDING_PHASE = "R277_REAL_CANDIDATE_AUTONOMOUS_DRY_RUN_BINDING"
 
 AUTO_DRY_RUN_WAIT = "AUTO_DRY_RUN_WAIT"
 AUTO_DRY_RUN_BLOCKED = "AUTO_DRY_RUN_BLOCKED"
@@ -100,6 +101,8 @@ def build_tiny_live_autonomous_armed_dry_run(
     reason: str | None = None,
     rehearsal_fixture_lane: str | None = None,
     rehearsal_arm_fixture_lane: bool = False,
+    real_candidate_dry_run_bind: bool = False,
+    dry_run_arm_real_candidate_lane: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     generated_at = now or datetime.now(UTC)
@@ -117,8 +120,16 @@ def build_tiny_live_autonomous_armed_dry_run(
     alert_packet = candidate_watch.get("candidate_alert_packet") if isinstance(candidate_watch.get("candidate_alert_packet"), Mapping) else {}
     selected_candidate = alert_packet.get("current_candidate") if isinstance(alert_packet.get("current_candidate"), Mapping) else None
     strategy_evidence = alert_packet.get("strategy_evidence") if isinstance(alert_packet.get("strategy_evidence"), Mapping) else {}
+    selected_candidate = _annotate_selected_candidate_for_binding(
+        selected_candidate=selected_candidate,
+        alert_packet=alert_packet,
+        strategy_evidence=strategy_evidence,
+        rehearsal=bool(rehearsal),
+    )
     lane_key = str((selected_candidate or {}).get("lane_key") or "")
     direction = str((selected_candidate or {}).get("direction") or "")
+    if real_candidate_dry_run_bind and dry_run_arm_real_candidate_lane and selected_candidate and not rehearsal:
+        arming_state = _with_real_candidate_dry_run_arming(arming_state, lane_key=lane_key)
 
     blockers: list[str] = []
     status = AUTO_DRY_RUN_WAIT
@@ -131,6 +142,17 @@ def build_tiny_live_autonomous_armed_dry_run(
         else []
     )
     blockers.extend(strategy_blockers)
+    real_binding_blockers = (
+        _real_candidate_binding_blockers(
+            selected_candidate=selected_candidate,
+            alert_packet=alert_packet,
+            strategy_evidence=strategy_evidence,
+            rehearsal=bool(rehearsal),
+        )
+        if selected_candidate and not rehearsal
+        else []
+    )
+    blockers.extend(real_binding_blockers)
 
     risk_contract = (
         _build_rehearsal_fixture_risk_contract(lane_key=lane_key, generated_at=generated_at)
@@ -146,9 +168,16 @@ def build_tiny_live_autonomous_armed_dry_run(
         else _empty_risk_contract_status(risk_path)
     )
     if selected_candidate:
-        blockers.extend(_risk_contract_blockers(risk_contract, arming_state=arming_state))
-        blockers.extend(_exchange_minimum_blockers(selected_candidate, arming_state=arming_state))
-        blockers.extend(_duplicate_blockers(lane_key=lane_key, selected_candidate=selected_candidate, log_dir=resolved_log_dir, today=generated_at.date()))
+        risk_blockers = _risk_contract_blockers(risk_contract, arming_state=arming_state)
+        exchange_blockers = _exchange_minimum_blockers(selected_candidate, arming_state=arming_state)
+        duplicate_blockers = _duplicate_blockers(lane_key=lane_key, selected_candidate=selected_candidate, log_dir=resolved_log_dir, today=generated_at.date())
+        blockers.extend(risk_blockers)
+        blockers.extend(exchange_blockers)
+        blockers.extend(duplicate_blockers)
+    else:
+        risk_blockers = []
+        exchange_blockers = []
+        duplicate_blockers = []
     blockers = _dedupe(blockers)
 
     simulated_order_triplet = None
@@ -165,12 +194,22 @@ def build_tiny_live_autonomous_armed_dry_run(
         {
             **_safety_fields(),
             "event_type": "AUTONOMOUS_ARMED_LANE_DRY_RUN",
-            "created_by_phase": REHEARSAL_CREATED_BY_PHASE if rehearsal else CREATED_BY_PHASE,
+            "created_by_phase": _created_by_phase(
+                rehearsal=bool(rehearsal),
+                real_candidate_dry_run_bind=bool(real_candidate_dry_run_bind),
+            ),
             "rehearsal_supported": True,
+            "real_candidate_binding_supported": True,
+            "real_candidate_dry_run_bind_requested": bool(real_candidate_dry_run_bind),
+            "dry_run_arm_real_candidate_lane_requested": bool(dry_run_arm_real_candidate_lane),
             "supported_rehearsal_fixture_lanes": sorted(SUPPORTED_REHEARSAL_FIXTURE_LANES),
             "rehearsal_mode": bool(rehearsal),
             "fixture_candidate": bool(rehearsal),
-            "real_market_signal": False if rehearsal else None,
+            "real_market_signal": bool(selected_candidate and not rehearsal and selected_candidate.get("real_market_signal") is True),
+            "real_candidate_source": selected_candidate.get("real_candidate_source") if selected_candidate else None,
+            "source_signal_id": selected_candidate.get("source_signal_id") if selected_candidate else None,
+            "source_lane_key": selected_candidate.get("source_lane_key") if selected_candidate else None,
+            "source_age_minutes": selected_candidate.get("source_age_minutes") if selected_candidate else None,
             "real_order_forbidden": True,
             "submit_allowed": False,
             "status": status,
@@ -192,11 +231,26 @@ def build_tiny_live_autonomous_armed_dry_run(
             "strategy_evidence": dict(strategy_evidence),
             "exact_lane_risk_contract": risk_contract,
             "simulated_order_triplet": simulated_order_triplet,
+            "real_candidate_dry_run_binding_matrix": _build_real_candidate_binding_matrix(
+                selected_candidate=selected_candidate,
+                alert_packet=alert_packet,
+                arming_state=arming_state,
+                risk_contract=risk_contract,
+                strategy_blockers=strategy_blockers,
+                real_binding_blockers=real_binding_blockers,
+                risk_blockers=risk_blockers,
+                exchange_blockers=exchange_blockers,
+                duplicate_blockers=duplicate_blockers,
+                blockers=blockers,
+                rehearsal=bool(rehearsal),
+            ),
             "dry_run_go_no_go": {
                 "go": status == AUTO_DRY_RUN_READY,
                 "status": status,
                 "dry_run_only": True,
                 "rehearsal_mode": bool(rehearsal),
+                "real_candidate_binding_supported": True,
+                "real_candidate_dry_run_go_no_go": status,
                 "real_order_forbidden": True,
                 "submit_allowed": False,
                 "final_command_available": False,
@@ -231,10 +285,16 @@ def build_simulated_order_triplet(*, selected_candidate: Mapping[str, Any], armi
         "positionSide": direction.upper(),
         "dry_run_only": True,
         "sent": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
     }
     return {
         "triplet_id": uuid4().hex,
         "lane_key": selected_candidate.get("lane_key"),
+        "source_signal_id": selected_candidate.get("signal_id"),
+        "source_lane_key": selected_candidate.get("lane_key"),
+        "source_age_minutes": selected_candidate.get("age_minutes"),
+        "built_from_real_market_signal": selected_candidate.get("real_market_signal") is True,
         "entry_order": {
             **common,
             "side": entry_side,
@@ -288,7 +348,7 @@ def build_autonomous_dry_run_notification_payload(*, status: str, lane_key: str 
 def append_autonomous_dry_run_record(payload: dict[str, Any], *, log_dir: str | Path) -> dict[str, Any]:
     record = {
         **payload,
-        "record_id": f"{'r276_rehearsal_auto_dry_run' if payload.get('rehearsal_mode') else 'r275_auto_dry_run'}_{uuid4().hex}",
+        "record_id": f"{_record_prefix(payload)}_{uuid4().hex}",
         "autonomous_dry_run_recorded": True,
         "recorded_at": datetime.now(UTC).isoformat(),
     }
@@ -299,10 +359,38 @@ def append_autonomous_dry_run_record(payload: dict[str, Any], *, log_dir: str | 
     return record
 
 
+def _record_prefix(payload: Mapping[str, Any]) -> str:
+    if payload.get("rehearsal_mode") is True:
+        return "r276_rehearsal_auto_dry_run"
+    if payload.get("real_market_signal") is True:
+        return "r277_real_candidate_auto_dry_run"
+    return "r275_auto_dry_run"
+
+
+def _created_by_phase(*, rehearsal: bool, real_candidate_dry_run_bind: bool) -> str:
+    if rehearsal:
+        return REHEARSAL_CREATED_BY_PHASE
+    if real_candidate_dry_run_bind:
+        return REAL_CANDIDATE_BINDING_PHASE
+    return CREATED_BY_PHASE
+
+
 def load_latest_autonomous_rehearsal_record(*, log_dir: str | Path | None = None) -> dict[str, Any] | None:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     for row in _read_ndjson_reverse(Path(resolved_log_dir) / LEDGER_FILENAME):
         if row.get("rehearsal_mode") is True and row.get("fixture_candidate") is True:
+            return row
+    return None
+
+
+def load_latest_autonomous_real_candidate_record(*, log_dir: str | Path | None = None) -> dict[str, Any] | None:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    for row in _read_ndjson_reverse(Path(resolved_log_dir) / LEDGER_FILENAME):
+        if (
+            row.get("rehearsal_mode") is not True
+            and row.get("fixture_candidate") is not True
+            and row.get("real_market_signal") is True
+        ):
             return row
     return None
 
@@ -363,6 +451,146 @@ def _with_rehearsal_fixture_arming(arming_state: Mapping[str, Any], *, lane_key:
     )
     state["lanes"] = lanes
     return state
+
+
+def _with_real_candidate_dry_run_arming(arming_state: Mapping[str, Any], *, lane_key: str) -> dict[str, Any]:
+    state = dict(arming_state)
+    state.update(
+        {
+            "global_auto_live_enabled": True,
+            "auto_execute_mode": "dry_run_only",
+            "armed_lane_key": lane_key,
+            "allowed_lane_keys": sorted(set([*list(state.get("allowed_lane_keys") or []), lane_key])),
+            "lane_auto_live_enabled_keys": sorted(set([*list(state.get("lane_auto_live_enabled_keys") or []), lane_key])),
+            "any_lane_auto_armed": True,
+            "real_candidate_diagnostic_arming_override": True,
+            "dry_run_only": True,
+            "real_live_execution_enabled": False,
+            "live_execution_enabled": False,
+            "submit_allowed": False,
+        }
+    )
+    lanes = [dict(item) for item in state.get("lanes") or [] if isinstance(item, Mapping)]
+    lanes.append(
+        {
+            "lane_key": lane_key,
+            "lane_auto_live_enabled": True,
+            "real_candidate_diagnostic_arming_override": True,
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+        }
+    )
+    state["lanes"] = lanes
+    return state
+
+
+def _annotate_selected_candidate_for_binding(
+    *,
+    selected_candidate: Mapping[str, Any] | None,
+    alert_packet: Mapping[str, Any],
+    strategy_evidence: Mapping[str, Any],
+    rehearsal: bool,
+) -> dict[str, Any] | None:
+    if not selected_candidate:
+        return None
+    candidate = dict(selected_candidate)
+    if rehearsal:
+        candidate["fixture_candidate"] = True
+        candidate["real_market_signal"] = False
+        return candidate
+    candidate.setdefault("fixture_candidate", False)
+    candidate.setdefault("rehearsal_mode", False)
+    candidate["real_market_signal"] = not (
+        candidate.get("fixture_candidate") is True or candidate.get("rehearsal_mode") is True
+    )
+    candidate["real_candidate_source"] = "qualified_candidate_watch"
+    candidate["source_signal_id"] = candidate.get("signal_id")
+    candidate["source_lane_key"] = candidate.get("lane_key")
+    candidate["source_age_minutes"] = candidate.get("age_minutes")
+    candidate["source_watch_status"] = alert_packet.get("status")
+    candidate["source_watch_category"] = strategy_evidence.get("live_qualification_class") or strategy_evidence.get("watch_category")
+    return candidate
+
+
+def _real_candidate_binding_blockers(
+    *,
+    selected_candidate: Mapping[str, Any],
+    alert_packet: Mapping[str, Any],
+    strategy_evidence: Mapping[str, Any],
+    rehearsal: bool,
+) -> list[str]:
+    if rehearsal:
+        return []
+    blockers: list[str] = []
+    if selected_candidate.get("fixture_candidate") is True:
+        blockers.append("fixture_candidate_rejected_in_real_candidate_mode")
+    if selected_candidate.get("real_market_signal") is not True:
+        blockers.append("real_market_signal_required_for_real_candidate_mode")
+    if selected_candidate.get("real_candidate_source") != "qualified_candidate_watch":
+        blockers.append("real_candidate_source_not_qualified_candidate_watch")
+    if not str(selected_candidate.get("source_signal_id") or selected_candidate.get("signal_id") or ""):
+        blockers.append("source_signal_id_missing")
+    if not str(selected_candidate.get("source_lane_key") or selected_candidate.get("lane_key") or ""):
+        blockers.append("source_lane_key_missing")
+    if alert_packet.get("status") != WATCH_FOUND:
+        blockers.append("selected_candidate_not_live_qualified")
+    live_class = str(strategy_evidence.get("live_qualification_class") or strategy_evidence.get("watch_category") or "")
+    if live_class == NEAR_MISS_INCUBATOR:
+        blockers.append("selected_candidate_from_near_miss_incubator")
+    if live_class == PAPER_ONLY:
+        blockers.append("selected_candidate_from_paper_only")
+    if live_class != LIVE_QUALIFIED:
+        blockers.append("selected_candidate_live_qualification_class_not_live_qualified")
+    text = " ".join(str(value or "") for value in [selected_candidate, alert_packet, strategy_evidence]).lower()
+    if "betrayal" in text or "inverse" in text:
+        blockers.append("selected_candidate_betrayal_inverse_family")
+    return _dedupe(blockers)
+
+
+def _build_real_candidate_binding_matrix(
+    *,
+    selected_candidate: Mapping[str, Any] | None,
+    alert_packet: Mapping[str, Any],
+    arming_state: Mapping[str, Any],
+    risk_contract: Mapping[str, Any],
+    strategy_blockers: list[str],
+    real_binding_blockers: list[str],
+    risk_blockers: list[str],
+    exchange_blockers: list[str],
+    duplicate_blockers: list[str],
+    blockers: list[str],
+    rehearsal: bool,
+) -> dict[str, Any]:
+    lane_key = str((selected_candidate or {}).get("lane_key") or "")
+    armed_keys = set(arming_state.get("lane_auto_live_enabled_keys") or [])
+    protective_ready = bool(
+        selected_candidate
+        and selected_candidate.get("stop") is not None
+        and selected_candidate.get("take_profit") is not None
+        and (risk_contract.get("contract") or {}).get("protective_stop_required") is True
+        and (risk_contract.get("contract") or {}).get("take_profit_required") is True
+    )
+    return {
+        "real_fresh_candidate_exists": bool(selected_candidate and not rehearsal),
+        "candidate_is_live_qualified": alert_packet.get("status") == WATCH_FOUND and not real_binding_blockers,
+        "exact_lane_auto_armed": bool(
+            lane_key
+            and arming_state.get("armed_lane_key") == lane_key
+            and lane_key in set(arming_state.get("allowed_lane_keys") or [])
+            and lane_key in armed_keys
+        ),
+        "global_auto_live_enabled": arming_state.get("global_auto_live_enabled") is True,
+        "risk_contract_valid": risk_contract.get("risk_contract_valid") is True and not risk_blockers,
+        "exchange_minimum_valid": bool(selected_candidate) and not exchange_blockers,
+        "strategy_valid": bool(selected_candidate) and not strategy_blockers and not real_binding_blockers,
+        "idempotency_clean": bool(selected_candidate) and not duplicate_blockers,
+        "protective_orders_ready": protective_ready,
+        "final_command_available": False,
+        "real_order_forbidden": True,
+        "submit_allowed": False,
+        "ready": bool(selected_candidate and not blockers and not rehearsal),
+        "blockers": list(blockers),
+    }
 
 
 def _build_rehearsal_fixture_watch(fixture_lane: str | None, *, generated_at: datetime) -> dict[str, Any] | None:

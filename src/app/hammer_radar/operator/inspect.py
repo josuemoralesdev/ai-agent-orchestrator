@@ -3257,6 +3257,8 @@ def main() -> int:
                     reason=args.reason,
                     rehearsal_fixture_lane=args.rehearsal_fixture_lane,
                     rehearsal_arm_fixture_lane=args.rehearsal_arm_fixture_lane,
+                    real_candidate_dry_run_bind=args.real_candidate_dry_run_bind,
+                    dry_run_arm_real_candidate_lane=args.dry_run_arm_real_candidate_lane,
                 )
             )
         )
@@ -5871,6 +5873,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_autonomous_armed_dry_run_parser.add_argument(
         "--rehearsal-arm-fixture-lane",
+        action="store_true",
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--real-candidate-dry-run-bind",
+        action="store_true",
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--dry-run-arm-real-candidate-lane",
         action="store_true",
     )
 

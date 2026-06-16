@@ -150,10 +150,38 @@ def test_exact_live_qualified_armed_lane_can_build_long_triplet(tmp_path: Path) 
 
     triplet = payload["simulated_order_triplet"]
     assert payload["status"] == AUTO_DRY_RUN_READY
+    assert payload["rehearsal_mode"] is False
+    assert payload["fixture_candidate"] is False
+    assert payload["real_market_signal"] is True
+    assert payload["real_candidate_binding_supported"] is True
+    assert payload["real_candidate_source"] == "qualified_candidate_watch"
+    assert payload["source_signal_id"] == payload["selected_candidate"]["signal_id"]
+    assert payload["source_lane_key"] == LANE_44M_LONG
+    assert payload["source_age_minutes"] == payload["selected_candidate"]["age_minutes"]
+    assert payload["selected_candidate"]["real_market_signal"] is True
+    assert payload["selected_candidate"]["fixture_candidate"] is False
     assert payload["autonomous_dry_run_recorded"] is True
     assert triplet["entry_order"]["side"] == "BUY"
     assert triplet["protective_stop_order"]["side"] == "SELL"
     assert triplet["take_profit_order"]["side"] == "SELL"
+    assert triplet["source_signal_id"] == payload["source_signal_id"]
+    assert triplet["built_from_real_market_signal"] is True
+    assert triplet["entry_order"]["submit_allowed"] is False
+    assert triplet["entry_order"]["real_order_forbidden"] is True
+    assert triplet["protective_stop_order"]["submit_allowed"] is False
+    assert triplet["take_profit_order"]["submit_allowed"] is False
+    matrix = payload["real_candidate_dry_run_binding_matrix"]
+    assert matrix["real_fresh_candidate_exists"] is True
+    assert matrix["candidate_is_live_qualified"] is True
+    assert matrix["exact_lane_auto_armed"] is True
+    assert matrix["global_auto_live_enabled"] is True
+    assert matrix["risk_contract_valid"] is True
+    assert matrix["exchange_minimum_valid"] is True
+    assert matrix["strategy_valid"] is True
+    assert matrix["idempotency_clean"] is True
+    assert matrix["protective_orders_ready"] is True
+    assert matrix["final_command_available"] is False
+    assert matrix["real_order_forbidden"] is True
     assert payload["real_order_placed"] is False
     assert payload["submit_attempted"] is False
     assert payload["binance_order_endpoint_called"] is False
@@ -180,6 +208,84 @@ def test_exact_live_qualified_armed_lane_can_build_short_triplet(tmp_path: Path)
     assert triplet["take_profit_order"]["side"] == "BUY"
     assert triplet["binance_order_endpoint_called"] is False
     assert triplet["binance_test_order_endpoint_called"] is False
+
+
+def test_real_candidate_diagnostic_arm_exact_lane_ready_for_55m_long(tmp_path: Path) -> None:
+    _seed_ready_candidate(tmp_path, LANE_55M_LONG)
+
+    payload = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        config_path=tmp_path / "missing_arming_config.json",
+        risk_contract_config_path=_risk_config(tmp_path, LANE_55M_LONG),
+        real_candidate_dry_run_bind=True,
+        dry_run_arm_real_candidate_lane=True,
+        record_autonomous_dry_run=True,
+        reason="R277 test diagnostic arm only",
+    )
+
+    assert payload["status"] == AUTO_DRY_RUN_READY
+    assert payload["selected_candidate"]["lane_key"] == LANE_55M_LONG
+    assert payload["real_market_signal"] is True
+    assert payload["arming_state"]["real_candidate_diagnostic_arming_override"] is True
+    assert payload["arming_state"]["live_execution_enabled"] is False
+    assert payload["real_candidate_dry_run_binding_matrix"]["exact_lane_auto_armed"] is True
+    assert payload["dry_run_go_no_go"]["real_candidate_dry_run_go_no_go"] == AUTO_DRY_RUN_READY
+    assert payload["simulated_order_triplet"]["entry_order"]["side"] == "BUY"
+    assert payload["final_command_available"] is False
+    assert payload["submit_allowed"] is False
+    assert payload["order_placed"] is False
+    assert payload["binance_order_endpoint_called"] is False
+
+
+def test_fixture_candidate_cannot_be_bound_as_real_market_signal(tmp_path: Path) -> None:
+    fake_watch = {
+        "event_type": "LIVE_QUALIFIED_FRESH_CANDIDATE_WATCH",
+        "status": "LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND",
+        "current_fresh_candidate_status": "LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND",
+        "candidate_alert_packet": {
+            "status": "LIVE_QUALIFIED_FRESH_CANDIDATE_FOUND",
+            "current_candidate": {
+                "signal_id": "REHEARSAL_SHOULD_NOT_BIND",
+                "symbol": "BTCUSDT",
+                "timeframe": "44m",
+                "direction": "long",
+                "entry_mode": "ladder_close_50_618",
+                "lane_key": LANE_44M_LONG,
+                "age_minutes": 1.0,
+                "freshness_status": "fresh",
+                "entry": 100.0,
+                "stop": 95.0,
+                "take_profit": 110.0,
+                "fixture_candidate": True,
+                "real_market_signal": False,
+            },
+            "strategy_evidence": {
+                "live_qualification_class": "LIVE_QUALIFIED",
+                "win_rate_pct": 62.0,
+                "sample_count": 40,
+                "avg_pnl_pct": 0.1,
+            },
+            "blocked_by": [],
+        },
+    }
+
+    with patch(
+        "src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run.build_live_qualified_fresh_candidate_watch",
+        return_value=fake_watch,
+    ):
+        payload = build_tiny_live_autonomous_armed_dry_run(
+            log_dir=tmp_path,
+            config_path=_arming_config(tmp_path, global_on=True, lane_key=LANE_44M_LONG),
+            risk_contract_config_path=_risk_config(tmp_path, LANE_44M_LONG),
+            real_candidate_dry_run_bind=True,
+            dry_run_arm_real_candidate_lane=True,
+        )
+
+    assert payload["status"] == AUTO_DRY_RUN_BLOCKED
+    assert payload["real_market_signal"] is False
+    assert "fixture_candidate_rejected_in_real_candidate_mode" in payload["blockers"]
+    assert "real_market_signal_required_for_real_candidate_mode" in payload["blockers"]
+    assert payload["simulated_order_triplet"] is None
 
 
 def test_rehearsal_fixture_44m_long_can_auto_dry_run_ready_without_config_mutation(tmp_path: Path) -> None:
@@ -303,6 +409,7 @@ def test_autonomous_dry_run_endpoint_is_safe(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["arming_state"]["global_auto_live_enabled"] is False
+    assert payload["real_candidate_binding_supported"] is True
     assert payload["status"] == AUTO_DRY_RUN_WAIT
     assert payload["real_order_placed"] is False
     assert payload["binance_order_endpoint_called"] is False

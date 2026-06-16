@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.strategy_promotion_watcher import build_strategy_promotion_status
 from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
     build_tiny_live_autonomous_armed_dry_run,
+    load_latest_autonomous_real_candidate_record,
     load_latest_autonomous_rehearsal_record,
 )
 from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import (
@@ -507,6 +508,7 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
 def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
     packet = build_tiny_live_autonomous_armed_dry_run(log_dir=log_dir)
     latest_rehearsal = load_latest_autonomous_rehearsal_record(log_dir=log_dir)
+    latest_real_candidate = load_latest_autonomous_real_candidate_record(log_dir=log_dir)
     arming = packet.get("arming_state") if isinstance(packet.get("arming_state"), Mapping) else {}
     candidate = packet.get("selected_candidate") if isinstance(packet.get("selected_candidate"), Mapping) else {}
     status = str(packet.get("status") or "AUTO_DRY_RUN_WAIT")
@@ -526,6 +528,17 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         "selected_candidate_lane": candidate.get("lane_key"),
         "auto_dry_run_status": status,
         "rehearsal_supported": True,
+        "real_candidate_binding_supported": packet.get("real_candidate_binding_supported") is True,
+        "real_candidate_binding_status": status,
+        "real_candidate_lane": candidate.get("source_lane_key") or candidate.get("lane_key"),
+        "real_candidate_signal_id": candidate.get("source_signal_id") or candidate.get("signal_id"),
+        "real_candidate_dry_run_go_no_go": (
+            packet.get("dry_run_go_no_go", {}).get("real_candidate_dry_run_go_no_go")
+            if isinstance(packet.get("dry_run_go_no_go"), Mapping)
+            else status
+        ),
+        "real_candidate_blockers": blockers,
+        "latest_real_candidate_dry_run_record": _latest_real_candidate_record_summary(latest_real_candidate),
         "latest_rehearsal_status": latest_rehearsal.get("status") if latest_rehearsal else None,
         "latest_rehearsal_lane": (
             (latest_rehearsal.get("selected_candidate") or {}).get("lane_key")
@@ -539,6 +552,26 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         "real_order_forbidden": True,
         "final_command_available": False,
         "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
+    }
+
+
+def _latest_real_candidate_record_summary(record: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not record:
+        return None
+    candidate = record.get("selected_candidate") if isinstance(record.get("selected_candidate"), Mapping) else {}
+    triplet = record.get("simulated_order_triplet") if isinstance(record.get("simulated_order_triplet"), Mapping) else None
+    return {
+        "record_id": record.get("record_id"),
+        "status": record.get("status"),
+        "recorded_at": record.get("recorded_at"),
+        "lane_key": candidate.get("source_lane_key") or candidate.get("lane_key"),
+        "signal_id": candidate.get("source_signal_id") or candidate.get("signal_id"),
+        "real_market_signal": record.get("real_market_signal") is True,
+        "fixture_candidate": record.get("fixture_candidate") is True,
+        "simulated_order_triplet": triplet,
+        "final_command_available": False,
+        "real_order_forbidden": True,
+        "submit_allowed": False,
     }
 
 

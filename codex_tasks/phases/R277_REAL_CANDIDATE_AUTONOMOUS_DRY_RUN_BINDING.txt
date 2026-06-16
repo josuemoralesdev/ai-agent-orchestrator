@@ -1,0 +1,271 @@
+# R277 — Real Candidate Autonomous Dry-Run Binding
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: AUTONOMOUS EXECUTION BINDING / REAL-CANDIDATE DRY-RUN
+  Secondary: SAFETY HARDENING, FINAL PRE-LIVE READINESS, WATCHER INTEGRATION
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  R275 created the autonomous armed-lane dry-run gate.
+  R276 proved the autonomous dry-run path behaves correctly under fixture rehearsals:
+    - 44m long fixture => AUTO_DRY_RUN_READY
+    - 44m short fixture => AUTO_DRY_RUN_READY
+    - 55m long fixture => AUTO_DRY_RUN_READY
+    - 8m short near-miss fixture => blocked
+    - no submit, no order, no Binance order endpoint
+
+  R277 must now bind the autonomous dry-run path to real fresh candidates from the live-qualified watcher.
+  This is still dry-run only.
+  No real order is allowed.
+
+Hard goal:
+  When a real fresh LIVE_QUALIFIED candidate appears from the watcher and the exact lane is armed in dry-run mode, the system should produce:
+    AUTO_DRY_RUN_READY
+    selected real candidate
+    exact strategy evidence
+    exact risk contract validation
+    simulated order triplet built from the real signal
+    final_command_available=false
+    submit_allowed=false
+    real_order_forbidden=true
+    order_placed=false
+    binance_order_endpoint_called=false
+
+  When no real fresh candidate exists:
+    AUTO_DRY_RUN_WAIT
+
+  When a real candidate exists but lane/global arming is OFF:
+    AUTO_DRY_RUN_BLOCKED or WAIT with explicit arming blocker
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT submit signed requests.
+  - Do NOT enable real live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT expose secrets.
+  - Do NOT mutate env files.
+  - Do NOT make final command available.
+  - Do NOT allow fixture mode to leak into real candidate mode.
+  - Do NOT use rehearsal candidate as real market signal.
+  - Do NOT allow near-miss lanes to bind as real ready.
+  - Do NOT allow 8m short to bind as live-ready.
+  - Do NOT allow Betrayal/inverse lanes to bind as first live.
+  - If uncertain, return AUTO_DRY_RUN_WAIT or AUTO_DRY_RUN_BLOCKED.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/test_tiny_live_autonomous_armed_dry_run.py
+    - tests/hammer_radar/test_tiny_live_final_console.py
+    - tests/hammer_radar/test_strategy_promotion_watcher.py
+
+Implementation scope:
+  1. Real candidate binding:
+     Extend the autonomous dry-run module so non-rehearsal mode uses only the real live-qualified fresh candidate watcher output.
+
+     Required distinctions:
+       rehearsal_mode=false
+       fixture_candidate=false
+       real_market_signal=true only when selected candidate comes from live watcher
+       real_candidate_source="qualified_candidate_watch"
+       source_signal_id=<real signal id>
+       source_lane_key=<real lane key>
+       source_age_minutes=<real age>
+
+     The module must reject:
+       fixture_candidate=true in real mode
+       real_market_signal=false in real mode
+       selected candidate missing source signal id
+       selected candidate not in LIVE_QUALIFIED
+       selected candidate from NEAR_MISS_INCUBATOR
+       selected candidate from PAPER_ONLY
+       selected candidate from betrayal/inverse family
+
+  2. Arming behavior:
+     Default config stays OFF:
+       global_auto_live_enabled=false
+       lane_auto_live_enabled=false
+       auto_execute_mode=dry_run_only
+
+     Add or verify a safe diagnostic path to evaluate “what would happen if this exact real lane were armed in dry-run.”
+     This must be explicit and diagnostic-only, not a real live arming mutation unless existing patterns already support safe dry-run arming.
+
+     Preferred CLI option:
+       tiny-live-autonomous-armed-dry-run
+         --real-candidate-dry-run-bind
+         --dry-run-arm-real-candidate-lane
+         --record-autonomous-dry-run
+         --operator-id local_operator
+         --reason "R277 real candidate dry-run binding only; no submit."
+
+     If no fresh real candidate exists, this should return WAIT, not fake one.
+
+  3. Simulated order triplet from real signal:
+     If real candidate exists and all gates pass:
+       use real entry/stop/take_profit from trade ticket / candidate source
+       validate direction:
+         long: BUY entry, SELL stop, SELL TP
+         short: SELL entry, BUY stop, BUY TP
+       use contract:
+         notional <= 80 USDT
+         leverage == 10
+         qty must respect exchange minimum/precision model already available
+       all orders:
+         dry_run_only=true
+         sent=false
+         submit_allowed=false
+         real_order_forbidden=true
+
+  4. Readiness matrix:
+     Add a real-candidate dry-run binding matrix:
+       real_fresh_candidate_exists
+       candidate_is_live_qualified
+       exact_lane_auto_armed
+       global_auto_live_enabled
+       risk_contract_valid
+       exchange_minimum_valid
+       strategy_valid
+       idempotency_clean
+       protective_orders_ready
+       final_command_available=false
+       real_order_forbidden=true
+
+  5. Final console:
+     Extend autonomous panel:
+       real_candidate_binding_supported=true
+       real_candidate_binding_status
+       real_candidate_lane
+       real_candidate_signal_id
+       real_candidate_dry_run_go_no_go
+       real_candidate_blockers
+       latest_real_candidate_dry_run_record
+       final_command_available=false
+       real_order_forbidden=true
+
+  6. API:
+     Default GET /tiny-live/autonomous-armed-dry-run must remain safe/off.
+     It should expose whether real candidate binding is supported.
+     It should not auto-arm from GET.
+     If query params are added, they must be explicit and dry-run only.
+     Avoid creating an accidental “one click live” surface.
+
+  7. Tests:
+     Add/update tests proving:
+       - default endpoint/config remains OFF.
+       - no real fresh candidate => AUTO_DRY_RUN_WAIT.
+       - real candidate exists but global arming OFF => blocked.
+       - real candidate exists, global dry-run arm true, exact lane off => blocked.
+       - real LIVE_QUALIFIED 44m long + dry-run arming => AUTO_DRY_RUN_READY.
+       - real LIVE_QUALIFIED 44m short + dry-run arming => AUTO_DRY_RUN_READY.
+       - real LIVE_QUALIFIED 55m long + dry-run arming => AUTO_DRY_RUN_READY.
+       - real 8m short near-miss => blocked.
+       - real below-55 13m/4m => blocked.
+       - real betrayal/inverse => blocked.
+       - fixture candidates cannot be treated as real_market_signal.
+       - real candidate triplet sides are correct for long.
+       - real candidate triplet sides are correct for short.
+       - final_command_available=false.
+       - submit_allowed=false.
+       - order_placed=false.
+       - submit_attempted=false.
+       - binance_order_endpoint_called=false.
+       - binance_test_order_endpoint_called=false.
+       - secrets_shown=false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous or real_candidate or rehearsal or qualified_candidate or strategy_promotion or tiny_live_strategy_lane_selection or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq '{
+    event_type,
+    status,
+    current_fresh_candidate_status,
+    candidate_alert_packet,
+    live_qualified_lanes,
+    near_miss_incubator_lanes,
+    safety
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-armed-dry-run | jq '{
+    status,
+    rehearsal_supported,
+    real_candidate_binding_supported,
+    arming_state,
+    candidate_watch_status,
+    selected_candidate,
+    simulated_order_triplet,
+    dry_run_go_no_go,
+    blockers,
+    safety
+  }'
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-armed-dry-run \
+    --real-candidate-dry-run-bind \
+    --dry-run-arm-real-candidate-lane \
+    --record-autonomous-dry-run \
+    --operator-id local_operator \
+    --reason "R277 real candidate autonomous dry-run binding only; no submit; no order; no Binance order endpoint." \
+    | tee /tmp/r277_real_candidate_dry_run_binding.json \
+    | jq '{
+      status,
+      rehearsal_mode,
+      fixture_candidate,
+      real_market_signal,
+      real_candidate_binding_supported,
+      selected_candidate,
+      strategy_evidence,
+      exact_lane_risk_contract,
+      simulated_order_triplet,
+      dry_run_go_no_go,
+      blockers,
+      safety
+    }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - real candidate binding support
+  - default endpoint status
+  - current real candidate watcher status
+  - real candidate binding CLI status
+  - whether no-candidate WAIT was correct
+  - whether fixture mode remains separate
+  - whether final console shows binding status
+  - proof no submit/no real order/no Binance order endpoint
