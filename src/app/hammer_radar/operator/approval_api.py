@@ -127,6 +127,10 @@ from src.app.hammer_radar.operator.tiny_live_test_only_matching_candidate_trigge
     build_status_tiny_live_test_only_matching_candidate_trigger_certificate,
     build_tiny_live_test_only_matching_candidate_trigger_certificate,
 )
+from src.app.hammer_radar.operator.tiny_live_timer_integrated_test_only_matching_trigger_rehearsal import (
+    build_status_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal,
+    build_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1101,6 +1105,28 @@ def tiny_live_test_only_matching_candidate_trigger_certificate_status(
             record_test_only_matching_candidate_trigger_certificate=False,
         )
     return build_status_tiny_live_test_only_matching_candidate_trigger_certificate(
+        log_dir=get_log_dir(use_env=True)
+    )
+
+
+@app.get("/tiny-live/timer-integrated-test-only-matching-trigger-rehearsal/status")
+def tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_status(
+    lane_key: str | None = None,
+    simulate_matching_for_tests_only: bool = Query(False),
+    simulate_nonmatching_for_tests_only: bool = Query(False),
+) -> dict:
+    if simulate_matching_for_tests_only or simulate_nonmatching_for_tests_only:
+        return build_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal(
+            log_dir=get_log_dir(use_env=True),
+            lane_key=lane_key,
+            operator_id="api_status_read_model",
+            reason="R297 API test-only read-model simulation; no record; no submit; no order.",
+            simulate_matching_fresh_candidate_for_tests_only=simulate_matching_for_tests_only,
+            simulate_nonmatching_fresh_candidate_for_tests_only=simulate_nonmatching_for_tests_only,
+            iterations=1,
+            record_timer_integrated_test_only_matching_trigger_rehearsal=False,
+        )
+    return build_status_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal(
         log_dir=get_log_dir(use_env=True)
     )
 

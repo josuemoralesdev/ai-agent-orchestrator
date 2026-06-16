@@ -1,0 +1,474 @@
+# R297 — Timer-Integrated Test-Only Matching Trigger Rehearsal
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: EXTENSION OF EXISTING CAPABILITY
+  Secondary: TIMER/SCHEDULER INTEGRATION / TEST-ONLY MATCHING TRIGGER REHEARSAL / DRY-RUN SAFETY AUDIT
+  Duplicate risk level: HIGH
+
+Why duplicate risk exists:
+  Existing capabilities already include:
+    - R294 dry-run lane arming rehearsal
+    - R295 timer-observed armed-lane wait certificate
+    - R296 test-only matching candidate trigger certificate
+    - autonomous trigger loop
+    - autonomous trigger scheduler
+    - systemd dry-run timer health
+    - final console panels
+  R297 must reuse these. Do not create a parallel scheduler, parallel timer loop, parallel fake candidate engine, or parallel order path.
+
+Current state:
+  - R296 and R296B are committed and clean.
+  - R296 matching test-only candidate certifies simulated lifecycle.
+  - R296 nonmatching test-only candidate does not trigger.
+  - Plain R296 API status is safe by default:
+      TEST_ONLY_MATCHING_CANDIDATE_TRIGGER_BLOCKED
+      missing_test_only_simulation_flag
+      no simulation
+      no record
+  - Explicit API simulation can certify but does not record.
+  - CLI can explicitly record test-only certificate.
+  - Live order, submit, executable payload remain unavailable.
+
+Purpose:
+  Add a timer/scheduler-integrated rehearsal packet proving that:
+    - the system can run a bounded scheduler-style dry-run rehearsal using a test-only matching candidate
+    - the rehearsal uses the same timer/scheduler/final-console visibility chain
+    - the normal installed systemd timer remains read-only/real-candidate-only and is not modified to inject fake candidates
+    - the matching branch records simulated lifecycle only
+    - no live order, no submit, no executable payload, no Binance order/test-order call occurs
+
+Hard goal:
+  Build a safe R297 certificate that says:
+    "If the scheduler path is given an explicit test-only matching candidate in a bounded manual rehearsal, the integration chain observes the simulated dry-run trigger correctly while all live/order surfaces remain disabled."
+
+Operator doctrine:
+  - Operator arms/disarms/tunes risk/kills system.
+  - Machine auto-triggers only when armed and all gates are open.
+  - Operator does not approve each signal.
+  - R297 remains test-only dry-run rehearsal, not live trading.
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT set HAMMER_LIVE_EXECUTION_ENABLED=true.
+  - Do NOT set HAMMER_ALLOW_LIVE_ORDERS=true.
+  - Do NOT disable global kill switch.
+  - Do NOT mutate env files.
+  - Do NOT mutate live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT create executable order payloads.
+  - Do NOT make final live submit command available.
+  - Do NOT print secrets, signatures, signed URLs, API keys, or env values.
+  - Do NOT require per-signal operator approval.
+  - Do NOT install/start/stop/restart/enable/disable systemd.
+  - Do NOT run sudo.
+  - Do NOT write to /etc/systemd/system.
+  - Do NOT alter installed timer templates to inject fake candidates.
+  - Do NOT make normal scheduler/status endpoints simulate by default.
+  - R297 simulation must require explicit test-only flag.
+
+Allowed:
+  - Modify repo code/docs/tests.
+  - Read existing configs/logs.
+  - Read timer health using existing read-only helper.
+  - Write repo-local R297 ledger only when explicit record flag is used.
+  - Add API/CLI/final-console visibility.
+  - Add print-only script.
+  - Add tests using mocks/fixtures.
+  - Add a bounded manual scheduler-style rehearsal command that is explicit/test-only and not used by installed systemd timer.
+
+Required capability scan:
+  Inspect and reuse before coding:
+    - src/app/hammer_radar/operator/tiny_live_test_only_matching_candidate_trigger_certificate.py
+    - src/app/hammer_radar/operator/tiny_live_timer_observed_armed_lane_wait_certificate.py
+    - src/app/hammer_radar/operator/tiny_live_dry_run_lane_arming_rehearsal.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_loop.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    - src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    - src/app/hammer_radar/operator/tiny_live_one_shot_pre_activation_gate.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation requirements:
+
+1. Add module:
+   src/app/hammer_radar/operator/tiny_live_timer_integrated_test_only_matching_trigger_rehearsal.py
+
+   Packet:
+     event_type="TINY_LIVE_TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL"
+     created_by_phase="R297_TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL"
+
+   Required fields:
+     - status:
+         TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL_CERTIFIED
+         TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL_BLOCKED
+         TIMER_INTEGRATED_TEST_ONLY_NONMATCHING_TRIGGER_REHEARSAL_NO_TRIGGER
+     - requested_lane_key
+     - simulated_candidate_lane_key
+     - requested_operator_id
+     - requested_reason
+     - allowed_lane_keys
+     - lane_is_live_qualified
+     - candidate_matches_requested_lane
+     - exact_lane_only=true
+     - no_cross_lane_borrowing=true
+     - dry_run_only=true
+     - test_only=true
+     - bounded_manual_rehearsal_only=true
+     - installed_systemd_timer_mutated=false
+     - installed_systemd_timer_fake_candidate_injection_enabled=false
+     - normal_scheduler_default_simulation_enabled=false
+     - live_execution_enabled=false
+     - allow_live_orders=false
+     - global_kill_switch=true
+     - timer_health_status
+     - timer_active
+     - recent_tick_seen
+     - recent_tick_count
+     - scheduler_integration_rehearsal_supported=true
+     - scheduler_rehearsal_iterations_requested
+     - scheduler_rehearsal_iterations_completed
+     - scheduler_rehearsal_latest_status
+     - scheduler_rehearsal_latest_trigger_status
+     - test_only_matching_certificate_status
+     - timer_observed_wait_certificate_status
+     - simulated_fresh_candidate_injected
+     - simulated_trigger_recorded
+     - simulated_lifecycle_status
+     - simulated_open_record
+     - simulated_protective_orders
+     - simulated_close_plan
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+     - executable_payload_created=false
+     - order_payload_created=false
+     - order_placed=false
+     - binance_order_endpoint_called=false
+     - binance_test_order_endpoint_called=false
+     - per_signal_operator_approval_required=false
+     - blockers
+     - safety
+     - timer_integrated_test_only_matching_trigger_rehearsal_panel
+
+2. Explicit test-only flags:
+   CLI must require one of:
+     --simulate-matching-fresh-candidate-for-tests-only
+     --simulate-nonmatching-fresh-candidate-for-tests-only
+
+   If no simulation flag:
+     status=TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL_BLOCKED
+     blockers includes missing_test_only_simulation_flag
+     simulated_trigger_recorded=false
+
+   If both flags:
+     blocked with conflicting_test_only_simulation_flags
+
+3. Bounded scheduler-style rehearsal:
+   Add inspect command:
+     tiny-live-timer-integrated-test-only-matching-trigger-rehearsal
+
+   Args:
+     --lane-key <lane>
+     --operator-id <id>
+     --reason <text>
+     --simulate-matching-fresh-candidate-for-tests-only
+     --simulate-nonmatching-fresh-candidate-for-tests-only
+     --iterations <n> default 1, max 2
+     --record-timer-integrated-test-only-matching-trigger-rehearsal
+
+   It must:
+     - not sleep
+     - not touch systemd
+     - not mutate installed timer units
+     - not call Binance
+     - not write env/config/risk contracts
+     - not call normal live submit/final command surfaces
+     - use R296 certificate internally for matching/nonmatching simulation
+     - return scheduler-style summary fields
+
+4. Allowed lanes:
+   Only:
+     BTCUSDT|44m|long|ladder_close_50_618
+     BTCUSDT|44m|short|ladder_close_50_618
+     BTCUSDT|55m|long|ladder_close_50_618
+
+   Reject:
+     - near-miss
+     - paper-only
+     - unknown
+     - empty
+     - non-BTCUSDT
+     - no exact risk contract
+
+5. API:
+   Add:
+     GET /tiny-live/timer-integrated-test-only-matching-trigger-rehearsal/status
+
+   Safe default:
+     - no simulation
+     - no record
+     - status blocked with missing_test_only_simulation_flag
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+
+   Optional explicit query param may simulate but must not record:
+     ?simulate_matching_for_tests_only=true
+     ?simulate_nonmatching_for_tests_only=true
+     ?lane_key=...
+
+   API must never record R297 ledger.
+
+6. Final console:
+   Add:
+     timer_integrated_test_only_matching_trigger_rehearsal_panel
+
+   It must be safe by default:
+     - no simulation flag
+     - no record
+     - blocked with missing_test_only_simulation_flag
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+
+7. Print-only script:
+   Add:
+     scripts/hammer_print_r297_timer_integrated_test_only_matching_trigger_rehearsal_plan.sh
+
+   Must print commands only.
+   It must not run sudo/systemctl/curl/order/install/cp/mv/rm.
+   It may print curl commands as text, not execute them.
+
+   Include:
+     - timer health check
+     - R296 certificate check
+     - R297 plain safe-default API check
+     - R297 explicit matching CLI rehearsal command
+     - R297 explicit nonmatching CLI rehearsal command
+     - R297 explicit API simulation command
+     - final console check
+     - safety grep
+     - cleanup guidance
+
+   Banner:
+     R297 PRINT ONLY - timer-integrated test-only matching trigger rehearsal plan
+
+8. Docs:
+   Add:
+     docs/hammer_radar/live_readiness/R297_TIMER_INTEGRATED_TEST_ONLY_MATCHING_TRIGGER_REHEARSAL.md
+
+   Update:
+     docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+   Explain:
+     - what R297 certifies
+     - why it is timer/scheduler integrated but not installed systemd mutation
+     - why normal timer does not inject fake candidates
+     - matching vs nonmatching path
+     - safety invariants
+     - expected next phase
+
+9. Tests:
+   Add/extend tests for:
+     - plain CLI without simulation blocks
+     - both simulation flags block
+     - matching simulation certifies
+     - nonmatching simulation no-triggers
+     - bounded iterations max 2
+     - invalid lane blocks
+     - near-miss lane blocks
+     - paper-only lane blocks
+     - installed_systemd_timer_mutated=false
+     - installed_systemd_timer_fake_candidate_injection_enabled=false
+     - normal_scheduler_default_simulation_enabled=false
+     - simulated lifecycle remains SIMULATED_DRY_RUN_ONLY
+     - API plain status blocks and records nothing
+     - API explicit simulation certifies and records nothing
+     - final console panel safe by default
+     - final_command_available=false always
+     - submit_allowed=false always
+     - real_order_forbidden=true always
+     - executable_payload_created=false always
+     - order_payload_created=false always
+     - order_placed=false always
+     - binance_order_endpoint_called=false always
+     - binance_test_order_endpoint_called=false always
+     - print-only script contains no executable dangerous command behavior
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "timer_integrated_test_only_matching_trigger_rehearsal or test_only_matching_candidate_trigger_certificate or timer_observed_armed_lane_wait_certificate or timer_health or autonomous_trigger_scheduler or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  sleep 2
+  systemctl is-active hammer-approval-api.service
+  ss -ltnp | grep ':8015' || true
+
+  echo "=== R297 PRINT ONLY PLAN ==="
+  bash scripts/hammer_print_r297_timer_integrated_test_only_matching_trigger_rehearsal_plan.sh | sed -n '1,380p'
+
+  echo "=== R297 PLAIN API SAFE DEFAULT ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/timer-integrated-test-only-matching-trigger-rehearsal/status | jq '{
+    event_type,
+    status,
+    simulation_flag_required,
+    simulated_trigger_recorded,
+    record_timer_integrated_test_only_matching_trigger_rehearsal_requested,
+    timer_integrated_test_only_matching_trigger_rehearsal_recorded,
+    installed_systemd_timer_mutated,
+    installed_systemd_timer_fake_candidate_injection_enabled,
+    normal_scheduler_default_simulation_enabled,
+    blockers,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== R297 MATCHING CLI REHEARSAL ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-timer-integrated-test-only-matching-trigger-rehearsal \
+    --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R297 timer-integrated test-only matching trigger rehearsal; no submit; no order." \
+    --simulate-matching-fresh-candidate-for-tests-only \
+    --iterations 1 \
+    --record-timer-integrated-test-only-matching-trigger-rehearsal \
+    | tee /tmp/r297_timer_integrated_test_only_matching_trigger_rehearsal.json \
+    | jq '{
+      event_type,
+      status,
+      requested_lane_key,
+      simulated_candidate_lane_key,
+      lane_is_live_qualified,
+      candidate_matches_requested_lane,
+      exact_lane_only,
+      no_cross_lane_borrowing,
+      dry_run_only,
+      test_only,
+      bounded_manual_rehearsal_only,
+      installed_systemd_timer_mutated,
+      installed_systemd_timer_fake_candidate_injection_enabled,
+      normal_scheduler_default_simulation_enabled,
+      timer_health_status,
+      timer_active,
+      recent_tick_seen,
+      scheduler_integration_rehearsal_supported,
+      scheduler_rehearsal_iterations_requested,
+      scheduler_rehearsal_iterations_completed,
+      scheduler_rehearsal_latest_status,
+      scheduler_rehearsal_latest_trigger_status,
+      test_only_matching_certificate_status,
+      timer_observed_wait_certificate_status,
+      simulated_fresh_candidate_injected,
+      simulated_trigger_recorded,
+      simulated_lifecycle_status,
+      simulated_open_record,
+      simulated_protective_orders,
+      simulated_close_plan,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      executable_payload_created,
+      order_payload_created,
+      order_placed,
+      binance_order_endpoint_called,
+      binance_test_order_endpoint_called,
+      per_signal_operator_approval_required,
+      blockers,
+      safety
+    }'
+
+  echo "=== R297 NONMATCHING CLI REHEARSAL ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-timer-integrated-test-only-matching-trigger-rehearsal \
+    --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R297 timer-integrated test-only nonmatching no-trigger rehearsal; no submit; no order." \
+    --simulate-nonmatching-fresh-candidate-for-tests-only \
+    --iterations 1 \
+    | jq '{
+      event_type,
+      status,
+      requested_lane_key,
+      simulated_candidate_lane_key,
+      candidate_matches_requested_lane,
+      simulated_trigger_recorded,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      executable_payload_created,
+      order_payload_created,
+      order_placed,
+      binance_order_endpoint_called,
+      binance_test_order_endpoint_called,
+      blockers,
+      safety
+    }'
+
+  echo "=== R297 EXPLICIT API SIMULATION MUST NOT RECORD ==="
+  curl -sS "http://127.0.0.1:8015/tiny-live/timer-integrated-test-only-matching-trigger-rehearsal/status?simulate_matching_for_tests_only=true" | jq '{
+    event_type,
+    status,
+    simulated_trigger_recorded,
+    record_timer_integrated_test_only_matching_trigger_rehearsal_requested,
+    timer_integrated_test_only_matching_trigger_rehearsal_recorded,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    executable_payload_created,
+    order_payload_created,
+    order_placed,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    timer_integrated_test_only_matching_trigger_rehearsal_panel,
+    test_only_matching_candidate_trigger_certificate_panel,
+    timer_observed_armed_lane_wait_certificate_panel,
+    dry_run_lane_arming_rehearsal_panel,
+    autonomous_trigger_scheduler_timer_health_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"executable_payload_created\": true\|\"secrets_shown\": true\|\"live_execution_enabled\": true\|\"allow_live_orders\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - plain API safe-default status
+  - matching CLI rehearsal status
+  - nonmatching CLI rehearsal status
+  - explicit API simulation no-record proof
+  - final console panel summary
+  - proof installed systemd timer was not mutated
+  - proof no order/submit/executable payload/live enable/secrets
+  - runtime log dirt generated and cleanup recommendation
+  - recommended next phase

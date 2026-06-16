@@ -3054,6 +3054,32 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-timer-integrated-test-only-matching-trigger-rehearsal":
+        from src.app.hammer_radar.operator.tiny_live_timer_integrated_test_only_matching_trigger_rehearsal import (
+            build_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal,
+            format_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_json,
+        )
+
+        print(
+            format_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_json(
+                build_tiny_live_timer_integrated_test_only_matching_trigger_rehearsal(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    simulate_matching_fresh_candidate_for_tests_only=(
+                        args.simulate_matching_fresh_candidate_for_tests_only
+                    ),
+                    simulate_nonmatching_fresh_candidate_for_tests_only=(
+                        args.simulate_nonmatching_fresh_candidate_for_tests_only
+                    ),
+                    iterations=args.iterations,
+                    record_timer_integrated_test_only_matching_trigger_rehearsal=(
+                        args.record_timer_integrated_test_only_matching_trigger_rehearsal
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6101,6 +6127,40 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_test_only_matching_candidate_trigger_certificate_parser.add_argument(
         "--record-test-only-matching-candidate-trigger-certificate",
+        action="store_true",
+    )
+
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser = subparsers.add_parser(
+        "tiny-live-timer-integrated-test-only-matching-trigger-rehearsal",
+        parents=[parent],
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--simulate-matching-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--simulate-nonmatching-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+    )
+    tiny_live_timer_integrated_test_only_matching_trigger_rehearsal_parser.add_argument(
+        "--record-timer-integrated-test-only-matching-trigger-rehearsal",
         action="store_true",
     )
 
