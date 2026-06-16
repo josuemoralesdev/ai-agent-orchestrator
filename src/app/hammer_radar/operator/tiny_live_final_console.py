@@ -603,6 +603,22 @@ def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = Non
         "latest_status": binding.get("status"),
         "binance_readiness_ready": matrix.get("binance_readiness_ready") is True,
         "exchange_minimum_ready": matrix.get("exchange_minimum_ready") is True,
+        "account_position_readiness_status": binding.get("account_position_readiness_status"),
+        "account_balance_checked": binding.get("account_balance_checked") is True,
+        "position_risk_checked": binding.get("position_risk_checked") is True,
+        "wallet_supports_minimum_tiny": binding.get("wallet_supports_minimum_tiny") is True,
+        "wallet_supports_configured_margin_budget": (
+            binding.get("wallet_supports_configured_margin_budget") is True
+        ),
+        "open_position_conflict": binding.get("open_position_conflict"),
+        "btcusdt_position_summary": {
+            "position_amt": binding.get("btcusdt_position_amt"),
+            "position_side": binding.get("btcusdt_position_side"),
+            "position_notional": binding.get("btcusdt_position_notional"),
+        },
+        "leverage_checked": binding.get("leverage_checked") is True,
+        "margin_mode_checked": binding.get("margin_mode_checked") is True,
+        "private_readonly_supported": True,
         "wallet_ready": matrix.get("wallet_ready") is True,
         "position_conflict_status": (
             "NO_CONFLICT"
@@ -614,6 +630,14 @@ def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = Non
         "configured_margin_budget": binding.get("configured_margin_budget_usdt"),
         "readiness_blockers": list(binding.get("readiness_blockers") or []),
         "safe_next_readonly_commands": list(binding.get("safe_next_readonly_commands") or []),
+        "private_readonly_safe_next_command": next(
+            (
+                command
+                for command in binding.get("safe_next_readonly_commands") or []
+                if "--fetch-binance-readonly-account-position" in str(command)
+            ),
+            None,
+        ),
         "final_command_available": False,
         "submit_allowed": False,
         "real_order_forbidden": True,

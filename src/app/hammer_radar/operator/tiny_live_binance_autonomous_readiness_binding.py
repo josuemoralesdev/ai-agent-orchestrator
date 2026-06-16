@@ -19,6 +19,9 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
+from src.app.hammer_radar.operator.binance_account_position_readonly import (
+    build_account_position_readiness,
+)
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE
 from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
@@ -99,6 +102,7 @@ SAFETY = {
 
 SOURCE_SURFACES_USED = [
     "src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py",
+    "src/app/hammer_radar/operator/binance_account_position_readonly.py",
     "src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py",
     "src/app/hammer_radar/operator/binance_readonly.py",
     "configs/hammer_radar/autonomous_arming_state.json",
@@ -156,7 +160,11 @@ def build_tiny_live_binance_autonomous_readiness_binding(
         fetch_requested=fetch_binance_readonly_account_position,
         confirmation_valid=account_position_confirmation_valid,
         account_position_snapshot=account_position_snapshot,
+        env=source_env,
+        risk_contract=risk_contract,
+        urlopen_func=urlopen_func,
     )
+    safety.update(_account_position_safety_delta(account_position))
     exchange = _exchange_minimum_summary(
         precision_binding["precision_snapshot"],
         precision_binding["mark_price_snapshot"],
@@ -223,7 +231,17 @@ def build_tiny_live_binance_autonomous_readiness_binding(
             "candidate_notional_at_cap": exchange["candidate_notional_at_cap"],
             "cap_clears_exchange_minimum": exchange["cap_clears_exchange_minimum"],
             "wallet_supports_minimum_tiny": account_position["wallet_supports_minimum_tiny"],
+            "wallet_balance_usdt": account_position.get("wallet_balance_usdt"),
+            "available_balance_usdt": account_position.get("available_balance_usdt"),
+            "wallet_supports_configured_margin_budget": account_position[
+                "wallet_supports_configured_margin_budget"
+            ],
             "open_position_conflict": account_position["open_position_conflict"],
+            "btcusdt_position_amt": account_position.get("btcusdt_position_amt"),
+            "btcusdt_position_side": account_position.get("btcusdt_position_side"),
+            "btcusdt_position_notional": account_position.get("btcusdt_position_notional"),
+            "leverage_matches_expectation": account_position.get("leverage_matches_expectation"),
+            "margin_mode_matches_expectation": account_position.get("margin_mode_matches_expectation"),
             "account_position_readiness_status": account_position["account_position_readiness_status"],
             "readiness_blockers": readiness_blockers,
             "latest_record": latest_record,
@@ -257,8 +275,12 @@ def safe_next_readonly_commands() -> list[str]:
             "\"I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT.\""
         ),
         (
-            "Account/position read-only is blocked in R279 unless a future phase provides a complete safe "
-            "account+position-risk adapter; no private endpoint is called by this binding."
+            "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+            "--log-dir logs/hammer_radar_forward tiny-live-binance-autonomous-readiness "
+            "--fetch-binance-readonly-account-position "
+            "--confirm-binance-readonly-account-position "
+            "\"I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; "
+            "NO LEVERAGE CHANGE; NO MARGIN CHANGE.\""
         ),
     ]
 
@@ -317,7 +339,12 @@ def load_latest_binance_autonomous_readiness_binding(
         "mark_price_checked": record.get("mark_price_checked") is True,
         "cap_clears_exchange_minimum": record.get("cap_clears_exchange_minimum"),
         "wallet_supports_minimum_tiny": record.get("wallet_supports_minimum_tiny"),
+        "wallet_supports_configured_margin_budget": record.get("wallet_supports_configured_margin_budget"),
         "open_position_conflict": record.get("open_position_conflict"),
+        "account_position_readiness_status": record.get("account_position_readiness_status"),
+        "btcusdt_position_amt": record.get("btcusdt_position_amt"),
+        "btcusdt_position_side": record.get("btcusdt_position_side"),
+        "btcusdt_position_notional": record.get("btcusdt_position_notional"),
         "readiness_blockers": list(record.get("readiness_blockers") or []),
         "final_command_available": False,
         "submit_allowed": False,
@@ -433,9 +460,13 @@ def _account_position_binding(
     fetch_requested: bool,
     confirmation_valid: bool,
     account_position_snapshot: Mapping[str, Any] | None,
+    env: Mapping[str, str] | None,
+    risk_contract: Mapping[str, Any],
+    urlopen_func: Callable[..., Any] | None,
 ) -> dict[str, Any]:
     if account_position_snapshot:
         wallet = _number(account_position_snapshot.get("available_balance_usdt"))
+        wallet_balance = _number(account_position_snapshot.get("wallet_balance_usdt"))
         conflict = account_position_snapshot.get("open_position_conflict")
         return {
             "fetch_requested": bool(fetch_requested),
@@ -446,40 +477,33 @@ def _account_position_binding(
             "leverage_checked": True,
             "margin_mode_checked": True,
             "available_balance_usdt": wallet,
+            "wallet_balance_usdt": wallet_balance,
             "wallet_supports_minimum_tiny": account_position_snapshot.get("wallet_supports_minimum_tiny"),
+            "wallet_supports_configured_margin_budget": account_position_snapshot.get(
+                "wallet_supports_configured_margin_budget",
+                account_position_snapshot.get("wallet_supports_minimum_tiny"),
+            ),
             "open_position_conflict": bool(conflict),
+            "btcusdt_position_amt": account_position_snapshot.get("btcusdt_position_amt", 0.0),
+            "btcusdt_position_side": account_position_snapshot.get("btcusdt_position_side", "BOTH"),
+            "btcusdt_position_notional": account_position_snapshot.get("btcusdt_position_notional", 0.0),
             "leverage_matches_expectation": account_position_snapshot.get("leverage_matches_expectation") is True,
             "margin_mode_matches_expectation": account_position_snapshot.get("margin_mode_matches_expectation") is True,
             "readiness_blockers": [str(item) for item in account_position_snapshot.get("readiness_blockers") or []],
-            "no_private_endpoint_called_by_r279": True,
+            "private_readonly_supported": True,
+            "safety": dict(SAFETY),
             "secrets_shown": False,
         }
-    if fetch_requested and not confirmation_valid:
-        status = "CONFIRMATION_INVALID"
-        blocker = "readonly_account_position_confirmation_invalid"
-    elif fetch_requested:
-        status = "NOT_IMPLEMENTED_SAFELY"
-        blocker = "readonly_account_position_check_not_available"
-    else:
-        status = "NOT_REQUESTED"
-        blocker = "readonly_account_position_not_requested"
-    return {
-        "fetch_requested": bool(fetch_requested),
-        "confirmation_valid": bool(confirmation_valid),
-        "account_position_readiness_status": status,
-        "account_balance_checked": False,
-        "position_risk_checked": False,
-        "leverage_checked": False,
-        "margin_mode_checked": False,
-        "available_balance_usdt": None,
-        "wallet_supports_minimum_tiny": None,
-        "open_position_conflict": None,
-        "leverage_matches_expectation": None,
-        "margin_mode_matches_expectation": None,
-        "readiness_blockers": [blocker],
-        "no_private_endpoint_called_by_r279": True,
-        "secrets_shown": False,
-    }
+    return build_account_position_readiness(
+        fetch_requested=fetch_requested,
+        confirmation_valid=confirmation_valid,
+        env=env,
+        symbol=SYMBOL,
+        configured_margin_budget_usdt=risk_contract["configured_margin_budget_usdt"],
+        configured_notional_cap_usdt=risk_contract["configured_notional_cap_usdt"],
+        configured_leverage=risk_contract["configured_leverage"],
+        urlopen_func=urlopen_func,
+    )
 
 
 def _exchange_minimum_summary(
@@ -528,6 +552,8 @@ def _readiness_blockers(
     blockers.extend(str(item) for item in account_position.get("readiness_blockers") or [] if item)
     if account_position.get("wallet_supports_minimum_tiny") is not True:
         blockers.append("wallet_supports_minimum_tiny_not_verified")
+    if account_position.get("wallet_supports_configured_margin_budget") is not True:
+        blockers.append("wallet_supports_configured_margin_budget_not_verified")
     if account_position.get("open_position_conflict") is not False:
         blockers.append("no_conflicting_position_not_verified")
     if risk_contract.get("configured_notional_cap_usdt") != 80.0:
@@ -558,6 +584,10 @@ def _autonomous_one_shot_matrix(
         "binance_readiness_ready": bool(binance_readiness_ready),
         "exchange_minimum_ready": exchange.get("exchange_minimum_ready") is True,
         "wallet_ready": account_position.get("wallet_supports_minimum_tiny") is True,
+        "wallet_supports_configured_margin_budget": account_position.get(
+            "wallet_supports_configured_margin_budget"
+        )
+        is True,
         "no_conflicting_position": account_position.get("open_position_conflict") is False,
         "no_prior_live_submit": True,
         "final_command_available": False,
@@ -583,6 +613,36 @@ def _dedupe(values: list[str]) -> list[str]:
             seen.add(value)
             result.append(value)
     return result
+
+
+def _account_position_safety_delta(account_position: Mapping[str, Any]) -> dict[str, Any]:
+    safety = account_position.get("safety") if isinstance(account_position.get("safety"), Mapping) else {}
+    keys = [
+        "hmac_signature_created",
+        "signed_request_created",
+        "signed_readonly_request_created",
+        "signed_trading_request_created",
+        "signed_order_request_created",
+        "binance_order_endpoint_called",
+        "binance_test_order_endpoint_called",
+        "binance_account_endpoint_called",
+        "binance_position_risk_endpoint_called",
+        "leverage_change_called",
+        "margin_change_called",
+        "cancel_order_endpoint_called",
+        "transfer_endpoint_called",
+        "withdraw_endpoint_called",
+        "private_binance_endpoint_called",
+        "signed_binance_endpoint_called",
+        "network_allowed",
+        "api_key_used",
+        "api_secret_used",
+        "signature_created",
+        "secrets_read",
+        "secrets_shown",
+        "secret_values_in_output",
+    ]
+    return {key: bool(safety.get(key)) for key in keys if key in safety}
 
 
 def _sanitize(value: Any) -> Any:

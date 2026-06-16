@@ -1,0 +1,364 @@
+# R280 — Safe Binance Account/Position Read-Only Adapter
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: BINANCE PRIVATE READ-ONLY ADAPTER / ACCOUNT POSITION SAFETY
+  Secondary: PRE-LIVE GATE, AUTONOMOUS ONE-SHOT READINESS, SAFETY HARDENING
+  Duplicate risk level: MEDIUM-HIGH
+
+Why this phase exists:
+  R279 added Binance autonomous readiness binding.
+  R279 safely verified public/read-only exchange facts:
+    - BTCUSDT exchange filters
+    - mark price
+    - min notional
+    - min quantity
+    - step size
+    - 80 USDT cap clears exchange minimum
+  R279 intentionally blocked account/position inspection as:
+    account_position_readiness_status="NOT_IMPLEMENTED_SAFELY"
+
+  R280 must implement that missing piece safely:
+    - read account/wallet balance
+    - read BTCUSDT position risk / open position status
+    - verify no conflicting live position
+    - verify wallet can support tiny live
+    - optionally read leverage/margin mode if safely exposed by existing Binance read-only surfaces
+    - never place, test, modify, cancel, transfer, or withdraw
+
+Hard goal:
+  Add a safe private read-only Binance account/position adapter that can be used by R279/R280 readiness without creating any trading capability.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT cancel orders.
+  - Do NOT change leverage.
+  - Do NOT change margin mode.
+  - Do NOT transfer.
+  - Do NOT withdraw.
+  - Do NOT create signed trading requests.
+  - Do NOT expose API keys or secrets.
+  - Do NOT print raw secret values.
+  - Do NOT mutate env files.
+  - Do NOT enable real live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT make final command available.
+  - Do NOT arm live.
+  - Do NOT treat read-only success as permission to execute.
+  - If any endpoint or adapter uncertainty exists, block readiness.
+
+Allowed endpoint class:
+  Private read-only Binance endpoints only, behind explicit confirmation.
+
+  Allowed examples, if implemented safely:
+    - futures account balance/account read-only endpoint
+    - futures position risk read-only endpoint
+    - position mode read-only endpoint if needed and safe
+
+  Forbidden examples:
+    - /fapi/v1/order
+    - /fapi/v1/batchOrders
+    - /fapi/v1/leverage
+    - /fapi/v1/marginType
+    - cancel endpoints
+    - transfer endpoints
+    - withdraw endpoints
+
+Required scan:
+  Inspect existing Binance/read-only code before adding anything:
+    - src/app/hammer_radar/operator/binance_readonly.py
+    - src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+    - src/app/hammer_radar/operator/tiny_live_binance_autonomous_readiness_binding.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_gate.py
+    - src/app/hammer_radar/operator/tiny_live_submit_gate_preview.py
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Safe signed read-only adapter:
+     Add or extend a module, preferably:
+       src/app/hammer_radar/operator/binance_account_position_readonly.py
+
+     It must expose safe functions similar to:
+       build_signed_readonly_query(...)
+       fetch_futures_account_balance_readonly(...)
+       fetch_futures_position_risk_readonly(...)
+       build_account_position_readiness(...)
+
+     Requirements:
+       - signing may be used ONLY for read-only endpoints.
+       - signed_readonly_request_created may be true.
+       - signed_trading_request_created must remain false.
+       - signed_order_request_created must remain false.
+       - hmac_signature_created may be true only if signed_readonly_request_created=true and endpoint is allowlisted read-only.
+       - never expose signature, query string containing secret-derived material, api key, or secret.
+       - endpoint allowlist must be explicit.
+       - any non-allowlisted endpoint must block before request.
+
+  2. Endpoint allowlist:
+     Add a clear allowlist, for example:
+       /fapi/v2/balance
+       /fapi/v2/account
+       /fapi/v2/positionRisk
+     or whichever existing project patterns safely support.
+
+     The adapter must report:
+       requested_endpoint
+       endpoint_allowlisted
+       private_readonly_endpoint_called
+       signed_readonly_request_created
+       signed_trading_request_created=false
+       binance_order_endpoint_called=false
+       binance_test_order_endpoint_called=false
+       leverage_change_called=false
+       margin_change_called=false
+
+  3. Account/position readiness packet:
+     Integrate with:
+       tiny_live_binance_autonomous_readiness_binding.py
+
+     On explicit account/position confirmation, output:
+       account_position_readiness_status:
+         NOT_REQUESTED
+         BLOCKED_CONFIRMATION_REQUIRED
+         BLOCKED_ENDPOINT_NOT_ALLOWLISTED
+         BLOCKED_FETCH_FAILED
+         READY
+         BLOCKED_CONFLICTING_POSITION
+         BLOCKED_WALLET_INSUFFICIENT
+
+       account_balance_checked
+       position_risk_checked
+       leverage_checked
+       margin_mode_checked
+       available_balance_usdt
+       wallet_balance_usdt
+       wallet_supports_minimum_tiny
+       wallet_supports_configured_margin_budget
+       configured_margin_budget_usdt=8
+       configured_notional_cap_usdt=80
+       configured_leverage=10
+       open_position_conflict
+       btcusdt_position_amt
+       btcusdt_position_side
+       btcusdt_position_notional
+       leverage_matches_expectation if available
+       margin_mode_matches_expectation if available
+       readiness_blockers
+
+     Ready requires:
+       - wallet/available balance supports configured margin budget or minimum tiny as defined by existing risk contract
+       - no conflicting BTCUSDT open position
+       - no unsafe endpoint was called
+       - no order/test-order/leverage/margin mutation
+       - secrets not shown
+
+  4. CLI:
+     Extend:
+       tiny-live-binance-autonomous-readiness
+
+     Account/position command:
+       PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+         --log-dir logs/hammer_radar_forward \
+         tiny-live-binance-autonomous-readiness \
+         --fetch-binance-readonly-account-position \
+         --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+
+     Missing/wrong confirmation must block and not call private endpoints.
+
+  5. API:
+     Keep default:
+       GET /tiny-live/binance-autonomous-readiness
+     no private network by default.
+
+     If adding query support for private read-only, require explicit confirmation.
+     CLI-only for private read-only is acceptable and preferred.
+
+  6. Final console:
+     Update binance_autonomous_readiness_panel to show:
+       account_position_readiness_status
+       account_balance_checked
+       position_risk_checked
+       wallet_supports_minimum_tiny
+       wallet_supports_configured_margin_budget
+       open_position_conflict
+       btcusdt_position_summary
+       leverage_checked
+       margin_mode_checked
+       private_readonly_supported=true
+       private_readonly_safe_next_command
+       binance_readiness_ready true only if:
+         exchange_minimum_ready=true
+         wallet_ready=true
+         no_conflicting_position=true
+         no unsafe endpoint called
+
+     Still:
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  7. Tests:
+     Add/update tests proving:
+       - missing account/position confirmation blocks.
+       - wrong confirmation blocks.
+       - private endpoint is not called on missing/wrong confirmation.
+       - only allowlisted read-only private endpoints can be called.
+       - non-allowlisted endpoint blocks.
+       - mock balance sufficient => wallet_ready true.
+       - mock balance insufficient => wallet_ready false and blocked.
+       - mock no BTCUSDT position => no_conflicting_position true.
+       - mock BTCUSDT position nonzero => conflict true and blocked.
+       - signed_readonly_request_created may be true only for allowlisted readonly endpoint.
+       - signed_trading_request_created false.
+       - signed_order_request_created false.
+       - hmac/signature data is not exposed.
+       - no order endpoint called.
+       - no test order endpoint called.
+       - no leverage change called.
+       - no margin change called.
+       - final command unavailable.
+       - submit_allowed false.
+       - final console shows private read-only status.
+       - R279 public precision/mark-price path still passes.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "binance_account_position or binance_autonomous or binance_readonly or autonomous or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  # Default endpoint: no private network
+  curl -s http://127.0.0.1:8015/tiny-live/binance-autonomous-readiness | jq '{
+    event_type,
+    status,
+    binding_supported,
+    readonly_requested,
+    account_position_binding,
+    autonomous_one_shot_readiness_matrix,
+    readiness_blockers,
+    safety
+  }'
+
+  # CLI default: no network
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    | tee /tmp/r280_binance_readiness_status.json \
+    | jq '{
+      event_type,
+      status,
+      account_position_binding,
+      autonomous_one_shot_readiness_matrix,
+      readiness_blockers,
+      safety
+    }'
+
+  # Private account/position read-only
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r280_binance_readonly_account_position.json \
+    | jq '{
+      event_type,
+      status,
+      account_balance_checked,
+      position_risk_checked,
+      leverage_checked,
+      margin_mode_checked,
+      account_position_readiness_status,
+      available_balance_usdt,
+      wallet_balance_usdt,
+      wallet_supports_minimum_tiny,
+      wallet_supports_configured_margin_budget,
+      open_position_conflict,
+      btcusdt_position_amt,
+      btcusdt_position_side,
+      btcusdt_position_notional,
+      readiness_blockers,
+      autonomous_one_shot_readiness_matrix,
+      safety
+    }'
+
+  # Combined public precision + private account/position read-only if supported
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r280_binance_combined_readonly.json \
+    | jq '{
+      event_type,
+      status,
+      exchange_info_checked,
+      mark_price_checked,
+      account_balance_checked,
+      position_risk_checked,
+      cap_clears_exchange_minimum,
+      wallet_supports_minimum_tiny,
+      wallet_supports_configured_margin_budget,
+      open_position_conflict,
+      readiness_blockers,
+      autonomous_one_shot_readiness_matrix,
+      safety
+    }'
+
+  # Final console
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    binance_autonomous_readiness_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  # Absolute endpoint status
+  for endpoint in \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  # Safety grep
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - allowlisted private read-only endpoints
+  - confirmation enforcement
+  - account/wallet readiness status
+  - position conflict status
+  - whether wallet supports configured tiny margin
+  - whether BTCUSDT position is clear
+  - final console private read-only panel
+  - proof no order/no test order/no leverage change/no margin change/no signed trading request

@@ -31,6 +31,10 @@ from tests.hammer_radar.test_tiny_live_binance_readonly_precision_mark_price_gat
     _fixture_logs,
     _mark_price_payload,
 )
+from tests.hammer_radar.test_binance_account_position_readonly import (
+    _PrivateFakeUrlOpen,
+    _safe_env,
+)
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
@@ -172,21 +176,61 @@ def test_readiness_can_be_ready_with_safe_mocked_wallet_and_no_position_conflict
     assert payload["real_order_forbidden"] is True
 
 
-def test_account_position_fetch_is_explicitly_blocked_even_with_confirmation(tmp_path: Path) -> None:
+def test_account_position_missing_and_wrong_confirmation_blocks_without_private_endpoint(tmp_path: Path) -> None:
+    for confirmation in (None, "wrong"):
+        fake = _PrivateFakeUrlOpen(available_balance="20", wallet_balance="20", position_amt="0", notional="0")
+        payload = build_tiny_live_binance_autonomous_readiness_binding(
+            log_dir=tmp_path,
+            fetch_binance_readonly_account_position=True,
+            confirm_binance_readonly_account_position=confirmation,
+            env=_safe_env(),
+            now=NOW,
+            urlopen_func=fake,
+        )
+
+        assert fake.calls == []
+        assert payload["status"] == BINANCE_READINESS_BLOCKED
+        assert payload["account_position_readiness_status"] == "BLOCKED_CONFIRMATION_REQUIRED"
+        assert "readonly_account_position_confirmation_invalid" in payload["readiness_blockers"]
+        assert payload["account_balance_checked"] is False
+        assert payload["position_risk_checked"] is False
+        assert payload["safety"]["signed_readonly_request_created"] is False
+        assert payload["safety"]["binance_account_endpoint_called"] is False
+
+
+def test_account_position_confirmation_calls_only_private_readonly_endpoints(tmp_path: Path) -> None:
+    fake = _PrivateFakeUrlOpen(available_balance="20", wallet_balance="22", position_amt="0", notional="0")
     payload = build_tiny_live_binance_autonomous_readiness_binding(
         log_dir=tmp_path,
         fetch_binance_readonly_account_position=True,
         confirm_binance_readonly_account_position=CONFIRM_BINANCE_READONLY_ACCOUNT_POSITION_PHRASE,
+        env=_safe_env(),
         now=NOW,
+        urlopen_func=fake,
     )
 
     assert payload["status"] == BINANCE_READINESS_BLOCKED
-    assert payload["account_position_readiness_status"] == "NOT_IMPLEMENTED_SAFELY"
-    assert "readonly_account_position_check_not_available" in payload["readiness_blockers"]
-    assert payload["account_balance_checked"] is False
-    assert payload["position_risk_checked"] is False
-    assert payload["safety"]["signed_readonly_request_created"] is False
-    assert payload["safety"]["binance_account_endpoint_called"] is False
+    assert [request.get_method() for request in fake.calls] == ["GET", "GET"]
+    assert fake.calls[0].full_url.startswith("https://fapi.binance.com/fapi/v2/balance?")
+    assert fake.calls[1].full_url.startswith("https://fapi.binance.com/fapi/v2/positionRisk?")
+    assert payload["account_position_readiness_status"] == "READY"
+    assert payload["account_balance_checked"] is True
+    assert payload["position_risk_checked"] is True
+    assert payload["wallet_supports_minimum_tiny"] is True
+    assert payload["wallet_supports_configured_margin_budget"] is True
+    assert payload["open_position_conflict"] is False
+    assert payload["btcusdt_position_amt"] == 0.0
+    assert payload["safety"]["signed_readonly_request_created"] is True
+    assert payload["safety"]["signed_trading_request_created"] is False
+    assert payload["safety"]["signed_order_request_created"] is False
+    assert payload["safety"]["binance_account_endpoint_called"] is True
+    assert payload["safety"]["binance_position_risk_endpoint_called"] is True
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert payload["safety"]["binance_test_order_endpoint_called"] is False
+    assert payload["safety"]["leverage_change_called"] is False
+    assert payload["safety"]["margin_change_called"] is False
+    assert payload["final_command_available"] is False
+    assert payload["submit_allowed"] is False
 
 
 def test_endpoint_default_does_not_fetch_network(tmp_path: Path, monkeypatch) -> None:
