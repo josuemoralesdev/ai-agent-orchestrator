@@ -97,6 +97,9 @@ from src.app.hammer_radar.operator.tiny_live_actual_submit_reconciliation import
 from src.app.hammer_radar.operator.tiny_live_jit_launch_packet import (
     build_tiny_live_jit_launch_packet,
 )
+from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
+    build_tiny_live_binance_autonomous_readiness_binding,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -967,6 +970,18 @@ def tiny_live_autonomous_armed_dry_run() -> dict:
 @app.get("/tiny-live/autonomous-arming/status")
 def tiny_live_autonomous_arming_status() -> dict:
     return build_autonomous_dry_run_arming_status(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/binance-autonomous-readiness")
+def tiny_live_binance_autonomous_readiness(
+    fetch_readonly_precision: bool = Query(False),
+    confirm: str | None = Query(None),
+) -> dict:
+    return build_tiny_live_binance_autonomous_readiness_binding(
+        log_dir=get_log_dir(use_env=True),
+        fetch_binance_readonly_precision_mark_price=fetch_readonly_precision,
+        confirm_tiny_live_binance_readonly_fetch=confirm,
+    )
 
 
 @app.post("/tiny-live/autonomous-arming/arm-dry-run-lane")

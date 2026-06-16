@@ -2748,6 +2748,31 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-binance-autonomous-readiness":
+        from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
+            build_tiny_live_binance_autonomous_readiness_binding,
+            format_binance_autonomous_readiness_binding_json,
+        )
+
+        print(
+            format_binance_autonomous_readiness_binding_json(
+                build_tiny_live_binance_autonomous_readiness_binding(
+                    log_dir=args.log_dir,
+                    fetch_binance_readonly_precision_mark_price=(
+                        args.fetch_binance_readonly_precision_mark_price
+                    ),
+                    confirm_tiny_live_binance_readonly_fetch=(
+                        args.confirm_tiny_live_binance_readonly_fetch
+                    ),
+                    fetch_binance_readonly_account_position=(
+                        args.fetch_binance_readonly_account_position
+                    ),
+                    confirm_binance_readonly_account_position=(
+                        args.confirm_binance_readonly_account_position
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-leverage-notional-adjustment-preview":
         from src.app.hammer_radar.operator.tiny_live_leverage_notional_adjustment_preview import (
             build_tiny_live_leverage_notional_adjustment_preview,
@@ -5438,6 +5463,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_binance_readonly_precision_mark_price_gate_parser.add_argument(
         "--confirm-tiny-live-binance-readonly-fetch",
+        default=None,
+    )
+
+    tiny_live_binance_autonomous_readiness_parser = subparsers.add_parser(
+        "tiny-live-binance-autonomous-readiness",
+        parents=[parent],
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--fetch-binance-readonly-precision-mark-price",
+        action="store_true",
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--confirm-tiny-live-binance-readonly-fetch",
+        default=None,
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--fetch-binance-readonly-account-position",
+        action="store_true",
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--confirm-binance-readonly-account-position",
         default=None,
     )
 

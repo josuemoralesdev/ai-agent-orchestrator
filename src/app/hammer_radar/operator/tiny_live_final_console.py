@@ -48,6 +48,9 @@ from src.app.hammer_radar.operator.tiny_live_binance_readonly_precision_mark_pri
     build_exchange_minimum_tiny_live_decision_packet,
     load_tiny_live_binance_readonly_precision_mark_price_records,
 )
+from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
+    build_tiny_live_binance_autonomous_readiness_binding,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -107,6 +110,7 @@ SOURCE_SURFACES_USED = [
     "logs/hammer_radar_forward/tiny_live_actual_submit_gate.ndjson",
     "logs/hammer_radar_forward/tiny_live_submit_gate_preview.ndjson",
     "logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson",
+    "logs/hammer_radar_forward/tiny_live_binance_autonomous_readiness_binding.ndjson",
     f"logs/hammer_radar_forward/{LEDGER_FILENAME}",
 ]
 
@@ -190,6 +194,9 @@ def build_tiny_live_final_console(
             official_lane_key=official_lane_key,
         )
         autonomous_armed_dry_run_panel = build_autonomous_armed_dry_run_panel(
+            log_dir=resolved_log_dir,
+        )
+        binance_autonomous_readiness_panel = build_binance_autonomous_readiness_panel(
             log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
@@ -381,6 +388,7 @@ def build_tiny_live_final_console(
                 "latest_jit_launch_packet": latest_jit_launch_packet,
                 "lane_intelligence_panel": lane_intelligence_panel,
                 "autonomous_armed_dry_run_panel": autonomous_armed_dry_run_panel,
+                "binance_autonomous_readiness_panel": binance_autonomous_readiness_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -580,6 +588,35 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         "submit_allowed": False,
         "final_command_available": False,
         "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
+    }
+
+
+def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
+    binding = build_tiny_live_binance_autonomous_readiness_binding(log_dir=log_dir)
+    matrix = (
+        binding.get("autonomous_one_shot_readiness_matrix")
+        if isinstance(binding.get("autonomous_one_shot_readiness_matrix"), Mapping)
+        else {}
+    )
+    return {
+        "binding_supported": binding.get("binding_supported") is True,
+        "latest_status": binding.get("status"),
+        "binance_readiness_ready": matrix.get("binance_readiness_ready") is True,
+        "exchange_minimum_ready": matrix.get("exchange_minimum_ready") is True,
+        "wallet_ready": matrix.get("wallet_ready") is True,
+        "position_conflict_status": (
+            "NO_CONFLICT"
+            if matrix.get("no_conflicting_position") is True
+            else "NOT_VERIFIED_OR_CONFLICT"
+        ),
+        "configured_cap": binding.get("configured_notional_cap_usdt"),
+        "configured_leverage": binding.get("configured_leverage"),
+        "configured_margin_budget": binding.get("configured_margin_budget_usdt"),
+        "readiness_blockers": list(binding.get("readiness_blockers") or []),
+        "safe_next_readonly_commands": list(binding.get("safe_next_readonly_commands") or []),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
     }
 
 

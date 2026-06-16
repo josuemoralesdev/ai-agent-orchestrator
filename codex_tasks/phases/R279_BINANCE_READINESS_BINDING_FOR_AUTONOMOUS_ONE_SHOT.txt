@@ -1,0 +1,331 @@
+# R279 — Binance Readiness Binding for Autonomous One-Shot
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: BINANCE READINESS BINDING / PRE-LIVE GATE
+  Secondary: AUTONOMOUS ONE-SHOT READINESS, READ-ONLY EXCHANGE VALIDATION, SAFETY HARDENING
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  R275 created autonomous armed-lane dry-run.
+  R276 proved fixture rehearsal can reach AUTO_DRY_RUN_READY.
+  R277 bound autonomous dry-run to real candidate watcher flow.
+  R278 added operator dry-run arming controls and proved:
+    - default OFF
+    - exact live-qualified lanes can arm in dry-run mode
+    - 8m short / near-miss cannot arm
+    - disarm returns OFF
+    - no Binance order endpoint is called
+
+  R279 must now bind read-only Binance/exchange readiness to the autonomous one-shot path.
+  This is still NOT live execution.
+  This is not a real order phase.
+  This phase prepares the one-shot gate by proving the system can verify exchange facts safely.
+
+Hard goal:
+  Add a Binance readiness binding packet for autonomous one-shot that verifies:
+    - Binance credentials are configured without exposing secrets
+    - account/balance can be read only if explicit confirmation is given
+    - exchange info / precision / min notional can be read only if explicit confirmation is given
+    - mark price can be read only if explicit confirmation is given
+    - BTCUSDT filters are compatible with configured 80 USDT notional cap
+    - leverage expectation is 10x, but do not change leverage in this phase
+    - margin expectation is isolated, but do not change margin mode in this phase
+    - no open conflicting live position if read-only account inspection supports it
+    - no order/test-order/private trading endpoint is called
+    - autonomous one-shot remains blocked until Binance readiness is green
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT submit signed order requests.
+  - Do NOT create HMAC signatures for trading endpoints.
+  - Do NOT change leverage.
+  - Do NOT change margin mode.
+  - Do NOT cancel orders.
+  - Do NOT transfer or withdraw.
+  - Do NOT mutate env files.
+  - Do NOT expose secrets.
+  - Do NOT enable real live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT make final command available.
+  - Do NOT arm real live.
+  - Do NOT treat read-only readiness as permission to execute.
+  - If uncertain, return BINANCE_READINESS_BLOCKED.
+
+Allowed network behavior:
+  Only read-only Binance endpoints may be used, and only behind explicit confirmation phrases.
+  If existing project code already has a read-only precision/mark-price gate, extend/reuse it.
+  Do not invent unsafe direct calls if safe wrappers already exist.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_jit_launch_packet.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_reconciliation.py
+    - src/app/hammer_radar/operator/tiny_live_actual_submit_gate.py
+    - src/app/hammer_radar/operator/tiny_live_submit_gate_preview.py
+    - src/app/hammer_radar/operator/tiny_live_binance_readonly_precision_mark_price_gate.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Binance readiness binding module:
+     Add or extend a module, preferably:
+       tiny_live_binance_autonomous_readiness_binding.py
+
+     It should produce:
+       event_type="BINANCE_AUTONOMOUS_ONE_SHOT_READINESS_BINDING"
+       status:
+         BINANCE_READINESS_NOT_REQUESTED
+         BINANCE_READINESS_BLOCKED
+         BINANCE_READINESS_READY
+       created_by_phase="R279_BINANCE_READINESS_BINDING_FOR_AUTONOMOUS_ONE_SHOT"
+
+     It must include:
+       readonly_requested
+       readonly_confirmation_valid
+       credentials_configured
+       secrets_shown=false
+       symbol="BTCUSDT"
+       account_balance_checked
+       exchange_info_checked
+       mark_price_checked
+       position_risk_checked
+       leverage_checked
+       margin_mode_checked
+       configured_notional_cap_usdt=80
+       configured_leverage=10
+       configured_margin_budget_usdt=8
+       exchange_min_notional
+       exchange_min_quantity
+       exchange_step_size
+       candidate_quantity_at_cap
+       candidate_notional_at_cap
+       cap_clears_exchange_minimum
+       wallet_supports_minimum_tiny
+       open_position_conflict
+       readiness_blockers
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+       safety
+
+  2. Safe confirmation phrases:
+     Add explicit confirmation phrase requirements:
+       For read-only exchange info / mark price:
+         "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+
+       For read-only account/position inspection, if private signed read-only endpoints are already supported:
+         "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+
+     If account/position inspection would require new signing code and none exists safely, do not implement it. Return:
+       account_position_readiness_status="NOT_IMPLEMENTED_SAFELY"
+       blocker="readonly_account_position_check_not_available"
+     Better blocked than clever. Clever is how humans created margin calls.
+
+  3. Autonomous one-shot readiness matrix:
+     Add matrix:
+       autonomous_dry_run_arming_supported
+       real_candidate_binding_supported
+       dry_run_arming_default_off
+       live_qualified_lanes_available
+       binance_readiness_binding_supported
+       binance_readiness_ready
+       exchange_minimum_ready
+       wallet_ready
+       no_conflicting_position
+       no_prior_live_submit
+       final_command_available=false
+       one_shot_live_allowed=false
+       real_order_forbidden=true
+
+  4. API:
+     Add safe GET:
+       /tiny-live/binance-autonomous-readiness
+
+     Default GET must NOT hit Binance network unless explicit query/flag is provided.
+     Default output should show readiness binding support and current recorded/latest readiness, if any.
+
+     Optional explicit read-only network query allowed only if already consistent with project patterns:
+       /tiny-live/binance-autonomous-readiness?fetch_readonly_precision=true&confirm=...
+     But CLI is preferred for any read-only network call.
+
+  5. CLI:
+     Add inspect command:
+       tiny-live-binance-autonomous-readiness
+
+     Required safe command examples:
+       # no network, status only
+       PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+         --log-dir logs/hammer_radar_forward \
+         tiny-live-binance-autonomous-readiness
+
+       # readonly precision/mark price only
+       PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+         --log-dir logs/hammer_radar_forward \
+         tiny-live-binance-autonomous-readiness \
+         --fetch-binance-readonly-precision-mark-price \
+         --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+
+       # account/position read-only only if safely supported
+       PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+         --log-dir logs/hammer_radar_forward \
+         tiny-live-binance-autonomous-readiness \
+         --fetch-binance-readonly-account-position \
+         --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+
+     CLI output must never include secrets.
+
+  6. Final console:
+     Add panel:
+       binance_autonomous_readiness_panel
+
+     Include:
+       binding_supported
+       latest_status
+       binance_readiness_ready
+       exchange_minimum_ready
+       wallet_ready
+       position_conflict_status
+       configured_cap
+       configured_leverage
+       configured_margin_budget
+       readiness_blockers
+       safe_next_readonly_commands
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  7. Tests:
+     Add/update tests proving:
+       - default Binance readiness endpoint does not fetch network.
+       - missing confirmation blocks read-only fetch.
+       - wrong confirmation blocks read-only fetch.
+       - readonly precision confirmation allows only read-only precision/mark path.
+       - no order endpoint called.
+       - no test order endpoint called.
+       - no leverage change called.
+       - no margin change called.
+       - no secrets shown.
+       - readiness is BLOCKED if min notional/quantity cannot be verified.
+       - readiness is BLOCKED if cap does not clear exchange minimum.
+       - readiness is READY only when exchange minimum + wallet + no conflict conditions are satisfied or safely mocked.
+       - final console shows Binance readiness panel.
+       - autonomous one-shot remains unavailable.
+       - final_command_available=false.
+       - submit_allowed=false.
+       - real_order_forbidden=true.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "binance_autonomous or binance_readonly or autonomous or arming or real_candidate or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  # Default, no network
+  curl -s http://127.0.0.1:8015/tiny-live/binance-autonomous-readiness | jq '{
+    event_type,
+    status,
+    binding_supported,
+    readonly_requested,
+    latest_record,
+    autonomous_one_shot_readiness_matrix,
+    safety
+  }'
+
+  # CLI default, no network
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    | tee /tmp/r279_binance_readiness_status.json \
+    | jq '{
+      event_type,
+      status,
+      binding_supported,
+      readiness_blockers,
+      autonomous_one_shot_readiness_matrix,
+      safety
+    }'
+
+  # Existing/extended readonly precision mark-price check, only if implementation supports it safely
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    | tee /tmp/r279_binance_readonly_precision.json \
+    | jq '{
+      event_type,
+      status,
+      exchange_info_checked,
+      mark_price_checked,
+      configured_notional_cap_usdt,
+      configured_leverage,
+      configured_margin_budget_usdt,
+      exchange_min_notional,
+      exchange_min_quantity,
+      exchange_step_size,
+      candidate_quantity_at_cap,
+      candidate_notional_at_cap,
+      cap_clears_exchange_minimum,
+      readiness_blockers,
+      safety
+    }'
+
+  # Final console
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_armed_dry_run_panel,
+    binance_autonomous_readiness_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  # Absolute endpoint status
+  for endpoint in \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  # Safety grep
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - endpoint added
+  - CLI command added
+  - default no-network status
+  - read-only precision/mark-price status
+  - whether account/position read-only was implemented or explicitly blocked
+  - readiness blockers
+  - final console Binance readiness panel
+  - proof no submit/no real order/no Binance order endpoint/no leverage change/no margin change
