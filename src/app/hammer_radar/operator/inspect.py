@@ -2922,6 +2922,68 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-autonomous-trigger-scheduler-once":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
+            build_tiny_live_autonomous_trigger_scheduler_once,
+            format_tiny_live_autonomous_trigger_scheduler_json,
+        )
+
+        print(
+            format_tiny_live_autonomous_trigger_scheduler_json(
+                build_tiny_live_autonomous_trigger_scheduler_once(
+                    log_dir=args.log_dir,
+                    fetch_binance_readonly_precision_mark_price=(
+                        args.fetch_binance_readonly_precision_mark_price
+                    ),
+                    confirm_tiny_live_binance_readonly_fetch=(
+                        args.confirm_tiny_live_binance_readonly_fetch
+                    ),
+                    fetch_binance_readonly_account_position=(
+                        args.fetch_binance_readonly_account_position
+                    ),
+                    confirm_binance_readonly_account_position=(
+                        args.confirm_binance_readonly_account_position
+                    ),
+                    load_discovered_binance_readonly_env=args.load_discovered_binance_readonly_env,
+                    binance_readonly_env_file=args.binance_readonly_env_file,
+                    record_autonomous_trigger_scheduler=args.record_autonomous_trigger_scheduler,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
+    elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
+            format_tiny_live_autonomous_trigger_scheduler_json,
+            run_tiny_live_autonomous_trigger_scheduler_loop,
+        )
+
+        print(
+            format_tiny_live_autonomous_trigger_scheduler_json(
+                run_tiny_live_autonomous_trigger_scheduler_loop(
+                    log_dir=args.log_dir,
+                    max_iterations=args.max_iterations,
+                    sleep_seconds=args.sleep_seconds,
+                    fetch_binance_readonly_precision_mark_price=(
+                        args.fetch_binance_readonly_precision_mark_price
+                    ),
+                    confirm_tiny_live_binance_readonly_fetch=(
+                        args.confirm_tiny_live_binance_readonly_fetch
+                    ),
+                    fetch_binance_readonly_account_position=(
+                        args.fetch_binance_readonly_account_position
+                    ),
+                    confirm_binance_readonly_account_position=(
+                        args.confirm_binance_readonly_account_position
+                    ),
+                    load_discovered_binance_readonly_env=args.load_discovered_binance_readonly_env,
+                    binance_readonly_env_file=args.binance_readonly_env_file,
+                    record_autonomous_trigger_scheduler=args.record_autonomous_trigger_scheduler,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                )
+            )
+        )
     elif args.command == "tiny-live-leverage-notional-adjustment-preview":
         from src.app.hammer_radar.operator.tiny_live_leverage_notional_adjustment_preview import (
             build_tiny_live_leverage_notional_adjustment_preview,
@@ -5823,6 +5885,99 @@ def _build_parser() -> argparse.ArgumentParser:
         default="local_operator",
     )
     tiny_live_autonomous_trigger_loop_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+
+    tiny_live_autonomous_trigger_scheduler_once_parser = subparsers.add_parser(
+        "tiny-live-autonomous-trigger-scheduler-once",
+        parents=[parent],
+    )
+    for scheduler_parser in (tiny_live_autonomous_trigger_scheduler_once_parser,):
+        scheduler_parser.add_argument(
+            "--load-discovered-binance-readonly-env",
+            action="store_true",
+        )
+        scheduler_parser.add_argument(
+            "--binance-readonly-env-file",
+            default=None,
+        )
+        scheduler_parser.add_argument(
+            "--fetch-binance-readonly-precision-mark-price",
+            action="store_true",
+        )
+        scheduler_parser.add_argument(
+            "--confirm-tiny-live-binance-readonly-fetch",
+            default=None,
+        )
+        scheduler_parser.add_argument(
+            "--fetch-binance-readonly-account-position",
+            action="store_true",
+        )
+        scheduler_parser.add_argument(
+            "--confirm-binance-readonly-account-position",
+            default=None,
+        )
+        scheduler_parser.add_argument(
+            "--record-autonomous-trigger-scheduler",
+            action="store_true",
+        )
+        scheduler_parser.add_argument(
+            "--operator-id",
+            default="local_operator",
+        )
+        scheduler_parser.add_argument(
+            "--reason",
+            default=None,
+        )
+
+    tiny_live_autonomous_trigger_scheduler_loop_parser = subparsers.add_parser(
+        "tiny-live-autonomous-trigger-scheduler-loop",
+        parents=[parent],
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=1,
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--sleep-seconds",
+        type=float,
+        default=0.0,
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--load-discovered-binance-readonly-env",
+        action="store_true",
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--binance-readonly-env-file",
+        default=None,
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--fetch-binance-readonly-precision-mark-price",
+        action="store_true",
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--confirm-tiny-live-binance-readonly-fetch",
+        default=None,
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--fetch-binance-readonly-account-position",
+        action="store_true",
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--confirm-binance-readonly-account-position",
+        default=None,
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--record-autonomous-trigger-scheduler",
+        action="store_true",
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_autonomous_trigger_scheduler_loop_parser.add_argument(
         "--reason",
         default=None,
     )

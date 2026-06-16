@@ -69,6 +69,9 @@ from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
 from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
     build_latest_or_not_checked_autonomous_trigger_loop,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
+    build_latest_or_idle_autonomous_trigger_scheduler,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -232,6 +235,9 @@ def build_tiny_live_final_console(
             risk_contract_config_path=risk_path,
         )
         autonomous_trigger_loop_panel = build_autonomous_trigger_loop_panel(
+            log_dir=resolved_log_dir,
+        )
+        autonomous_trigger_scheduler_panel = build_autonomous_trigger_scheduler_panel(
             log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
@@ -431,6 +437,7 @@ def build_tiny_live_final_console(
                 "one_shot_pre_activation_gate_panel": one_shot_pre_activation_gate_panel,
                 "fresh_trigger_watch_panel": fresh_trigger_watch_panel,
                 "autonomous_trigger_loop_panel": autonomous_trigger_loop_panel,
+                "autonomous_trigger_scheduler_panel": autonomous_trigger_scheduler_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -884,6 +891,67 @@ def build_autonomous_trigger_loop_panel(
             or "auto_triggers_when_armed_and_all_gates_open",
             "per_signal_operator_approval_required": False,
             "alert_is_visibility_only": True,
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return panel
+
+
+def build_autonomous_trigger_scheduler_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_latest_or_idle_autonomous_trigger_scheduler(log_dir=log_dir)
+    panel = packet.get("autonomous_trigger_scheduler_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {
+            "scheduler_supported": True,
+            "status": packet.get("status"),
+            "latest_scheduler_status": packet.get("status"),
+            "latest_trigger_loop_status": packet.get("trigger_loop_status"),
+            "iterations_summary": {
+                "iterations_requested": packet.get("iterations_requested"),
+                "iterations_completed": packet.get("iterations_completed"),
+                "statuses_seen": list(packet.get("statuses_seen") or []),
+                "latest_status": packet.get("latest_status") or packet.get("status"),
+                "latest_trigger_loop_status": packet.get("latest_trigger_loop_status")
+                or packet.get("trigger_loop_status"),
+                "latest_candidate_lane_key": packet.get("latest_candidate_lane_key")
+                or packet.get("current_candidate_lane_key"),
+                "any_dry_run_execution_recorded": (
+                    packet.get("any_dry_run_execution_recorded") is True
+                    or packet.get("autonomous_dry_run_execution_recorded") is True
+                ),
+                "any_unsafe_flag_detected": packet.get("any_unsafe_flag_detected") is True,
+                "stopped_reason": packet.get("stopped_reason"),
+            },
+        }
+    panel.update(
+        {
+            "scheduler_supported": True,
+            "latest_scheduler_status": panel.get("latest_scheduler_status") or panel.get("status"),
+            "latest_trigger_loop_status": panel.get("latest_trigger_loop_status"),
+            "operator_role": "arms_disarms_tunes_risk_not_per_signal_approval",
+            "machine_role": "auto_triggers_when_armed_and_all_gates_open",
+            "per_signal_operator_approval_required": False,
+            "next_scheduler_command": panel.get("next_scheduler_command")
+            or (
+                "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+                "--log-dir logs/hammer_radar_forward tiny-live-autonomous-trigger-scheduler-once "
+                "--record-autonomous-trigger-scheduler --operator-id local_operator "
+                "--reason \"R288 autonomous trigger scheduler dry-run loop; no submit.\""
+            ),
+            "proposed_safe_loop_command": panel.get("proposed_safe_loop_command")
+            or (
+                "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+                "--log-dir logs/hammer_radar_forward tiny-live-autonomous-trigger-scheduler-loop "
+                "--max-iterations 2 --sleep-seconds 0 --record-autonomous-trigger-scheduler "
+                "--operator-id local_operator --reason \"R288 bounded dry-run scheduler validation; no submit.\""
+            ),
             "final_command_available": False,
             "submit_allowed": False,
             "real_order_forbidden": True,

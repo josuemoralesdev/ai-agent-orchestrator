@@ -359,6 +359,9 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
     build_tiny_live_autonomous_armed_dry_run,
     disarm_autonomous_dry_run_lane,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
+    build_latest_or_idle_autonomous_trigger_scheduler,
+)
 from src.app.hammer_radar.operator.telegram_approval_challenge import (
     create_first_live_approval_challenge,
     load_telegram_approval_challenges,
@@ -1023,6 +1026,11 @@ def tiny_live_fresh_trigger_watch() -> dict:
 @app.get("/tiny-live/autonomous-trigger-loop")
 def tiny_live_autonomous_trigger_loop() -> dict:
     return build_latest_or_not_checked_autonomous_trigger_loop(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/autonomous-trigger-scheduler/status")
+def tiny_live_autonomous_trigger_scheduler_status() -> dict:
+    return build_latest_or_idle_autonomous_trigger_scheduler(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

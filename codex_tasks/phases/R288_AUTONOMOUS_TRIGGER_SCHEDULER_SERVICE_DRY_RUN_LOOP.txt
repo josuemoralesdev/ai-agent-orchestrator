@@ -1,0 +1,382 @@
+# R288 — Autonomous Trigger Scheduler Service Dry-Run Loop
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: SCHEDULER / AUTONOMOUS LOOP
+  Secondary: DRY-RUN ONLY, SERVICE PREP, NO-SUBMIT SAFETY
+  Duplicate risk level: MEDIUM-HIGH
+
+Operator doctrine:
+  The operator does NOT approve each signal.
+  The operator arms/disarms lanes, tunes risk, monitors alerts/logs, and can kill the system.
+  The machine auto-triggers when armed and all gates are open.
+
+Current state after R287:
+  - autonomous trigger loop exists
+  - operator_role = arms_disarms_tunes_risk_not_per_signal_approval
+  - machine_role = auto_triggers_when_armed_and_all_gates_open
+  - per_signal_operator_approval_required = false
+  - R287 status was AUTONOMOUS_TRIGGER_WAIT
+  - Binance readiness ready
+  - wallet ready
+  - leverage/margin ready
+  - no conflicting BTCUSDT position
+  - exchange minimum ready
+  - no current fresh live-qualified candidate
+  - final_command_available=false
+  - submit_allowed=false
+  - no order endpoints
+
+Why this phase exists:
+  R287 proves the autonomous trigger loop semantics.
+  R288 must make the loop runnable repeatedly, as a scheduler/service style dry-run loop, without requiring manual CLI pokes.
+  This prepares the machine to watch overnight/daytime and record trigger states.
+
+Hard goal:
+  Add a safe scheduler loop wrapper for:
+    tiny-live-autonomous-trigger-loop
+
+  It should run repeatedly in dry-run mode, record packets, expose status, and remain safe:
+    - no live order
+    - no order endpoint
+    - no executable payload
+    - no final command
+    - no per-signal operator approval
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage mutation endpoint.
+  - Do NOT call Binance margin type mutation endpoint.
+  - Do NOT call any mutation endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - No per-signal approval gates.
+  - Scheduler is dry-run visibility and audit only.
+
+Allowed:
+  - Build scheduler module.
+  - Build CLI command to run one iteration.
+  - Build CLI command to run bounded loop with limited iterations.
+  - Build API status endpoint.
+  - Build docs/tests.
+  - Read-only Binance checks through safe loader/confirmation if explicitly requested by CLI.
+  - Record dry-run loop packets.
+  - Produce Telegram-compatible visibility payload prepared-not-sent by default.
+  - Optionally send Telegram only if explicit send flag already supported and safe; default false.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_loop.py
+    - src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    - src/app/hammer_radar/operator/tiny_live_one_shot_pre_activation_gate.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - systemd/service docs if present
+    - scripts/ if present
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. New module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+
+     Packet:
+       event_type="TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER"
+       created_by_phase="R288_AUTONOMOUS_TRIGGER_SCHEDULER_SERVICE_DRY_RUN_LOOP"
+       status:
+         AUTONOMOUS_TRIGGER_SCHEDULER_IDLE
+         AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED
+         AUTONOMOUS_TRIGGER_SCHEDULER_LOOP_COMPLETED
+         AUTONOMOUS_TRIGGER_SCHEDULER_BLOCKED
+         AUTONOMOUS_TRIGGER_SCHEDULER_NOT_CHECKED
+
+  2. One-iteration function:
+     It should call/reuse R287 autonomous trigger loop safely.
+     Fields:
+       - iteration_id
+       - generated_at
+       - operator_role
+       - machine_role
+       - per_signal_operator_approval_required=false
+       - autonomous_mode="dry_run_only"
+       - trigger_loop_status
+       - current_fresh_candidate_exists
+       - current_candidate_lane_key
+       - exact_lane_auto_armed
+       - autonomous_dry_run_execution_recorded
+       - alert_visibility_only=true
+       - telegram_payload_prepared
+       - telegram_send_enabled=false by default
+       - next_required_step
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+       - safety
+
+  3. Bounded loop:
+     Add a bounded scheduler loop callable with:
+       - max_iterations default 1
+       - sleep_seconds default 0 for tests, configurable for CLI
+       - hard cap max_iterations <= 20 unless explicit test internal override
+       - records each iteration
+       - no infinite loop from Codex
+       - returns summary:
+           iterations_requested
+           iterations_completed
+           statuses_seen
+           latest_status
+           latest_candidate_lane_key
+           any_dry_run_execution_recorded
+           any_unsafe_flag_detected
+           stopped_reason
+
+  4. CLI:
+     Add inspect commands:
+       tiny-live-autonomous-trigger-scheduler-once
+       tiny-live-autonomous-trigger-scheduler-loop
+
+     Options for both:
+       --load-discovered-binance-readonly-env
+       --fetch-binance-readonly-precision-mark-price
+       --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+       --fetch-binance-readonly-account-position
+       --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+       --record-autonomous-trigger-scheduler
+       --operator-id local_operator
+       --reason "R288 autonomous trigger scheduler dry-run loop; no submit."
+
+     Additional loop options:
+       --max-iterations
+       --sleep-seconds
+
+     Constraints:
+       - max_iterations must be bounded.
+       - sleep_seconds must be bounded.
+       - no daemonization from Codex command.
+       - no background process started by Codex.
+       - CLI can print a proposed systemd/timer unit template, but must not install it.
+
+  5. API:
+     Add:
+       GET /tiny-live/autonomous-trigger-scheduler/status
+
+     Default safe:
+       - no private Binance fetch by default
+       - returns latest scheduler packet if available, else idle/not checked
+       - no order
+       - no submit
+       - no Telegram send
+
+  6. Final console:
+     Add:
+       autonomous_trigger_scheduler_panel
+
+     Include:
+       - scheduler supported
+       - latest scheduler status
+       - latest trigger loop status
+       - iterations summary if available
+       - operator role
+       - machine role
+       - per_signal_operator_approval_required=false
+       - next scheduler command
+       - proposed safe loop command
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+
+  7. Systemd/timer template doc only:
+     Add doc:
+       docs/hammer_radar/live_readiness/R288_AUTONOMOUS_TRIGGER_SCHEDULER_DRY_RUN_LOOP.md
+
+     Include:
+       - safe one-shot command
+       - safe bounded loop command
+       - optional systemd service/timer template
+       - explicitly says DO NOT install in this Codex phase
+       - explicit note: live execution remains disabled
+       - explicit note: operator arms/disarms/tunes; machine auto-triggers later when live mode is intentionally enabled
+
+  8. Tests:
+     Add tests:
+       - scheduler once records iteration.
+       - scheduler loop completes bounded iterations.
+       - max iteration cap enforced.
+       - no per-signal operator approval required.
+       - no live order/test-order endpoints.
+       - no executable payload.
+       - no live config/lane controls/risk contract/env mutation.
+       - final command unavailable.
+       - API status default safe.
+       - final console includes scheduler panel.
+       - loop summary reports WAIT when no candidate.
+       - dry-run executed path can be simulated by fixtures without real order.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous_trigger_scheduler or autonomous_trigger_loop or fresh_trigger_watch or one_shot_pre_activation or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== AUTONOMOUS TRIGGER SCHEDULER ONCE ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-once \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    --record-autonomous-trigger-scheduler \
+    --operator-id local_operator \
+    --reason "R288 autonomous trigger scheduler dry-run loop; no submit." \
+    | tee /tmp/r288_autonomous_trigger_scheduler_once.json \
+    | jq '{
+      event_type,
+      status,
+      iteration_id,
+      operator_role,
+      machine_role,
+      per_signal_operator_approval_required,
+      autonomous_mode,
+      trigger_loop_status,
+      current_fresh_candidate_exists,
+      current_candidate_lane_key,
+      exact_lane_auto_armed,
+      autonomous_dry_run_execution_recorded,
+      alert_visibility_only,
+      telegram_payload_prepared,
+      telegram_send_enabled,
+      next_required_step,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== AUTONOMOUS TRIGGER SCHEDULER BOUNDED LOOP ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-loop \
+    --max-iterations 2 \
+    --sleep-seconds 0 \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    --record-autonomous-trigger-scheduler \
+    --operator-id local_operator \
+    --reason "R288 bounded dry-run scheduler validation; no submit." \
+    | tee /tmp/r288_autonomous_trigger_scheduler_loop.json \
+    | jq '{
+      event_type,
+      status,
+      iterations_requested,
+      iterations_completed,
+      statuses_seen,
+      latest_status,
+      latest_trigger_loop_status,
+      latest_candidate_lane_key,
+      any_dry_run_execution_recorded,
+      any_unsafe_flag_detected,
+      stopped_reason,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== API SCHEDULER STATUS DEFAULT SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-trigger-scheduler/status | jq '{
+    event_type,
+    status,
+    autonomous_trigger_scheduler_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_trigger_loop_panel,
+    autonomous_trigger_scheduler_panel,
+    fresh_trigger_watch_panel,
+    one_shot_pre_activation_gate_panel,
+    autonomous_armed_dry_run_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== CURRENT WATCH STATUS ==="
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-trigger-loop | jq '{
+    event_type,
+    status,
+    operator_role,
+    machine_role,
+    per_signal_operator_approval_required,
+    current_fresh_candidate_exists,
+    next_required_step,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/autonomous-trigger-scheduler/status \
+    /tiny-live/autonomous-trigger-loop \
+    /tiny-live/fresh-trigger-watch \
+    /tiny-live/one-shot-pre-activation-gate \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"lane_controls_written\": true\|\"risk_contract_config_written\": true\|\"live_config_written\": true\|\"executable_payload_created\": true\|\"per_signal_operator_approval_required\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - scheduler once status
+  - bounded loop summary
+  - latest trigger loop status
+  - whether per-signal approval remains false
+  - whether any dry-run execution happened
+  - whether any unsafe flag appeared
+  - proof no submit/no order/no executable payload/no mutation/no secrets
+  - recommended next phase
