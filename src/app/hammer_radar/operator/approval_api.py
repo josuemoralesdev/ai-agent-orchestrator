@@ -363,6 +363,9 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import
     build_autonomous_trigger_scheduler_systemd_template_status,
     build_latest_or_idle_autonomous_trigger_scheduler,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_activation_readiness import (
+    build_autonomous_trigger_scheduler_activation_readiness,
+)
 from src.app.hammer_radar.operator.telegram_approval_challenge import (
     create_first_live_approval_challenge,
     load_telegram_approval_challenges,
@@ -1037,6 +1040,11 @@ def tiny_live_autonomous_trigger_scheduler_status() -> dict:
 @app.get("/tiny-live/autonomous-trigger-scheduler/systemd-template-status")
 def tiny_live_autonomous_trigger_scheduler_systemd_template_status() -> dict:
     return build_autonomous_trigger_scheduler_systemd_template_status()
+
+
+@app.get("/tiny-live/autonomous-trigger-scheduler/activation-readiness")
+def tiny_live_autonomous_trigger_scheduler_activation_readiness() -> dict:
+    return build_autonomous_trigger_scheduler_activation_readiness()
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

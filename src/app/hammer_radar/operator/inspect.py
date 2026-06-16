@@ -2963,6 +2963,17 @@ def main() -> int:
                 build_autonomous_trigger_scheduler_systemd_template_status()
             )
         )
+    elif args.command == "tiny-live-autonomous-trigger-scheduler-activation-readiness":
+        from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_activation_readiness import (
+            build_autonomous_trigger_scheduler_activation_readiness,
+            format_autonomous_trigger_scheduler_activation_readiness_json,
+        )
+
+        print(
+            format_autonomous_trigger_scheduler_activation_readiness_json(
+                build_autonomous_trigger_scheduler_activation_readiness()
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -5944,6 +5955,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser(
         "tiny-live-autonomous-trigger-scheduler-systemd-template-status",
+        parents=[parent],
+    )
+    subparsers.add_parser(
+        "tiny-live-autonomous-trigger-scheduler-activation-readiness",
         parents=[parent],
     )
 

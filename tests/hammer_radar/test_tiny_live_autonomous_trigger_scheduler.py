@@ -22,6 +22,10 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import
     build_tiny_live_autonomous_trigger_scheduler_once,
     run_tiny_live_autonomous_trigger_scheduler_loop,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_activation_readiness import (
+    ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL,
+    build_autonomous_trigger_scheduler_activation_readiness,
+)
 from tests.hammer_radar.test_tiny_live_autonomous_trigger_loop import _write_armed_state
 from tests.hammer_radar.test_tiny_live_one_shot_pre_activation_gate import (
     LANE_44M_LONG,
@@ -46,6 +50,13 @@ CHECKLIST_PATH = (
     / "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
 )
 PRINT_ONLY_SCRIPT_PATH = REPO_ROOT / "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh"
+ACTIVATION_CHECKLIST_PATH = (
+    REPO_ROOT
+    / "docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md"
+)
+ACTIVATION_PRINT_ONLY_SCRIPT_PATH = (
+    REPO_ROOT / "scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh"
+)
 
 
 def test_scheduler_once_records_iteration(tmp_path: Path) -> None:
@@ -290,6 +301,128 @@ def test_systemd_template_status_cli_and_api(tmp_path: Path, monkeypatch) -> Non
     assert api_payload["submit_allowed"] is False
 
 
+def test_activation_readiness_ready_when_templates_checklists_scripts_exist() -> None:
+    payload = build_autonomous_trigger_scheduler_activation_readiness(repo_root=REPO_ROOT)
+
+    assert payload["event_type"] == "TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_ACTIVATION_READINESS"
+    assert payload["created_by_phase"] == "R290_MANUAL_SYSTEMD_INSTALL_DRY_RUN_ACTIVATION_CHECKLIST"
+    assert payload["status"] == ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+    assert payload["service_template_present"] is True
+    assert payload["timer_template_present"] is True
+    assert payload["checklist_present"] is True
+    assert payload["print_only_script_present"] is True
+    assert payload["activation_checklist_present"] is True
+    assert payload["activation_print_only_script_present"] is True
+    assert payload["templates_safe"] is True
+    assert payload["forbidden_pattern_hits"] == []
+    assert payload["approval_api_expected_url"] == "http://127.0.0.1:8015"
+    assert payload["manual_install_commands"]
+    assert payload["manual_start_commands"]
+    assert payload["manual_status_commands"]
+    assert payload["manual_tick_smoke_commands"]
+    assert payload["manual_rollback_commands"]
+    assert payload["codex_install_performed"] is False
+    assert payload["codex_systemctl_start_performed"] is False
+    assert payload["codex_systemctl_enable_performed"] is False
+    assert payload["codex_sudo_performed"] is False
+    assert payload["dry_run_only"] is True
+    assert payload["live_execution_enabled"] is False
+    _assert_no_submit_or_mutation(payload)
+
+
+def test_activation_print_script_exists_and_prints_only() -> None:
+    text = ACTIVATION_PRINT_ONLY_SCRIPT_PATH.read_text(encoding="utf-8")
+    command_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("echo")
+    ]
+
+    assert ACTIVATION_PRINT_ONLY_SCRIPT_PATH.exists()
+    assert "R290 DRY RUN PRINT ONLY" in text
+    assert "does not run sudo, systemctl, cp, install, rm" in text
+    assert not any(line.startswith("sudo") for line in command_lines)
+    assert not any(line.startswith("systemctl") for line in command_lines)
+    assert not any(line.startswith("cp ") for line in command_lines)
+    assert not any(line.startswith("install ") for line in command_lines)
+    assert not any(line.startswith("rm ") for line in command_lines)
+    assert "sudo install -m 0644" in text
+    assert "sudo /usr/bin/systemctl start hammer-autonomous-trigger-scheduler-dry-run.timer" in text
+    assert "sudo systemctl disable --now hammer-autonomous-trigger-scheduler-dry-run.timer" in text
+    assert "tiny-live-autonomous-trigger-scheduler-activation-readiness" in text
+
+
+def test_activation_docs_templates_and_scripts_do_not_expose_secrets_or_live_submit() -> None:
+    paths = [
+        SERVICE_TEMPLATE_PATH,
+        TIMER_TEMPLATE_PATH,
+        CHECKLIST_PATH,
+        PRINT_ONLY_SCRIPT_PATH,
+        ACTIVATION_CHECKLIST_PATH,
+        ACTIVATION_PRINT_ONLY_SCRIPT_PATH,
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    forbidden = (
+        "BINANCE_API_SECRET=",
+        "BINANCE_API_KEY=",
+        "/fapi/v1/order",
+        "fapi/v1/order",
+        "final-live-submit",
+        "submit-live",
+        "codex_install_performed: true",
+        '"codex_install_performed": true',
+        "codex_sudo_performed: true",
+        '"codex_sudo_performed": true',
+        "codex_systemctl_start_performed: true",
+        '"codex_systemctl_start_performed": true',
+    )
+    for token in forbidden:
+        assert token not in combined
+
+
+def test_activation_readiness_cli_and_api_safe(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv(LOG_DIR_ENV_VAR, str(tmp_path))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            str(tmp_path),
+            "tiny-live-autonomous-trigger-scheduler-activation-readiness",
+        ],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": "."},
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    cli_payload = json.loads(result.stdout)
+    assert cli_payload["status"] == ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+    assert cli_payload["codex_install_performed"] is False
+    assert cli_payload["codex_systemctl_start_performed"] is False
+    assert cli_payload["codex_systemctl_enable_performed"] is False
+    assert cli_payload["codex_sudo_performed"] is False
+    assert cli_payload["final_command_available"] is False
+    assert cli_payload["submit_allowed"] is False
+    assert cli_payload["per_signal_operator_approval_required"] is False
+
+    with patch.object(urllib.request, "urlopen") as urlopen:
+        response = TestClient(app).get("/tiny-live/autonomous-trigger-scheduler/activation-readiness")
+
+    urlopen.assert_not_called()
+    api_payload = response.json()
+    assert response.status_code == 200
+    assert api_payload["status"] == ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+    assert api_payload["autonomous_trigger_scheduler_activation_panel"][
+        "activation_readiness_status"
+    ] == ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+    assert api_payload["final_command_available"] is False
+    assert api_payload["submit_allowed"] is False
+    assert api_payload["real_order_forbidden"] is True
+    _assert_no_submit_or_mutation(api_payload)
+
+
 def test_final_console_includes_scheduler_systemd_panel(tmp_path: Path) -> None:
     from src.app.hammer_radar.operator import tiny_live_final_console as final_console
 
@@ -312,6 +445,29 @@ def test_final_console_includes_scheduler_systemd_panel(tmp_path: Path) -> None:
     assert panel["install_performed"] is False
     assert panel["systemctl_called_by_codex"] is False
     assert panel["sudo_called_by_codex"] is False
+    assert panel["dry_run_only"] is True
+    assert panel["final_command_available"] is False
+    assert panel["submit_allowed"] is False
+    assert panel["real_order_forbidden"] is True
+
+
+def test_final_console_includes_scheduler_activation_panel(tmp_path: Path) -> None:
+    from src.app.hammer_radar.operator import tiny_live_final_console as final_console
+
+    payload = final_console.build_tiny_live_final_console(log_dir=tmp_path)
+    panel = payload["autonomous_trigger_scheduler_activation_panel"]
+
+    assert panel["activation_readiness_status"] == ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+    assert panel["activation_checklist_path"] == (
+        "docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md"
+    )
+    assert panel["activation_print_only_script_path"] == (
+        "scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh"
+    )
+    assert panel["codex_install_performed"] is False
+    assert panel["codex_systemctl_start_performed"] is False
+    assert panel["codex_systemctl_enable_performed"] is False
+    assert panel["codex_sudo_performed"] is False
     assert panel["dry_run_only"] is True
     assert panel["final_command_available"] is False
     assert panel["submit_allowed"] is False

@@ -1,0 +1,365 @@
+# R290 — Manual Systemd Install Dry-Run Activation Checklist
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: OPS ACTIVATION CHECKLIST / MANUAL INSTALL PREP
+  Secondary: SYSTEMD DRY-RUN TIMER ACTIVATION, SAFETY PREFLIGHT, NO-SUBMIT
+  Duplicate risk level: MEDIUM-HIGH
+
+Operator doctrine:
+  The operator does NOT approve each signal.
+  The operator arms/disarms lanes, tunes risk, monitors alerts/logs, and can kill the system.
+  The machine auto-triggers when armed and all gates are open.
+
+Current state after R289:
+  - R289 committed clean.
+  - Systemd service/timer templates exist in repo.
+  - Checklist exists.
+  - Print-only install plan exists.
+  - API systemd-template-status returns SYSTEMD_TEMPLATE_READY.
+  - Final console includes autonomous_trigger_scheduler_systemd_panel.
+  - Codex did not install/start/enable anything.
+  - Dry-run scheduler only.
+  - final_command_available=false.
+  - submit_allowed=false.
+  - no live order.
+  - no Binance order endpoint.
+  - no per-signal approval.
+
+Why this phase exists:
+  R289 created the systemd blueprint.
+  R290 must create a formal manual activation packet and smoke checklist for the human operator to install/start the dry-run timer.
+  Codex still must not run sudo/systemctl install/start/enable.
+  This phase is about making the manual activation safe, repeatable, and auditable.
+
+Hard goal:
+  Add an activation readiness packet and manual install smoke checklist that answers:
+    - Are templates present?
+    - Are templates safe?
+    - Is approval API alive?
+    - Is scheduler endpoint alive?
+    - Are live flags false?
+    - Are final command and submit still unavailable?
+    - What exact manual commands should operator run?
+    - What exact smoke checks prove the timer is ticking after manual install?
+    - What exact rollback commands stop/remove it?
+
+Non-negotiable safety:
+  - Do NOT run sudo.
+  - Do NOT install systemd units.
+  - Do NOT start/enable timers.
+  - Do NOT mutate /etc/systemd/system.
+  - Do NOT run daemon-reload.
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - No per-signal approval gates.
+  - This remains dry-run timer activation only.
+
+Allowed:
+  - Create repo-local activation packet module.
+  - Create docs/checklists.
+  - Create print-only manual command script.
+  - Add API/CLI status packet.
+  - Add tests.
+  - Read local service status for existing approval API only if no sudo and no mutation.
+  - Include manual commands in docs/scripts as printed text only.
+  - Prepare smoke commands for operator.
+
+Required scan:
+  Inspect:
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template
+    - ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template
+    - scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh
+    - docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. New module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_activation_readiness.py
+
+     Packet:
+       event_type="TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_ACTIVATION_READINESS"
+       created_by_phase="R290_MANUAL_SYSTEMD_INSTALL_DRY_RUN_ACTIVATION_CHECKLIST"
+       status:
+         ACTIVATION_READINESS_READY_FOR_MANUAL_INSTALL
+         ACTIVATION_READINESS_BLOCKED
+         ACTIVATION_READINESS_NOT_CHECKED
+
+  2. Activation readiness fields:
+     - generated_at
+     - service_template_path
+     - timer_template_path
+     - checklist_path
+     - print_only_install_plan_script_path
+     - activation_checklist_path
+     - activation_print_only_script_path
+     - service_template_present
+     - timer_template_present
+     - checklist_present
+     - print_only_script_present
+     - activation_checklist_present
+     - activation_print_only_script_present
+     - templates_safe
+     - forbidden_pattern_hits
+     - approval_api_expected_url="http://127.0.0.1:8015"
+     - approval_api_check_command
+     - scheduler_status_check_command
+     - final_console_check_command
+     - manual_install_commands
+     - manual_start_commands
+     - manual_status_commands
+     - manual_tick_smoke_commands
+     - manual_rollback_commands
+     - codex_install_performed=false
+     - codex_systemctl_start_performed=false
+     - codex_systemctl_enable_performed=false
+     - codex_sudo_performed=false
+     - dry_run_only=true
+     - live_execution_enabled=false
+     - per_signal_operator_approval_required=false
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+     - next_manual_operator_step
+     - blockers
+     - safety
+
+  3. New activation checklist doc:
+     Add:
+       docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md
+
+     Include sections:
+       - Purpose
+       - What this activates
+       - What this does NOT activate
+       - Operator doctrine
+       - Preflight checks before install
+       - Manual install commands
+       - Manual start command
+       - Wait for timer tick
+       - Smoke checks after first/second tick
+       - API verification
+       - Journal verification
+       - Safety grep verification
+       - Rollback commands
+       - Expected good output
+       - Stop criteria
+       - Red flags
+       - Next phase after activation
+
+     Must clearly say:
+       - This is dry-run only.
+       - No live orders.
+       - No Binance order endpoint.
+       - No executable payload.
+       - Operator controls arming/risk/kill switch; machine auto-triggers when armed and gates are open.
+       - Do not install if final_command_available or submit_allowed ever returns true.
+
+  4. New print-only activation script:
+     Add:
+       scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh
+
+     It must:
+       - print commands only
+       - not run sudo
+       - not run systemctl
+       - not copy files
+       - not mutate files
+       - include "R290 DRY RUN PRINT ONLY" banner
+       - print preflight commands
+       - print install commands
+       - print start/status/journal/smoke commands
+       - print rollback commands
+       - exit 0
+
+  5. CLI:
+     Add inspect command:
+       tiny-live-autonomous-trigger-scheduler-activation-readiness
+
+     It must:
+       - return packet above
+       - not install
+       - not start
+       - not run systemctl start
+       - not sudo
+       - not mutate anything
+
+  6. API:
+     Add endpoint:
+       GET /tiny-live/autonomous-trigger-scheduler/activation-readiness
+
+     Default safe:
+       - no network beyond local file checks
+       - no systemctl
+       - no sudo
+       - no mutation
+       - returns activation readiness panel
+
+  7. Final console:
+     Add:
+       autonomous_trigger_scheduler_activation_panel
+
+     Include:
+       - activation readiness status
+       - activation checklist path
+       - activation print-only script path
+       - next manual operator step
+       - codex install false
+       - codex systemctl false
+       - dry-run only true
+       - final command false
+       - submit false
+       - real order forbidden true
+
+  8. Phase index:
+     Update:
+       docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+  9. Tests:
+     Add tests:
+       - activation readiness ready when templates/checklists/scripts exist.
+       - activation print script exists and prints only.
+       - activation print script does not execute sudo/systemctl/cp/install/rm.
+       - manual commands are present as printed text.
+       - no secrets in docs/templates/scripts.
+       - no Binance order/test-order endpoint in templates/scripts.
+       - no live submit command.
+       - no executable payload.
+       - API activation endpoint safe.
+       - final console includes activation panel.
+       - codex_install_performed false.
+       - codex_systemctl_start_performed false.
+       - codex_systemctl_enable_performed false.
+       - codex_sudo_performed false.
+       - final_command_available false.
+       - submit_allowed false.
+       - per_signal_operator_approval_required false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "activation_readiness or systemd_template or autonomous_trigger_scheduler or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== ACTIVATION READINESS CLI ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-activation-readiness \
+    | tee /tmp/r290_activation_readiness.json \
+    | jq '{
+      event_type,
+      status,
+      service_template_present,
+      timer_template_present,
+      checklist_present,
+      print_only_script_present,
+      activation_checklist_present,
+      activation_print_only_script_present,
+      templates_safe,
+      forbidden_pattern_hits,
+      approval_api_expected_url,
+      codex_install_performed,
+      codex_systemctl_start_performed,
+      codex_systemctl_enable_performed,
+      codex_sudo_performed,
+      dry_run_only,
+      live_execution_enabled,
+      per_signal_operator_approval_required,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      next_manual_operator_step,
+      blockers,
+      safety
+    }'
+
+  echo "=== R290 PRINT ONLY ACTIVATION PLAN ==="
+  bash scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh | sed -n '1,260p'
+
+  echo "=== API ACTIVATION READINESS ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/autonomous-trigger-scheduler/activation-readiness | jq '{
+    event_type,
+    status,
+    autonomous_trigger_scheduler_activation_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_trigger_scheduler_activation_panel,
+    autonomous_trigger_scheduler_systemd_panel,
+    autonomous_trigger_scheduler_panel,
+    autonomous_trigger_loop_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== TEMPLATE / SCRIPT / DOC SAFETY GREP ==="
+  grep -R "fapi/v1/order\|test.*order\|leverage_change\|margin_change\|BINANCE_API_SECRET=\|BINANCE_API_KEY=\|final-live-submit\|submit-live\|codex_install_performed.: true\|codex_sudo_performed.: true\|codex_systemctl_start_performed.: true" -n \
+    ops/systemd/hammer-radar \
+    docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md \
+    docs/hammer_radar/live_readiness/R290_MANUAL_SYSTEMD_DRY_RUN_TIMER_ACTIVATION_CHECKLIST.md \
+    scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh \
+    scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh \
+    2>/dev/null || true
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/autonomous-trigger-scheduler/activation-readiness \
+    /tiny-live/autonomous-trigger-scheduler/systemd-template-status \
+    /tiny-live/autonomous-trigger-scheduler/status \
+    /tiny-live/autonomous-trigger-loop \
+    /tiny-live/fresh-trigger-watch \
+    /tiny-live/one-shot-pre-activation-gate \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP LOGS ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"lane_controls_written\": true\|\"risk_contract_config_written\": true\|\"live_config_written\": true\|\"executable_payload_created\": true\|\"per_signal_operator_approval_required\": true\|\"systemctl_called_by_codex\": true\|\"sudo_called_by_codex\": true\|\"installs_performed_by_codex\": true\|\"codex_install_performed\": true\|\"codex_systemctl_start_performed\": true\|\"codex_systemctl_enable_performed\": true\|\"codex_sudo_performed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - activation readiness status
+  - checklist/script paths
+  - proof Codex did not install/start/enable systemd
+  - proof no submit/no order/no executable payload/no mutation/no secrets
+  - exact manual command source for operator
+  - recommended next phase
