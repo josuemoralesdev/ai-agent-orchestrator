@@ -2985,6 +2985,28 @@ def main() -> int:
                 build_autonomous_trigger_scheduler_timer_health(log_dir=args.log_dir)
             )
         )
+    elif args.command == "tiny-live-dry-run-lane-arming-rehearsal":
+        from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal import (
+            build_tiny_live_dry_run_lane_arming_rehearsal,
+            format_tiny_live_dry_run_lane_arming_rehearsal_json,
+        )
+
+        print(
+            format_tiny_live_dry_run_lane_arming_rehearsal_json(
+                build_tiny_live_dry_run_lane_arming_rehearsal(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_dry_run_lane_arming_rehearsal=(
+                        args.record_dry_run_lane_arming_rehearsal
+                    ),
+                    simulate_fresh_candidate_for_tests_only=(
+                        args.simulate_fresh_candidate_for_tests_only
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -5975,6 +5997,22 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "tiny-live-autonomous-trigger-scheduler-timer-health",
         parents=[parent],
+    )
+
+    tiny_live_dry_run_lane_arming_rehearsal_parser = subparsers.add_parser(
+        "tiny-live-dry-run-lane-arming-rehearsal",
+        parents=[parent],
+    )
+    tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument("--lane-key", default=None)
+    tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument("--operator-id", default="local_operator")
+    tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument("--reason", default=None)
+    tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument(
+        "--record-dry-run-lane-arming-rehearsal",
+        action="store_true",
+    )
+    tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument(
+        "--simulate-fresh-candidate-for-tests-only",
+        action="store_true",
     )
 
     tiny_live_autonomous_trigger_scheduler_loop_parser = subparsers.add_parser(

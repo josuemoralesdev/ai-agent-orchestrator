@@ -79,6 +79,9 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_activa
 from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_timer_health import (
     build_autonomous_trigger_scheduler_timer_health,
 )
+from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal import (
+    build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -148,6 +151,8 @@ SOURCE_SURFACES_USED = [
     "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh",
     "scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh",
     "scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh",
+    "src/app/hammer_radar/operator/tiny_live_dry_run_lane_arming_rehearsal.py",
+    "scripts/hammer_print_r294_dry_run_lane_arming_rehearsal_plan.sh",
 ]
 
 
@@ -259,6 +264,9 @@ def build_tiny_live_final_console(
         autonomous_trigger_scheduler_activation_panel = build_autonomous_trigger_scheduler_activation_panel()
         autonomous_trigger_scheduler_timer_health_panel = (
             build_autonomous_trigger_scheduler_timer_health_panel(log_dir=resolved_log_dir)
+        )
+        dry_run_lane_arming_rehearsal_panel = build_dry_run_lane_arming_rehearsal_panel(
+            log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -465,6 +473,7 @@ def build_tiny_live_final_console(
                 "autonomous_trigger_scheduler_timer_health_panel": (
                     autonomous_trigger_scheduler_timer_health_panel
                 ),
+                "dry_run_lane_arming_rehearsal_panel": dry_run_lane_arming_rehearsal_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -1090,6 +1099,55 @@ def build_autonomous_trigger_scheduler_timer_health_panel(
             "final_command_available": False,
             "submit_allowed": False,
             "real_order_forbidden": True,
+        }
+    )
+    return _sanitize(panel)
+
+
+def build_dry_run_lane_arming_rehearsal_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal(log_dir=log_dir)
+    panel = packet.get("dry_run_lane_arming_rehearsal_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "status": panel.get("status") or packet.get("status"),
+            "allowed_lane_keys": list(panel.get("allowed_lane_keys") or packet.get("allowed_lane_keys") or []),
+            "requested_armed_lane": panel.get("requested_armed_lane") or packet.get("requested_lane_key"),
+            "timer_health_summary": panel.get("timer_health_summary")
+            or {
+                "timer_health_status": packet.get("timer_health_status"),
+                "timer_active": packet.get("timer_active") is True,
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+            },
+            "fresh_candidate_match_summary": panel.get("fresh_candidate_match_summary")
+            or {
+                "current_fresh_candidate_exists": packet.get("current_fresh_candidate_exists") is True,
+                "current_candidate_lane_key": packet.get("current_candidate_lane_key"),
+                "current_candidate_matches_armed_lane": (
+                    packet.get("current_candidate_matches_armed_lane") is True
+                ),
+                "exact_lane_only": True,
+                "no_cross_lane_borrowing": True,
+            },
+            "simulated_trigger_summary": panel.get("simulated_trigger_summary")
+            or {
+                "simulated_trigger_recorded": packet.get("simulated_trigger_recorded") is True,
+                "simulated_open_record": packet.get("simulated_open_record"),
+                "simulated_protective_orders": packet.get("simulated_protective_orders"),
+                "simulated_close_plan": packet.get("simulated_close_plan"),
+            },
+            "blockers": list(panel.get("blockers") or packet.get("blockers") or []),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+            "recommended_next_operator_move": panel.get("recommended_next_operator_move")
+            or packet.get("recommended_next_operator_move"),
         }
     )
     return _sanitize(panel)

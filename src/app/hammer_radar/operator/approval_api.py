@@ -116,6 +116,10 @@ from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
 from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
     build_latest_or_not_checked_autonomous_trigger_loop,
 )
+from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal import (
+    build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal,
+    build_tiny_live_dry_run_lane_arming_rehearsal,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -479,6 +483,12 @@ class TinyLiveAutonomousDryRunDisarmRequest(BaseModel):
     operator_id: str = Field(default="local_operator", min_length=1)
     reason: str = ""
     confirm_dry_run_autonomous_disarm: str | None = None
+
+
+class TinyLiveDryRunLaneArmingRehearsalRecordRequest(BaseModel):
+    lane_key: str = Field(min_length=1)
+    operator_id: str = Field(default="local_operator", min_length=1)
+    reason: str = Field(min_length=1)
 
 
 class LiveEnvChecklistConfirmRequest(BaseModel):
@@ -1053,6 +1063,26 @@ def tiny_live_autonomous_trigger_scheduler_activation_readiness() -> dict:
 @app.get("/tiny-live/autonomous-trigger-scheduler/timer-health")
 def tiny_live_autonomous_trigger_scheduler_timer_health() -> dict:
     return build_autonomous_trigger_scheduler_timer_health(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/dry-run-lane-arming-rehearsal/status")
+def tiny_live_dry_run_lane_arming_rehearsal_status() -> dict:
+    return build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal(
+        log_dir=get_log_dir(use_env=True)
+    )
+
+
+@app.post("/tiny-live/dry-run-lane-arming-rehearsal/record")
+def tiny_live_dry_run_lane_arming_rehearsal_record(
+    request: TinyLiveDryRunLaneArmingRehearsalRecordRequest,
+) -> dict:
+    return build_tiny_live_dry_run_lane_arming_rehearsal(
+        log_dir=get_log_dir(use_env=True),
+        lane_key=request.lane_key,
+        operator_id=request.operator_id,
+        reason=request.reason,
+        record_dry_run_lane_arming_rehearsal=True,
+    )
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")
