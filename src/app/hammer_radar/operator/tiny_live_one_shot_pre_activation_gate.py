@@ -78,6 +78,8 @@ APPROVED_LIVE_QUALIFIED_LANES = {
     "BTCUSDT|44m|short|ladder_close_50_618",
     "BTCUSDT|55m|long|ladder_close_50_618",
 }
+OPERATOR_ROLE = "arms_disarms_tunes_risk_not_per_signal_approval"
+MACHINE_ROLE = "auto_triggers_when_armed_and_all_gates_open"
 
 SAFETY = {
     **SAFETY_FALSE,
@@ -282,6 +284,10 @@ def build_tiny_live_one_shot_pre_activation_gate(
             "event_type": EVENT_TYPE,
             "created_by_phase": CREATED_BY_PHASE,
             "generated_at": generated_at.isoformat(),
+            "operator_role": OPERATOR_ROLE,
+            "machine_role": MACHINE_ROLE,
+            "per_signal_operator_approval_required": False,
+            "alert_is_visibility_only": True,
             "status": status,
             "next_required_step": next_required_step,
             "record_pre_activation_review_requested": bool(record_pre_activation_review),
@@ -407,6 +413,10 @@ def build_not_checked_pre_activation_gate_packet(*, log_dir: str | Path | None =
         "event_type": EVENT_TYPE,
         "created_by_phase": CREATED_BY_PHASE,
         "generated_at": generated_at.isoformat(),
+        "operator_role": OPERATOR_ROLE,
+        "machine_role": MACHINE_ROLE,
+        "per_signal_operator_approval_required": False,
+        "alert_is_visibility_only": True,
         "status": ONE_SHOT_PRE_ACTIVATION_NOT_CHECKED,
         "next_required_step": RUN_READONLY_PRE_ACTIVATION_CHECKS,
         "blockers": ["pre_activation_gate_not_checked"],
@@ -753,6 +763,10 @@ def _panel(
     candidate = _current_candidate(watch)
     return _sanitize(
         {
+            "operator_role": OPERATOR_ROLE,
+            "machine_role": MACHINE_ROLE,
+            "per_signal_operator_approval_required": False,
+            "alert_is_visibility_only": True,
             "status": status,
             "current_candidate_status": _candidate_alert(watch).get("status")
             or watch.get("status")

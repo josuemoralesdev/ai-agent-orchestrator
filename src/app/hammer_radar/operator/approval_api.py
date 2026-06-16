@@ -113,6 +113,9 @@ from src.app.hammer_radar.operator.tiny_live_one_shot_pre_activation_gate import
 from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
     build_latest_or_not_checked_fresh_trigger_watch,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
+    build_latest_or_not_checked_autonomous_trigger_loop,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1015,6 +1018,11 @@ def tiny_live_one_shot_pre_activation_gate() -> dict:
 @app.get("/tiny-live/fresh-trigger-watch")
 def tiny_live_fresh_trigger_watch() -> dict:
     return build_latest_or_not_checked_fresh_trigger_watch(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/autonomous-trigger-loop")
+def tiny_live_autonomous_trigger_loop() -> dict:
+    return build_latest_or_not_checked_autonomous_trigger_loop(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

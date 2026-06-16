@@ -1,0 +1,419 @@
+# R287 — Autonomous Trigger Loop Semantics and Dry-Run Execution Path
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: AUTONOMOUS TRIGGER LOOP / SEMANTICS CORRECTION
+  Secondary: NO-SUBMIT DRY-RUN EXECUTION PATH, OPERATOR ROLE CLARIFICATION, SCHEDULER PREP
+  Duplicate risk level: MEDIUM-HIGH
+
+Critical operator correction:
+  The target architecture is NOT per-signal operator review.
+  The operator does not approve each trade.
+  The operator tunes, arms, disarms, configures risk, and watches the machine.
+  When all gates are open, the machine must trade by itself by design.
+
+Correct operator role:
+  - operator configures risk contracts
+  - operator arms/disarms lanes or global mode
+  - operator monitors dashboards/alerts
+  - operator kills the system if needed
+  - operator does NOT manually approve each signal once autonomous mode is armed
+
+Correct machine role:
+  - machine watches live-qualified signals
+  - machine validates gates
+  - machine opens position automatically when armed and gates are open
+  - machine closes via protective stop/take-profit/trailing/exit logic automatically
+  - machine records audit packets
+  - machine alerts operator for visibility, not permission
+
+Why this phase exists:
+  R286 used too much "operator review" wording.
+  That is acceptable for pre-live safety, but wrong for final architecture.
+  R287 must correct terminology and build the autonomous trigger loop as a dry-run/no-submit execution path:
+    - if gates are open and lane is dry-run armed, machine creates a simulated execution lifecycle automatically
+    - no operator approval prompt
+    - no live order
+    - no Binance order endpoint
+    - no final live command
+    - alert is visibility only
+
+Current proven readiness from R285/R286:
+  - Binance readiness ready
+  - wallet ready
+  - BTCUSDT 10x isolated verified
+  - no BTCUSDT position conflict
+  - exchange minimum ready
+  - live-qualified lanes exist:
+      BTCUSDT|44m|long|ladder_close_50_618
+      BTCUSDT|44m|short|ladder_close_50_618
+      BTCUSDT|55m|long|ladder_close_50_618
+  - no current fresh live-qualified candidate at last check
+  - final_command_available=false
+  - submit_allowed=false
+  - no real order
+
+Hard goal:
+  Add an autonomous dry-run trigger loop packet that can be run repeatedly.
+  If a fresh approved live-qualified candidate appears AND matching lane is dry-run armed AND all gates are green:
+    - machine automatically records an autonomous dry-run open/close lifecycle preview
+    - machine prepares protective triplet preview
+    - machine records that it WOULD trigger automatically under live mode later
+    - no operator approval required field
+    - no live order and no executable payload
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage mutation endpoint.
+  - Do NOT call Binance margin type mutation endpoint.
+  - Do NOT call any mutation endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - This phase is autonomous dry-run only.
+  - It must never require per-signal operator approval.
+  - Alerts are visibility only, not permission gates.
+
+Allowed:
+  - Read-only Binance checks through existing safe loader/confirmations.
+  - Read live-qualified candidate watch.
+  - Read autonomous dry-run arming state.
+  - Read exact lane risk contract.
+  - Read idempotency/audit logs.
+  - Write dry-run autonomous trigger records to NDJSON.
+  - Write code/docs/tests.
+  - If lane is dry-run armed by explicit operator arming controls, the loop may create simulated open/close/protective preview records only.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    - src/app/hammer_radar/operator/tiny_live_one_shot_pre_activation_gate.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Terminology correction:
+     Replace/augment "operator review required" language in R286/R285 panels where appropriate with:
+       - "operator visibility only"
+       - "machine waits for gates"
+       - "machine auto-triggers when autonomous mode is armed and all gates are open"
+       - "operator approval is not a per-signal gate"
+       - "operator controls arming/risk/kill switch"
+
+     Keep safety wording clear:
+       - R287 is dry-run only
+       - live submit remains unavailable
+
+  2. New module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_autonomous_trigger_loop.py
+
+     Packet:
+       event_type="TINY_LIVE_AUTONOMOUS_TRIGGER_LOOP"
+       created_by_phase="R287_AUTONOMOUS_TRIGGER_LOOP_SEMANTICS_AND_DRY_RUN_EXECUTION_PATH"
+       status:
+         AUTONOMOUS_TRIGGER_WAIT
+         AUTONOMOUS_TRIGGER_BLOCKED
+         AUTONOMOUS_TRIGGER_DRY_RUN_EXECUTED
+         AUTONOMOUS_TRIGGER_NOT_CHECKED
+
+  3. Packet fields:
+     - generated_at
+     - operator_role="arms_disarms_tunes_risk_not_per_signal_approval"
+     - machine_role="auto_triggers_when_armed_and_all_gates_open"
+     - per_signal_operator_approval_required=false
+     - alert_is_visibility_only=true
+     - autonomous_mode="dry_run_only"
+     - live_execution_enabled=false
+     - allow_live_orders=false
+     - global_kill_switch
+     - pre_activation_status
+     - fresh_trigger_watch_status
+     - current_fresh_candidate_exists
+     - current_candidate_lane_key
+     - current_candidate_signal_id
+     - approved_lane_match
+     - candidate_live_qualified
+     - exact_lane_auto_armed
+     - global_auto_live_enabled
+     - dry_run_only
+     - exact_lane_risk_contract_found
+     - exact_lane_risk_contract_valid
+     - binance_readiness_ready
+     - wallet_ready
+     - leverage_margin_ready
+     - no_conflicting_position
+     - exchange_minimum_ready
+     - idempotency_clean
+     - protective_triplet_preview_available
+     - protective_triplet_preview_valid
+     - autonomous_dry_run_execution_recorded
+     - simulated_open_record
+     - simulated_close_plan
+     - simulated_protective_orders
+     - next_required_step
+     - blockers
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+     - safety
+
+  4. Decision logic:
+     If no fresh candidate:
+       status = AUTONOMOUS_TRIGGER_WAIT
+       next_required_step = WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE
+
+     If fresh candidate exists but paper-only/near-miss/not approved:
+       status = AUTONOMOUS_TRIGGER_BLOCKED
+       blockers explain strategy/lane reason
+
+     If fresh approved candidate exists but lane not dry-run armed:
+       status = AUTONOMOUS_TRIGGER_BLOCKED
+       blockers include exact_lane_not_armed
+       next_required_step = ARM_APPROVED_LANE_DRY_RUN_ONLY_IF_OPERATOR_WANTS_MACHINE_ACTIVE
+       This is NOT per-signal approval. This is machine arming.
+
+     If fresh approved candidate exists, exact lane is dry-run armed, risk contract valid, Binance readiness green, idempotency clean:
+       status = AUTONOMOUS_TRIGGER_DRY_RUN_EXECUTED
+       record a simulated lifecycle:
+         simulated_open_record
+         simulated_protective_orders
+         simulated_close_plan
+       final command still unavailable.
+       no order endpoint.
+
+  5. Dry-run lifecycle:
+     It must simulate:
+       - intended side
+       - entry
+       - stop
+       - take_profit
+       - qty rounded by existing exchange precision logic
+       - notional <= 80 USDT
+       - leverage 10
+       - margin budget 8 USDT
+       - max_loss_usdt from contract
+       - protective stop/tp required
+       - exit plan status = PROTECTIVE_ORDERS_SIMULATED
+
+     It must NOT create executable order payloads.
+
+  6. CLI:
+     Add inspect command:
+       tiny-live-autonomous-trigger-loop
+
+     Options:
+       --load-discovered-binance-readonly-env
+       --fetch-binance-readonly-precision-mark-price
+       --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+       --fetch-binance-readonly-account-position
+       --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+       --record-autonomous-trigger-loop
+       --operator-id local_operator
+       --reason "R287 autonomous dry-run trigger loop; machine auto-triggers only when dry-run armed and all gates open."
+
+     No confirmation phrase for per-signal approval.
+     Any confirmation phrase is only for read-only Binance access, not trade approval.
+
+  7. API:
+     Add endpoint:
+       GET /tiny-live/autonomous-trigger-loop
+
+     Default:
+       - no private network unless cached safe state or explicit CLI path
+       - no live submit
+       - no Telegram send
+       - returns latest/safe wait state
+
+  8. Final console:
+     Add panel:
+       autonomous_trigger_loop_panel
+
+     Must show:
+       - operator role
+       - machine role
+       - per_signal_operator_approval_required=false
+       - status
+       - candidate summary
+       - arming status
+       - autonomous dry-run lifecycle status
+       - next step
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+
+  9. Tests:
+     Add tests:
+       - no candidate => AUTONOMOUS_TRIGGER_WAIT.
+       - paper-only/near-miss candidate => BLOCKED.
+       - approved candidate but lane not armed => BLOCKED exact_lane_not_armed.
+       - approved candidate + lane armed + gates green => AUTONOMOUS_TRIGGER_DRY_RUN_EXECUTED.
+       - dry-run executed records simulated open/protective/close plan.
+       - no per-signal operator approval required.
+       - alert visibility only.
+       - no live order endpoint/test order endpoint.
+       - no leverage/margin mutation.
+       - no live config/lane controls/risk contracts/env mutation except existing explicit arming commands if invoked outside this loop.
+       - no executable payload.
+       - final command unavailable.
+       - final console includes autonomous trigger loop panel.
+       - API default safe.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous_trigger_loop or fresh_trigger_watch or one_shot_pre_activation or autonomous_armed_dry_run or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== AUTONOMOUS TRIGGER LOOP WITH FULL READONLY CHECKS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-loop \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    --record-autonomous-trigger-loop \
+    --operator-id local_operator \
+    --reason "R287 autonomous dry-run trigger loop; machine auto-triggers only when dry-run armed and all gates open." \
+    | tee /tmp/r287_autonomous_trigger_loop.json \
+    | jq '{
+      event_type,
+      status,
+      operator_role,
+      machine_role,
+      per_signal_operator_approval_required,
+      alert_is_visibility_only,
+      autonomous_mode,
+      pre_activation_status,
+      fresh_trigger_watch_status,
+      current_fresh_candidate_exists,
+      current_candidate_lane_key,
+      current_candidate_signal_id,
+      approved_lane_match,
+      candidate_live_qualified,
+      exact_lane_auto_armed,
+      global_auto_live_enabled,
+      dry_run_only,
+      exact_lane_risk_contract_found,
+      exact_lane_risk_contract_valid,
+      binance_readiness_ready,
+      wallet_ready,
+      leverage_margin_ready,
+      no_conflicting_position,
+      exchange_minimum_ready,
+      idempotency_clean,
+      protective_triplet_preview_available,
+      protective_triplet_preview_valid,
+      autonomous_dry_run_execution_recorded,
+      simulated_open_record,
+      simulated_protective_orders,
+      simulated_close_plan,
+      next_required_step,
+      blockers,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== API AUTONOMOUS TRIGGER LOOP DEFAULT SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-trigger-loop | jq '{
+    event_type,
+    status,
+    autonomous_trigger_loop_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    one_shot_pre_activation_gate_panel,
+    fresh_trigger_watch_panel,
+    autonomous_trigger_loop_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== CURRENT WATCH STATUS ==="
+  curl -s http://127.0.0.1:8015/tiny-live/fresh-trigger-watch | jq '{
+    event_type,
+    status,
+    fresh_trigger_watch_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq '{
+    event_type,
+    status,
+    current_fresh_candidate_status,
+    live_qualified_lanes,
+    safety
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/autonomous-trigger-loop \
+    /tiny-live/fresh-trigger-watch \
+    /tiny-live/one-shot-pre-activation-gate \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"lane_controls_written\": true\|\"risk_contract_config_written\": true\|\"live_config_written\": true\|\"executable_payload_created\": true\|\"per_signal_operator_approval_required\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - autonomous trigger loop status
+  - whether operator role wording is corrected
+  - whether per-signal approval is false
+  - whether machine role is auto-trigger when armed/gates open
+  - current candidate state
+  - whether dry-run lifecycle executed or waiting
+  - proof no submit/no order/no executable payload/no mutation/no secrets
+  - recommended next phase

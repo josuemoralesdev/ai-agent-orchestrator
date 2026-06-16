@@ -45,6 +45,8 @@ LEDGER_FILENAME = "tiny_live_fresh_trigger_watch.ndjson"
 FRESH_TRIGGER_WAIT = "FRESH_TRIGGER_WAIT"
 FRESH_TRIGGER_BLOCKED = "FRESH_TRIGGER_BLOCKED"
 FRESH_TRIGGER_READY_FOR_OPERATOR_REVIEW = "FRESH_TRIGGER_READY_FOR_OPERATOR_REVIEW"
+OPERATOR_ROLE = "arms_disarms_tunes_risk_not_per_signal_approval"
+MACHINE_ROLE = "auto_triggers_when_armed_and_all_gates_open"
 FRESH_TRIGGER_NOT_CHECKED = "FRESH_TRIGGER_NOT_CHECKED"
 
 WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE = "WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE"
@@ -188,6 +190,10 @@ def build_tiny_live_fresh_trigger_watch(
             "event_type": EVENT_TYPE,
             "created_by_phase": CREATED_BY_PHASE,
             "generated_at": generated_at.isoformat(),
+            "operator_role": OPERATOR_ROLE,
+            "machine_role": MACHINE_ROLE,
+            "per_signal_operator_approval_required": False,
+            "alert_is_visibility_only": True,
             "approved_live_qualified_lanes": sorted(APPROVED_LIVE_QUALIFIED_LANES),
             "status": status,
             "pre_activation_status": pre_activation.get("status"),
@@ -451,7 +457,8 @@ def _telegram_payload(
             f"valid={pre_activation.get('exact_lane_risk_contract_valid') is True} "
             f"protective_preview={pre_activation.get('protective_triplet_preview_valid') is True}",
             f"dry-run next step: {next_required_step}",
-            "No submit. No order. Operator review only.",
+            "Operator visibility only. Machine waits for gates and auto-triggers when autonomous mode is armed.",
+            "No submit. No order. Operator approval is not a per-signal gate.",
         ]
     )
     return {
@@ -462,6 +469,8 @@ def _telegram_payload(
         "status": "prepared_not_sent",
         "message": message,
         "visibility_only": True,
+        "permission_gate": False,
+        "per_signal_operator_approval_required": False,
         "secrets_shown": False,
     }
 
@@ -475,6 +484,10 @@ def _panel(
     telegram_payload: Mapping[str, Any],
 ) -> dict[str, Any]:
     return {
+        "operator_role": OPERATOR_ROLE,
+        "machine_role": MACHINE_ROLE,
+        "per_signal_operator_approval_required": False,
+        "alert_is_visibility_only": True,
         "status": status,
         "current_candidate_summary": {
             "lane_key": candidate.get("lane_key") or pre_activation.get("current_candidate_lane_key"),

@@ -66,6 +66,9 @@ from src.app.hammer_radar.operator.tiny_live_one_shot_pre_activation_gate import
 from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
     build_latest_or_not_checked_fresh_trigger_watch,
 )
+from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
+    build_latest_or_not_checked_autonomous_trigger_loop,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -227,6 +230,9 @@ def build_tiny_live_final_console(
         fresh_trigger_watch_panel = build_fresh_trigger_watch_panel(
             log_dir=resolved_log_dir,
             risk_contract_config_path=risk_path,
+        )
+        autonomous_trigger_loop_panel = build_autonomous_trigger_loop_panel(
+            log_dir=resolved_log_dir,
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -424,6 +430,7 @@ def build_tiny_live_final_console(
                 ),
                 "one_shot_pre_activation_gate_panel": one_shot_pre_activation_gate_panel,
                 "fresh_trigger_watch_panel": fresh_trigger_watch_panel,
+                "autonomous_trigger_loop_panel": autonomous_trigger_loop_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -837,6 +844,52 @@ def build_fresh_trigger_watch_panel(
         "submit_allowed": False,
         "real_order_forbidden": True,
     }
+
+
+def build_autonomous_trigger_loop_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_latest_or_not_checked_autonomous_trigger_loop(log_dir=log_dir)
+    panel = packet.get("autonomous_trigger_loop_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {
+            "operator_role": packet.get("operator_role"),
+            "machine_role": packet.get("machine_role"),
+            "per_signal_operator_approval_required": False,
+            "alert_is_visibility_only": True,
+            "status": packet.get("status"),
+            "candidate_summary": {
+                "lane_key": packet.get("current_candidate_lane_key"),
+                "signal_id": packet.get("current_candidate_signal_id"),
+            },
+            "arming_status": {
+                "global_auto_live_enabled": packet.get("global_auto_live_enabled") is True,
+                "exact_lane_auto_armed": packet.get("exact_lane_auto_armed") is True,
+                "dry_run_only": True,
+            },
+            "autonomous_dry_run_lifecycle_status": (
+                "recorded" if packet.get("autonomous_dry_run_execution_recorded") is True else "not_recorded"
+            ),
+            "next_required_step": packet.get("next_required_step"),
+            "blockers": list(packet.get("blockers") or []),
+        }
+    panel.update(
+        {
+            "operator_role": panel.get("operator_role")
+            or "arms_disarms_tunes_risk_not_per_signal_approval",
+            "machine_role": panel.get("machine_role")
+            or "auto_triggers_when_armed_and_all_gates_open",
+            "per_signal_operator_approval_required": False,
+            "alert_is_visibility_only": True,
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return panel
 
 
 def _latest_real_candidate_record_summary(record: Mapping[str, Any] | None) -> dict[str, Any] | None:
