@@ -1,0 +1,393 @@
+# R286 — Fresh Live-Qualified Trigger Watch and Alert Packet
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: TRIGGER WATCH / ALERT PACKET
+  Secondary: ONE-SHOT PRE-ACTIVATION CONTINUATION, TELEGRAM/OPERATOR VISIBILITY, NO-SUBMIT SAFETY
+  Duplicate risk level: MEDIUM-HIGH
+
+Operator context:
+  R285 achieved:
+    - ONE_SHOT_PRE_ACTIVATION_READY_TO_WAIT_FOR_TRIGGER
+    - Binance readiness ready
+    - wallet ready
+    - BTCUSDT no conflicting position
+    - BTCUSDT 10x isolated verified
+    - exchange minimum ready
+    - live-qualified lanes available
+    - no fresh live-qualified candidate currently
+    - final_command_available=false
+    - submit_allowed=false
+    - no Binance order/test-order endpoints
+
+Why this phase exists:
+  The machine is now ready to wait for a fresh LIVE_QUALIFIED candidate.
+  R286 must convert that waiting state into an operator-visible fresh-trigger watch packet.
+  It should be useful overnight: when a fresh eligible candidate appears, the system produces a clear alert/packet for operator review and next dry-run step.
+  It must still not submit or expose a live command.
+
+Approved live-qualified lanes:
+  - BTCUSDT|44m|long|ladder_close_50_618
+  - BTCUSDT|44m|short|ladder_close_50_618
+  - BTCUSDT|55m|long|ladder_close_50_618
+
+Hard goal:
+  Build a trigger watch packet that:
+    - checks R285 pre-activation readiness
+    - checks current fresh LIVE_QUALIFIED candidate
+    - if no candidate: status WAIT
+    - if paper-only/near-miss: status BLOCKED
+    - if fresh approved live-qualified candidate: status FRESH_TRIGGER_READY_FOR_OPERATOR_REVIEW
+    - prepares a Telegram-compatible/operator alert payload
+    - recommends the next dry-run/arming review step
+    - never submits and never makes final command available
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage mutation endpoint.
+  - Do NOT call Binance margin type mutation endpoint.
+  - Do NOT call any mutation endpoint.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write lane controls.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - Telegram/operator alert is visibility only, not execution.
+  - If a candidate exists but exact lane contract/protective preview is missing, alert must clearly say blocked/pending dry-run review.
+
+Allowed:
+  - Read-only R285 packet generation.
+  - Read-only Binance checks through existing safe loader/confirmations.
+  - Read current live-qualified candidate watch.
+  - Read autonomous dry-run arming state.
+  - Read exact risk contract.
+  - Produce no-submit operator alert payload.
+  - Record alert packet to NDJSON.
+  - Optional Telegram send flag must default false.
+  - If existing Telegram send helper exists, use only if explicit flag is passed; no default send.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_one_shot_pre_activation_gate.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/readiness.py
+    - src/app/hammer_radar/operator/notifications.py or telegram modules if present
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/autonomous_arming_state.json
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. New module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+
+     Packet:
+       event_type="TINY_LIVE_FRESH_LIVE_QUALIFIED_TRIGGER_WATCH"
+       created_by_phase="R286_FRESH_LIVE_QUALIFIED_TRIGGER_WATCH_AND_ALERT_PACKET"
+       status:
+         FRESH_TRIGGER_WAIT
+         FRESH_TRIGGER_BLOCKED
+         FRESH_TRIGGER_READY_FOR_OPERATOR_REVIEW
+         FRESH_TRIGGER_NOT_CHECKED
+
+  2. Packet fields:
+     - generated_at
+     - approved_live_qualified_lanes
+     - pre_activation_status
+     - pre_activation_ready_to_wait
+     - binance_readiness_ready
+     - wallet_ready
+     - leverage_margin_ready
+     - no_conflicting_position
+     - current_fresh_candidate_exists
+     - current_candidate_lane_key
+     - current_candidate_signal_id
+     - current_candidate_timeframe
+     - current_candidate_direction
+     - current_candidate_entry_mode
+     - current_candidate_age_minutes
+     - current_candidate_entry
+     - current_candidate_stop
+     - current_candidate_take_profit
+     - current_candidate_is_live_qualified
+     - current_candidate_watch_category
+     - approved_lane_match
+     - exact_lane_risk_contract_found
+     - exact_lane_risk_contract_valid
+     - protective_triplet_preview_available
+     - protective_triplet_preview_valid
+     - autonomous_dry_run_status
+     - autonomous_dry_run_blockers
+     - next_required_step
+     - recommended_operator_move
+     - alert_should_send
+     - telegram_compatible_payload
+     - record_trigger_watch_requested
+     - trigger_watch_recorded
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+     - blockers
+     - safety
+
+  3. Decision logic:
+     If R285 says READY_TO_WAIT_FOR_TRIGGER and no current fresh candidate:
+       status = FRESH_TRIGGER_WAIT
+       next_required_step = WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE
+       alert_should_send=false by default.
+
+     If a current candidate exists but is paper-only or near-miss:
+       status = FRESH_TRIGGER_BLOCKED
+       recommended_operator_move = STRATEGY_LAB_PAPER_REVIEW
+       alert may be prepared but should not be urgent/live.
+       no submit.
+
+     If a current fresh candidate exists on approved live-qualified lane:
+       status = FRESH_TRIGGER_READY_FOR_OPERATOR_REVIEW
+       next_required_step = RUN_ONE_SHOT_DRY_RUN_TRIGGER_PACKET_OR_ARMING_REVIEW
+       alert_should_send=true only if CLI flag requests send or if existing notification architecture requires prepared-not-sent by default.
+       final command unavailable.
+
+     If pre-activation itself is blocked:
+       status = FRESH_TRIGGER_BLOCKED
+       blockers include pre_activation_not_ready.
+
+  4. Telegram/operator alert payload:
+     Format must be compact and safe:
+       title: Hammer Radar one-shot trigger watch
+       status
+       lane
+       signal_id
+       timeframe/direction
+       entry/stop/take_profit if available
+       age_minutes
+       Binance readiness summary
+       risk contract status
+       dry-run next step
+       "No submit. No order. Operator review only."
+
+     It must not include secrets/signatures/signed URLs.
+
+  5. CLI:
+     Add inspect command:
+       tiny-live-fresh-trigger-watch
+
+     Options:
+       --load-discovered-binance-readonly-env
+       --fetch-binance-readonly-precision-mark-price
+       --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+       --fetch-binance-readonly-account-position
+       --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+       --record-trigger-watch
+       --operator-id local_operator
+       --reason "R286 trigger watch; no submit; operator visibility only."
+       --send-telegram false by default if supported
+
+     If --send-telegram is implemented:
+       - default false
+       - require explicit true flag
+       - send only alert text
+       - record whether sent
+       - no secrets
+
+  6. API:
+     Add safe endpoint:
+       GET /tiny-live/fresh-trigger-watch
+
+     Default:
+       - no private network fetch unless using latest cached/read-only state.
+       - may return latest recorded packet or safe NOT_CHECKED/WAIT packet.
+       - no Telegram send by default.
+       - no submit.
+
+  7. Final console:
+     Add:
+       fresh_trigger_watch_panel
+
+     Include:
+       status
+       current candidate summary
+       approved lane match
+       pre-activation status
+       risk contract status
+       dry-run/arming status
+       telegram prepared payload status
+       next required step
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  8. Tests:
+     Add tests:
+       - no candidate + pre-activation ready => FRESH_TRIGGER_WAIT.
+       - fresh paper-only candidate => BLOCKED and no submit.
+       - fresh near-miss candidate => BLOCKED and no submit.
+       - fresh approved live-qualified candidate => READY_FOR_OPERATOR_REVIEW, no submit.
+       - pre-activation blocked => BLOCKED.
+       - Telegram payload contains no secrets/signatures.
+       - send default false.
+       - final command unavailable.
+       - submit_allowed false.
+       - no order/test-order endpoints.
+       - no live controls/lane controls/risk contract/env mutation.
+       - final console includes fresh trigger panel.
+       - API default safe.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "fresh_trigger_watch or one_shot_pre_activation or post_manual or leverage_margin or binance_autonomous or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== FRESH TRIGGER WATCH WITH FULL READONLY CHECKS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-fresh-trigger-watch \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    --record-trigger-watch \
+    --operator-id local_operator \
+    --reason "R286 trigger watch; no submit; operator visibility only." \
+    | tee /tmp/r286_fresh_trigger_watch.json \
+    | jq '{
+      event_type,
+      status,
+      pre_activation_status,
+      pre_activation_ready_to_wait,
+      binance_readiness_ready,
+      wallet_ready,
+      leverage_margin_ready,
+      no_conflicting_position,
+      current_fresh_candidate_exists,
+      current_candidate_lane_key,
+      current_candidate_signal_id,
+      current_candidate_timeframe,
+      current_candidate_direction,
+      current_candidate_age_minutes,
+      current_candidate_is_live_qualified,
+      current_candidate_watch_category,
+      approved_lane_match,
+      exact_lane_risk_contract_found,
+      exact_lane_risk_contract_valid,
+      protective_triplet_preview_available,
+      protective_triplet_preview_valid,
+      autonomous_dry_run_status,
+      next_required_step,
+      recommended_operator_move,
+      alert_should_send,
+      telegram_compatible_payload,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      blockers,
+      safety
+    }'
+
+  echo "=== API FRESH TRIGGER WATCH DEFAULT SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/fresh-trigger-watch | jq '{
+    event_type,
+    status,
+    fresh_trigger_watch_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    one_shot_pre_activation_gate_panel,
+    fresh_trigger_watch_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== QUALIFIED CANDIDATE WATCH ==="
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq '{
+    event_type,
+    status,
+    live_qualified_lanes,
+    current_fresh_candidate_status,
+    next_action,
+    safety
+  }'
+
+  echo "=== READINESS / TRADE TICKET ==="
+  curl -s http://127.0.0.1:8015/readiness | jq '{
+    readiness_status,
+    reason_summary,
+    current_state,
+    blockers,
+    next_required_action
+  }'
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    readiness_status,
+    lane_key,
+    signal_id,
+    suggested_position_usd,
+    suggested_leverage,
+    blockers
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/fresh-trigger-watch \
+    /tiny-live/one-shot-pre-activation-gate \
+    /tiny-live/post-manual-leverage-margin-verification \
+    /tiny-live/leverage-margin-readiness \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"lane_controls_written\": true\|\"risk_contract_config_written\": true\|\"live_config_written\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - trigger watch status
+  - whether fresh approved candidate exists
+  - whether alert payload is prepared
+  - whether Telegram send is default false
+  - exact next required step
+  - proof no submit/no order/no mutation/no secrets
+  - recommended next phase

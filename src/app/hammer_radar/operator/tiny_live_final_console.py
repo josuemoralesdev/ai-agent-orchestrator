@@ -63,6 +63,9 @@ from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
 from src.app.hammer_radar.operator.tiny_live_one_shot_pre_activation_gate import (
     build_tiny_live_one_shot_pre_activation_gate,
 )
+from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
+    build_latest_or_not_checked_fresh_trigger_watch,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -218,6 +221,10 @@ def build_tiny_live_final_console(
             build_post_manual_leverage_margin_verification_panel(log_dir=resolved_log_dir)
         )
         one_shot_pre_activation_gate_panel = build_one_shot_pre_activation_gate_panel(
+            log_dir=resolved_log_dir,
+            risk_contract_config_path=risk_path,
+        )
+        fresh_trigger_watch_panel = build_fresh_trigger_watch_panel(
             log_dir=resolved_log_dir,
             risk_contract_config_path=risk_path,
         )
@@ -416,6 +423,7 @@ def build_tiny_live_final_console(
                     post_manual_leverage_margin_verification_panel
                 ),
                 "one_shot_pre_activation_gate_panel": one_shot_pre_activation_gate_panel,
+                "fresh_trigger_watch_panel": fresh_trigger_watch_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -788,6 +796,43 @@ def build_one_shot_pre_activation_gate_panel(
         "idempotency_status": {},
         "next_required_step": packet.get("next_required_step"),
         "safe_next_cli_command": packet.get("safe_next_cli_command"),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
+    }
+
+
+def build_fresh_trigger_watch_panel(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract_config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_latest_or_not_checked_fresh_trigger_watch(
+        log_dir=log_dir,
+    )
+    panel = packet.get("fresh_trigger_watch_panel")
+    if isinstance(panel, Mapping):
+        return dict(panel)
+    return {
+        "status": packet.get("status"),
+        "current_candidate_summary": {
+            "lane_key": packet.get("current_candidate_lane_key"),
+            "signal_id": packet.get("current_candidate_signal_id"),
+            "timeframe": packet.get("current_candidate_timeframe"),
+            "direction": packet.get("current_candidate_direction"),
+            "entry_mode": packet.get("current_candidate_entry_mode"),
+            "age_minutes": packet.get("current_candidate_age_minutes"),
+        },
+        "approved_lane_match": packet.get("approved_lane_match"),
+        "pre_activation_status": packet.get("pre_activation_status"),
+        "risk_contract_status": {
+            "found": packet.get("exact_lane_risk_contract_found"),
+            "valid": packet.get("exact_lane_risk_contract_valid"),
+        },
+        "dry_run_arming_status": packet.get("autonomous_dry_run_status"),
+        "telegram_payload_prepared": bool(packet.get("telegram_compatible_payload")),
+        "telegram_send_enabled": False,
+        "next_required_step": packet.get("next_required_step"),
         "final_command_available": False,
         "submit_allowed": False,
         "real_order_forbidden": True,
