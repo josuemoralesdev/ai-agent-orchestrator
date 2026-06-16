@@ -214,6 +214,11 @@ def test_account_position_confirmation_calls_only_private_readonly_endpoints(tmp
     assert fake.calls[0].full_url.startswith("https://fapi.binance.com/fapi/v2/balance?")
     assert fake.calls[1].full_url.startswith("https://fapi.binance.com/fapi/v2/positionRisk?")
     assert payload["account_position_readiness_status"] == "READY"
+    assert payload["account_read_env_discovery_status"] == "ACCOUNT_READ_ENV_READY"
+    assert payload["selected_account_read_env_names"]["selected_api_key_env_name"] == "HAMMER_ACCOUNT_READ_BINANCE_API_KEY"
+    assert payload["selected_account_read_env_names"]["selected_env_values_redacted"] is True
+    assert payload["selected_env_source"] == "alias"
+    assert payload["selected_account_read_env_contract"]["selected_env_source_detail"] == "role_specific"
     assert payload["account_balance_checked"] is True
     assert payload["position_risk_checked"] is True
     assert payload["wallet_supports_minimum_tiny"] is True
@@ -295,6 +300,11 @@ def test_final_console_includes_binance_autonomous_readiness_panel(tmp_path: Pat
 
     panel = payload["binance_autonomous_readiness_panel"]
     assert panel["binding_supported"] is True
+    assert "account_read_env_discovery_status" in panel
+    assert "selected_account_read_env_names" in panel
+    assert "account_read_alias_candidates_present" in panel
+    assert "runtime_env_source_summary" in panel
+    assert "private_readonly_safe_next_command" in panel
     assert panel["final_command_available"] is False
     assert panel["submit_allowed"] is False
     assert panel["real_order_forbidden"] is True

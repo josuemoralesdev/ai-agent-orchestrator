@@ -18,6 +18,9 @@ from typing import Any
 from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+    build_binance_account_read_env_discovery,
+)
 from src.app.hammer_radar.operator.first_live_chain_runbook import read_recent_ndjson_records
 from src.app.hammer_radar.operator.full_spectrum_lane_scoreboard import DEFAULT_OFFICIAL_TINY_LIVE_LANE
 from src.app.hammer_radar.operator.lane_control import SAFETY_FALSE, normalize_lane_key
@@ -593,6 +596,8 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
 
 def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
     binding = build_tiny_live_binance_autonomous_readiness_binding(log_dir=log_dir)
+    discovery = build_binance_account_read_env_discovery(include_systemd=False)
+    selected = discovery.get("selected_env_contract") if isinstance(discovery.get("selected_env_contract"), Mapping) else {}
     matrix = (
         binding.get("autonomous_one_shot_readiness_matrix")
         if isinstance(binding.get("autonomous_one_shot_readiness_matrix"), Mapping)
@@ -601,6 +606,28 @@ def build_binance_autonomous_readiness_panel(*, log_dir: str | Path | None = Non
     return {
         "binding_supported": binding.get("binding_supported") is True,
         "latest_status": binding.get("status"),
+        "account_read_env_discovery_status": discovery.get("status"),
+        "selected_account_read_env_names": {
+            "selected_api_key_env_name": selected.get("selected_api_key_env_name"),
+            "selected_api_secret_env_name": selected.get("selected_api_secret_env_name"),
+            "selected_mode_env_name": selected.get("selected_mode_env_name"),
+            "selected_enabled_env_name": selected.get("selected_enabled_env_name"),
+            "selected_env_values_redacted": True,
+        },
+        "selected_env_source": selected.get("selected_env_source"),
+        "account_read_alias_candidates_present": [
+            {
+                "source": candidate.get("source"),
+                "api_key_env_name": candidate.get("api_key_env_name"),
+                "api_secret_env_name": candidate.get("api_secret_env_name"),
+                "api_key_present": candidate.get("api_key_present") is True,
+                "api_secret_present": candidate.get("api_secret_present") is True,
+            }
+            for candidate in discovery.get("discovered_alias_candidates") or []
+            if isinstance(candidate, Mapping)
+            and (candidate.get("api_key_present") is True or candidate.get("api_secret_present") is True)
+        ],
+        "runtime_env_source_summary": discovery.get("runtime_env_sources"),
         "binance_readiness_ready": matrix.get("binance_readiness_ready") is True,
         "exchange_minimum_ready": matrix.get("exchange_minimum_ready") is True,
         "account_position_readiness_status": binding.get("account_position_readiness_status"),

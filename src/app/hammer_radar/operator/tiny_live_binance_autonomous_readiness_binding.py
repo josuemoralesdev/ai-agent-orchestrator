@@ -18,6 +18,9 @@ from typing import Any
 from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
+from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+    build_binance_account_read_env_discovery,
+)
 from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
 from src.app.hammer_radar.operator.binance_account_position_readonly import (
     build_account_position_readiness,
@@ -144,6 +147,7 @@ def build_tiny_live_binance_autonomous_readiness_binding(
     )
     safety = dict(SAFETY)
 
+    account_read_env_discovery = build_binance_account_read_env_discovery(env=source_env, include_systemd=False)
     credentials = _credentials_summary(source_env)
     risk_contract = _risk_contract_summary(risk_path)
     latest_record = load_latest_binance_autonomous_readiness_binding(log_dir=resolved_log_dir)
@@ -213,6 +217,27 @@ def build_tiny_live_binance_autonomous_readiness_binding(
             ),
             "credentials_configured": credentials["credentials_configured"],
             "credential_summary": credentials,
+            "account_read_env_discovery_status": account_read_env_discovery.get("status"),
+            "account_read_env_discovery": account_read_env_discovery,
+            "selected_account_read_env_contract": account_read_env_discovery.get("selected_env_contract"),
+            "selected_account_read_env_names": _selected_account_read_env_names(account_read_env_discovery),
+            "selected_env_source": (
+                (account_read_env_discovery.get("selected_env_contract") or {}).get("selected_env_source")
+                if isinstance(account_read_env_discovery.get("selected_env_contract"), Mapping)
+                else None
+            ),
+            "account_read_alias_candidates_present": [
+                {
+                    "source": candidate.get("source"),
+                    "api_key_env_name": candidate.get("api_key_env_name"),
+                    "api_secret_env_name": candidate.get("api_secret_env_name"),
+                    "api_key_present": candidate.get("api_key_present") is True,
+                    "api_secret_present": candidate.get("api_secret_present") is True,
+                }
+                for candidate in account_read_env_discovery.get("discovered_alias_candidates") or []
+                if isinstance(candidate, Mapping)
+                and (candidate.get("api_key_present") is True or candidate.get("api_secret_present") is True)
+            ],
             "secrets_shown": False,
             "symbol": SYMBOL,
             "account_balance_checked": account_position["account_balance_checked"],
@@ -362,17 +387,34 @@ def format_binance_autonomous_readiness_binding_json(payload: Mapping[str, Any])
 
 def _credentials_summary(env: Mapping[str, str]) -> dict[str, Any]:
     status = build_binance_readonly_status(env=env)
+    discovery = build_binance_account_read_env_discovery(env=env, include_systemd=False)
+    selected = discovery.get("selected_env_contract") if isinstance(discovery.get("selected_env_contract"), Mapping) else {}
     return {
         "connector_status": status.get("connector_status"),
         "connector_mode": status.get("connector_mode"),
-        "api_key_present": bool(status.get("api_key_present")),
-        "api_secret_present": bool(status.get("api_secret_present")),
-        "credentials_configured": bool(status.get("api_key_present") and status.get("api_secret_present")),
+        "api_key_present": bool(selected.get("api_key_present")),
+        "api_secret_present": bool(selected.get("api_secret_present")),
+        "credentials_configured": discovery.get("status") == "ACCOUNT_READ_ENV_READY",
+        "account_read_env_discovery_status": discovery.get("status"),
+        "selected_env_source": selected.get("selected_env_source"),
+        "selected_api_key_env_name": selected.get("selected_api_key_env_name"),
+        "selected_api_secret_env_name": selected.get("selected_api_secret_env_name"),
         "live_trading_env": status.get("live_trading_env"),
         "secrets_shown": False,
         "raw_secret_values_included": False,
         "blockers": list(status.get("blockers") or []),
         "warnings": list(status.get("warnings") or []),
+    }
+
+
+def _selected_account_read_env_names(discovery: Mapping[str, Any]) -> dict[str, Any]:
+    selected = discovery.get("selected_env_contract") if isinstance(discovery.get("selected_env_contract"), Mapping) else {}
+    return {
+        "selected_api_key_env_name": selected.get("selected_api_key_env_name"),
+        "selected_api_secret_env_name": selected.get("selected_api_secret_env_name"),
+        "selected_mode_env_name": selected.get("selected_mode_env_name"),
+        "selected_enabled_env_name": selected.get("selected_enabled_env_name"),
+        "selected_env_values_redacted": True,
     }
 
 

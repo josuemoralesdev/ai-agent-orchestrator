@@ -808,8 +808,9 @@ def test_no_secrets_in_output(tmp_path: Path, monkeypatch) -> None:
     )
     raw = json.dumps(payload, sort_keys=True)
     assert SECRET_SENTINEL not in raw
-    assert "BINANCE_API_KEY" not in raw
-    assert "BINANCE_API_SECRET" not in raw
+    assert payload["binance_autonomous_readiness_panel"]["selected_account_read_env_names"][
+        "selected_env_values_redacted"
+    ] is True
     assert all(value not in raw for value in os.environ.values() if value == SECRET_SENTINEL)
 
 

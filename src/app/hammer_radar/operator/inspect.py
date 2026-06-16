@@ -2748,6 +2748,13 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-binance-account-read-env-discovery":
+        from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+            build_binance_account_read_env_discovery,
+            format_binance_account_read_env_discovery_json,
+        )
+
+        print(format_binance_account_read_env_discovery_json(build_binance_account_read_env_discovery()))
     elif args.command == "tiny-live-binance-autonomous-readiness":
         from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
             build_tiny_live_binance_autonomous_readiness_binding,
@@ -5464,6 +5471,11 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_binance_readonly_precision_mark_price_gate_parser.add_argument(
         "--confirm-tiny-live-binance-readonly-fetch",
         default=None,
+    )
+
+    subparsers.add_parser(
+        "tiny-live-binance-account-read-env-discovery",
+        parents=[parent],
     )
 
     tiny_live_binance_autonomous_readiness_parser = subparsers.add_parser(

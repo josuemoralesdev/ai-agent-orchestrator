@@ -24,8 +24,12 @@ from src.app.hammer_radar.operator.binance_readonly import (
     REQUIRED_CONNECTOR_MODE,
     build_binance_readonly_status,
 )
+from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+    ACCOUNT_READ_ENV_READY,
+    adapt_env_for_selected_account_read_contract,
+    build_binance_account_read_env_discovery,
+)
 from src.app.hammer_radar.operator.env_role_adapter import (
-    account_read_env_for_legacy_connector,
     resolve_account_read_env_pair,
     validate_account_read_runtime_safety,
 )
@@ -368,7 +372,7 @@ def _request_private_readonly_json(
     validation = validate_private_readonly_endpoint(endpoint_path)
     if not validation["endpoint_allowlisted"]:
         raise RuntimeError("private_readonly_endpoint_not_allowlisted")
-    adapted_env = account_read_env_for_legacy_connector(env=env)
+    adapted_env = adapt_env_for_selected_account_read_contract(env=env)
     api_key = str(adapted_env.get(ENV_API_KEY) or "").strip()
     api_secret = str(adapted_env.get(ENV_API_SECRET) or "").strip()
     if not api_key or not api_secret:
@@ -400,32 +404,42 @@ def _request_private_readonly_json(
 
 def _preflight(*, env: Mapping[str, str] | None) -> dict[str, Any]:
     source = os.environ if env is None else env
-    adapted_env = account_read_env_for_legacy_connector(env=source)
+    discovery = build_binance_account_read_env_discovery(env=source, include_systemd=False)
+    selected = (
+        discovery.get("selected_env_contract")
+        if isinstance(discovery.get("selected_env_contract"), Mapping)
+        else {}
+    )
+    adapted_env = adapt_env_for_selected_account_read_contract(env=source)
     connector = build_binance_readonly_status(env=adapted_env)
     env_role = resolve_account_read_env_pair(env=source)
     runtime = validate_account_read_runtime_safety(env=source)
     blockers: list[str] = []
+    if discovery.get("status") != ACCOUNT_READ_ENV_READY:
+        blockers.extend(str(item) for item in discovery.get("readiness_blockers") or [])
     if connector.get("connector_status") != CONNECTOR_STATUS_READY:
         blockers.append(f"connector_status_is_{connector.get('connector_status') or 'UNKNOWN'}")
     if connector.get("connector_mode") != REQUIRED_CONNECTOR_MODE:
         blockers.append("connector_mode_not_read_only")
-    if not env_role.get("api_key_present"):
+    if not selected.get("api_key_present"):
         blockers.append("account_read_api_key_missing")
-    if not env_role.get("api_secret_present"):
+    if not selected.get("api_secret_present"):
         blockers.append("account_read_api_secret_missing")
-    if runtime.get("runtime_safety_ok") is not True:
+    if selected.get("runtime_safety_ok") is not True and runtime.get("runtime_safety_ok") is not True:
         blockers.append("account_read_runtime_safety_not_ok")
     return {
         "safe_to_call": not blockers,
+        "account_read_env_discovery_status": discovery.get("status"),
+        "selected_env_contract": dict(selected),
         "connector_status": connector.get("connector_status"),
         "connector_mode": connector.get("connector_mode"),
-        "api_key_present": bool(env_role.get("api_key_present")),
-        "api_secret_present": bool(env_role.get("api_secret_present")),
-        "selected_pair_source": env_role.get("selected_pair_source"),
-        "runtime_safety_ok": runtime.get("runtime_safety_ok") is True,
+        "api_key_present": bool(selected.get("api_key_present")),
+        "api_secret_present": bool(selected.get("api_secret_present")),
+        "selected_pair_source": selected.get("selected_env_source") or env_role.get("selected_pair_source"),
+        "runtime_safety_ok": selected.get("runtime_safety_ok") is True or runtime.get("runtime_safety_ok") is True,
         "failed_runtime_flags": list(runtime.get("failed_flags") or []),
-        "blockers": blockers,
-        "warnings": list(env_role.get("warnings") or []),
+        "blockers": _dedupe(blockers),
+        "warnings": _dedupe([*list(env_role.get("warnings") or []), *list(discovery.get("readiness_blockers") or [])]),
         "secrets_shown": False,
     }
 
@@ -577,3 +591,7 @@ def _sanitize(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_sanitize(item) for item in value]
     return value
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(str(value) for value in values if value))

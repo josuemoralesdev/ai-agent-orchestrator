@@ -35,6 +35,9 @@ from src.app.hammer_radar.operator.binance_readonly import (
     build_binance_exchange_info,
     build_binance_readonly_status,
 )
+from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+    build_binance_account_read_env_discovery,
+)
 from src.app.hammer_radar.operator.binance_live_status import build_binance_live_status
 from src.app.hammer_radar.operator.betrayal_shadow_outcomes import (
     build_betrayal_shadow_outcomes_payload,
@@ -982,6 +985,11 @@ def tiny_live_binance_autonomous_readiness(
         fetch_binance_readonly_precision_mark_price=fetch_readonly_precision,
         confirm_tiny_live_binance_readonly_fetch=confirm,
     )
+
+
+@app.get("/tiny-live/binance-account-read-env-discovery")
+def tiny_live_binance_account_read_env_discovery() -> dict:
+    return build_binance_account_read_env_discovery()
 
 
 @app.post("/tiny-live/autonomous-arming/arm-dry-run-lane")
