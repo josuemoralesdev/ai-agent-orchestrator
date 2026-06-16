@@ -1,0 +1,273 @@
+# R276 — Autonomous Armed Lane Rehearsal Fixture
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: AUTONOMOUS EXECUTION REHEARSAL / DRY-RUN
+  Secondary: SAFETY HARDENING, FIXTURED CANDIDATE TEST, OPERATOR ARMING
+  Duplicate risk level: MEDIUM
+
+Why this phase exists:
+  R275 added the autonomous armed-lane dry-run gate.
+  It defaults OFF and safely returns AUTO_DRY_RUN_WAIT when no fresh live-qualified candidate exists.
+  The next proof is not real execution.
+  The next proof is a controlled rehearsal:
+    - inject or fixture a fake fresh LIVE_QUALIFIED candidate
+    - arm the exact lane in dry-run mode
+    - prove the machine reaches AUTO_DRY_RUN_READY
+    - prove the simulated order triplet is correct
+    - prove no Binance order/test-order endpoint is called
+    - prove near-miss and paper-only lanes still cannot rehearse as live
+
+Hard goal:
+  Build a rehearsal-only fixture path for autonomous armed dry-run.
+  It must let tests and an explicit operator diagnostic simulate a fresh live-qualified candidate without touching real exchange execution.
+
+Non-negotiable safety:
+  - Do NOT place real orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT enable real live execution.
+  - Do NOT disable kill switches.
+  - Do NOT expose secrets.
+  - Do NOT mutate env files.
+  - Do NOT allow fixture mode to affect production candidate logs unless explicitly recorded as rehearsal.
+  - Do NOT allow rehearsal fixture to be mistaken for a real market signal.
+  - Do NOT allow near-miss 8m short into AUTO_DRY_RUN_READY.
+  - Do NOT allow below-55 lanes into AUTO_DRY_RUN_READY.
+  - Do NOT allow Betrayal/inverse rehearsal into live-ready status.
+  - If uncertain, remain AUTO_DRY_RUN_BLOCKED.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    - src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    - src/app/hammer_radar/operator/trade_ticket.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - tests/hammer_radar/test_tiny_live_autonomous_armed_dry_run.py
+    - tests/hammer_radar/test_tiny_live_strategy_lane_selection.py
+    - tests/hammer_radar/test_tiny_live_final_console.py
+
+Implementation scope:
+  1. Rehearsal fixture mode:
+     Add a safe explicit fixture mode for autonomous dry-run, available only via test/diagnostic surfaces.
+     It should be unmistakably marked:
+       rehearsal_mode=true
+       fixture_candidate=true
+       real_market_signal=false
+       real_order_forbidden=true
+       submit_allowed=false
+       binance_order_endpoint_called=false
+
+     It should support at least these fixture lane keys:
+       BTCUSDT|44m|long|ladder_close_50_618
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|55m|long|ladder_close_50_618
+
+  2. Fixture candidate packet:
+     Fixture candidate should include:
+       symbol BTCUSDT
+       timeframe
+       direction
+       entry_mode ladder_close_50_618
+       lane_key
+       fake signal_id with REHEARSAL prefix
+       age_minutes <= freshness threshold
+       freshness_status fresh
+       entry, stop, take_profit
+       score/tier if needed by trade-ticket logic
+
+     Use deterministic fake prices suitable for dry-run.
+     Do not fetch live private account state.
+
+  3. Fixture arming:
+     Add a rehearsal-only arming override or helper that can arm:
+       global_auto_live_enabled=true
+       auto_execute_mode=dry_run_only
+       armed_lane_key=<fixture lane>
+       exact lane enabled=true
+     without enabling real live execution.
+
+     This may be CLI-only/test-only.
+     If written to config, it must be visibly dry-run/rehearsal and must not enable real submit.
+     Prefer not to permanently mutate the main default OFF config unless explicitly requested.
+
+  4. AUTO_DRY_RUN_READY proof:
+     When fixture candidate is live-qualified and exact lane is dry-run armed:
+       status=AUTO_DRY_RUN_READY
+       dry_run_go_no_go.go=true
+       simulated_order_triplet present
+       final_command_available=false
+       real_order_forbidden=true
+       order_placed=false
+       submit_attempted=false
+       binance_order_endpoint_called=false
+       binance_test_order_endpoint_called=false
+
+  5. Order-side correctness:
+     For long:
+       main BUY MARKET
+       stop SELL STOP_MARKET REDUCE_ONLY
+       take_profit SELL TAKE_PROFIT_MARKET REDUCE_ONLY
+
+     For short:
+       main SELL MARKET
+       stop BUY STOP_MARKET REDUCE_ONLY
+       take_profit BUY TAKE_PROFIT_MARKET REDUCE_ONLY
+
+  6. Negative rehearsals:
+     Prove these never become AUTO_DRY_RUN_READY:
+       BTCUSDT|8m|short|ladder_close_50_618 near-miss
+       BTCUSDT|13m|long|ladder_close_50_618 below-55
+       BTCUSDT|4m|long or 4m short below-55
+       Betrayal/inverse fixture if present
+
+  7. API/CLI:
+     Prefer CLI diagnostic for fixture rehearsal:
+       inspect tiny-live-autonomous-armed-dry-run
+         --rehearsal-fixture-lane BTCUSDT|44m|long|ladder_close_50_618
+         --rehearsal-arm-fixture-lane
+         --record-autonomous-dry-run
+         --operator-id local_operator
+         --reason "R276 rehearsal only; no submit."
+
+     API endpoint may accept read-only query params only if existing project pattern allows:
+       /tiny-live/autonomous-armed-dry-run?rehearsal_fixture_lane=...
+     But do not create a public/easy accidental trigger that looks like live execution.
+     If API supports fixture, require explicit rehearsal flags and keep final_command_available=false.
+
+  8. Final console:
+     Add or extend autonomous panel with:
+       rehearsal_supported=true
+       latest_rehearsal_status if recorded
+       latest_rehearsal_lane
+       latest_rehearsal_order_triplet
+       real_order_forbidden=true
+       final_command_available=false
+
+  9. Tests:
+     Add/update tests proving:
+       - default R275 still OFF.
+       - 44m long fixture + dry-run arming => AUTO_DRY_RUN_READY.
+       - 44m short fixture + dry-run arming => AUTO_DRY_RUN_READY.
+       - 55m long fixture + dry-run arming => AUTO_DRY_RUN_READY.
+       - long order sides correct.
+       - short order sides correct.
+       - near-miss 8m short fixture blocks.
+       - below-55 13m / 4m fixture blocks.
+       - Betrayal/inverse fixture blocks.
+       - no real order placed.
+       - no submit attempted.
+       - no Binance order endpoint called.
+       - no Binance test order endpoint called.
+       - no secrets shown.
+       - final command remains unavailable.
+       - rehearsal output cannot be mistaken for real market signal.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "autonomous or rehearsal or qualified_candidate or strategy_promotion or tiny_live_strategy_lane_selection or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-armed-dry-run | jq '{
+    status,
+    arming_state,
+    candidate_watch_status,
+    selected_candidate,
+    simulated_order_triplet,
+    dry_run_go_no_go,
+    blockers,
+    safety
+  }'
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-armed-dry-run \
+    --rehearsal-fixture-lane "BTCUSDT|44m|long|ladder_close_50_618" \
+    --rehearsal-arm-fixture-lane \
+    --record-autonomous-dry-run \
+    --operator-id local_operator \
+    --reason "R276 44m long autonomous rehearsal fixture only; no submit; no order; no Binance order endpoint." \
+    | tee /tmp/r276_44m_long_rehearsal.json \
+    | jq '{
+      status,
+      rehearsal_mode,
+      selected_candidate,
+      simulated_order_triplet,
+      dry_run_go_no_go,
+      safety
+    }'
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-armed-dry-run \
+    --rehearsal-fixture-lane "BTCUSDT|44m|short|ladder_close_50_618" \
+    --rehearsal-arm-fixture-lane \
+    --record-autonomous-dry-run \
+    --operator-id local_operator \
+    --reason "R276 44m short autonomous rehearsal fixture only; no submit; no order; no Binance order endpoint." \
+    | tee /tmp/r276_44m_short_rehearsal.json \
+    | jq '{
+      status,
+      rehearsal_mode,
+      selected_candidate,
+      simulated_order_triplet,
+      dry_run_go_no_go,
+      safety
+    }'
+
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-armed-dry-run \
+    --rehearsal-fixture-lane "BTCUSDT|8m|short|ladder_close_50_618" \
+    --rehearsal-arm-fixture-lane \
+    --record-autonomous-dry-run \
+    --operator-id local_operator \
+    --reason "R276 8m short near-miss negative rehearsal; must block; no submit." \
+    | tee /tmp/r276_8m_short_negative_rehearsal.json \
+    | jq '{
+      status,
+      rehearsal_mode,
+      selected_candidate,
+      strategy_evidence,
+      blockers,
+      dry_run_go_no_go,
+      safety
+    }'
+
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - fixture lanes supported
+  - 44m long rehearsal result
+  - 44m short rehearsal result
+  - 8m short negative rehearsal result
+  - order-side correctness
+  - final console panel status
+  - proof no submit/no real order/no Binance order endpoint

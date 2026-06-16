@@ -24,12 +24,15 @@ from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import RISK_CONT
 from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
     LIVE_QUALIFIED,
     NEAR_MISS_INCUBATOR,
+    PAPER_ONLY,
+    build_explicit_lane_risk_contract,
     build_exact_lane_risk_contract_status,
 )
 
 CONFIG_PATH = Path("configs/hammer_radar/autonomous_arming_state.json")
 LEDGER_FILENAME = "tiny_live_autonomous_armed_dry_run.ndjson"
 CREATED_BY_PHASE = "R275_AUTONOMOUS_ARMED_LANE_DRY_RUN"
+REHEARSAL_CREATED_BY_PHASE = "R276_AUTONOMOUS_ARMED_LANE_REHEARSAL_FIXTURE"
 
 AUTO_DRY_RUN_WAIT = "AUTO_DRY_RUN_WAIT"
 AUTO_DRY_RUN_BLOCKED = "AUTO_DRY_RUN_BLOCKED"
@@ -51,6 +54,11 @@ SUBMIT_ATTEMPTED = False
 BINANCE_ORDER_ENDPOINT_CALLED = False
 BINANCE_TEST_ORDER_ENDPOINT_CALLED = False
 SECRETS_SHOWN = False
+SUPPORTED_REHEARSAL_FIXTURE_LANES = {
+    "BTCUSDT|44m|long|ladder_close_50_618",
+    "BTCUSDT|44m|short|ladder_close_50_618",
+    "BTCUSDT|55m|long|ladder_close_50_618",
+}
 
 
 def default_autonomous_arming_state() -> dict[str, Any]:
@@ -90,13 +98,22 @@ def build_tiny_live_autonomous_armed_dry_run(
     record_autonomous_dry_run: bool = False,
     operator_id: str = "local_operator",
     reason: str | None = None,
+    rehearsal_fixture_lane: str | None = None,
+    rehearsal_arm_fixture_lane: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     generated_at = now or datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     risk_path = Path(risk_contract_config_path) if risk_contract_config_path is not None else RISK_CONTRACT_CONFIG_PATH
     arming_state = load_autonomous_arming_state(config_path)
-    candidate_watch = build_live_qualified_fresh_candidate_watch(log_dir=resolved_log_dir)
+    rehearsal = _build_rehearsal_fixture_watch(rehearsal_fixture_lane, generated_at=generated_at)
+    if rehearsal and rehearsal_arm_fixture_lane:
+        arming_state = _with_rehearsal_fixture_arming(arming_state, lane_key=str(rehearsal["lane_key"]))
+    candidate_watch = (
+        rehearsal["candidate_watch"]
+        if rehearsal
+        else build_live_qualified_fresh_candidate_watch(log_dir=resolved_log_dir)
+    )
     alert_packet = candidate_watch.get("candidate_alert_packet") if isinstance(candidate_watch.get("candidate_alert_packet"), Mapping) else {}
     selected_candidate = alert_packet.get("current_candidate") if isinstance(alert_packet.get("current_candidate"), Mapping) else None
     strategy_evidence = alert_packet.get("strategy_evidence") if isinstance(alert_packet.get("strategy_evidence"), Mapping) else {}
@@ -116,7 +133,9 @@ def build_tiny_live_autonomous_armed_dry_run(
     blockers.extend(strategy_blockers)
 
     risk_contract = (
-        build_exact_lane_risk_contract_status(
+        _build_rehearsal_fixture_risk_contract(lane_key=lane_key, generated_at=generated_at)
+        if rehearsal and lane_key in SUPPORTED_REHEARSAL_FIXTURE_LANES
+        else build_exact_lane_risk_contract_status(
             lane_key=lane_key,
             risk_contract_config_path=risk_path,
             strategy_qualification={
@@ -146,7 +165,14 @@ def build_tiny_live_autonomous_armed_dry_run(
         {
             **_safety_fields(),
             "event_type": "AUTONOMOUS_ARMED_LANE_DRY_RUN",
-            "created_by_phase": CREATED_BY_PHASE,
+            "created_by_phase": REHEARSAL_CREATED_BY_PHASE if rehearsal else CREATED_BY_PHASE,
+            "rehearsal_supported": True,
+            "supported_rehearsal_fixture_lanes": sorted(SUPPORTED_REHEARSAL_FIXTURE_LANES),
+            "rehearsal_mode": bool(rehearsal),
+            "fixture_candidate": bool(rehearsal),
+            "real_market_signal": False if rehearsal else None,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
             "status": status,
             "generated_at": generated_at.isoformat(),
             "record_autonomous_dry_run_requested": bool(record_autonomous_dry_run),
@@ -170,7 +196,9 @@ def build_tiny_live_autonomous_armed_dry_run(
                 "go": status == AUTO_DRY_RUN_READY,
                 "status": status,
                 "dry_run_only": True,
+                "rehearsal_mode": bool(rehearsal),
                 "real_order_forbidden": True,
+                "submit_allowed": False,
                 "final_command_available": False,
             },
             "blockers": blockers,
@@ -183,7 +211,7 @@ def build_tiny_live_autonomous_armed_dry_run(
             "safety": _safety_fields(),
         }
     )
-    if record_autonomous_dry_run and status == AUTO_DRY_RUN_READY:
+    if record_autonomous_dry_run and (status == AUTO_DRY_RUN_READY or rehearsal):
         payload = append_autonomous_dry_run_record(payload, log_dir=resolved_log_dir)
     return payload
 
@@ -260,7 +288,7 @@ def build_autonomous_dry_run_notification_payload(*, status: str, lane_key: str 
 def append_autonomous_dry_run_record(payload: dict[str, Any], *, log_dir: str | Path) -> dict[str, Any]:
     record = {
         **payload,
-        "record_id": f"r275_auto_dry_run_{uuid4().hex}",
+        "record_id": f"{'r276_rehearsal_auto_dry_run' if payload.get('rehearsal_mode') else 'r275_auto_dry_run'}_{uuid4().hex}",
         "autonomous_dry_run_recorded": True,
         "recorded_at": datetime.now(UTC).isoformat(),
     }
@@ -269,6 +297,14 @@ def append_autonomous_dry_run_record(payload: dict[str, Any], *, log_dir: str | 
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
     return record
+
+
+def load_latest_autonomous_rehearsal_record(*, log_dir: str | Path | None = None) -> dict[str, Any] | None:
+    resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    for row in _read_ndjson_reverse(Path(resolved_log_dir) / LEDGER_FILENAME):
+        if row.get("rehearsal_mode") is True and row.get("fixture_candidate") is True:
+            return row
+    return None
 
 
 def format_tiny_live_autonomous_armed_dry_run_json(payload: Mapping[str, Any]) -> str:
@@ -295,6 +331,211 @@ def _normalize_arming_state(state: Mapping[str, Any], *, path: Path) -> dict[str
         "any_lane_auto_armed": bool(lane_enabled_keys),
         "dry_run_only": True,
         "live_execution_enabled": False,
+    }
+
+
+def _with_rehearsal_fixture_arming(arming_state: Mapping[str, Any], *, lane_key: str) -> dict[str, Any]:
+    state = dict(arming_state)
+    state.update(
+        {
+            "global_auto_live_enabled": True,
+            "auto_execute_mode": "dry_run_only",
+            "armed_lane_key": lane_key,
+            "allowed_lane_keys": sorted(set([*list(state.get("allowed_lane_keys") or []), lane_key])),
+            "lane_auto_live_enabled_keys": sorted(set([*list(state.get("lane_auto_live_enabled_keys") or []), lane_key])),
+            "any_lane_auto_armed": True,
+            "rehearsal_arming_override": True,
+            "rehearsal_mode": True,
+            "real_live_execution_enabled": False,
+            "live_execution_enabled": False,
+            "submit_allowed": False,
+        }
+    )
+    lanes = [dict(item) for item in state.get("lanes") or [] if isinstance(item, Mapping)]
+    lanes.append(
+        {
+            "lane_key": lane_key,
+            "lane_auto_live_enabled": True,
+            "rehearsal_mode": True,
+            "dry_run_only": True,
+            "real_order_forbidden": True,
+        }
+    )
+    state["lanes"] = lanes
+    return state
+
+
+def _build_rehearsal_fixture_watch(fixture_lane: str | None, *, generated_at: datetime) -> dict[str, Any] | None:
+    if not fixture_lane:
+        return None
+    parts = str(fixture_lane).split("|")
+    if len(parts) != 4:
+        candidate = {
+            "signal_id": f"REHEARSAL_INVALID_{uuid4().hex}",
+            "symbol": "BTCUSDT",
+            "timeframe": "",
+            "direction": "",
+            "entry_mode": "",
+            "lane_key": str(fixture_lane),
+            "age_minutes": 0.0,
+            "freshness_status": "fresh",
+            "fixture_candidate": True,
+            "real_market_signal": False,
+        }
+        evidence = _fixture_strategy_evidence(lane_key=str(fixture_lane), timeframe="", direction="", live_class=PAPER_ONLY)
+        status = "WATCH_BLOCKED_PAPER_ONLY"
+        blocked_by = ["rehearsal_fixture_lane_key_invalid"]
+    else:
+        symbol, timeframe, direction, entry_mode = parts
+        lane_key = "|".join(parts)
+        live_class = _fixture_live_class(lane_key=lane_key, timeframe=timeframe, direction=direction)
+        status = WATCH_FOUND if live_class == LIVE_QUALIFIED else (
+            "WATCH_BLOCKED_NEAR_MISS" if live_class == NEAR_MISS_INCUBATOR else "WATCH_BLOCKED_PAPER_ONLY"
+        )
+        if _fixture_is_betrayal(lane_key=lane_key, direction=direction):
+            status = "WATCH_BLOCKED_BETRAYAL"
+        blocked_by = [] if status == WATCH_FOUND else [status.lower()]
+        prices = _fixture_prices(direction=direction)
+        candidate = {
+            "signal_id": f"REHEARSAL_{generated_at.strftime('%Y%m%dT%H%M%S')}_{timeframe}_{direction}",
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "direction": direction,
+            "entry_mode": entry_mode,
+            "lane_key": lane_key,
+            "age_minutes": 1.0,
+            "freshness_status": "fresh",
+            "entry": prices["entry"],
+            "stop": prices["stop"],
+            "take_profit": prices["take_profit"],
+            "score": 88.0 if live_class == LIVE_QUALIFIED else 44.0,
+            "tier": "LIVE_QUALIFIED" if live_class == LIVE_QUALIFIED else "REHEARSAL_BLOCKED",
+            "rehearsal_mode": True,
+            "fixture_candidate": True,
+            "real_market_signal": False,
+            "real_order_forbidden": True,
+            "submit_allowed": False,
+        }
+        evidence = _fixture_strategy_evidence(lane_key=lane_key, timeframe=timeframe, direction=direction, live_class=live_class)
+    alert_packet = {
+        **_safety_fields(),
+        "event_type": "QUALIFIED_CANDIDATE_WATCH_REHEARSAL_FIXTURE",
+        "status": status,
+        "current_candidate": candidate,
+        "strategy_evidence": evidence,
+        "operator_packet": {
+            "recommended_action": "REVIEW_REHEARSAL_DRY_RUN_PACKET" if status == WATCH_FOUND else "REHEARSAL_BLOCKED_EXPECTED",
+            "final_command_available": False,
+            "submit_allowed_from_codex": False,
+            "operator_review_only": True,
+            "no_live_order_placed": True,
+        },
+        "blocked_by": blocked_by,
+        "rehearsal_mode": True,
+        "fixture_candidate": True,
+        "real_market_signal": False,
+        "real_order_forbidden": True,
+        "submit_allowed": False,
+    }
+    return {
+        "lane_key": candidate["lane_key"],
+        "candidate_watch": {
+            **_safety_fields(),
+            "event_type": "LIVE_QUALIFIED_FRESH_CANDIDATE_WATCH_REHEARSAL_FIXTURE",
+            "status": status,
+            "current_fresh_candidate_status": status,
+            "qualified_fresh_candidate_exists": status == WATCH_FOUND,
+            "fresh_candidate_lane_keys": [candidate["lane_key"]],
+            "qualified_fresh_candidate_lane_keys": [candidate["lane_key"]] if status == WATCH_FOUND else [],
+            "current_candidate_lane_key": candidate["lane_key"],
+            "candidate_alert_packet": alert_packet,
+            "blocked_by": blocked_by,
+            "rehearsal_mode": True,
+            "fixture_candidate": True,
+            "real_market_signal": False,
+        },
+    }
+
+
+def _fixture_live_class(*, lane_key: str, timeframe: str, direction: str) -> str:
+    if _fixture_is_betrayal(lane_key=lane_key, direction=direction):
+        return PAPER_ONLY
+    if lane_key in SUPPORTED_REHEARSAL_FIXTURE_LANES:
+        return LIVE_QUALIFIED
+    if lane_key == "BTCUSDT|8m|short|ladder_close_50_618":
+        return NEAR_MISS_INCUBATOR
+    return PAPER_ONLY
+
+
+def _fixture_is_betrayal(*, lane_key: str, direction: str) -> bool:
+    text = f"{lane_key} {direction}".lower()
+    return "betrayal" in text or "inverse" in text
+
+
+def _fixture_strategy_evidence(*, lane_key: str, timeframe: str, direction: str, live_class: str) -> dict[str, Any]:
+    win_rate = 62.0 if live_class == LIVE_QUALIFIED else (53.33 if live_class == NEAR_MISS_INCUBATOR else 47.27)
+    avg_pnl = 0.18 if live_class == LIVE_QUALIFIED else (0.05 if live_class == NEAR_MISS_INCUBATOR else -0.02)
+    return {
+        "lane_key": lane_key,
+        "symbol": "BTCUSDT",
+        "timeframe": timeframe,
+        "direction": direction,
+        "entry_mode": "ladder_close_50_618",
+        "live_qualification_class": live_class,
+        "watch_category": live_class,
+        "win_rate_pct": win_rate,
+        "sample_count": 40,
+        "avg_pnl_pct": avg_pnl,
+        "rehearsal_mode": True,
+        "fixture_candidate": True,
+        "real_market_signal": False,
+    }
+
+
+def _fixture_prices(*, direction: str) -> dict[str, float]:
+    if direction == "short":
+        return {"entry": 70000.0, "stop": 70700.0, "take_profit": 68600.0}
+    return {"entry": 70000.0, "stop": 69300.0, "take_profit": 71400.0}
+
+
+def _build_rehearsal_fixture_risk_contract(*, lane_key: str, generated_at: datetime) -> dict[str, Any]:
+    contract = build_explicit_lane_risk_contract(
+        lane_key=lane_key,
+        strategy_qualification={
+            "lane_key": lane_key,
+            "win_rate_pct": 62.0,
+            "sample_count": 40,
+            "avg_pnl_pct": 0.18,
+            "min_sample": 30,
+            "min_win_rate_pct": 55.0,
+            "qualification_status": "QUALIFIED",
+        },
+        now=generated_at,
+    )
+    contract.update(
+        {
+            "created_by_phase": REHEARSAL_CREATED_BY_PHASE,
+            "rehearsal_mode": True,
+            "fixture_candidate": True,
+            "real_market_signal": False,
+            "live_execution_enabled": False,
+            "live_authorized": False,
+            "order_payload_forbidden_until_live_gate": True,
+            "binance_call_forbidden_until_live_gate": True,
+        }
+    )
+    return {
+        **_safety_fields(),
+        "lane_key": lane_key,
+        "risk_contract_path": "in_memory_rehearsal_fixture",
+        "exact_contract_found": True,
+        "risk_contract_valid": True,
+        "contract": contract,
+        "validation_summary": {"risk_contract_valid": True, "blocked_by": [], "rehearsal_mode": True},
+        "blocked_by": [],
+        "no_cross_lane_borrowing": True,
+        "rehearsal_mode": True,
+        "fixture_candidate": True,
     }
 
 
@@ -369,8 +610,10 @@ def _exchange_minimum_blockers(selected_candidate: Mapping[str, Any] | None, arm
 def _duplicate_blockers(*, lane_key: str, selected_candidate: Mapping[str, Any] | None, log_dir: Path, today: date) -> list[str]:
     if not selected_candidate:
         return []
+    if selected_candidate.get("fixture_candidate") is True or selected_candidate.get("rehearsal_mode") is True:
+        return []
     signal_id = str(selected_candidate.get("signal_id") or "")
-    records = _read_ndjson_reverse(log_dir / LEDGER_FILENAME)
+    records = [row for row in _read_ndjson_reverse(log_dir / LEDGER_FILENAME) if row.get("rehearsal_mode") is not True]
     blockers: list[str] = []
     if any(str(row.get("selected_candidate", {}).get("signal_id") or "") == signal_id for row in records if isinstance(row.get("selected_candidate"), Mapping)):
         blockers.append("duplicate_autonomous_dry_run_signal")
@@ -471,6 +714,8 @@ def _safety_fields() -> dict[str, Any]:
         "binance_test_order_endpoint_called": BINANCE_TEST_ORDER_ENDPOINT_CALLED,
         "secrets_shown": SECRETS_SHOWN,
         "final_command_available": False,
+        "real_order_forbidden": True,
+        "submit_allowed": False,
     }
 
 

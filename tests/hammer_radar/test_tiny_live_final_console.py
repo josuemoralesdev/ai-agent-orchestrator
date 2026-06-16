@@ -660,6 +660,31 @@ def test_api_get_final_console_returns_json() -> None:
     assert response.json()["target_scope"]["submit_allowed"] is False
 
 
+def test_autonomous_panel_reports_latest_rehearsal_fixture(tmp_path: Path) -> None:
+    from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
+        build_tiny_live_autonomous_armed_dry_run,
+    )
+
+    lane_key = "BTCUSDT|44m|long|ladder_close_50_618"
+    recorded = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        rehearsal_fixture_lane=lane_key,
+        rehearsal_arm_fixture_lane=True,
+        record_autonomous_dry_run=True,
+        reason="final console fixture visibility",
+    )
+
+    panel = r263.build_autonomous_armed_dry_run_panel(log_dir=tmp_path)
+
+    assert recorded["status"] == "AUTO_DRY_RUN_READY"
+    assert panel["rehearsal_supported"] is True
+    assert panel["latest_rehearsal_status"] == "AUTO_DRY_RUN_READY"
+    assert panel["latest_rehearsal_lane"] == lane_key
+    assert panel["latest_rehearsal_order_triplet"]["entry_order"]["side"] == "BUY"
+    assert panel["real_order_forbidden"] is True
+    assert panel["final_command_available"] is False
+
+
 def test_operator_final_console_route_is_read_only_html() -> None:
     from fastapi.testclient import TestClient
 

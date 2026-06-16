@@ -25,6 +25,7 @@ from src.app.hammer_radar.operator.readiness import build_readiness_payload
 from src.app.hammer_radar.operator.strategy_promotion_watcher import build_strategy_promotion_status
 from src.app.hammer_radar.operator.tiny_live_autonomous_armed_dry_run import (
     build_tiny_live_autonomous_armed_dry_run,
+    load_latest_autonomous_rehearsal_record,
 )
 from src.app.hammer_radar.operator.tiny_live_actual_submit_gate import (
     LANE_CONTROLS_PATH,
@@ -505,6 +506,7 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
 
 def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
     packet = build_tiny_live_autonomous_armed_dry_run(log_dir=log_dir)
+    latest_rehearsal = load_latest_autonomous_rehearsal_record(log_dir=log_dir)
     arming = packet.get("arming_state") if isinstance(packet.get("arming_state"), Mapping) else {}
     candidate = packet.get("selected_candidate") if isinstance(packet.get("selected_candidate"), Mapping) else {}
     status = str(packet.get("status") or "AUTO_DRY_RUN_WAIT")
@@ -523,9 +525,19 @@ def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -
         "auto_execute_mode": arming.get("auto_execute_mode") or "dry_run_only",
         "selected_candidate_lane": candidate.get("lane_key"),
         "auto_dry_run_status": status,
+        "rehearsal_supported": True,
+        "latest_rehearsal_status": latest_rehearsal.get("status") if latest_rehearsal else None,
+        "latest_rehearsal_lane": (
+            (latest_rehearsal.get("selected_candidate") or {}).get("lane_key")
+            if isinstance((latest_rehearsal or {}).get("selected_candidate"), Mapping)
+            else None
+        ),
+        "latest_rehearsal_order_triplet": latest_rehearsal.get("simulated_order_triplet") if latest_rehearsal else None,
         "next_required_step": next_required_step,
         "blockers": blockers,
         "real_order_still_forbidden": True,
+        "real_order_forbidden": True,
+        "final_command_available": False,
         "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
     }
 

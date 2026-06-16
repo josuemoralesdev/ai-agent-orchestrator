@@ -3255,6 +3255,8 @@ def main() -> int:
                     record_autonomous_dry_run=args.record_autonomous_dry_run,
                     operator_id=args.operator_id,
                     reason=args.reason,
+                    rehearsal_fixture_lane=args.rehearsal_fixture_lane,
+                    rehearsal_arm_fixture_lane=args.rehearsal_arm_fixture_lane,
                 )
             )
         )
@@ -5862,6 +5864,14 @@ def _build_parser() -> argparse.ArgumentParser:
     tiny_live_autonomous_armed_dry_run_parser.add_argument(
         "--risk-contract-config-path",
         default=None,
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--rehearsal-fixture-lane",
+        default=None,
+    )
+    tiny_live_autonomous_armed_dry_run_parser.add_argument(
+        "--rehearsal-arm-fixture-lane",
+        action="store_true",
     )
 
     tiny_live_risk_contract_fix_parser = subparsers.add_parser(

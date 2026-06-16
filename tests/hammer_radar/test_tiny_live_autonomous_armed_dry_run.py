@@ -29,6 +29,7 @@ from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
 
 LANE_44M_LONG = "BTCUSDT|44m|long|ladder_close_50_618"
 LANE_44M_SHORT = "BTCUSDT|44m|short|ladder_close_50_618"
+LANE_55M_LONG = "BTCUSDT|55m|long|ladder_close_50_618"
 LANE_8M_SHORT = "BTCUSDT|8m|short|ladder_close_50_618"
 LANE_13M_LONG = "BTCUSDT|13m|long|ladder_close_50_618"
 
@@ -179,6 +180,120 @@ def test_exact_live_qualified_armed_lane_can_build_short_triplet(tmp_path: Path)
     assert triplet["take_profit_order"]["side"] == "BUY"
     assert triplet["binance_order_endpoint_called"] is False
     assert triplet["binance_test_order_endpoint_called"] is False
+
+
+def test_rehearsal_fixture_44m_long_can_auto_dry_run_ready_without_config_mutation(tmp_path: Path) -> None:
+    payload = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        rehearsal_fixture_lane=LANE_44M_LONG,
+        rehearsal_arm_fixture_lane=True,
+        record_autonomous_dry_run=True,
+        operator_id="test_operator",
+        reason="R276 rehearsal only",
+    )
+
+    triplet = payload["simulated_order_triplet"]
+    assert payload["status"] == AUTO_DRY_RUN_READY
+    assert payload["rehearsal_mode"] is True
+    assert payload["fixture_candidate"] is True
+    assert payload["real_market_signal"] is False
+    assert payload["selected_candidate"]["signal_id"].startswith("REHEARSAL_")
+    assert payload["selected_candidate"]["freshness_status"] == "fresh"
+    assert payload["selected_candidate"]["age_minutes"] <= 5
+    assert triplet["entry_order"]["side"] == "BUY"
+    assert triplet["entry_order"]["type"] == "MARKET"
+    assert triplet["protective_stop_order"]["side"] == "SELL"
+    assert triplet["protective_stop_order"]["type"] == "STOP_MARKET"
+    assert triplet["protective_stop_order"]["reduceOnly"] is True
+    assert triplet["take_profit_order"]["side"] == "SELL"
+    assert triplet["take_profit_order"]["type"] == "TAKE_PROFIT_MARKET"
+    assert triplet["take_profit_order"]["reduceOnly"] is True
+    assert payload["dry_run_go_no_go"]["go"] is True
+    assert payload["dry_run_go_no_go"]["final_command_available"] is False
+    assert payload["real_order_forbidden"] is True
+    assert payload["order_placed"] is False
+    assert payload["submit_attempted"] is False
+    assert payload["binance_order_endpoint_called"] is False
+    assert payload["binance_test_order_endpoint_called"] is False
+    assert payload["safety"]["submit_allowed"] is False
+    assert payload["safety"]["secrets_shown"] is False
+
+
+def test_rehearsal_fixture_44m_short_can_auto_dry_run_ready_with_short_sides(tmp_path: Path) -> None:
+    payload = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        rehearsal_fixture_lane=LANE_44M_SHORT,
+        rehearsal_arm_fixture_lane=True,
+    )
+
+    triplet = payload["simulated_order_triplet"]
+    assert payload["status"] == AUTO_DRY_RUN_READY
+    assert payload["selected_candidate"]["real_market_signal"] is False
+    assert triplet["entry_order"]["side"] == "SELL"
+    assert triplet["entry_order"]["type"] == "MARKET"
+    assert triplet["protective_stop_order"]["side"] == "BUY"
+    assert triplet["protective_stop_order"]["type"] == "STOP_MARKET"
+    assert triplet["protective_stop_order"]["reduceOnly"] is True
+    assert triplet["take_profit_order"]["side"] == "BUY"
+    assert triplet["take_profit_order"]["type"] == "TAKE_PROFIT_MARKET"
+    assert triplet["take_profit_order"]["reduceOnly"] is True
+    assert triplet["submit_attempted"] is False
+    assert triplet["binance_order_endpoint_called"] is False
+    assert triplet["binance_test_order_endpoint_called"] is False
+
+
+def test_rehearsal_fixture_55m_long_can_auto_dry_run_ready(tmp_path: Path) -> None:
+    payload = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        rehearsal_fixture_lane=LANE_55M_LONG,
+        rehearsal_arm_fixture_lane=True,
+    )
+
+    assert payload["status"] == AUTO_DRY_RUN_READY
+    assert payload["selected_candidate"]["lane_key"] == LANE_55M_LONG
+    assert payload["simulated_order_triplet"]["entry_order"]["side"] == "BUY"
+    assert payload["final_command_available"] is False
+
+
+def test_rehearsal_fixture_requires_explicit_arm_to_be_ready(tmp_path: Path) -> None:
+    payload = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=tmp_path,
+        rehearsal_fixture_lane=LANE_44M_LONG,
+        rehearsal_arm_fixture_lane=False,
+    )
+
+    assert payload["status"] == AUTO_DRY_RUN_BLOCKED
+    assert BLOCKED_BY_GLOBAL_ARMING in payload["blockers"]
+    assert payload["simulated_order_triplet"] is None
+
+
+def test_negative_rehearsal_fixtures_never_become_auto_dry_run_ready(tmp_path: Path) -> None:
+    for lane_key in (
+        LANE_8M_SHORT,
+        LANE_13M_LONG,
+        "BTCUSDT|4m|long|ladder_close_50_618",
+        "BTCUSDT|4m|short|ladder_close_50_618",
+        "BTCUSDT|44m|betrayal_inverse|ladder_close_50_618",
+    ):
+        payload = build_tiny_live_autonomous_armed_dry_run(
+            log_dir=tmp_path / lane_key.replace("|", "_"),
+            rehearsal_fixture_lane=lane_key,
+            rehearsal_arm_fixture_lane=True,
+            record_autonomous_dry_run=True,
+        )
+
+        assert payload["rehearsal_mode"] is True
+        assert payload["autonomous_dry_run_recorded"] is True
+        assert payload["fixture_candidate"] is True
+        assert payload["real_market_signal"] is False
+        assert payload["status"] == AUTO_DRY_RUN_BLOCKED
+        assert payload["dry_run_go_no_go"]["go"] is False
+        assert payload["simulated_order_triplet"] is None
+        assert payload["order_placed"] is False
+        assert payload["submit_attempted"] is False
+        assert payload["binance_order_endpoint_called"] is False
+        assert payload["binance_test_order_endpoint_called"] is False
+        assert payload["final_command_available"] is False
 
 
 def test_autonomous_dry_run_endpoint_is_safe(tmp_path: Path) -> None:
