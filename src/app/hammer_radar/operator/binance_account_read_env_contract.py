@@ -43,6 +43,8 @@ CANONICAL_ENABLED_ENV = "HAMMER_BINANCE_ACCOUNT_READ_ENABLED"
 CANONICAL_MODE_ENV = "HAMMER_BINANCE_ACCOUNT_READ_MODE"
 CANONICAL_API_KEY_ENV = "HAMMER_BINANCE_ACCOUNT_READ_API_KEY"
 CANONICAL_API_SECRET_ENV = "HAMMER_BINANCE_ACCOUNT_READ_API_SECRET"
+HAMMER_RADAR_CONFIG_DIR = Path("/home/josue/.config/hammer-radar")
+KNOWN_SAFE_READONLY_ENV_FILE = HAMMER_RADAR_CONFIG_DIR / "binance-readonly.env"
 
 READ_ONLY_TRUE_VALUES = {"1", "true", "yes", "on", "enabled"}
 READ_ONLY_MODE_VALUES = {"read_only", "readonly"}
@@ -80,6 +82,17 @@ DISCOVERY_ENV_NAME_ALLOWLIST = [
     *[name for pair in ALIAS_CANDIDATE_PAIRS for name in pair[:2]],
 ]
 
+RUNTIME_ENV_FILE_LOAD_ALLOWLIST = [
+    ENV_API_KEY,
+    ENV_API_SECRET,
+    ENV_CONNECTOR_MODE,
+    ENV_LIVE_TRADING_ENABLED,
+    CANONICAL_API_KEY_ENV,
+    CANONICAL_API_SECRET_ENV,
+    CANONICAL_MODE_ENV,
+    CANONICAL_ENABLED_ENV,
+]
+
 SAFETY = {
     **SAFETY_FALSE,
     "env_written": False,
@@ -107,7 +120,17 @@ def build_binance_account_read_env_discovery(
     *,
     env: Mapping[str, str] | None = None,
     include_systemd: bool = True,
+    load_discovered_binance_readonly_env: bool = False,
+    binance_readonly_env_file: str | Path | None = None,
 ) -> dict[str, Any]:
+    loaded_summary = build_loaded_env_summary(load_requested=False)
+    if load_discovered_binance_readonly_env or binance_readonly_env_file is not None:
+        target_path = binance_readonly_env_file
+        if target_path is None:
+            discovered = discover_systemd_env_files_for_hammer_approval_api()
+            allowed = _allowed_runtime_env_file_paths(discovered)
+            target_path = allowed[0] if allowed else KNOWN_SAFE_READONLY_ENV_FILE
+        loaded_summary = load_allowed_readonly_env_file(target_path)
     source = os.environ if env is None else env
     canonical_pair = _pair_summary(
         source,
@@ -123,6 +146,8 @@ def build_binance_account_read_env_discovery(
     status = _status_for_selection(canonical_pair, alias_candidates, selected)
     runtime_sources = _runtime_env_sources(source, include_systemd=include_systemd)
     blockers = _blockers_for_status(status, selected, canonical_pair, alias_candidates)
+    if loaded_summary.get("loaded_env_file_status") not in {None, "NOT_REQUESTED", "LOADED"}:
+        blockers = _dedupe([*blockers, str(loaded_summary.get("loaded_env_file_status"))])
     env_presence = {
         name: _presence(source, name)
         for name in _dedupe(
@@ -157,6 +182,21 @@ def build_binance_account_read_env_discovery(
             "runtime_env_sources": runtime_sources["runtime_env_sources"],
             "systemd_environment_files": runtime_sources["systemd_environment_files"],
             "candidate_env_file_paths": runtime_sources["candidate_env_file_paths"],
+            "cli_runtime_env_loader_supported": True,
+            "safe_cli_env_loader_command": (
+                "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
+                "--log-dir logs/hammer_radar_forward tiny-live-binance-account-read-env-discovery "
+                "--load-discovered-binance-readonly-env"
+            ),
+            "allowed_env_file_paths": _allowed_runtime_env_file_paths(runtime_sources["systemd_environment_files"]),
+            "loaded_env_file_status": loaded_summary.get("loaded_env_file_status"),
+            "loaded_env_file_path": loaded_summary.get("loaded_env_file_path"),
+            "loaded_env_names": loaded_summary.get("loaded_env_names", []),
+            "ignored_env_names": loaded_summary.get("ignored_env_names", []),
+            "loaded_secret_names_redacted": True,
+            "env_file_values_printed": False,
+            "env_file_values_redacted": True,
+            "runtime_env_loader": loaded_summary,
             "safe_manual_fallback_template": {
                 "path": "/home/josue/.config/hammer-radar/binance-readonly.env",
                 "variables": [
@@ -195,6 +235,109 @@ def adapt_env_for_selected_account_read_contract(*, env: Mapping[str, str] | Non
     adapted[ENV_CONNECTOR_MODE] = "read_only"
     adapted[ENV_LIVE_TRADING_ENABLED] = "false"
     return adapted
+
+
+def discover_systemd_env_files_for_hammer_approval_api() -> list[str]:
+    return _systemd_environment_files()
+
+
+def parse_env_file_names_only(path: str | Path) -> dict[str, Any]:
+    normalized = _normalize_runtime_env_file_path(path)
+    if not normalized["allowed"]:
+        return {
+            "path": str(path),
+            "allowed": False,
+            "status": normalized["status"],
+            "names": [],
+            "values_redacted": True,
+            "values_printed": False,
+        }
+    return {
+        "path": normalized["path"],
+        "allowed": True,
+        "status": "PARSED_NAMES_ONLY",
+        "names": _env_file_names(normalized["path"], allowed_names=RUNTIME_ENV_FILE_LOAD_ALLOWLIST),
+        "values_redacted": True,
+        "values_printed": False,
+    }
+
+
+def load_allowed_readonly_env_file(path: str | Path) -> dict[str, Any]:
+    normalized = _normalize_runtime_env_file_path(path)
+    if not normalized["allowed"]:
+        return build_loaded_env_summary(
+            load_requested=True,
+            status=normalized["status"],
+            path=str(path),
+            blockers=[normalized["status"]],
+        )
+    resolved_path = Path(str(normalized["path"]))
+    before_stat = _file_stat(resolved_path)
+    parsed = _parse_env_file_allowed_values(resolved_path)
+    overlay = {**os.environ, **parsed["values"]}
+    mode = _env_value(overlay, ENV_CONNECTOR_MODE).lower() or _env_value(overlay, CANONICAL_MODE_ENV).lower()
+    live = _env_value(overlay, ENV_LIVE_TRADING_ENABLED).lower()
+    blockers: list[str] = []
+    if mode not in READ_ONLY_MODE_VALUES:
+        blockers.append("connector_mode_not_read_only")
+    if live not in LIVE_FALSE_VALUES:
+        blockers.append("live_trading_flag_not_false")
+    if blockers:
+        return build_loaded_env_summary(
+            load_requested=True,
+            status="BLOCKED_UNSAFE_ENV_VALUES",
+            path=str(resolved_path),
+            loaded_env_names=[],
+            ignored_env_names=parsed["ignored_names"],
+            blockers=blockers,
+            file_stat_before=before_stat,
+            file_stat_after=_file_stat(resolved_path),
+        )
+    for name, value in parsed["values"].items():
+        os.environ[name] = value
+    return build_loaded_env_summary(
+        load_requested=True,
+        status="LOADED",
+        path=str(resolved_path),
+        loaded_env_names=sorted(parsed["values"]),
+        ignored_env_names=parsed["ignored_names"],
+        blockers=[],
+        file_stat_before=before_stat,
+        file_stat_after=_file_stat(resolved_path),
+    )
+
+
+def build_loaded_env_summary(
+    *,
+    load_requested: bool,
+    status: str | None = None,
+    path: str | None = None,
+    loaded_env_names: list[str] | None = None,
+    ignored_env_names: list[str] | None = None,
+    blockers: list[str] | None = None,
+    file_stat_before: Mapping[str, Any] | None = None,
+    file_stat_after: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    before = dict(file_stat_before or {})
+    after = dict(file_stat_after or before)
+    return {
+        "load_requested": bool(load_requested),
+        "loaded_env_file_status": status or ("NOT_REQUESTED" if not load_requested else "UNKNOWN"),
+        "loaded_env_file_path": path,
+        "loaded_env_names": sorted(_dedupe(loaded_env_names or [])),
+        "ignored_env_names": sorted(_dedupe(ignored_env_names or [])),
+        "loaded_secret_names_redacted": True,
+        "env_file_values_printed": False,
+        "secret_values_in_output": False,
+        "secrets_shown": False,
+        "env_written": False,
+        "env_mutated": False,
+        "env_file_modified": bool(before and after and before != after),
+        "allowed_env_names": list(RUNTIME_ENV_FILE_LOAD_ALLOWLIST),
+        "read_only_mode_required": True,
+        "live_trading_false_required": True,
+        "blockers": _dedupe(blockers or []),
+    }
 
 
 def format_binance_account_read_env_discovery_json(payload: Mapping[str, Any]) -> str:
@@ -423,6 +566,79 @@ def _systemd_environment_files() -> list[str]:
             if path:
                 paths.append(path)
     return _dedupe(paths)
+
+
+def _allowed_runtime_env_file_paths(systemd_files: list[str] | None = None) -> list[str]:
+    candidates = [*(systemd_files or []), str(KNOWN_SAFE_READONLY_ENV_FILE)]
+    allowed: list[str] = []
+    for candidate in candidates:
+        normalized = _normalize_runtime_env_file_path(candidate, systemd_files=systemd_files)
+        if normalized["allowed"]:
+            allowed.append(str(normalized["path"]))
+    return _dedupe(allowed)
+
+
+def _normalize_runtime_env_file_path(
+    path: str | Path,
+    *,
+    systemd_files: list[str] | None = None,
+) -> dict[str, Any]:
+    raw = Path(path).expanduser()
+    try:
+        resolved = raw.resolve(strict=False)
+        allowed_dir = HAMMER_RADAR_CONFIG_DIR.resolve(strict=False)
+        known = KNOWN_SAFE_READONLY_ENV_FILE.resolve(strict=False)
+    except OSError:
+        return {"allowed": False, "path": str(path), "status": "ENV_FILE_PATH_INVALID"}
+    if allowed_dir not in [resolved, *resolved.parents]:
+        return {"allowed": False, "path": str(resolved), "status": "ENV_FILE_PATH_OUTSIDE_ALLOWLIST_DIR"}
+    systemd_resolved: set[Path] = set()
+    discovered_files = systemd_files if systemd_files is not None else discover_systemd_env_files_for_hammer_approval_api()
+    for item in discovered_files:
+        try:
+            item_path = Path(item).expanduser().resolve(strict=False)
+        except OSError:
+            continue
+        systemd_resolved.add(item_path)
+    if resolved != known and resolved not in systemd_resolved:
+        return {"allowed": False, "path": str(resolved), "status": "ENV_FILE_PATH_NOT_DISCOVERED_OR_KNOWN_SAFE"}
+    return {"allowed": True, "path": str(resolved), "status": "ENV_FILE_PATH_ALLOWED"}
+
+
+def _parse_env_file_allowed_values(path: Path) -> dict[str, Any]:
+    try:
+        rows = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {"values": {}, "ignored_names": [], "read_error": True}
+    values: dict[str, str] = {}
+    ignored: list[str] = []
+    for row in rows:
+        stripped = row.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, raw_value = stripped.split("=", 1)
+        key = name.strip()
+        if key not in RUNTIME_ENV_FILE_LOAD_ALLOWLIST:
+            ignored.append(key)
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return {"values": values, "ignored_names": _dedupe(ignored), "read_error": False}
+
+
+def _file_stat(path: Path) -> dict[str, Any]:
+    try:
+        stat = path.stat()
+    except OSError:
+        return {"exists": False}
+    return {
+        "exists": True,
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "inode": stat.st_ino,
+    }
 
 
 def _env_file_names(path: str, *, allowed_names: list[str]) -> list[str]:

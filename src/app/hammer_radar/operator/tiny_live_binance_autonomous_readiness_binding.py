@@ -19,7 +19,9 @@ from uuid import uuid4
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.binance_account_read_env_contract import (
+    KNOWN_SAFE_READONLY_ENV_FILE,
     build_binance_account_read_env_discovery,
+    load_allowed_readonly_env_file,
 )
 from src.app.hammer_radar.operator.binance_readonly import build_binance_readonly_status
 from src.app.hammer_radar.operator.binance_account_position_readonly import (
@@ -125,12 +127,19 @@ def build_tiny_live_binance_autonomous_readiness_binding(
     risk_contract_config_path: str | Path | None = None,
     autonomous_arming_config_path: str | Path | None = None,
     env: Mapping[str, str] | None = None,
+    load_discovered_binance_readonly_env: bool = False,
+    binance_readonly_env_file: str | Path | None = None,
     account_position_snapshot: Mapping[str, Any] | None = None,
     now: datetime | None = None,
     urlopen_func: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
     generated_at = now or datetime.now(UTC)
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
+    loaded_runtime_env_summary = None
+    if load_discovered_binance_readonly_env or binance_readonly_env_file is not None:
+        loaded_runtime_env_summary = load_allowed_readonly_env_file(
+            binance_readonly_env_file or KNOWN_SAFE_READONLY_ENV_FILE
+        )
     source_env = os.environ if env is None else env
     risk_path = Path(risk_contract_config_path) if risk_contract_config_path is not None else None
     arming_path = (
@@ -219,6 +228,15 @@ def build_tiny_live_binance_autonomous_readiness_binding(
             "credential_summary": credentials,
             "account_read_env_discovery_status": account_read_env_discovery.get("status"),
             "account_read_env_discovery": account_read_env_discovery,
+            "cli_runtime_env_loader_supported": True,
+            "loaded_env_file_status": (
+                loaded_runtime_env_summary or account_read_env_discovery.get("runtime_env_loader") or {}
+            ).get("loaded_env_file_status"),
+            "loaded_env_names": (
+                loaded_runtime_env_summary or account_read_env_discovery.get("runtime_env_loader") or {}
+            ).get("loaded_env_names", []),
+            "loaded_secret_names_redacted": True,
+            "env_file_values_printed": False,
             "selected_account_read_env_contract": account_read_env_discovery.get("selected_env_contract"),
             "selected_account_read_env_names": _selected_account_read_env_names(account_read_env_discovery),
             "selected_env_source": (
@@ -302,6 +320,7 @@ def safe_next_readonly_commands() -> list[str]:
         (
             "PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect "
             "--log-dir logs/hammer_radar_forward tiny-live-binance-autonomous-readiness "
+            "--load-discovered-binance-readonly-env "
             "--fetch-binance-readonly-account-position "
             "--confirm-binance-readonly-account-position "
             "\"I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; "

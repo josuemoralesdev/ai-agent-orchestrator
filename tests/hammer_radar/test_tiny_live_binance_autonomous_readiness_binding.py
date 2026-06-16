@@ -12,6 +12,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from src.app.hammer_radar.operator.approval_api import app
+from src.app.hammer_radar.operator import binance_account_read_env_contract as env_contract
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
     BINANCE_READINESS_BLOCKED,
@@ -236,6 +237,59 @@ def test_account_position_confirmation_calls_only_private_readonly_endpoints(tmp
     assert payload["safety"]["margin_change_called"] is False
     assert payload["final_command_available"] is False
     assert payload["submit_allowed"] is False
+
+
+def test_account_position_cli_loader_uses_loaded_env_contract(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    env_file = safe_dir / "binance-readonly.env"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", env_file)
+    for name in ["BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_CONNECTOR_MODE", "BINANCE_LIVE_TRADING_ENABLED"]:
+        monkeypatch.delenv(name, raising=False)
+    env_file.write_text(
+        "BINANCE_API_KEY=loaded-readonly-key\n"
+        "BINANCE_API_SECRET=loaded-readonly-secret\n"
+        "BINANCE_CONNECTOR_MODE=read_only\n"
+        "BINANCE_LIVE_TRADING_ENABLED=false\n",
+        encoding="utf-8",
+    )
+    fake = _PrivateFakeUrlOpen(available_balance="20", wallet_balance="22", position_amt="0", notional="0")
+
+    payload = build_tiny_live_binance_autonomous_readiness_binding(
+        log_dir=tmp_path,
+        fetch_binance_readonly_account_position=True,
+        confirm_binance_readonly_account_position=CONFIRM_BINANCE_READONLY_ACCOUNT_POSITION_PHRASE,
+        load_discovered_binance_readonly_env=True,
+        binance_readonly_env_file=env_file,
+        now=NOW,
+        urlopen_func=fake,
+    )
+    rendered = json.dumps(payload)
+
+    assert payload["loaded_env_file_status"] == "LOADED"
+    assert payload["loaded_env_names"] == [
+        "BINANCE_API_KEY",
+        "BINANCE_API_SECRET",
+        "BINANCE_CONNECTOR_MODE",
+        "BINANCE_LIVE_TRADING_ENABLED",
+    ]
+    assert payload["account_read_env_discovery_status"] == "ACCOUNT_READ_ENV_READY"
+    assert payload["selected_account_read_env_names"]["selected_api_key_env_name"] == "BINANCE_API_KEY"
+    assert [request.get_method() for request in fake.calls] == ["GET", "GET"]
+    assert payload["account_balance_checked"] is True
+    assert payload["position_risk_checked"] is True
+    assert payload["safety"]["signed_readonly_request_created"] is True
+    assert payload["safety"]["signed_trading_request_created"] is False
+    assert payload["safety"]["signed_order_request_created"] is False
+    assert payload["safety"]["binance_order_endpoint_called"] is False
+    assert payload["safety"]["binance_test_order_endpoint_called"] is False
+    assert payload["safety"]["leverage_change_called"] is False
+    assert payload["safety"]["margin_change_called"] is False
+    assert payload["final_command_available"] is False
+    assert payload["submit_allowed"] is False
+    assert "loaded-readonly-key" not in rendered
+    assert "loaded-readonly-secret" not in rendered
 
 
 def test_endpoint_default_does_not_fetch_network(tmp_path: Path, monkeypatch) -> None:

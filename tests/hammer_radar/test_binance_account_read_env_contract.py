@@ -18,7 +18,10 @@ from src.app.hammer_radar.operator.binance_account_read_env_contract import (
     ACCOUNT_READ_ENV_READY,
     build_binance_account_read_env_discovery,
     format_binance_account_read_env_discovery_json,
+    load_allowed_readonly_env_file,
+    parse_env_file_names_only,
 )
+from src.app.hammer_radar.operator import binance_account_read_env_contract as env_contract
 from src.app.hammer_radar.operator.binance_account_position_readonly import build_account_position_readiness
 from tests.hammer_radar.test_binance_account_position_readonly import _PrivateFakeUrlOpen
 
@@ -170,3 +173,153 @@ def test_cli_discovery_hides_secret_values_and_does_not_require_network(tmp_path
     assert payload["safety"]["network_allowed"] is False
     assert "cli-secret-key-value" not in result.stdout
     assert "cli-secret-value" not in result.stdout
+
+
+def test_runtime_env_loader_rejects_non_allowlisted_path(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", safe_dir / "binance-readonly.env")
+    outside = tmp_path / "other.env"
+    outside.write_text("BINANCE_CONNECTOR_MODE=read_only\nBINANCE_LIVE_TRADING_ENABLED=false\n", encoding="utf-8")
+
+    payload = load_allowed_readonly_env_file(outside)
+
+    assert payload["loaded_env_file_status"] == "ENV_FILE_PATH_OUTSIDE_ALLOWLIST_DIR"
+    assert payload["loaded_env_names"] == []
+    assert payload["env_file_values_printed"] is False
+    assert payload["env_written"] is False
+    assert payload["env_mutated"] is False
+
+
+def test_runtime_env_loader_rejects_traversal_path(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", safe_dir / "binance-readonly.env")
+    traversal = safe_dir / ".." / "outside.env"
+    traversal.write_text("BINANCE_CONNECTOR_MODE=read_only\nBINANCE_LIVE_TRADING_ENABLED=false\n", encoding="utf-8")
+
+    payload = load_allowed_readonly_env_file(traversal)
+
+    assert payload["loaded_env_file_status"] == "ENV_FILE_PATH_OUTSIDE_ALLOWLIST_DIR"
+    assert payload["loaded_env_names"] == []
+
+
+def test_runtime_env_loader_loads_only_allowlisted_keys_and_redacts(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    env_file = safe_dir / "binance-readonly.env"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", env_file)
+    monkeypatch.delenv("BINANCE_API_KEY", raising=False)
+    monkeypatch.delenv("BINANCE_API_SECRET", raising=False)
+    monkeypatch.delenv("UNRELATED_SECRET", raising=False)
+    env_file.write_text(
+        "\n".join(
+            [
+                "BINANCE_API_KEY=loader-key-value",
+                "BINANCE_API_SECRET=loader-secret-value",
+                "BINANCE_CONNECTOR_MODE=read_only",
+                "BINANCE_LIVE_TRADING_ENABLED=false",
+                "UNRELATED_SECRET=must-not-load",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    before = env_file.read_text(encoding="utf-8")
+
+    payload = load_allowed_readonly_env_file(env_file)
+    rendered = json.dumps(payload)
+
+    assert payload["loaded_env_file_status"] == "LOADED"
+    assert payload["loaded_env_names"] == [
+        "BINANCE_API_KEY",
+        "BINANCE_API_SECRET",
+        "BINANCE_CONNECTOR_MODE",
+        "BINANCE_LIVE_TRADING_ENABLED",
+    ]
+    assert payload["ignored_env_names"] == ["UNRELATED_SECRET"]
+    assert os.environ["BINANCE_API_KEY"] == "loader-key-value"
+    assert os.environ["BINANCE_API_SECRET"] == "loader-secret-value"
+    assert "UNRELATED_SECRET" not in os.environ
+    assert env_file.read_text(encoding="utf-8") == before
+    assert "loader-key-value" not in rendered
+    assert "loader-secret-value" not in rendered
+    assert payload["loaded_secret_names_redacted"] is True
+    assert payload["env_file_values_printed"] is False
+    assert payload["env_file_modified"] is False
+
+
+def test_runtime_env_loader_blocks_non_readonly_mode(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    env_file = safe_dir / "binance-readonly.env"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", env_file)
+    monkeypatch.delenv("BINANCE_API_KEY", raising=False)
+    env_file.write_text(
+        "BINANCE_API_KEY=key\nBINANCE_API_SECRET=secret\nBINANCE_CONNECTOR_MODE=trading\nBINANCE_LIVE_TRADING_ENABLED=false\n",
+        encoding="utf-8",
+    )
+
+    payload = load_allowed_readonly_env_file(env_file)
+
+    assert payload["loaded_env_file_status"] == "BLOCKED_UNSAFE_ENV_VALUES"
+    assert "connector_mode_not_read_only" in payload["blockers"]
+    assert "BINANCE_API_KEY" not in os.environ
+
+
+def test_runtime_env_loader_blocks_live_trading_true(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    env_file = safe_dir / "binance-readonly.env"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", env_file)
+    monkeypatch.delenv("BINANCE_API_KEY", raising=False)
+    env_file.write_text(
+        "BINANCE_API_KEY=key\nBINANCE_API_SECRET=secret\nBINANCE_CONNECTOR_MODE=read_only\nBINANCE_LIVE_TRADING_ENABLED=true\n",
+        encoding="utf-8",
+    )
+
+    payload = load_allowed_readonly_env_file(env_file)
+
+    assert payload["loaded_env_file_status"] == "BLOCKED_UNSAFE_ENV_VALUES"
+    assert "live_trading_flag_not_false" in payload["blockers"]
+    assert "BINANCE_API_KEY" not in os.environ
+
+
+def test_discovery_with_runtime_loader_reports_ready_names_only(tmp_path: Path, monkeypatch) -> None:
+    safe_dir = tmp_path / "hammer-radar"
+    safe_dir.mkdir()
+    env_file = safe_dir / "binance-readonly.env"
+    monkeypatch.setattr(env_contract, "HAMMER_RADAR_CONFIG_DIR", safe_dir)
+    monkeypatch.setattr(env_contract, "KNOWN_SAFE_READONLY_ENV_FILE", env_file)
+    for name in ["BINANCE_API_KEY", "BINANCE_API_SECRET", "BINANCE_CONNECTOR_MODE", "BINANCE_LIVE_TRADING_ENABLED"]:
+        monkeypatch.delenv(name, raising=False)
+    env_file.write_text(
+        "BINANCE_API_KEY=discovery-key\nBINANCE_API_SECRET=discovery-secret\nBINANCE_CONNECTOR_MODE=read_only\nBINANCE_LIVE_TRADING_ENABLED=false\n",
+        encoding="utf-8",
+    )
+
+    payload = build_binance_account_read_env_discovery(
+        include_systemd=False,
+        load_discovered_binance_readonly_env=True,
+        binance_readonly_env_file=env_file,
+    )
+    names = parse_env_file_names_only(env_file)
+    rendered = format_binance_account_read_env_discovery_json(payload)
+
+    assert payload["status"] == ACCOUNT_READ_ENV_READY
+    assert payload["cli_runtime_env_loader_supported"] is True
+    assert payload["loaded_env_file_status"] == "LOADED"
+    assert payload["loaded_env_names"] == [
+        "BINANCE_API_KEY",
+        "BINANCE_API_SECRET",
+        "BINANCE_CONNECTOR_MODE",
+        "BINANCE_LIVE_TRADING_ENABLED",
+    ]
+    assert names["names"] == payload["loaded_env_names"]
+    assert payload["loaded_secret_names_redacted"] is True
+    assert payload["env_file_values_printed"] is False
+    assert "discovery-key" not in rendered
+    assert "discovery-secret" not in rendered

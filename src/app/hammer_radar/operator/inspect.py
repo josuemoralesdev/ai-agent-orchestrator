@@ -2754,7 +2754,14 @@ def main() -> int:
             format_binance_account_read_env_discovery_json,
         )
 
-        print(format_binance_account_read_env_discovery_json(build_binance_account_read_env_discovery()))
+        print(
+            format_binance_account_read_env_discovery_json(
+                build_binance_account_read_env_discovery(
+                    load_discovered_binance_readonly_env=args.load_discovered_binance_readonly_env,
+                    binance_readonly_env_file=args.binance_readonly_env_file,
+                )
+            )
+        )
     elif args.command == "tiny-live-binance-autonomous-readiness":
         from src.app.hammer_radar.operator.tiny_live_binance_autonomous_readiness_binding import (
             build_tiny_live_binance_autonomous_readiness_binding,
@@ -2777,6 +2784,8 @@ def main() -> int:
                     confirm_binance_readonly_account_position=(
                         args.confirm_binance_readonly_account_position
                     ),
+                    load_discovered_binance_readonly_env=args.load_discovered_binance_readonly_env,
+                    binance_readonly_env_file=args.binance_readonly_env_file,
                 )
             )
         )
@@ -5473,9 +5482,17 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
     )
 
-    subparsers.add_parser(
+    tiny_live_binance_account_read_env_discovery_parser = subparsers.add_parser(
         "tiny-live-binance-account-read-env-discovery",
         parents=[parent],
+    )
+    tiny_live_binance_account_read_env_discovery_parser.add_argument(
+        "--load-discovered-binance-readonly-env",
+        action="store_true",
+    )
+    tiny_live_binance_account_read_env_discovery_parser.add_argument(
+        "--binance-readonly-env-file",
+        default=None,
     )
 
     tiny_live_binance_autonomous_readiness_parser = subparsers.add_parser(
@@ -5496,6 +5513,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_binance_autonomous_readiness_parser.add_argument(
         "--confirm-binance-readonly-account-position",
+        default=None,
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--load-discovered-binance-readonly-env",
+        action="store_true",
+    )
+    tiny_live_binance_autonomous_readiness_parser.add_argument(
+        "--binance-readonly-env-file",
         default=None,
     )
 

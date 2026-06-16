@@ -1,0 +1,344 @@
+# R282 — CLI Runtime Env Source Loader for Binance Read-Only Validation
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: CLI ENV SOURCE LOADER / BINANCE READ-ONLY VALIDATION
+  Secondary: R281 FOLLOW-UP, PRIVATE READ-ONLY ACCOUNT CHECK, PRE-LIVE GATE
+  Duplicate risk level: MEDIUM-HIGH
+
+Why this phase exists:
+  R281 discovered that Binance read-only env already exists and is wired for the systemd/API runtime:
+    - /home/josue/.config/hammer-radar/binance-readonly.env
+    - BINANCE_API_KEY
+    - BINANCE_API_SECRET
+    - BINANCE_CONNECTOR_MODE
+    - BINANCE_LIVE_TRADING_ENABLED
+
+  R281 proved:
+    - API/final console sees ACCOUNT_READ_ENV_READY
+    - CLI shell does not see those env vars by default
+    - no secrets were printed
+    - no env files were mutated
+    - no order endpoints were called
+
+  R282 must let CLI validation safely load the same already-existing systemd EnvironmentFile so private account/position read-only validation can run from CLI too.
+
+Hard goal:
+  Add a safe CLI/runtime env source loader that loads existing discovered read-only env files into process memory only for validation commands, redacts values, and then runs R280 account/position read-only checks.
+
+Important:
+  Do NOT create new env files.
+  Do NOT modify env files.
+  Do NOT commit env files.
+  Do NOT print secret values.
+  Do NOT require manual secret entry.
+
+Non-negotiable safety:
+  - Do NOT print API key values.
+  - Do NOT print API secret values.
+  - Do NOT print full signed URLs.
+  - Do NOT write env files.
+  - Do NOT mutate env files.
+  - Do NOT commit env files.
+  - Do NOT place real orders.
+  - Do NOT call Binance order endpoint.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT change leverage.
+  - Do NOT change margin mode.
+  - Do NOT cancel orders.
+  - Do NOT transfer or withdraw.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT make final command available.
+  - Do NOT weaken confirmation phrases.
+  - Do NOT use non-allowlisted endpoints.
+  - Do NOT automatically load arbitrary env files outside discovered safe paths.
+  - If path is not allowlisted/discovered from systemd, block.
+
+Allowed env source:
+  Discovered env file:
+    /home/josue/.config/hammer-radar/binance-readonly.env
+
+  It may be loaded into CLI process memory only when:
+    - explicit CLI flag requests runtime env file loading
+    - file path matches discovered/allowlisted path
+    - no values are printed
+    - no env file is modified
+    - loaded vars are limited to expected Binance read-only env names
+    - connector mode resolves to read_only
+    - live trading flag resolves false
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/binance_account_read_env_contract.py
+    - src/app/hammer_radar/operator/binance_account_position_readonly.py
+    - src/app/hammer_radar/operator/tiny_live_binance_autonomous_readiness_binding.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - tests/hammer_radar/test_binance_account_read_env_contract.py
+    - tests/hammer_radar/test_binance_account_position_readonly.py
+    - tests/hammer_radar/test_tiny_live_binance_autonomous_readiness_binding.py
+
+Implementation scope:
+  1. Safe runtime env loader:
+     Extend:
+       src/app/hammer_radar/operator/binance_account_read_env_contract.py
+
+     Add helpers like:
+       discover_systemd_env_files_for_hammer_approval_api()
+       parse_env_file_names_only(path)
+       load_allowed_readonly_env_file(path)
+       build_loaded_env_summary()
+
+     Rules:
+       - parse simple KEY=VALUE lines
+       - ignore comments and blank lines
+       - never return values in output
+       - only set process env for allowlisted keys:
+           BINANCE_API_KEY
+           BINANCE_API_SECRET
+           BINANCE_CONNECTOR_MODE
+           BINANCE_LIVE_TRADING_ENABLED
+           HAMMER_BINANCE_ACCOUNT_READ_API_KEY
+           HAMMER_BINANCE_ACCOUNT_READ_API_SECRET
+           HAMMER_BINANCE_ACCOUNT_READ_MODE
+           HAMMER_BINANCE_ACCOUNT_READ_ENABLED
+       - mark loaded key names only
+       - reject paths outside:
+           /home/josue/.config/hammer-radar/
+       - reject if file path does not equal or derive from R281 discovered systemd EnvironmentFile
+       - reject if mode is not read_only
+       - reject if live trading flag is true
+
+  2. CLI flags:
+     Extend inspect commands:
+       tiny-live-binance-account-read-env-discovery
+       tiny-live-binance-autonomous-readiness
+
+     Add safe flag:
+       --load-discovered-binance-readonly-env
+
+     Optional explicit path flag:
+       --binance-readonly-env-file /home/josue/.config/hammer-radar/binance-readonly.env
+
+     If explicit path is supplied:
+       - it must be under /home/josue/.config/hammer-radar/
+       - it must match discovered systemd env file path or known safe path
+       - no values printed
+       - block if unsafe
+
+  3. R281 discovery output:
+     Update discovery output to include:
+       cli_runtime_env_loader_supported=true
+       safe_cli_env_loader_command
+       allowed_env_file_paths
+       loaded_env_file_status
+       loaded_env_names
+       loaded_secret_names_redacted=true
+       env_file_values_printed=false
+
+  4. R280 private read-only integration:
+     Update tiny-live-binance-autonomous-readiness:
+       If --load-discovered-binance-readonly-env is present:
+         - load safe env before preflight
+         - run account/position read-only using loaded env contract
+         - still require account/position confirmation phrase
+         - still block final command and live submit
+
+  5. API:
+     API should not load files dynamically by query unless already loaded by service.
+     Keep API safe:
+       - endpoint may expose loader support
+       - no file values
+       - no mutation
+       - no network unless explicit existing safe behavior
+
+  6. Final console:
+     Update binance_autonomous_readiness_panel:
+       cli_runtime_env_loader_supported=true
+       safe_cli_env_loader_command
+       selected env names redacted
+       account read env ready status
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  7. Tests:
+     Add/update tests proving:
+       - env loader rejects non-allowlisted paths.
+       - env loader rejects unsafe traversal paths.
+       - env loader loads only allowlisted keys.
+       - env loader redacts secret values.
+       - env loader does not write env files.
+       - env loader blocks if connector mode is not read_only.
+       - env loader blocks if live trading flag is true.
+       - CLI discovery with loader reports ACCOUNT_READ_ENV_READY.
+       - CLI account/position preflight uses loaded env contract.
+       - account/position command still requires confirmation.
+       - no order endpoint called.
+       - no test order endpoint called.
+       - no leverage change.
+       - no margin change.
+       - signed_trading_request_created=false.
+       - signed_order_request_created=false.
+       - final_command_available=false.
+       - submit_allowed=false.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "account_read_env or binance_account_position or binance_autonomous or binance_readonly or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== DISCOVERY WITHOUT CLI LOADER ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-account-read-env-discovery \
+    | tee /tmp/r282_discovery_without_loader.json \
+    | jq '{
+      event_type,
+      status,
+      selected_env_contract,
+      runtime_env_sources,
+      cli_runtime_env_loader_supported,
+      safe_cli_env_loader_command,
+      safety
+    }'
+
+  echo "=== DISCOVERY WITH CLI LOADER ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-account-read-env-discovery \
+    --load-discovered-binance-readonly-env \
+    | tee /tmp/r282_discovery_with_loader.json \
+    | jq '{
+      event_type,
+      status,
+      selected_env_contract,
+      runtime_env_sources,
+      loaded_env_file_status,
+      loaded_env_names,
+      loaded_secret_names_redacted,
+      env_file_values_printed,
+      safety
+    }'
+
+  echo "=== PRIVATE ACCOUNT/POSITION READONLY WITH CLI LOADER ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r282_private_account_position_with_loader.json \
+    | jq '{
+      event_type,
+      status,
+      account_read_env_discovery_status,
+      selected_account_read_env_names,
+      account_position_binding,
+      account_balance_checked,
+      position_risk_checked,
+      account_position_readiness_status,
+      available_balance_usdt,
+      wallet_balance_usdt,
+      wallet_supports_minimum_tiny,
+      wallet_supports_configured_margin_budget,
+      open_position_conflict,
+      btcusdt_position_amt,
+      btcusdt_position_side,
+      btcusdt_position_notional,
+      readiness_blockers,
+      autonomous_one_shot_readiness_matrix,
+      safety
+    }'
+
+  echo "=== COMBINED PUBLIC + PRIVATE READONLY WITH CLI LOADER ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-binance-autonomous-readiness \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    | tee /tmp/r282_combined_readonly_with_loader.json \
+    | jq '{
+      event_type,
+      status,
+      exchange_info_checked,
+      mark_price_checked,
+      account_balance_checked,
+      position_risk_checked,
+      cap_clears_exchange_minimum,
+      wallet_supports_minimum_tiny,
+      wallet_supports_configured_margin_budget,
+      open_position_conflict,
+      account_position_readiness_status,
+      readiness_blockers,
+      autonomous_one_shot_readiness_matrix,
+      safety
+    }'
+
+  echo "=== API DISCOVERY STILL SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/binance-account-read-env-discovery | jq '{
+    event_type,
+    status,
+    selected_env_contract,
+    runtime_env_sources,
+    cli_runtime_env_loader_supported,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    binance_autonomous_readiness_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/binance-account-read-env-discovery \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,120p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - loader support added
+  - safe env file path loaded
+  - loaded env names only
+  - whether private account/position read-only is now READY or exact remaining blocker
+  - wallet readiness
+  - BTCUSDT position conflict status
+  - proof no secret values/no env mutation/no order/no leverage/no margin change
