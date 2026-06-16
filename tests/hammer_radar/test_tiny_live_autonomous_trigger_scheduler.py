@@ -17,6 +17,8 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import
     AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED,
     AUTONOMOUS_TRIGGER_SCHEDULER_LOOP_COMPLETED,
     AUTONOMOUS_TRIGGER_SCHEDULER_NOT_CHECKED,
+    SYSTEMD_TEMPLATE_READY,
+    build_autonomous_trigger_scheduler_systemd_template_status,
     build_tiny_live_autonomous_trigger_scheduler_once,
     run_tiny_live_autonomous_trigger_scheduler_loop,
 )
@@ -31,6 +33,19 @@ from tests.hammer_radar.test_tiny_live_one_shot_pre_activation_gate import (
     _watch_with_candidate,
     _write_risk_contracts,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SERVICE_TEMPLATE_PATH = (
+    REPO_ROOT / "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template"
+)
+TIMER_TEMPLATE_PATH = (
+    REPO_ROOT / "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template"
+)
+CHECKLIST_PATH = (
+    REPO_ROOT
+    / "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
+)
+PRINT_ONLY_SCRIPT_PATH = REPO_ROOT / "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh"
 
 
 def test_scheduler_once_records_iteration(tmp_path: Path) -> None:
@@ -161,6 +176,148 @@ def test_final_console_includes_scheduler_panel(tmp_path: Path) -> None:
     assert panel["real_order_forbidden"] is True
 
 
+def test_systemd_service_template_exists_and_is_dry_run_safe() -> None:
+    text = SERVICE_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    assert SERVICE_TEMPLATE_PATH.exists()
+    assert "Type=oneshot" in text
+    assert "WorkingDirectory=/home/josue/workspace/kernel/ai-agent-orchestrator-main" in text
+    assert "tiny-live-autonomous-trigger-scheduler-once" in text
+    assert "--record-autonomous-trigger-scheduler" in text
+    assert "--operator-id systemd_scheduler" in text
+    assert "systemd dry-run autonomous trigger scheduler tick; no submit." in text
+    assert "HAMMER_LIVE_EXECUTION_ENABLED=false" in text
+    assert "HAMMER_ALLOW_LIVE_ORDERS=false" in text
+    assert "HAMMER_GLOBAL_KILL_SWITCH=true" in text
+    _assert_template_text_safe(text)
+
+
+def test_systemd_timer_template_exists_and_is_not_enabled_by_template() -> None:
+    text = TIMER_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    assert TIMER_TEMPLATE_PATH.exists()
+    assert "OnUnitActiveSec=2min" in text
+    assert "RandomizedDelaySec=5s" in text
+    assert "Persistent=false" in text
+    assert "WantedBy=timers.target" in text
+    assert "systemctl" not in text
+    assert "sudo" not in text
+
+
+def test_systemd_checklist_contains_install_status_and_rollback_commands() -> None:
+    text = CHECKLIST_PATH.read_text(encoding="utf-8")
+
+    assert CHECKLIST_PATH.exists()
+    assert (
+        "sudo install -m 0644 ops/systemd/hammer-radar/"
+        "hammer-autonomous-trigger-scheduler-dry-run.service.template"
+    ) in text
+    assert "sudo systemctl daemon-reload" in text
+    assert "sudo /usr/bin/systemctl start hammer-autonomous-trigger-scheduler-dry-run.timer" in text
+    assert "journalctl -u hammer-autonomous-trigger-scheduler-dry-run.service" in text
+    assert "sudo systemctl disable --now hammer-autonomous-trigger-scheduler-dry-run.timer" in text
+    assert "R289 remains dry-run scheduler only, no live orders" in text
+
+
+def test_print_only_install_plan_script_prints_without_direct_systemd_execution() -> None:
+    text = PRINT_ONLY_SCRIPT_PATH.read_text(encoding="utf-8")
+    command_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("echo")
+    ]
+
+    assert PRINT_ONLY_SCRIPT_PATH.exists()
+    assert "DRY RUN PRINT ONLY" in text
+    assert "does not run sudo, systemctl, copy files" in text
+    assert not any(line.startswith("sudo") for line in command_lines)
+    assert not any("systemctl" in line for line in command_lines)
+    assert not any("install -m" in line for line in command_lines)
+    assert "hammer-autonomous-trigger-scheduler-dry-run.service.template" in text
+    assert "R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md" in text
+
+
+def test_systemd_template_status_packet_safe() -> None:
+    payload = build_autonomous_trigger_scheduler_systemd_template_status(repo_root=REPO_ROOT)
+
+    assert payload["event_type"] == "TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_STATUS"
+    assert payload["created_by_phase"] == "R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_AND_INSTALL_CHECKLIST"
+    assert payload["status"] == SYSTEMD_TEMPLATE_READY
+    assert payload["service_template_present"] is True
+    assert payload["timer_template_present"] is True
+    assert payload["checklist_present"] is True
+    assert payload["print_only_script_present"] is True
+    assert payload["template_dry_run_only"] is True
+    assert payload["installs_performed_by_codex"] is False
+    assert payload["systemctl_called_by_codex"] is False
+    assert payload["sudo_called_by_codex"] is False
+    assert payload["live_execution_enabled"] is False
+    assert payload["forbidden_pattern_hits"] == []
+    _assert_no_submit_or_mutation(payload)
+
+
+def test_systemd_template_status_cli_and_api(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv(LOG_DIR_ENV_VAR, str(tmp_path))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.app.hammer_radar.operator.inspect",
+            "--log-dir",
+            str(tmp_path),
+            "tiny-live-autonomous-trigger-scheduler-systemd-template-status",
+        ],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": "."},
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    cli_payload = json.loads(result.stdout)
+    assert cli_payload["installs_performed_by_codex"] is False
+    assert cli_payload["systemctl_called_by_codex"] is False
+    assert cli_payload["sudo_called_by_codex"] is False
+    assert cli_payload["final_command_available"] is False
+    assert cli_payload["submit_allowed"] is False
+
+    response = TestClient(app).get("/tiny-live/autonomous-trigger-scheduler/systemd-template-status")
+    api_payload = response.json()
+    assert response.status_code == 200
+    assert api_payload["installs_performed_by_codex"] is False
+    assert api_payload["systemctl_called_by_codex"] is False
+    assert api_payload["sudo_called_by_codex"] is False
+    assert api_payload["final_command_available"] is False
+    assert api_payload["submit_allowed"] is False
+
+
+def test_final_console_includes_scheduler_systemd_panel(tmp_path: Path) -> None:
+    from src.app.hammer_radar.operator import tiny_live_final_console as final_console
+
+    payload = final_console.build_tiny_live_final_console(log_dir=tmp_path)
+    panel = payload["autonomous_trigger_scheduler_systemd_panel"]
+
+    assert panel["template_status"] == SYSTEMD_TEMPLATE_READY
+    assert panel["service_template_path"] == (
+        "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template"
+    )
+    assert panel["timer_template_path"] == (
+        "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template"
+    )
+    assert panel["checklist_path"] == (
+        "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
+    )
+    assert panel["print_only_install_plan_script_path"] == (
+        "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh"
+    )
+    assert panel["install_performed"] is False
+    assert panel["systemctl_called_by_codex"] is False
+    assert panel["sudo_called_by_codex"] is False
+    assert panel["dry_run_only"] is True
+    assert panel["final_command_available"] is False
+    assert panel["submit_allowed"] is False
+    assert panel["real_order_forbidden"] is True
+
+
 def test_scheduler_dry_run_executed_path_can_be_simulated(tmp_path: Path) -> None:
     risk_path = _write_risk_contracts(tmp_path, contracts=[_contract(LANE_44M_LONG)])
     arming_path = _write_armed_state(tmp_path, LANE_44M_LONG)
@@ -245,3 +402,20 @@ def _assert_no_submit_or_mutation(payload: dict) -> None:
         "per_signal_operator_approval_required",
     ):
         assert safety[key] is False
+
+
+def _assert_template_text_safe(text: str) -> None:
+    forbidden = (
+        "/fapi/v1/order",
+        "test-order",
+        "leverage_change",
+        "margin_change",
+        "BINANCE_API_SECRET=",
+        "BINANCE_API_KEY=",
+        "final-live-submit",
+        "submit-live",
+        "sudo",
+        "systemctl",
+    )
+    for token in forbidden:
+        assert token not in text

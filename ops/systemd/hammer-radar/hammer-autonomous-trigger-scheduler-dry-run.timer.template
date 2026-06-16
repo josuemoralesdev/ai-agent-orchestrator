@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Hammer Radar autonomous trigger scheduler dry-run tick every 2 minutes
+Documentation=docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+RandomizedDelaySec=5s
+Persistent=false
+Unit=hammer-autonomous-trigger-scheduler-dry-run.service
+
+[Install]
+WantedBy=timers.target
+

@@ -1,0 +1,19 @@
+[Unit]
+Description=Hammer Radar autonomous trigger scheduler dry-run tick
+Documentation=docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=josue
+WorkingDirectory=/home/josue/workspace/kernel/ai-agent-orchestrator-main
+Environment=PYTHONPATH=.
+Environment=HAMMER_RADAR_LOG_DIR=/home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward
+Environment=HAMMER_LIVE_EXECUTION_ENABLED=false
+Environment=HAMMER_ALLOW_LIVE_ORDERS=false
+Environment=HAMMER_GLOBAL_KILL_SWITCH=true
+ExecStart=/home/josue/workspace/kernel/ai-agent-orchestrator-main/.venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-autonomous-trigger-scheduler-once --record-autonomous-trigger-scheduler --operator-id systemd_scheduler --reason "systemd dry-run autonomous trigger scheduler tick; no submit."
+NoNewPrivileges=true
+PrivateTmp=true
+

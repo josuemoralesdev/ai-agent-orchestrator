@@ -70,6 +70,7 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
     build_latest_or_not_checked_autonomous_trigger_loop,
 )
 from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
+    build_autonomous_trigger_scheduler_systemd_template_status,
     build_latest_or_idle_autonomous_trigger_scheduler,
 )
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
@@ -133,6 +134,10 @@ SOURCE_SURFACES_USED = [
     "logs/hammer_radar_forward/tiny_live_binance_readonly_precision_mark_price_gate.ndjson",
     "logs/hammer_radar_forward/tiny_live_binance_autonomous_readiness_binding.ndjson",
     f"logs/hammer_radar_forward/{LEDGER_FILENAME}",
+    "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template",
+    "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template",
+    "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md",
+    "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh",
 ]
 
 
@@ -240,6 +245,7 @@ def build_tiny_live_final_console(
         autonomous_trigger_scheduler_panel = build_autonomous_trigger_scheduler_panel(
             log_dir=resolved_log_dir,
         )
+        autonomous_trigger_scheduler_systemd_panel = build_autonomous_trigger_scheduler_systemd_panel()
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
             promotion_snapshot=promotion_snapshot,
@@ -438,6 +444,7 @@ def build_tiny_live_final_console(
                 "fresh_trigger_watch_panel": fresh_trigger_watch_panel,
                 "autonomous_trigger_loop_panel": autonomous_trigger_loop_panel,
                 "autonomous_trigger_scheduler_panel": autonomous_trigger_scheduler_panel,
+                "autonomous_trigger_scheduler_systemd_panel": autonomous_trigger_scheduler_systemd_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -958,6 +965,38 @@ def build_autonomous_trigger_scheduler_panel(
         }
     )
     return panel
+
+
+def build_autonomous_trigger_scheduler_systemd_panel() -> dict[str, Any]:
+    packet = build_autonomous_trigger_scheduler_systemd_template_status()
+    panel = packet.get("autonomous_trigger_scheduler_systemd_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "template_status": panel.get("template_status") or packet.get("status"),
+            "service_template_path": packet.get("service_template_path"),
+            "timer_template_path": packet.get("timer_template_path"),
+            "checklist_path": packet.get("checklist_path"),
+            "print_only_install_plan_script_path": packet.get("print_only_install_plan_script_path"),
+            "install_performed": False,
+            "installs_performed_by_codex": False,
+            "systemctl_called": False,
+            "systemctl_called_by_codex": False,
+            "sudo_called": False,
+            "sudo_called_by_codex": False,
+            "dry_run_only": True,
+            "template_dry_run_only": True,
+            "next_manual_operator_step": panel.get("next_manual_operator_step")
+            or "Review the R289 checklist and print-only install plan before any manual systemd install.",
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return _sanitize(panel)
 
 
 def _latest_real_candidate_record_summary(record: Mapping[str, Any] | None) -> dict[str, Any] | None:

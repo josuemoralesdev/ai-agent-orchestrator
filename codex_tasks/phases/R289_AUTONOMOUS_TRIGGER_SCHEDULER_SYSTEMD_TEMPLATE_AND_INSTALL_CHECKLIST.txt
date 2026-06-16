@@ -1,0 +1,338 @@
+# R289 — Autonomous Trigger Scheduler Systemd Template and Manual Install Checklist
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: OPS WIRING / SYSTEMD TEMPLATE
+  Secondary: MANUAL INSTALL CHECKLIST, DRY-RUN SCHEDULER READINESS, NO-SUBMIT SAFETY
+  Duplicate risk level: MEDIUM-HIGH
+
+Operator doctrine:
+  The operator does NOT approve each signal.
+  The operator arms/disarms lanes, tunes risk, monitors alerts/logs, and can kill the system.
+  The machine auto-triggers when armed and all gates are open.
+
+Current state after R288:
+  - autonomous trigger scheduler module exists
+  - scheduler once works
+  - bounded scheduler loop works
+  - API scheduler status works
+  - final console has scheduler panel
+  - per_signal_operator_approval_required=false
+  - autonomous_mode=dry_run_only
+  - no current fresh live-qualified candidate
+  - final_command_available=false
+  - submit_allowed=false
+  - no order endpoints
+  - no executable payload
+
+Why this phase exists:
+  R288 made the scheduler callable.
+  R289 must prepare safe operational wiring so the operator can manually install a systemd service/timer later.
+  Codex must NOT install or start the service.
+  This phase creates unit templates, install checklist, preflight commands, uninstall/rollback commands, and safety smoke commands.
+
+Hard goal:
+  Add a complete dry-run systemd/timer template and manual install checklist for:
+    tiny-live-autonomous-trigger-scheduler-once
+
+  The installed service, when manually installed later by the operator, should run periodically and record scheduler ticks.
+  This phase only prepares files/docs/scripts in repo.
+
+Non-negotiable safety:
+  - Do NOT run sudo.
+  - Do NOT install systemd units.
+  - Do NOT start/enable timers.
+  - Do NOT mutate /etc/systemd/system.
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate env files.
+  - Do NOT make final live submit command available.
+  - Do NOT create executable order payloads.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - No per-signal approval gates.
+  - Systemd template must remain dry-run scheduler only.
+
+Allowed:
+  - Create repo-local systemd template files.
+  - Create docs/checklists.
+  - Add validation CLI/API fields that expose install checklist paths.
+  - Add tests verifying unit content is safe.
+  - Add scripts that print install commands but do not execute sudo/systemctl.
+  - Add smoke commands in docs only.
+
+Required scan:
+  Inspect:
+    - docs/hammer_radar/live_readiness/R288_AUTONOMOUS_TRIGGER_SCHEDULER_DRY_RUN_LOOP.md
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - existing systemd docs/templates/scripts in repo
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. Add repo-local systemd template files, not installed:
+     Create directory if absent:
+       ops/systemd/hammer-radar/
+
+     Add:
+       ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template
+       ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template
+
+     Service template must:
+       - use WorkingDirectory=/home/josue/workspace/kernel/ai-agent-orchestrator-main
+       - use ExecStart with .venv python inspect command:
+           PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-autonomous-trigger-scheduler-once --record-autonomous-trigger-scheduler --operator-id systemd_scheduler --reason "systemd dry-run autonomous trigger scheduler tick; no submit."
+       - include read-only Binance flags only if safe and env loader supported:
+           --load-discovered-binance-readonly-env
+           --fetch-binance-readonly-precision-mark-price
+           confirmation string
+           --fetch-binance-readonly-account-position
+           confirmation string
+       - set environment safety flags explicitly false if existing convention allows:
+           HAMMER_LIVE_EXECUTION_ENABLED=false
+           HAMMER_ALLOW_LIVE_ORDERS=false
+           HAMMER_GLOBAL_KILL_SWITCH=true
+       - NOT include any live submit command
+       - NOT include any Binance order endpoint command
+       - NOT include API keys or secrets
+       - NOT write env files
+       - NOT use sudo inside ExecStart
+       - Type=oneshot
+
+     Timer template must:
+       - run every 60 seconds or every 2 minutes, choose safer default every 2 minutes
+       - persistent=false unless repo conventions suggest otherwise
+       - include RandomizedDelaySec small or 0, choose 5s if appropriate
+       - NOT enable itself.
+
+  2. Add manual install checklist doc:
+     docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md
+
+     Include:
+       - What this installs
+       - What it does NOT do
+       - Safety assumptions
+       - Preflight commands
+       - Copy commands to /etc/systemd/system
+       - daemon-reload command
+       - start timer command
+       - status/journal commands
+       - API verification commands
+       - safety grep
+       - stop/disable/remove rollback commands
+       - note: operator controls arming/risk/kill switch; machine auto-triggers when armed and gates open
+       - note: R289 remains dry-run scheduler only, no live orders
+       - note: do not install if final_command_available=true or submit_allowed=true appears anywhere unexpectedly
+
+  3. Add a print-only helper script:
+     scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh
+
+     It must:
+       - print commands only
+       - not run sudo
+       - not run systemctl
+       - not copy files
+       - not mutate anything
+       - include "DRY RUN PRINT ONLY" banner
+       - include paths to templates/checklist
+       - exit 0
+
+  4. Add scheduler ops readiness module or extend existing scheduler module:
+     Add function/packet:
+       event_type="TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_STATUS"
+       created_by_phase="R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_AND_INSTALL_CHECKLIST"
+       status:
+         SYSTEMD_TEMPLATE_READY
+         SYSTEMD_TEMPLATE_BLOCKED
+         SYSTEMD_TEMPLATE_NOT_CHECKED
+
+     Fields:
+       - service_template_path
+       - timer_template_path
+       - checklist_path
+       - print_only_install_plan_script_path
+       - service_template_present
+       - timer_template_present
+       - checklist_present
+       - print_only_script_present
+       - template_dry_run_only=true
+       - installs_performed_by_codex=false
+       - systemctl_called_by_codex=false
+       - sudo_called_by_codex=false
+       - live_execution_enabled=false
+       - per_signal_operator_approval_required=false
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+       - safety
+
+  5. CLI:
+     Add inspect command:
+       tiny-live-autonomous-trigger-scheduler-systemd-template-status
+
+     It should print the packet above.
+     It must not install or run systemctl.
+
+  6. API:
+     Add:
+       GET /tiny-live/autonomous-trigger-scheduler/systemd-template-status
+
+     Default safe:
+       - no network required
+       - no systemctl
+       - no sudo
+       - no mutation
+       - returns template/checklist/script status
+
+  7. Final console:
+     Add:
+       autonomous_trigger_scheduler_systemd_panel
+
+     Include:
+       - template status
+       - service template path
+       - timer template path
+       - checklist path
+       - print-only script path
+       - install performed false
+       - systemctl called false
+       - sudo called false
+       - dry-run only true
+       - next manual operator step
+       - final_command_available=false
+       - submit_allowed=false
+       - real_order_forbidden=true
+
+  8. Phase index:
+     Update docs/hammer_radar/live_readiness/PHASE_INDEX.md with R289 entry.
+
+  9. Tests:
+     Add tests:
+       - service template exists and contains tiny-live-autonomous-trigger-scheduler-once.
+       - service template contains dry-run/no-submit reason.
+       - service template contains no Binance order/test-order endpoints.
+       - service template contains no secrets.
+       - service template contains no sudo.
+       - timer template exists.
+       - checklist exists and contains install + rollback commands.
+       - print-only script does not call sudo/systemctl directly except printed text.
+       - template status CLI/API packet says installs_performed_by_codex=false.
+       - final console includes systemd panel.
+       - safety flags false.
+       - no final command.
+       - no submit.
+       - no per-signal approval.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "systemd_template or autonomous_trigger_scheduler or autonomous_trigger_loop or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== SYSTEMD TEMPLATE STATUS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-autonomous-trigger-scheduler-systemd-template-status \
+    | tee /tmp/r289_systemd_template_status.json \
+    | jq '{
+      event_type,
+      status,
+      service_template_path,
+      timer_template_path,
+      checklist_path,
+      print_only_install_plan_script_path,
+      service_template_present,
+      timer_template_present,
+      checklist_present,
+      print_only_script_present,
+      template_dry_run_only,
+      installs_performed_by_codex,
+      systemctl_called_by_codex,
+      sudo_called_by_codex,
+      live_execution_enabled,
+      per_signal_operator_approval_required,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      safety
+    }'
+
+  echo "=== PRINT ONLY INSTALL PLAN ==="
+  bash scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh | sed -n '1,180p'
+
+  echo "=== TEMPLATE CONTENT SAFETY GREP ==="
+  grep -R "fapi/v1/order\|test.*order\|leverage_change\|margin_change\|BINANCE_API_SECRET=\|BINANCE_API_KEY=\|final-live-submit\|submit-live\|sudo systemctl start\|sudo systemctl enable" -n \
+    ops/systemd/hammer-radar \
+    docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md \
+    scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh \
+    2>/dev/null || true
+
+  echo "=== API SYSTEMD TEMPLATE STATUS ==="
+  curl -s http://127.0.0.1:8015/tiny-live/autonomous-trigger-scheduler/systemd-template-status | jq '{
+    event_type,
+    status,
+    autonomous_trigger_scheduler_systemd_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    autonomous_trigger_scheduler_panel,
+    autonomous_trigger_scheduler_systemd_panel,
+    autonomous_trigger_loop_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/autonomous-trigger-scheduler/systemd-template-status \
+    /tiny-live/autonomous-trigger-scheduler/status \
+    /tiny-live/autonomous-trigger-loop \
+    /tiny-live/fresh-trigger-watch \
+    /tiny-live/one-shot-pre-activation-gate \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP LOGS ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"lane_controls_written\": true\|\"risk_contract_config_written\": true\|\"live_config_written\": true\|\"executable_payload_created\": true\|\"per_signal_operator_approval_required\": true\|\"systemctl_called_by_codex\": true\|\"sudo_called_by_codex\": true\|\"installs_performed_by_codex\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - template status
+  - template/checklist/script paths
+  - proof Codex did not install/start/enable systemd
+  - proof no submit/no order/no executable payload/no mutation/no secrets
+  - manual operator install command location
+  - recommended next phase

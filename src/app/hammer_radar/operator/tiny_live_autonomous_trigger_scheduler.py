@@ -25,8 +25,23 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_loop import (
 )
 
 EVENT_TYPE = "TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER"
+SYSTEMD_TEMPLATE_EVENT_TYPE = "TINY_LIVE_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_STATUS"
 CREATED_BY_PHASE = "R288_AUTONOMOUS_TRIGGER_SCHEDULER_SERVICE_DRY_RUN_LOOP"
+SYSTEMD_TEMPLATE_CREATED_BY_PHASE = "R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_TEMPLATE_AND_INSTALL_CHECKLIST"
 LEDGER_FILENAME = "tiny_live_autonomous_trigger_scheduler.ndjson"
+
+SERVICE_TEMPLATE_PATH = Path(
+    "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.service.template"
+)
+TIMER_TEMPLATE_PATH = Path(
+    "ops/systemd/hammer-radar/hammer-autonomous-trigger-scheduler-dry-run.timer.template"
+)
+CHECKLIST_PATH = Path(
+    "docs/hammer_radar/live_readiness/R289_AUTONOMOUS_TRIGGER_SCHEDULER_SYSTEMD_INSTALL_CHECKLIST.md"
+)
+PRINT_ONLY_INSTALL_PLAN_SCRIPT_PATH = Path(
+    "scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh"
+)
 
 AUTONOMOUS_TRIGGER_SCHEDULER_IDLE = "AUTONOMOUS_TRIGGER_SCHEDULER_IDLE"
 AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED = (
@@ -35,6 +50,9 @@ AUTONOMOUS_TRIGGER_SCHEDULER_ITERATION_RECORDED = (
 AUTONOMOUS_TRIGGER_SCHEDULER_LOOP_COMPLETED = "AUTONOMOUS_TRIGGER_SCHEDULER_LOOP_COMPLETED"
 AUTONOMOUS_TRIGGER_SCHEDULER_BLOCKED = "AUTONOMOUS_TRIGGER_SCHEDULER_BLOCKED"
 AUTONOMOUS_TRIGGER_SCHEDULER_NOT_CHECKED = "AUTONOMOUS_TRIGGER_SCHEDULER_NOT_CHECKED"
+SYSTEMD_TEMPLATE_READY = "SYSTEMD_TEMPLATE_READY"
+SYSTEMD_TEMPLATE_BLOCKED = "SYSTEMD_TEMPLATE_BLOCKED"
+SYSTEMD_TEMPLATE_NOT_CHECKED = "SYSTEMD_TEMPLATE_NOT_CHECKED"
 
 DEFAULT_MAX_ITERATIONS = 1
 PUBLIC_MAX_ITERATIONS_CAP = 20
@@ -111,6 +129,21 @@ UNSAFE_TRUE_KEYS = {
     "global_live_flags_changed",
     "per_signal_operator_approval_required",
 }
+
+SYSTEMD_TEMPLATE_FORBIDDEN_PATTERNS = (
+    "/fapi/v1/order",
+    "fapi/v1/order",
+    "test-order",
+    "test order endpoint",
+    "leverage_change",
+    "margin_change",
+    "BINANCE_API_SECRET=",
+    "BINANCE_API_KEY=",
+    "final-live-submit",
+    "submit-live",
+    "sudo systemctl start",
+    "sudo systemctl enable",
+)
 
 
 def build_tiny_live_autonomous_trigger_scheduler_once(
@@ -386,6 +419,118 @@ def build_latest_or_idle_autonomous_trigger_scheduler(*, log_dir: str | Path | N
     )
 
 
+def build_autonomous_trigger_scheduler_systemd_template_status(
+    *,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    root = Path(repo_root) if repo_root is not None else Path.cwd()
+    service_path = SERVICE_TEMPLATE_PATH
+    timer_path = TIMER_TEMPLATE_PATH
+    checklist_path = CHECKLIST_PATH
+    script_path = PRINT_ONLY_INSTALL_PLAN_SCRIPT_PATH
+    present = {
+        "service_template_present": (root / service_path).exists(),
+        "timer_template_present": (root / timer_path).exists(),
+        "checklist_present": (root / checklist_path).exists(),
+        "print_only_script_present": (root / script_path).exists(),
+    }
+    scanned_text = "\n".join(_read_text_if_exists(root / path) for path in (service_path, timer_path, script_path))
+    forbidden_hits = [
+        pattern for pattern in SYSTEMD_TEMPLATE_FORBIDDEN_PATTERNS if pattern.lower() in scanned_text.lower()
+    ]
+    service_text = _read_text_if_exists(root / service_path)
+    timer_text = _read_text_if_exists(root / timer_path)
+    required_hits = {
+        "service_type_oneshot": "Type=oneshot" in service_text,
+        "service_uses_scheduler_once": "tiny-live-autonomous-trigger-scheduler-once" in service_text,
+        "service_records_scheduler": "--record-autonomous-trigger-scheduler" in service_text,
+        "service_reason_no_submit": "no submit" in service_text.lower(),
+        "service_live_execution_false": "HAMMER_LIVE_EXECUTION_ENABLED=false" in service_text,
+        "service_live_orders_false": "HAMMER_ALLOW_LIVE_ORDERS=false" in service_text,
+        "service_global_kill_switch_true": "HAMMER_GLOBAL_KILL_SWITCH=true" in service_text,
+        "timer_two_minute_interval": "OnUnitActiveSec=2min" in timer_text,
+        "timer_persistent_false": "Persistent=false" in timer_text,
+    }
+    blocked_reasons = [
+        key for key, value in {**present, **required_hits}.items() if value is not True
+    ]
+    blocked_reasons.extend(f"forbidden_pattern:{pattern}" for pattern in forbidden_hits)
+    status = SYSTEMD_TEMPLATE_READY if not blocked_reasons else SYSTEMD_TEMPLATE_BLOCKED
+    safety = _merged_safety(
+        {
+            "safety": {
+                "template_dry_run_only": True,
+                "installs_performed_by_codex": False,
+                "systemctl_called_by_codex": False,
+                "sudo_called_by_codex": False,
+                "live_execution_enabled": False,
+            }
+        }
+    )
+    safety.update(
+        {
+            "template_dry_run_only": True,
+            "installs_performed_by_codex": False,
+            "systemctl_called_by_codex": False,
+            "sudo_called_by_codex": False,
+            "live_execution_enabled": False,
+        }
+    )
+    packet = {
+        "event_type": SYSTEMD_TEMPLATE_EVENT_TYPE,
+        "created_by_phase": SYSTEMD_TEMPLATE_CREATED_BY_PHASE,
+        "status": status,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "service_template_path": str(service_path),
+        "timer_template_path": str(timer_path),
+        "checklist_path": str(checklist_path),
+        "print_only_install_plan_script_path": str(script_path),
+        **present,
+        "template_dry_run_only": True,
+        "installs_performed_by_codex": False,
+        "systemctl_called_by_codex": False,
+        "sudo_called_by_codex": False,
+        "live_execution_enabled": False,
+        "per_signal_operator_approval_required": False,
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
+        "required_template_checks": required_hits,
+        "forbidden_pattern_hits": forbidden_hits,
+        "blocked_reasons": blocked_reasons,
+        "next_manual_operator_step": (
+            "Review checklist and print-only install plan before any manual systemd install."
+            if status == SYSTEMD_TEMPLATE_READY
+            else "Fix missing or unsafe template/checklist/script content before install."
+        ),
+        "autonomous_trigger_scheduler_systemd_panel": {
+            "template_status": status,
+            "service_template_path": str(service_path),
+            "timer_template_path": str(timer_path),
+            "checklist_path": str(checklist_path),
+            "print_only_install_plan_script_path": str(script_path),
+            **present,
+            "install_performed": False,
+            "installs_performed_by_codex": False,
+            "systemctl_called": False,
+            "systemctl_called_by_codex": False,
+            "sudo_called": False,
+            "sudo_called_by_codex": False,
+            "dry_run_only": True,
+            "template_dry_run_only": True,
+            "next_manual_operator_step": (
+                "Run scripts/hammer_print_autonomous_trigger_scheduler_systemd_install_plan.sh, "
+                "then follow the R289 checklist manually."
+            ),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        },
+        "safety": safety,
+    }
+    return _sanitize(packet)
+
+
 def format_tiny_live_autonomous_trigger_scheduler_json(payload: Mapping[str, Any]) -> str:
     return json.dumps(_sanitize(payload), sort_keys=True, separators=(",", ":"))
 
@@ -507,6 +652,12 @@ def _dedupe(items: list[str]) -> list[str]:
             seen.add(item)
             deduped.append(item)
     return deduped
+
+
+def _read_text_if_exists(path: Path) -> str:
+    if not path.exists() or not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8")
 
 
 def _sanitize(value: Any) -> Any:
