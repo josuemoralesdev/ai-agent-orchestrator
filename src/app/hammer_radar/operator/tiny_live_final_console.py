@@ -82,6 +82,9 @@ from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler_timer_
 from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal import (
     build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal,
 )
+from src.app.hammer_radar.operator.tiny_live_timer_observed_armed_lane_wait_certificate import (
+    build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -152,7 +155,9 @@ SOURCE_SURFACES_USED = [
     "scripts/hammer_print_r290_manual_systemd_dry_run_activation_plan.sh",
     "scripts/hammer_print_r292_refresh_installed_dry_run_timer_units.sh",
     "src/app/hammer_radar/operator/tiny_live_dry_run_lane_arming_rehearsal.py",
+    "src/app/hammer_radar/operator/tiny_live_timer_observed_armed_lane_wait_certificate.py",
     "scripts/hammer_print_r294_dry_run_lane_arming_rehearsal_plan.sh",
+    "scripts/hammer_print_r295_timer_observed_armed_lane_wait_certificate_plan.sh",
 ]
 
 
@@ -267,6 +272,9 @@ def build_tiny_live_final_console(
         )
         dry_run_lane_arming_rehearsal_panel = build_dry_run_lane_arming_rehearsal_panel(
             log_dir=resolved_log_dir,
+        )
+        timer_observed_armed_lane_wait_certificate_panel = (
+            build_timer_observed_armed_lane_wait_certificate_panel(log_dir=resolved_log_dir)
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -474,6 +482,9 @@ def build_tiny_live_final_console(
                     autonomous_trigger_scheduler_timer_health_panel
                 ),
                 "dry_run_lane_arming_rehearsal_panel": dry_run_lane_arming_rehearsal_panel,
+                "timer_observed_armed_lane_wait_certificate_panel": (
+                    timer_observed_armed_lane_wait_certificate_panel
+                ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -1148,6 +1159,64 @@ def build_dry_run_lane_arming_rehearsal_panel(
             "real_order_forbidden": True,
             "recommended_next_operator_move": panel.get("recommended_next_operator_move")
             or packet.get("recommended_next_operator_move"),
+        }
+    )
+    return _sanitize(panel)
+
+
+def build_timer_observed_armed_lane_wait_certificate_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate(log_dir=log_dir)
+    panel = packet.get("timer_observed_armed_lane_wait_certificate_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "status": panel.get("status") or packet.get("status"),
+            "requested_lane_key": panel.get("requested_lane_key") or packet.get("requested_lane_key"),
+            "observed_lane_key": panel.get("observed_lane_key") or packet.get("requested_lane_key"),
+            "timer_health": panel.get("timer_health")
+            or {
+                "timer_health_status": packet.get("timer_health_status"),
+                "timer_active": packet.get("timer_active") is True,
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+                "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+            },
+            "recent_scheduler_tick_summary": panel.get("recent_scheduler_tick_summary")
+            or {
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+                "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+                "latest_scheduler_status": packet.get("scheduler_latest_status"),
+                "latest_trigger_loop_status": packet.get("scheduler_latest_trigger_loop_status"),
+                "latest_candidate_lane_key": packet.get("scheduler_latest_candidate_lane_key"),
+            },
+            "current_candidate_summary": panel.get("current_candidate_summary")
+            or {
+                "current_fresh_candidate_exists": packet.get("current_fresh_candidate_exists") is True,
+                "current_candidate_lane_key": packet.get("current_candidate_lane_key"),
+                "current_candidate_matches_requested_lane": (
+                    packet.get("current_candidate_matches_requested_lane") is True
+                ),
+            },
+            "exact_lane_match_status": panel.get("exact_lane_match_status")
+            or {
+                "exact_lane_only": True,
+                "exact_lane_match_required": True,
+                "no_cross_lane_borrowing": True,
+                "current_candidate_matches_requested_lane": (
+                    packet.get("current_candidate_matches_requested_lane") is True
+                ),
+            },
+            "blockers": list(panel.get("blockers") or packet.get("blockers") or []),
+            "recommended_next_operator_move": panel.get("recommended_next_operator_move")
+            or packet.get("recommended_next_operator_move"),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
         }
     )
     return _sanitize(panel)

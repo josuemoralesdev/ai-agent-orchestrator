@@ -3007,6 +3007,28 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-timer-observed-armed-lane-wait-certificate":
+        from src.app.hammer_radar.operator.tiny_live_timer_observed_armed_lane_wait_certificate import (
+            build_tiny_live_timer_observed_armed_lane_wait_certificate,
+            format_tiny_live_timer_observed_armed_lane_wait_certificate_json,
+        )
+
+        print(
+            format_tiny_live_timer_observed_armed_lane_wait_certificate_json(
+                build_tiny_live_timer_observed_armed_lane_wait_certificate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_timer_observed_armed_lane_wait_certificate=(
+                        args.record_timer_observed_armed_lane_wait_certificate
+                    ),
+                    simulate_matching_fresh_candidate_for_tests_only=(
+                        args.simulate_matching_fresh_candidate_for_tests_only
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6012,6 +6034,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_dry_run_lane_arming_rehearsal_parser.add_argument(
         "--simulate-fresh-candidate-for-tests-only",
+        action="store_true",
+    )
+
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser = subparsers.add_parser(
+        "tiny-live-timer-observed-armed-lane-wait-certificate",
+        parents=[parent],
+    )
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument("--lane-key", default=None)
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument("--reason", default=None)
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument(
+        "--record-timer-observed-armed-lane-wait-certificate",
+        action="store_true",
+    )
+    tiny_live_timer_observed_armed_lane_wait_certificate_parser.add_argument(
+        "--simulate-matching-fresh-candidate-for-tests-only",
         action="store_true",
     )
 

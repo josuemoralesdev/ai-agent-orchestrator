@@ -120,6 +120,9 @@ from src.app.hammer_radar.operator.tiny_live_dry_run_lane_arming_rehearsal impor
     build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal,
     build_tiny_live_dry_run_lane_arming_rehearsal,
 )
+from src.app.hammer_radar.operator.tiny_live_timer_observed_armed_lane_wait_certificate import (
+    build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1068,6 +1071,13 @@ def tiny_live_autonomous_trigger_scheduler_timer_health() -> dict:
 @app.get("/tiny-live/dry-run-lane-arming-rehearsal/status")
 def tiny_live_dry_run_lane_arming_rehearsal_status() -> dict:
     return build_latest_or_status_tiny_live_dry_run_lane_arming_rehearsal(
+        log_dir=get_log_dir(use_env=True)
+    )
+
+
+@app.get("/tiny-live/timer-observed-armed-lane-wait-certificate/status")
+def tiny_live_timer_observed_armed_lane_wait_certificate_status() -> dict:
+    return build_latest_or_status_tiny_live_timer_observed_armed_lane_wait_certificate(
         log_dir=get_log_dir(use_env=True)
     )
 
