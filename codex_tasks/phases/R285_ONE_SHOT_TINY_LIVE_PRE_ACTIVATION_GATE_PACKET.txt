@@ -1,0 +1,378 @@
+# R285 — One-Shot Tiny Live Pre-Activation Gate Packet
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: PRE-LIVE ONE-SHOT GATE PACKET
+  Secondary: BINANCE READINESS INTEGRATION, LIVE-QUALIFIED CANDIDATE GATE, SAFETY HARDENING
+  Duplicate risk level: MEDIUM-HIGH
+
+Operator context:
+  R284 verified manual Binance alignment:
+    - BTCUSDT leverage = 10x
+    - BTCUSDT margin mode = isolated
+    - BTCUSDT position amount = 0.0
+    - open_position_conflict = false
+    - wallet_balance_usdt approx 126.33
+    - wallet_supports_configured_margin_budget = true
+    - Binance readiness ready
+    - no order endpoint called
+    - no test order endpoint called
+    - no leverage/margin mutation
+    - no secrets shown
+
+Why this phase exists:
+  Binance/exchange readiness is now green.
+  The system still needs a single one-shot pre-activation gate packet that combines all readiness surfaces and remains blocked until a fresh LIVE_QUALIFIED candidate appears on an exact approved lane.
+
+Hard goal:
+  Build a read-only / no-submit one-shot tiny-live pre-activation packet that says whether the machine is READY_TO_WAIT_FOR_TRIGGER or BLOCKED, and why.
+
+This phase must NOT submit orders.
+This phase must NOT expose a final live submit command.
+This phase must NOT enable live execution.
+This phase must NOT mutate lane controls.
+
+Approved live-qualified candidate lanes:
+  - BTCUSDT|44m|long|ladder_close_50_618
+  - BTCUSDT|44m|short|ladder_close_50_618
+  - BTCUSDT|55m|long|ladder_close_50_618
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage mutation endpoint.
+  - Do NOT call Binance margin type mutation endpoint.
+  - Do NOT call any mutation endpoint.
+  - Do NOT change leverage.
+  - Do NOT change margin mode.
+  - Do NOT enable live execution.
+  - Do NOT disable global kill switch.
+  - Do NOT write lane controls.
+  - Do NOT write live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT make final submit command available.
+  - Do NOT print API keys/secrets/signatures/signed URLs.
+  - Do NOT create executable order payloads.
+  - Any order/triplet in this phase must be preview/simulation only and explicitly non-executable.
+  - If any required readiness surface is stale, missing, not checked, or blocked, packet must block.
+
+Allowed:
+  - Read-only Binance checks using R282 loader and confirmations.
+  - Public exchange info / mark price read-only checks.
+  - Existing strategy candidate watch.
+  - Existing autonomous dry-run state read.
+  - Existing risk contract read.
+  - Existing idempotency/audit log read.
+  - Build no-submit packet and tests/docs.
+  - Record a no-submit pre-activation audit packet.
+
+Required scan:
+  Inspect:
+    - src/app/hammer_radar/operator/tiny_live_binance_autonomous_readiness_binding.py
+    - src/app/hammer_radar/operator/tiny_live_leverage_margin_readiness.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/live_qualified_candidate_watch.py if exists
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - src/app/hammer_radar/operator/readiness.py
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - configs/hammer_radar/autonomous_arming_state.json
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation scope:
+  1. New module:
+     Add:
+       src/app/hammer_radar/operator/tiny_live_one_shot_pre_activation_gate.py
+
+     Packet:
+       event_type="TINY_LIVE_ONE_SHOT_PRE_ACTIVATION_GATE"
+       created_by_phase="R285_ONE_SHOT_TINY_LIVE_PRE_ACTIVATION_GATE_PACKET"
+       status:
+         ONE_SHOT_PRE_ACTIVATION_READY_TO_WAIT_FOR_TRIGGER
+         ONE_SHOT_PRE_ACTIVATION_READY_FOR_DRY_RUN_TRIGGER
+         ONE_SHOT_PRE_ACTIVATION_BLOCKED
+         ONE_SHOT_PRE_ACTIVATION_NOT_CHECKED
+
+  2. Required readiness matrix fields:
+     - binance_readiness_ready
+     - exchange_minimum_ready
+     - wallet_ready
+     - wallet_supports_configured_margin_budget
+     - no_conflicting_position
+     - leverage_margin_ready
+     - post_manual_leverage_margin_verified
+     - live_qualified_lanes_available
+     - current_fresh_candidate_exists
+     - current_fresh_candidate_is_live_qualified
+     - current_candidate_lane_key
+     - current_candidate_signal_id
+     - approved_lane_match
+     - exact_lane_risk_contract_found
+     - exact_lane_risk_contract_valid
+     - risk_contract_notional_cap_usdt
+     - risk_contract_leverage
+     - risk_contract_margin_budget_usdt
+     - protective_orders_required
+     - protective_triplet_preview_available
+     - protective_triplet_preview_valid
+     - idempotency_clean
+     - no_prior_live_submit
+     - autonomous_dry_run_default_off
+     - global_auto_live_enabled
+     - exact_lane_auto_armed
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+
+  3. Decision logic:
+     If Binance readiness is green, leverage/margin ready, wallet ready, no position conflict, exchange minimum ready, live-qualified lanes exist, but no fresh candidate:
+       status = ONE_SHOT_PRE_ACTIVATION_READY_TO_WAIT_FOR_TRIGGER
+       next_required_step = WAIT_FOR_FRESH_LIVE_QUALIFIED_CANDIDATE
+       final command unavailable.
+
+     If a fresh candidate exists but it is PAPER_ONLY or NEAR_MISS:
+       status = ONE_SHOT_PRE_ACTIVATION_BLOCKED
+       blockers include strategy_not_live_qualified / paper_only / near_miss.
+
+     If a fresh candidate exists on approved live-qualified lane but risk contract missing/invalid:
+       status = ONE_SHOT_PRE_ACTIVATION_BLOCKED
+       blockers include exact_lane_risk_contract_missing/invalid.
+
+     If all read-only gates green and fresh approved candidate exists:
+       status = ONE_SHOT_PRE_ACTIVATION_READY_FOR_DRY_RUN_TRIGGER
+       final command still unavailable in R285.
+       next_required_step = RUN_ONE_SHOT_DRY_RUN_TRIGGER_PACKET_OR_ARMING_REVIEW
+       no live order.
+
+     Never output actual submit command in R285.
+
+  4. Risk contract:
+     Must validate exact lane contract for the current candidate lane only.
+     No cross-lane borrowing.
+     Required contract:
+       mode explicit_notional_cap_with_leverage
+       symbol BTCUSDT
+       max_position_notional_usdt or max_notional_usdt == 80
+       leverage == 10
+       margin_budget_usdt == 8
+       max_loss_usdt present
+       protective orders required or equivalent stop/take-profit present
+
+  5. Protective order preview:
+     Reuse existing simulated/dry-run triplet preview logic if present.
+     Must be non-executable:
+       order_payload_created=false OR executable_payload_created=false
+       final_command_available=false
+       submit_allowed=false
+     If existing signed preview is stale or executable, do not reuse as go signal.
+     Report stale/missing clearly.
+
+  6. CLI:
+     Add inspect command:
+       tiny-live-one-shot-pre-activation-gate
+
+     Options:
+       --load-discovered-binance-readonly-env
+       --fetch-binance-readonly-precision-mark-price
+       --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT."
+       --fetch-binance-readonly-account-position
+       --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE."
+       --record-pre-activation-review
+       --operator-id local_operator
+       --reason "R285 no-submit pre-activation review; wait for fresh LIVE_QUALIFIED candidate."
+
+  7. API:
+     Add safe endpoint:
+       GET /tiny-live/one-shot-pre-activation-gate
+
+     Default should not hit private Binance network.
+     It may return latest recorded pre-activation packet or NOT_CHECKED with safe CLI command.
+     No secrets, no submit.
+
+  8. Final console:
+     Add panel:
+       one_shot_pre_activation_gate_panel
+
+     Include:
+       status
+       current candidate status
+       Binance readiness summary
+       leverage/margin verified summary
+       live-qualified lane list
+       approved lane match
+       exact risk contract status
+       protective preview status
+       idempotency status
+       next required step
+       safe next CLI command
+       final_command_available=false
+       submit_allowed=false
+       real_order_forbidden=true
+
+  9. Tests:
+     Add tests:
+       - all Binance readiness green + no fresh candidate => READY_TO_WAIT_FOR_TRIGGER.
+       - fresh paper-only candidate => BLOCKED.
+       - fresh near-miss candidate => BLOCKED.
+       - fresh approved live-qualified candidate + missing contract => BLOCKED.
+       - fresh approved live-qualified candidate + valid contract + no protective preview => BLOCKED or READY_FOR_DRY_RUN_TRIGGER depending existing preview requirement, but never submit.
+       - all gates green => READY_FOR_DRY_RUN_TRIGGER with final command unavailable.
+       - one_shot_live_allowed remains false.
+       - no order/test-order/leverage/margin mutation.
+       - no secrets/signatures/signed URLs shown.
+       - final console includes panel.
+       - API endpoint default safe no-network.
+       - exact lane only, no cross-lane borrowing.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "one_shot_pre_activation or post_manual or leverage_margin or account_read_env or binance_account_position or binance_autonomous or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  systemctl is-active hammer-approval-api.service
+
+  echo "=== ONE-SHOT PRE-ACTIVATION GATE WITH FULL READONLY CHECKS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-one-shot-pre-activation-gate \
+    --load-discovered-binance-readonly-env \
+    --fetch-binance-readonly-precision-mark-price \
+    --confirm-tiny-live-binance-readonly-fetch "I CONFIRM BINANCE READONLY PRECISION MARK PRICE CHECK ONLY; NO ORDER; NO SIGNATURE; NO PRIVATE ENDPOINT." \
+    --fetch-binance-readonly-account-position \
+    --confirm-binance-readonly-account-position "I CONFIRM BINANCE READONLY ACCOUNT POSITION CHECK ONLY; NO ORDER; NO TEST ORDER; NO LEVERAGE CHANGE; NO MARGIN CHANGE." \
+    --record-pre-activation-review \
+    --operator-id local_operator \
+    --reason "R285 no-submit pre-activation review; wait for fresh LIVE_QUALIFIED candidate." \
+    | tee /tmp/r285_one_shot_pre_activation_gate.json \
+    | jq '{
+      event_type,
+      status,
+      next_required_step,
+      binance_readiness_ready,
+      exchange_minimum_ready,
+      wallet_ready,
+      wallet_supports_configured_margin_budget,
+      no_conflicting_position,
+      leverage_margin_ready,
+      post_manual_leverage_margin_verified,
+      live_qualified_lanes_available,
+      current_fresh_candidate_exists,
+      current_fresh_candidate_is_live_qualified,
+      current_candidate_lane_key,
+      current_candidate_signal_id,
+      approved_lane_match,
+      exact_lane_risk_contract_found,
+      exact_lane_risk_contract_valid,
+      protective_triplet_preview_available,
+      protective_triplet_preview_valid,
+      idempotency_clean,
+      no_prior_live_submit,
+      one_shot_live_allowed,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      blockers,
+      safety
+    }'
+
+  echo "=== API PRE-ACTIVATION DEFAULT SAFE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/one-shot-pre-activation-gate | jq '{
+    event_type,
+    status,
+    one_shot_pre_activation_gate_panel,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    binance_autonomous_readiness_panel,
+    leverage_margin_readiness_panel,
+    post_manual_leverage_margin_verification_panel,
+    one_shot_pre_activation_gate_panel,
+    autonomous_armed_dry_run_panel,
+    final_console_go_no_go_packet,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== QUALIFIED CANDIDATE WATCH ==="
+  curl -s http://127.0.0.1:8015/tiny-live/qualified-candidate-watch | jq '{
+    event_type,
+    status,
+    live_qualified_lanes,
+    near_miss_incubator_lanes,
+    current_fresh_candidate_status,
+    next_action,
+    safety
+  }'
+
+  echo "=== READINESS / TRADE TICKET ==="
+  curl -s http://127.0.0.1:8015/readiness | jq '{
+    readiness_status,
+    reason_summary,
+    current_state,
+    blockers,
+    next_required_action
+  }'
+
+  curl -s http://127.0.0.1:8015/trade-ticket | jq '{
+    ticket_status,
+    readiness_status,
+    lane_key,
+    signal_id,
+    suggested_position_usd,
+    suggested_leverage,
+    blockers,
+    risk_contract
+  }'
+
+  echo "=== ABSOLUTE ENDPOINT CODES ==="
+  for endpoint in \
+    /tiny-live/one-shot-pre-activation-gate \
+    /tiny-live/post-manual-leverage-margin-verification \
+    /tiny-live/leverage-margin-readiness \
+    /tiny-live/binance-account-read-env-discovery \
+    /tiny-live/binance-autonomous-readiness \
+    /tiny-live/autonomous-armed-dry-run \
+    /tiny-live/autonomous-arming/status \
+    /tiny-live/qualified-candidate-watch \
+    /readiness \
+    /trade-ticket \
+    /tiny-live/final-console
+  do
+    echo
+    echo "### $endpoint"
+    /usr/bin/curl -sS -w '\nHTTP_CODE=%{http_code}\n' "http://127.0.0.1:8015$endpoint" | /usr/bin/sed -n '1,100p'
+  done
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"leverage_change_called\": true\|\"margin_change_called\": true\|\"signed_trading_request_created\": true\|\"signed_order_request_created\": true\|\"env_written\": true\|\"env_mutated\": true\|\"secret_values_in_output\": true\|\"secrets_shown\": true\|\"signed_url_shown\": true\|\"signature_shown\": true\|\"mutation_performed\": true\|\"final_command_available\": true\|\"submit_allowed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*submit*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - one-shot pre-activation status
+  - Binance readiness summary
+  - candidate state
+  - exact blockers
+  - whether waiting for fresh LIVE_QUALIFIED candidate
+  - proof no final command/no submit/no mutation/no order/no secrets
+  - recommended next phase

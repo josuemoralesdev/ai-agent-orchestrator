@@ -107,6 +107,9 @@ from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
     build_post_manual_leverage_margin_alignment_verification,
     build_tiny_live_leverage_margin_readiness,
 )
+from src.app.hammer_radar.operator.tiny_live_one_shot_pre_activation_gate import (
+    build_not_checked_pre_activation_gate_packet,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -999,6 +1002,11 @@ def tiny_live_leverage_margin_readiness() -> dict:
 @app.get("/tiny-live/post-manual-leverage-margin-verification")
 def tiny_live_post_manual_leverage_margin_verification() -> dict:
     return build_post_manual_leverage_margin_alignment_verification(log_dir=get_log_dir(use_env=True))
+
+
+@app.get("/tiny-live/one-shot-pre-activation-gate")
+def tiny_live_one_shot_pre_activation_gate() -> dict:
+    return build_not_checked_pre_activation_gate_packet(log_dir=get_log_dir(use_env=True))
 
 
 @app.get("/tiny-live/binance-account-read-env-discovery")

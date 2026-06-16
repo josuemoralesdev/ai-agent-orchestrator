@@ -60,6 +60,9 @@ from src.app.hammer_radar.operator.tiny_live_leverage_margin_readiness import (
     load_latest_post_manual_leverage_margin_verification,
     load_latest_tiny_live_leverage_margin_readiness,
 )
+from src.app.hammer_radar.operator.tiny_live_one_shot_pre_activation_gate import (
+    build_tiny_live_one_shot_pre_activation_gate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -213,6 +216,10 @@ def build_tiny_live_final_console(
         )
         post_manual_leverage_margin_verification_panel = (
             build_post_manual_leverage_margin_verification_panel(log_dir=resolved_log_dir)
+        )
+        one_shot_pre_activation_gate_panel = build_one_shot_pre_activation_gate_panel(
+            log_dir=resolved_log_dir,
+            risk_contract_config_path=risk_path,
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -408,6 +415,7 @@ def build_tiny_live_final_console(
                 "post_manual_leverage_margin_verification_panel": (
                     post_manual_leverage_margin_verification_panel
                 ),
+                "one_shot_pre_activation_gate_panel": one_shot_pre_activation_gate_panel,
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -753,6 +761,36 @@ def build_post_manual_leverage_margin_verification_panel(
         "submit_allowed": False,
         "real_order_forbidden": True,
         "safety": packet.get("safety") if isinstance(packet.get("safety"), Mapping) else {},
+    }
+
+
+def build_one_shot_pre_activation_gate_panel(
+    *,
+    log_dir: str | Path | None = None,
+    risk_contract_config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_tiny_live_one_shot_pre_activation_gate(
+        log_dir=log_dir,
+        risk_contract_config_path=risk_contract_config_path,
+    )
+    panel = packet.get("one_shot_pre_activation_gate_panel")
+    if isinstance(panel, Mapping):
+        return dict(panel)
+    return {
+        "status": packet.get("status"),
+        "current_candidate_status": packet.get("candidate_watch_status"),
+        "binance_readiness_summary": {},
+        "leverage_margin_verified_summary": {},
+        "live_qualified_lane_list": [],
+        "approved_lane_match": packet.get("approved_lane_match"),
+        "exact_risk_contract_status": {},
+        "protective_preview_status": {},
+        "idempotency_status": {},
+        "next_required_step": packet.get("next_required_step"),
+        "safe_next_cli_command": packet.get("safe_next_cli_command"),
+        "final_command_available": False,
+        "submit_allowed": False,
+        "real_order_forbidden": True,
     }
 
 
