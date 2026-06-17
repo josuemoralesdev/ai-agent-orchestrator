@@ -106,6 +106,9 @@ from src.app.hammer_radar.operator.tiny_live_manual_operator_dry_run_arming_post
 from src.app.hammer_radar.operator.tiny_live_armed_dry_run_timer_observation_certificate import (
     build_status_tiny_live_armed_dry_run_timer_observation_certificate,
 )
+from src.app.hammer_radar.operator.tiny_live_final_authorization_gate import (
+    build_status_tiny_live_final_authorization_gate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -334,6 +337,9 @@ def build_tiny_live_final_console(
             build_armed_dry_run_timer_observation_certificate_panel(
                 log_dir=resolved_log_dir
             )
+        )
+        final_tiny_live_authorization_gate_panel = (
+            build_final_tiny_live_authorization_gate_panel(log_dir=resolved_log_dir)
         )
         lane_context = load_lane_fisherman_context(
             lane_controls=lane_controls,
@@ -564,6 +570,9 @@ def build_tiny_live_final_console(
                 ),
                 "armed_dry_run_timer_observation_certificate_panel": (
                     armed_dry_run_timer_observation_certificate_panel
+                ),
+                "final_tiny_live_authorization_gate_panel": (
+                    final_tiny_live_authorization_gate_panel
                 ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
@@ -987,6 +996,44 @@ def build_fresh_trigger_watch_panel(
         "final_command_available": False,
         "submit_allowed": False,
         "real_order_forbidden": True,
+    }
+
+
+def build_final_tiny_live_authorization_gate_panel(
+    *,
+    log_dir: str | Path | None = None,
+    lane_key: str | None = None,
+) -> dict[str, Any]:
+    packet = build_status_tiny_live_final_authorization_gate(
+        log_dir=log_dir,
+        lane_key=lane_key,
+    )
+    panel = packet.get("final_tiny_live_authorization_gate_panel")
+    if isinstance(panel, Mapping):
+        return dict(panel)
+    return {
+        "status": packet.get("status"),
+        "requested_lane_key": packet.get("requested_lane_key"),
+        "exact_lane_armed_state": {
+            "dry_run_lane_armed": packet.get("dry_run_lane_armed"),
+            "exact_lane_auto_armed": packet.get("exact_lane_auto_armed"),
+            "any_lane_auto_armed": packet.get("any_lane_auto_armed"),
+            "armed_lane_key": packet.get("armed_lane_key"),
+        },
+        "real_candidate_summary": {
+            "exists": packet.get("current_real_candidate_exists"),
+            "lane_key": packet.get("current_real_candidate_lane_key"),
+            "signal_id": packet.get("current_real_candidate_signal_id"),
+            "matches_requested_lane": packet.get("candidate_matches_requested_lane"),
+        },
+        "readiness_matrix": {},
+        "blockers": list(packet.get("blockers") or []),
+        "final_command_available": packet.get("final_command_available") is True,
+        "final_manual_submit_packet": packet.get("final_manual_submit_packet"),
+        "manual_disarm_command": packet.get("manual_disarm_command"),
+        "recommended_next_operator_move": packet.get("recommended_next_operator_move"),
+        "submit_allowed": packet.get("submit_allowed") is True,
+        "real_order_forbidden": packet.get("real_order_forbidden") is not False,
     }
 
 

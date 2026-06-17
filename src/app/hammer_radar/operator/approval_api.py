@@ -146,6 +146,9 @@ from src.app.hammer_radar.operator.tiny_live_manual_operator_dry_run_arming_post
 from src.app.hammer_radar.operator.tiny_live_armed_dry_run_timer_observation_certificate import (
     build_status_tiny_live_armed_dry_run_timer_observation_certificate,
 )
+from src.app.hammer_radar.operator.tiny_live_final_authorization_gate import (
+    build_status_tiny_live_final_authorization_gate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1191,6 +1194,16 @@ def tiny_live_armed_dry_run_timer_observation_certificate_status(
     lane_key: str | None = None,
 ) -> dict:
     return build_status_tiny_live_armed_dry_run_timer_observation_certificate(
+        log_dir=get_log_dir(use_env=True),
+        lane_key=lane_key,
+    )
+
+
+@app.get("/tiny-live/final-authorization-gate/status")
+def tiny_live_final_authorization_gate_status(
+    lane_key: str | None = None,
+) -> dict:
+    return build_status_tiny_live_final_authorization_gate(
         log_dir=get_log_dir(use_env=True),
         lane_key=lane_key,
     )

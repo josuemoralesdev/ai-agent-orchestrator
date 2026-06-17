@@ -3175,6 +3175,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-final-authorization-gate":
+        from src.app.hammer_radar.operator.tiny_live_final_authorization_gate import (
+            build_tiny_live_final_authorization_gate,
+            format_tiny_live_final_authorization_gate_json,
+        )
+
+        print(
+            format_tiny_live_final_authorization_gate_json(
+                build_tiny_live_final_authorization_gate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_final_authorization_gate=args.record_final_authorization_gate,
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6365,6 +6382,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_armed_dry_run_timer_observation_certificate_parser.add_argument(
         "--record-armed-dry-run-timer-observation-certificate",
+        action="store_true",
+    )
+
+    tiny_live_final_authorization_gate_parser = subparsers.add_parser(
+        "tiny-live-final-authorization-gate",
+        parents=[parent],
+    )
+    tiny_live_final_authorization_gate_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_final_authorization_gate_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_final_authorization_gate_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_final_authorization_gate_parser.add_argument(
+        "--record-final-authorization-gate",
         action="store_true",
     )
 
