@@ -140,6 +140,9 @@ from src.app.hammer_radar.operator.tiny_live_real_candidate_timer_observation_ce
 from src.app.hammer_radar.operator.tiny_live_operator_exact_lane_dry_run_arming_bridge import (
     build_status_tiny_live_operator_exact_lane_dry_run_arming_bridge,
 )
+from src.app.hammer_radar.operator.tiny_live_manual_operator_dry_run_arming_post_arm_certificate import (
+    build_status_tiny_live_manual_operator_dry_run_arming_post_arm_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_fix import (
     build_tiny_live_risk_contract_diagnostic,
 )
@@ -1165,6 +1168,16 @@ def tiny_live_operator_exact_lane_dry_run_arming_bridge_status(
     lane_key: str | None = None,
 ) -> dict:
     return build_status_tiny_live_operator_exact_lane_dry_run_arming_bridge(
+        log_dir=get_log_dir(use_env=True),
+        lane_key=lane_key,
+    )
+
+
+@app.get("/tiny-live/manual-operator-dry-run-arming-post-arm-certificate/status")
+def tiny_live_manual_operator_dry_run_arming_post_arm_certificate_status(
+    lane_key: str | None = None,
+) -> dict:
+    return build_status_tiny_live_manual_operator_dry_run_arming_post_arm_certificate(
         log_dir=get_log_dir(use_env=True),
         lane_key=lane_key,
     )

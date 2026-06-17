@@ -3137,6 +3137,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-manual-operator-dry-run-arming-post-arm-certificate":
+        from src.app.hammer_radar.operator.tiny_live_manual_operator_dry_run_arming_post_arm_certificate import (
+            build_tiny_live_manual_operator_dry_run_arming_post_arm_certificate,
+            format_tiny_live_manual_operator_dry_run_arming_post_arm_certificate_json,
+        )
+
+        print(
+            format_tiny_live_manual_operator_dry_run_arming_post_arm_certificate_json(
+                build_tiny_live_manual_operator_dry_run_arming_post_arm_certificate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_manual_operator_dry_run_arming_post_arm_certificate=(
+                        args.record_manual_operator_dry_run_arming_post_arm_certificate
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6281,6 +6300,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_operator_exact_lane_dry_run_arming_bridge_parser.add_argument(
         "--record-operator-exact-lane-dry-run-arming-bridge",
+        action="store_true",
+    )
+
+    tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser = (
+        subparsers.add_parser(
+            "tiny-live-manual-operator-dry-run-arming-post-arm-certificate",
+            parents=[parent],
+        )
+    )
+    tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser.add_argument(
+        "--record-manual-operator-dry-run-arming-post-arm-certificate",
         action="store_true",
     )
 
