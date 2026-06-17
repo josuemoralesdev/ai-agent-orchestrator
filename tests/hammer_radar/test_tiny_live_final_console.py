@@ -674,7 +674,10 @@ def test_autonomous_panel_reports_latest_rehearsal_fixture(tmp_path: Path) -> No
         reason="final console fixture visibility",
     )
 
-    panel = r263.build_autonomous_armed_dry_run_panel(log_dir=tmp_path)
+    panel = r263.build_autonomous_armed_dry_run_panel(
+        log_dir=tmp_path,
+        autonomous_arming_config_path=tmp_path / "missing_arming_config.json",
+    )
 
     assert recorded["status"] == "AUTO_DRY_RUN_READY"
     assert panel["rehearsal_supported"] is True
@@ -709,7 +712,10 @@ def test_autonomous_panel_reports_real_candidate_binding_fields(tmp_path: Path) 
         reason="final console real candidate visibility",
     )
 
-    panel = r263.build_autonomous_armed_dry_run_panel(log_dir=tmp_path)
+    panel = r263.build_autonomous_armed_dry_run_panel(
+        log_dir=tmp_path,
+        autonomous_arming_config_path=tmp_path / "missing_arming_config.json",
+    )
 
     assert recorded["status"] == "AUTO_DRY_RUN_READY"
     assert panel["dry_run_arming_control_supported"] is True

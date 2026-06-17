@@ -103,6 +103,9 @@ from src.app.hammer_radar.operator.tiny_live_operator_exact_lane_dry_run_arming_
 from src.app.hammer_radar.operator.tiny_live_manual_operator_dry_run_arming_post_arm_certificate import (
     build_status_tiny_live_manual_operator_dry_run_arming_post_arm_certificate,
 )
+from src.app.hammer_radar.operator.tiny_live_armed_dry_run_timer_observation_certificate import (
+    build_status_tiny_live_armed_dry_run_timer_observation_certificate,
+)
 from src.app.hammer_radar.operator.tiny_live_risk_contract_validation import (
     build_tiny_live_risk_contract_validation_summary,
 )
@@ -180,6 +183,7 @@ SOURCE_SURFACES_USED = [
     "src/app/hammer_radar/operator/tiny_live_real_candidate_timer_observation_certificate.py",
     "src/app/hammer_radar/operator/tiny_live_operator_exact_lane_dry_run_arming_bridge.py",
     "src/app/hammer_radar/operator/tiny_live_manual_operator_dry_run_arming_post_arm_certificate.py",
+    "src/app/hammer_radar/operator/tiny_live_armed_dry_run_timer_observation_certificate.py",
     "scripts/hammer_print_r294_dry_run_lane_arming_rehearsal_plan.sh",
     "scripts/hammer_print_r295_timer_observed_armed_lane_wait_certificate_plan.sh",
     "scripts/hammer_print_r296_test_only_matching_candidate_trigger_certificate_plan.sh",
@@ -187,6 +191,7 @@ SOURCE_SURFACES_USED = [
     "scripts/hammer_print_r299_real_candidate_timer_observation_certificate_plan.sh",
     "scripts/hammer_print_r300_operator_exact_lane_dry_run_arming_bridge_plan.sh",
     "scripts/hammer_print_r301_manual_operator_dry_run_arming_post_arm_certificate_plan.sh",
+    "scripts/hammer_print_r302_armed_dry_run_timer_observation_certificate_plan.sh",
 ]
 
 
@@ -322,6 +327,11 @@ def build_tiny_live_final_console(
         )
         manual_operator_dry_run_arming_post_arm_certificate_panel = (
             build_manual_operator_dry_run_arming_post_arm_certificate_panel(
+                log_dir=resolved_log_dir
+            )
+        )
+        armed_dry_run_timer_observation_certificate_panel = (
+            build_armed_dry_run_timer_observation_certificate_panel(
                 log_dir=resolved_log_dir
             )
         )
@@ -552,6 +562,9 @@ def build_tiny_live_final_console(
                 "manual_operator_dry_run_arming_post_arm_certificate_panel": (
                     manual_operator_dry_run_arming_post_arm_certificate_panel
                 ),
+                "armed_dry_run_timer_observation_certificate_panel": (
+                    armed_dry_run_timer_observation_certificate_panel
+                ),
                 "exchange_minimum_decision_packet": exchange_minimum_decision_packet,
                 "promotion_readiness_panel": promotion_readiness_panel,
                 "qualified_candidate_watch": promotion_readiness_panel.get("qualified_candidate_watch")
@@ -680,9 +693,19 @@ def load_readiness_snapshot(*, log_dir: str | Path | None = None) -> dict[str, A
     return _sanitize(snapshot or fallback)
 
 
-def build_autonomous_armed_dry_run_panel(*, log_dir: str | Path | None = None) -> dict[str, Any]:
-    packet = build_tiny_live_autonomous_armed_dry_run(log_dir=log_dir)
-    arming_status = build_autonomous_dry_run_arming_status(log_dir=log_dir)
+def build_autonomous_armed_dry_run_panel(
+    *,
+    log_dir: str | Path | None = None,
+    autonomous_arming_config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_tiny_live_autonomous_armed_dry_run(
+        log_dir=log_dir,
+        config_path=autonomous_arming_config_path,
+    )
+    arming_status = build_autonomous_dry_run_arming_status(
+        log_dir=log_dir,
+        config_path=autonomous_arming_config_path,
+    )
     latest_rehearsal = load_latest_autonomous_rehearsal_record(log_dir=log_dir)
     latest_real_candidate = load_latest_autonomous_real_candidate_record(log_dir=log_dir)
     arming = packet.get("arming_state") if isinstance(packet.get("arming_state"), Mapping) else {}
@@ -1735,6 +1758,123 @@ def build_manual_operator_dry_run_arming_post_arm_certificate_panel(
             "post_arm_verification_command": panel.get("post_arm_verification_command")
             or packet.get("post_arm_verification_command"),
             "blockers": list(panel.get("blockers") or packet.get("blockers") or []),
+            "recommended_next_operator_move": panel.get("recommended_next_operator_move")
+            or packet.get("recommended_next_operator_move"),
+            "final_command_available": False,
+            "submit_allowed": False,
+            "real_order_forbidden": True,
+        }
+    )
+    return _sanitize(panel)
+
+
+def build_armed_dry_run_timer_observation_certificate_panel(
+    *,
+    log_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    packet = build_status_tiny_live_armed_dry_run_timer_observation_certificate(
+        log_dir=log_dir
+    )
+    panel = packet.get("armed_dry_run_timer_observation_certificate_panel")
+    if isinstance(panel, Mapping):
+        panel = dict(panel)
+    else:
+        panel = {}
+    panel.update(
+        {
+            "status": panel.get("status") or packet.get("status"),
+            "requested_lane_key": panel.get("requested_lane_key")
+            or packet.get("requested_lane_key"),
+            "current_arming_state": panel.get("current_arming_state")
+            or {
+                "global_auto_live_enabled": packet.get("global_auto_live_enabled")
+                is True,
+                "exact_lane_auto_armed": packet.get("exact_lane_auto_armed") is True,
+                "any_lane_auto_armed": packet.get("any_lane_auto_armed") is True,
+                "armed_lane_key": packet.get("armed_lane_key"),
+                "allowed_lane_keys": list(
+                    packet.get("allowed_lane_keys_from_arming_state") or []
+                ),
+                "lane_auto_live_enabled_keys": list(
+                    packet.get("lane_auto_live_enabled_keys") or []
+                ),
+            },
+            "r301_summary": panel.get("r301_summary")
+            or {
+                "status": packet.get("r301_post_arm_status"),
+                "exact_lane_auto_armed": packet.get("exact_lane_auto_armed") is True,
+                "any_lane_auto_armed": packet.get("any_lane_auto_armed") is True,
+                "armed_lane_key": packet.get("armed_lane_key"),
+            },
+            "r300_summary": panel.get("r300_summary")
+            or {
+                "status": packet.get("r300_bridge_status"),
+                "exact_lane_auto_armed": packet.get("exact_lane_auto_armed") is True,
+                "any_lane_auto_armed": packet.get("any_lane_auto_armed") is True,
+                "armed_lane_key": packet.get("armed_lane_key"),
+            },
+            "r299_summary": panel.get("r299_summary")
+            or {
+                "status": packet.get("r299_timer_observation_status"),
+                "timer_active": packet.get("timer_active") is True,
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+                "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+            },
+            "r298_summary": panel.get("r298_summary")
+            or {
+                "status": packet.get("r298_bridge_status"),
+                "current_real_candidate_exists": packet.get(
+                    "current_real_candidate_exists"
+                )
+                is True,
+                "current_real_candidate_lane_key": packet.get(
+                    "current_real_candidate_lane_key"
+                ),
+                "candidate_matches_requested_lane": packet.get(
+                    "candidate_matches_requested_lane"
+                )
+                is True,
+            },
+            "timer_scheduler_summary": panel.get("timer_scheduler_summary")
+            or {
+                "timer_health_status": packet.get("timer_health_status"),
+                "timer_active": packet.get("timer_active") is True,
+                "timer_loaded": packet.get("timer_loaded") is True,
+                "recent_tick_seen": packet.get("recent_tick_seen") is True,
+                "recent_tick_count": int(packet.get("recent_tick_count") or 0),
+                "scheduler_latest_status": packet.get("scheduler_latest_status"),
+                "scheduler_latest_trigger_loop_status": packet.get(
+                    "scheduler_latest_trigger_loop_status"
+                ),
+                "scheduler_latest_candidate_lane_key": packet.get(
+                    "scheduler_latest_candidate_lane_key"
+                ),
+            },
+            "real_candidate_summary": panel.get("real_candidate_summary")
+            or {
+                "exists": packet.get("current_real_candidate_exists") is True,
+                "lane_key": packet.get("current_real_candidate_lane_key"),
+                "signal_id": packet.get("current_real_candidate_signal_id"),
+                "freshness_status": packet.get("current_real_candidate_freshness_status"),
+                "live_qualification_class": packet.get(
+                    "current_real_candidate_live_qualification_class"
+                ),
+                "candidate_matches_requested_lane": packet.get(
+                    "candidate_matches_requested_lane"
+                )
+                is True,
+            },
+            "simulated_lifecycle_summary": panel.get("simulated_lifecycle_summary")
+            or {
+                "simulated_dry_run_trigger_recorded": packet.get(
+                    "simulated_dry_run_trigger_recorded"
+                )
+                is True,
+                "simulated_lifecycle_status": packet.get("simulated_lifecycle_status"),
+            },
+            "blockers": list(panel.get("blockers") or packet.get("blockers") or []),
+            "manual_operator_disarm_command": panel.get("manual_operator_disarm_command")
+            or packet.get("manual_operator_disarm_command"),
             "recommended_next_operator_move": panel.get("recommended_next_operator_move")
             or packet.get("recommended_next_operator_move"),
             "final_command_available": False,

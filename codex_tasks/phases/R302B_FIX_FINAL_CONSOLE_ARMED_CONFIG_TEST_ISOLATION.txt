@@ -1,0 +1,101 @@
+# R302B — Fix Final Console Armed Config Test Isolation
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: DIAGNOSTIC / AUDIT
+  Secondary: TEST FIX / FINAL CONSOLE FIXTURE ISOLATION
+  Duplicate risk level: LOW
+
+Context:
+  R302 runtime behavior is correct:
+    - ARMED_DRY_RUN_TIMER_OBSERVATION_WAIT_CERTIFIED
+    - exact lane armed for dry-run only
+    - no live execution
+    - no submit
+    - no order
+    - safety grep empty
+
+  But targeted tests fail:
+    tests/hammer_radar/test_tiny_live_final_console.py::test_autonomous_panel_reports_latest_rehearsal_fixture
+    tests/hammer_radar/test_tiny_live_final_console.py::test_autonomous_panel_reports_real_candidate_binding_fields
+
+  These tests expected unarmed state:
+    any_lane_auto_armed=false
+    global_auto_live_enabled=false
+
+  After R301 manual arming, the repo config now intentionally contains armed dry-run state:
+    BTCUSDT|44m|long|ladder_close_50_618
+    dry_run_only=true
+    live_execution_enabled=false
+
+Purpose:
+  Fix the stale final-console tests or their fixture isolation so they do not incorrectly assume the repo’s live operator arming config is unarmed after manual R301 arming.
+
+Non-negotiables:
+  - Do NOT disarm the lane.
+  - Do NOT mutate configs/hammer_radar/autonomous_arming_state.json.
+  - Do NOT change runtime behavior to fake unarmed state.
+  - Do NOT weaken R302.
+  - Do NOT remove safety fields.
+  - Do NOT place orders.
+  - Do NOT call Binance order/test-order endpoints.
+  - Do NOT enable live execution.
+  - Do NOT set submit_allowed true.
+  - Do NOT make final_command_available true.
+  - Do NOT hide live_execution_enabled/allow_live_orders safety fields.
+  - Do NOT change production logic merely to satisfy stale tests unless the logic is genuinely wrong.
+
+Required diagnosis:
+  Inspect:
+    - tests/hammer_radar/test_tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - configs/hammer_radar/autonomous_arming_state.json
+
+Expected fix:
+  Prefer test fixture isolation:
+    - tests that need unarmed state should use a temp arming config or seeded unarmed fixture
+    - tests that record an armed rehearsal fixture should expect armed values when that is the scenario
+    - final console tests must not accidentally depend on the repo’s current operator arming config unless intentionally testing live runtime state
+
+Acceptable approaches:
+  - Add a temporary unarmed arming config fixture for tests that expect unarmed state.
+  - Update final-console helper to accept an explicit test config path if such pattern already exists.
+  - Update expected assertions in tests where the fixture intentionally arms the lane.
+  - Keep production behavior honest: current manually armed dry-run state should show armed.
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar/test_tiny_live_final_console.py \
+    -k "autonomous_panel_reports_latest_rehearsal_fixture or autonomous_panel_reports_real_candidate_binding_fields or armed_dry_run_timer_observation_certificate"
+
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "armed_dry_run_timer_observation_certificate or manual_operator_dry_run_arming_post_arm_certificate or autonomous_trigger_scheduler or autonomous_trigger_loop or final_console or approval_api"
+
+  curl -sS http://127.0.0.1:8015/tiny-live/armed-dry-run-timer-observation-certificate/status | jq '{
+    status,
+    exact_lane_auto_armed,
+    any_lane_auto_armed,
+    armed_lane_key,
+    dry_run_only,
+    live_execution_enabled,
+    allow_live_orders,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    order_placed,
+    binance_order_endpoint_called,
+    binance_test_order_endpoint_called,
+    blockers
+  }'
+
+Report:
+  - root cause
+  - exact files changed
+  - tests run
+  - proof R302 runtime remains armed dry-run WAIT_CERTIFIED
+  - proof no order/live/submit flags changed

@@ -3156,6 +3156,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-armed-dry-run-timer-observation-certificate":
+        from src.app.hammer_radar.operator.tiny_live_armed_dry_run_timer_observation_certificate import (
+            build_tiny_live_armed_dry_run_timer_observation_certificate,
+            format_tiny_live_armed_dry_run_timer_observation_certificate_json,
+        )
+
+        print(
+            format_tiny_live_armed_dry_run_timer_observation_certificate_json(
+                build_tiny_live_armed_dry_run_timer_observation_certificate(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_armed_dry_run_timer_observation_certificate=(
+                        args.record_armed_dry_run_timer_observation_certificate
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6323,6 +6342,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_manual_operator_dry_run_arming_post_arm_certificate_parser.add_argument(
         "--record-manual-operator-dry-run-arming-post-arm-certificate",
+        action="store_true",
+    )
+
+    tiny_live_armed_dry_run_timer_observation_certificate_parser = (
+        subparsers.add_parser(
+            "tiny-live-armed-dry-run-timer-observation-certificate",
+            parents=[parent],
+        )
+    )
+    tiny_live_armed_dry_run_timer_observation_certificate_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_armed_dry_run_timer_observation_certificate_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_armed_dry_run_timer_observation_certificate_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_armed_dry_run_timer_observation_certificate_parser.add_argument(
+        "--record-armed-dry-run-timer-observation-certificate",
         action="store_true",
     )
 
