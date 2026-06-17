@@ -1,15 +1,26 @@
 {
-  "allowed_lane_keys": [],
-  "armed_lane_key": null,
+  "allowed_lane_keys": [
+    "BTCUSDT|44m|long|ladder_close_50_618"
+  ],
+  "armed_lane_key": "BTCUSDT|44m|long|ladder_close_50_618",
   "auto_execute_mode": "dry_run_only",
   "created_by_phase": "R278_OPERATOR_DRY_RUN_ARMING_CONTROL_REAL_CANDIDATE_WATCH",
   "daily_loss_stop_usdt": 5.0,
-  "global_auto_live_enabled": false,
-  "lanes": [],
-  "last_disarm_reason": "R278 validation cleanup; return autonomous dry-run arming to OFF.",
-  "last_disarmed_at": "2026-06-16T02:37:18.506555+00:00",
-  "last_disarmed_by_operator_id": "local_operator",
-  "last_disarmed_lane_key": null,
+  "global_auto_live_enabled": true,
+  "lanes": [
+    {
+      "armed_at": "2026-06-17T04:45:04.152766+00:00",
+      "created_by_phase": "R278_OPERATOR_DRY_RUN_ARMING_CONTROL_REAL_CANDIDATE_WATCH",
+      "dry_run_only": true,
+      "lane_auto_live_enabled": true,
+      "lane_key": "BTCUSDT|44m|long|ladder_close_50_618",
+      "live_execution_enabled": false,
+      "operator_id": "local_operator",
+      "real_order_forbidden": true,
+      "reason": "R301 manual operator exact-lane dry-run arm outside Codex; no submit; no order.",
+      "submit_allowed": false
+    }
+  ],
   "leverage": 10.0,
   "max_position_notional_usdt": 80.0,
   "max_trades_per_day": 1,
