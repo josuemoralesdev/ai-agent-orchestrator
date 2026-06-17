@@ -1,0 +1,453 @@
+# R300 — Operator Exact-Lane Dry-Run Arming Bridge
+
+Repo path:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  main
+
+Phase classification:
+  Primary: EXTENSION OF EXISTING CAPABILITY
+  Secondary: OPERATOR ARMING BRIDGE / EXACT-LANE DRY-RUN CONTROL / LIVE SAFETY AUDIT
+  Duplicate risk level: HIGH
+
+Why duplicate risk exists:
+  Existing capabilities already include:
+    - R278 operator dry-run arming control
+    - R286 fresh live-qualified trigger watch
+    - R287 autonomous trigger loop
+    - R288 autonomous trigger scheduler
+    - R292/R293 timer health
+    - R294 dry-run lane arming rehearsal
+    - R295 timer-observed armed-lane wait certificate
+    - R298 real-candidate dry-run trigger bridge
+    - R299 real-candidate timer observation certificate
+    - final console panels
+  R300 must reuse these. Do not create a parallel arming system, parallel config, parallel scheduler, parallel candidate watcher, or order path.
+
+Current state:
+  - R299 committed and clean.
+  - Timer is active and observing real-candidate bridge state.
+  - R298/R299 currently certify READY_TO_WAIT because no real matching fresh candidate exists.
+  - The installed dry-run timer is active but safe.
+  - The autonomous arming state is expected to remain OFF unless the operator manually arms it.
+  - No final live submit command is available.
+  - No order path is available.
+
+Purpose:
+  Add an operator-facing exact-lane dry-run arming bridge that:
+    - reads current autonomous dry-run arming state
+    - verifies whether the requested exact lane is armed for dry-run
+    - prints manual operator commands for arming/disarming without executing them
+    - certifies blocked/unarmed state safely by default
+    - certifies armed dry-run readiness only after operator manually arms outside Codex
+    - keeps final command, submit, executable payload, and order placement unavailable
+
+Hard goal:
+  If exact lane is not manually armed:
+    - status=OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_NOT_ARMED
+    - provide print-only manual arming command
+    - no config mutation by Codex
+    - no order/submit/payload
+
+  If operator has manually armed the exact lane:
+    - status=OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_ARMED_CERTIFIED
+    - exact_lane_auto_armed=true
+    - allowed_lane_keys contains requested lane only or safely includes requested approved lane
+    - dry_run_only=true
+    - live_execution_enabled=false
+    - allow_live_orders=false
+    - global kill switch still enforced for live
+    - no order/submit/payload
+
+Operator doctrine:
+  - Operator arms/disarms/tunes risk/kills system.
+  - Machine auto-triggers only when armed and all gates are open.
+  - Operator does not approve each signal.
+  - R300 remains dry-run arming bridge only.
+  - No live execution is authorized.
+
+Non-negotiable safety:
+  - Do NOT place orders.
+  - Do NOT call Binance /fapi/v1/order.
+  - Do NOT call Binance test order endpoint.
+  - Do NOT call Binance leverage/margin mutation endpoints.
+  - Do NOT enable live execution.
+  - Do NOT set HAMMER_LIVE_EXECUTION_ENABLED=true.
+  - Do NOT set HAMMER_ALLOW_LIVE_ORDERS=true.
+  - Do NOT disable global kill switch.
+  - Do NOT mutate env files.
+  - Do NOT mutate live config.
+  - Do NOT mutate risk contracts.
+  - Do NOT mutate configs/hammer_radar/autonomous_arming_state.json from Codex.
+  - Do NOT arm or disarm the system from Codex.
+  - Do NOT create executable order payloads.
+  - Do NOT make final live submit command available.
+  - Do NOT print secrets, signatures, signed URLs, API keys, or env values.
+  - Do NOT require per-signal operator approval.
+  - Do NOT install/start/stop/restart/enable/disable systemd.
+  - Do NOT run sudo.
+  - Do NOT write to /etc/systemd/system.
+  - Do NOT use test-only fake candidate input.
+  - R300 must only observe arming state and print manual commands.
+
+Allowed:
+  - Modify repo code/docs/tests.
+  - Read existing configs/logs.
+  - Read current autonomous dry-run arming state.
+  - Read R298/R299 status.
+  - Read timer health using existing read-only helper.
+  - Read scheduler status.
+  - Write repo-local R300 ledger only when explicit record flag is used.
+  - Add API/CLI/final-console visibility.
+  - Add print-only script.
+  - Add tests using fixtures/mocks.
+  - Produce manual operator command strings that the operator may choose to run outside Codex.
+
+Required capability scan:
+  Inspect and reuse before coding:
+    - src/app/hammer_radar/operator/tiny_live_autonomous_armed_dry_run.py
+    - src/app/hammer_radar/operator/tiny_live_real_candidate_timer_observation_certificate.py
+    - src/app/hammer_radar/operator/tiny_live_real_candidate_dry_run_trigger_bridge.py
+    - src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    - src/app/hammer_radar/operator/tiny_live_autonomous_trigger_loop.py
+    - src/app/hammer_radar/operator/tiny_live_timer_observed_armed_lane_wait_certificate.py
+    - src/app/hammer_radar/operator/tiny_live_dry_run_lane_arming_rehearsal.py
+    - src/app/hammer_radar/operator/tiny_live_final_console.py
+    - src/app/hammer_radar/operator/inspect.py
+    - src/app/hammer_radar/operator/approval_api.py
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - docs/hammer_radar/live_readiness/PHASE_INDEX.md
+    - tests/hammer_radar/
+
+Implementation requirements:
+
+1. Add module:
+   src/app/hammer_radar/operator/tiny_live_operator_exact_lane_dry_run_arming_bridge.py
+
+   Packet:
+     event_type="TINY_LIVE_OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE"
+     created_by_phase="R300_OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE"
+
+   Required fields:
+     - status:
+         OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_NOT_ARMED
+         OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_ARMED_CERTIFIED
+         OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_BLOCKED
+     - requested_lane_key
+     - allowed_lane_keys
+     - live_qualified_lane_keys
+     - lane_is_live_qualified
+     - lane_is_near_miss
+     - lane_is_paper_only
+     - exact_lane_only=true
+     - no_cross_lane_borrowing=true
+     - dry_run_only=true
+     - test_only=false
+     - fake_candidate_used=false
+     - operator_manual_action_required
+     - codex_arming_performed=false
+     - codex_config_mutation_performed=false
+     - autonomous_arming_config_path
+     - arming_state_loaded
+     - global_auto_live_enabled
+     - exact_lane_auto_armed
+     - any_lane_auto_armed
+     - armed_lane_key
+     - lane_auto_live_enabled_keys
+     - requested_lane_in_allowed_lane_keys
+     - requested_lane_in_lane_auto_live_enabled_keys
+     - current_real_candidate_exists
+     - current_real_candidate_lane_key
+     - r298_bridge_status
+     - r299_timer_observation_status
+     - timer_health_status
+     - timer_active
+     - recent_tick_seen
+     - recent_tick_count
+     - manual_operator_arm_command
+     - manual_operator_disarm_command
+     - manual_operator_status_command
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+     - executable_payload_created=false
+     - order_payload_created=false
+     - order_placed=false
+     - binance_order_endpoint_called=false
+     - binance_test_order_endpoint_called=false
+     - per_signal_operator_approval_required=false
+     - blockers
+     - safety
+     - operator_exact_lane_dry_run_arming_bridge_panel
+
+2. Status behavior:
+   If requested lane is invalid/near-miss/paper-only/unknown:
+     status=OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_BLOCKED
+     blockers explicit
+
+   If lane is valid/live-qualified but not currently armed:
+     status=OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_NOT_ARMED
+     operator_manual_action_required=true
+     exact_lane_auto_armed=false
+     codex_arming_performed=false
+     codex_config_mutation_performed=false
+
+   If lane is valid/live-qualified and manually armed:
+     status=OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE_ARMED_CERTIFIED
+     operator_manual_action_required=false
+     exact_lane_auto_armed=true
+     codex_arming_performed=false
+     codex_config_mutation_performed=false
+
+3. Manual commands:
+   The packet must include command strings only, never execute them:
+     manual_operator_arm_command
+     manual_operator_disarm_command
+     manual_operator_status_command
+
+   Commands should use existing inspect/R278 arming control if available.
+   They must be clearly marked:
+     DO_NOT_RUN_FROM_CODEX
+     MANUAL_OPERATOR_ONLY
+     DRY_RUN_ONLY
+     NO_ORDER
+
+4. CLI:
+   Add inspect command:
+     tiny-live-operator-exact-lane-dry-run-arming-bridge
+
+   Args:
+     --lane-key <lane>
+     --operator-id <id>
+     --reason <text>
+     --record-operator-exact-lane-dry-run-arming-bridge
+
+   No mutate/arm/disarm flags are allowed in this R300 command.
+
+5. API:
+   Add:
+     GET /tiny-live/operator-exact-lane-dry-run-arming-bridge/status
+
+   Safe default:
+     - lane defaults to BTCUSDT|44m|long|ladder_close_50_618
+     - no record
+     - no mutation
+     - no arming
+     - no order
+     - no submit
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+
+   Optional query param:
+     ?lane_key=...
+
+   API must never record R300 ledger and must never mutate config.
+
+6. Final console:
+   Add:
+     operator_exact_lane_dry_run_arming_bridge_panel
+
+   It should show:
+     - status
+     - requested lane
+     - current arming state
+     - R298/R299 summary
+     - timer health
+     - manual operator commands
+     - blockers
+     - recommended_next_operator_move
+     - final_command_available=false
+     - submit_allowed=false
+     - real_order_forbidden=true
+
+7. Print-only script:
+   Add:
+     scripts/hammer_print_r300_operator_exact_lane_dry_run_arming_bridge_plan.sh
+
+   Must print commands only.
+   It must not run sudo/systemctl/curl/order/install/cp/mv/rm.
+   It may print curl commands as text, not execute them.
+
+   Include:
+     - current arming bridge API check
+     - current R299 certificate check
+     - current R298 bridge check
+     - current scheduler/timer check
+     - manual operator arm command
+     - manual operator status command
+     - manual operator disarm command
+     - post-arm verification command
+     - final console check
+     - safety grep
+     - cleanup guidance
+
+   Banner:
+     R300 PRINT ONLY - operator exact-lane dry-run arming bridge plan
+
+8. Docs:
+   Add:
+     docs/hammer_radar/live_readiness/R300_OPERATOR_EXACT_LANE_DRY_RUN_ARMING_BRIDGE.md
+
+   Update:
+     docs/hammer_radar/live_readiness/PHASE_INDEX.md
+
+   Explain:
+     - R300 does not arm the system
+     - Codex must not mutate arming config
+     - operator manually arms/disarms outside Codex
+     - default expected state is NOT_ARMED
+     - after manual arming, verifier should certify ARMED
+     - no live order can occur
+     - expected next phase
+
+9. Tests:
+   Add/extend tests for:
+     - valid lane not armed => NOT_ARMED
+     - valid lane armed fixture => ARMED_CERTIFIED
+     - invalid lane blocks
+     - near-miss lane blocks
+     - paper-only lane blocks
+     - exact_lane_only=true
+     - no_cross_lane_borrowing=true
+     - test_only=false
+     - fake_candidate_used=false
+     - codex_arming_performed=false always
+     - codex_config_mutation_performed=false always
+     - manual command strings included
+     - no mutate/arm/disarm flags accepted by R300 command
+     - API plain status never records and never mutates
+     - final console includes panel
+     - final_command_available=false always
+     - submit_allowed=false always
+     - real_order_forbidden=true always
+     - executable_payload_created=false always
+     - order_payload_created=false always
+     - order_placed=false always
+     - binance_order_endpoint_called=false always
+     - binance_test_order_endpoint_called=false always
+     - print-only script does not execute dangerous commands
+
+Validation:
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/hammer_radar \
+    -k "operator_exact_lane_dry_run_arming_bridge or real_candidate_timer_observation_certificate or real_candidate_dry_run_trigger_bridge or autonomous_armed_dry_run or final_console or approval_api"
+
+  sudo systemctl restart hammer-approval-api.service
+  sleep 2
+  systemctl is-active hammer-approval-api.service
+  ss -ltnp | grep ':8015' || true
+
+  echo "=== R300 PRINT ONLY PLAN ==="
+  bash scripts/hammer_print_r300_operator_exact_lane_dry_run_arming_bridge_plan.sh | sed -n '1,420p'
+
+  echo "=== R300 API STATUS ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/operator-exact-lane-dry-run-arming-bridge/status | jq '{
+    event_type,
+    status,
+    requested_lane_key,
+    operator_exact_lane_dry_run_arming_bridge_panel,
+    operator_manual_action_required,
+    codex_arming_performed,
+    codex_config_mutation_performed,
+    exact_lane_auto_armed,
+    any_lane_auto_armed,
+    armed_lane_key,
+    global_auto_live_enabled,
+    manual_operator_arm_command,
+    manual_operator_disarm_command,
+    manual_operator_status_command,
+    final_command_available,
+    submit_allowed,
+    real_order_forbidden,
+    safety
+  }'
+
+  echo "=== R300 CLI STATUS ==="
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect \
+    --log-dir logs/hammer_radar_forward \
+    tiny-live-operator-exact-lane-dry-run-arming-bridge \
+    --lane-key "BTCUSDT|44m|long|ladder_close_50_618" \
+    --operator-id local_operator \
+    --reason "R300 operator exact-lane dry-run arming bridge; no Codex arming; no submit; no order." \
+    --record-operator-exact-lane-dry-run-arming-bridge \
+    | tee /tmp/r300_operator_exact_lane_dry_run_arming_bridge.json \
+    | jq '{
+      event_type,
+      status,
+      requested_lane_key,
+      lane_is_live_qualified,
+      exact_lane_only,
+      no_cross_lane_borrowing,
+      dry_run_only,
+      test_only,
+      fake_candidate_used,
+      operator_manual_action_required,
+      codex_arming_performed,
+      codex_config_mutation_performed,
+      arming_state_loaded,
+      global_auto_live_enabled,
+      exact_lane_auto_armed,
+      any_lane_auto_armed,
+      armed_lane_key,
+      lane_auto_live_enabled_keys,
+      requested_lane_in_allowed_lane_keys,
+      requested_lane_in_lane_auto_live_enabled_keys,
+      current_real_candidate_exists,
+      current_real_candidate_lane_key,
+      r298_bridge_status,
+      r299_timer_observation_status,
+      timer_health_status,
+      timer_active,
+      recent_tick_seen,
+      recent_tick_count,
+      manual_operator_arm_command,
+      manual_operator_disarm_command,
+      manual_operator_status_command,
+      final_command_available,
+      submit_allowed,
+      real_order_forbidden,
+      executable_payload_created,
+      order_payload_created,
+      order_placed,
+      binance_order_endpoint_called,
+      binance_test_order_endpoint_called,
+      per_signal_operator_approval_required,
+      blockers,
+      safety
+    }'
+
+  echo "=== FINAL CONSOLE ==="
+  curl -sS http://127.0.0.1:8015/tiny-live/final-console | jq '{
+    status,
+    operator_exact_lane_dry_run_arming_bridge_panel,
+    real_candidate_timer_observation_certificate_panel,
+    real_candidate_dry_run_trigger_bridge_panel,
+    final_live_submit_command_packet,
+    recommended_next_operator_move,
+    safety
+  }'
+
+  echo "=== SAFETY GREP ==="
+  grep -R "\"order_placed\": true\|\"binance_order_endpoint_called\": true\|\"binance_test_order_endpoint_called\": true\|\"submit_attempted\": true\|\"real_order_placed\": true\|\"final_command_available\": true\|\"submit_allowed\": true\|\"executable_payload_created\": true\|\"secrets_shown\": true\|\"live_execution_enabled\": true\|\"allow_live_orders\": true\|\"fake_candidate_used\": true\|\"codex_arming_performed\": true\|\"codex_config_mutation_performed\": true" -n \
+    logs/hammer_radar_forward/tiny_live*.ndjson \
+    logs/hammer_radar_forward/*autonomous*.ndjson \
+    logs/hammer_radar_forward/*binance*.ndjson \
+    2>/dev/null || true
+
+Report:
+  - files changed
+  - tests run
+  - R300 API status
+  - R300 CLI status
+  - whether exact lane is currently armed
+  - manual operator commands emitted
+  - proof Codex did not arm or mutate config
+  - proof no fake/test candidate was used
+  - API/final console panel summary
+  - proof no order/submit/executable payload/live enable/secrets
+  - runtime log dirt generated and cleanup recommendation
+  - recommended next phase

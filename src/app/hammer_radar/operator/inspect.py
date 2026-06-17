@@ -3118,6 +3118,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "tiny-live-operator-exact-lane-dry-run-arming-bridge":
+        from src.app.hammer_radar.operator.tiny_live_operator_exact_lane_dry_run_arming_bridge import (
+            build_tiny_live_operator_exact_lane_dry_run_arming_bridge,
+            format_tiny_live_operator_exact_lane_dry_run_arming_bridge_json,
+        )
+
+        print(
+            format_tiny_live_operator_exact_lane_dry_run_arming_bridge_json(
+                build_tiny_live_operator_exact_lane_dry_run_arming_bridge(
+                    log_dir=args.log_dir,
+                    lane_key=args.lane_key,
+                    operator_id=args.operator_id,
+                    reason=args.reason,
+                    record_operator_exact_lane_dry_run_arming_bridge=(
+                        args.record_operator_exact_lane_dry_run_arming_bridge
+                    ),
+                )
+            )
+        )
     elif args.command == "tiny-live-autonomous-trigger-scheduler-loop":
         from src.app.hammer_radar.operator.tiny_live_autonomous_trigger_scheduler import (
             format_tiny_live_autonomous_trigger_scheduler_json,
@@ -6241,6 +6260,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     tiny_live_real_candidate_timer_observation_certificate_parser.add_argument(
         "--record-real-candidate-timer-observation-certificate",
+        action="store_true",
+    )
+
+    tiny_live_operator_exact_lane_dry_run_arming_bridge_parser = subparsers.add_parser(
+        "tiny-live-operator-exact-lane-dry-run-arming-bridge",
+        parents=[parent],
+    )
+    tiny_live_operator_exact_lane_dry_run_arming_bridge_parser.add_argument(
+        "--lane-key",
+        default=None,
+    )
+    tiny_live_operator_exact_lane_dry_run_arming_bridge_parser.add_argument(
+        "--operator-id",
+        default="local_operator",
+    )
+    tiny_live_operator_exact_lane_dry_run_arming_bridge_parser.add_argument(
+        "--reason",
+        default=None,
+    )
+    tiny_live_operator_exact_lane_dry_run_arming_bridge_parser.add_argument(
+        "--record-operator-exact-lane-dry-run-arming-bridge",
         action="store_true",
     )
 
