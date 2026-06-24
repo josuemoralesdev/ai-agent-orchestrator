@@ -4692,6 +4692,17 @@ def main() -> int:
         from src.app.hammer_radar.operator.paper_refresh_scheduler import build_refresh_runs_text
 
         print(build_refresh_runs_text(limit=args.limit, log_dir=args.log_dir))
+    elif args.command == "strategy-lab-preview":
+        from src.app.hammer_radar.operator.strategy_lab_preview import (
+            build_strategy_lab_preview,
+            format_strategy_lab_preview_json,
+        )
+
+        print(
+            format_strategy_lab_preview_json(
+                build_strategy_lab_preview(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7497,6 +7508,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     paper_refresh_runs_parser = subparsers.add_parser("paper-refresh-runs", parents=[parent])
     paper_refresh_runs_parser.add_argument("--limit", type=int, default=50)
+
+    strategy_lab_preview_parser = subparsers.add_parser("strategy-lab-preview", parents=[parent])
+    strategy_lab_preview_parser.add_argument("--no-write", action="store_true")
 
     return parser
 

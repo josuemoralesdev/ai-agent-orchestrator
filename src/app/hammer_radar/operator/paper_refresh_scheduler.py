@@ -10,11 +10,12 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from src.app.hammer_radar.operator.archive import get_log_dir
 from src.app.hammer_radar.operator.betrayal_candle_archive import build_betrayal_candle_archive
@@ -54,6 +55,13 @@ WARNING = "Paper/watch refresh only. No live orders. No ETH/alt live tickets. BT
 SERVICE_NAME = "hammer-paper-refresh.service"
 SUGGESTED_SYSTEMD_UNIT_PATH = "ops/systemd/hammer-paper-refresh.service"
 WATCHER_ENTRYPOINT = ".venv/bin/python -m src.app.hammer_radar.operator.paper_refresh_scheduler --watch"
+PAPER_REFRESH_HEALTHY = "PAPER_REFRESH_HEALTHY"
+PAPER_REFRESH_DEGRADED_NON_CRITICAL = "PAPER_REFRESH_DEGRADED_NON_CRITICAL"
+PAPER_REFRESH_CRITICAL_FAILURE = "PAPER_REFRESH_CRITICAL_FAILURE"
+PAPER_REFRESH_STOPPING_MAX_ERRORS = "PAPER_REFRESH_STOPPING_MAX_ERRORS"
+RECOVERABILITY_CRITICAL = "critical"
+RECOVERABILITY_NON_CRITICAL = "non_critical"
+RECOVERABILITY_UNKNOWN = "unknown"
 
 TASK_MARKET_INTELLIGENCE = "market_intelligence"
 TASK_MULTI_SYMBOL_SCAN = "multi_symbol_scan"
@@ -118,6 +126,17 @@ AVAILABLE_TASKS = (
     TASK_BETRAYAL_SOURCE_SIGNAL_EMITTER,
 )
 
+CRITICAL_TASKS = {
+    TASK_LIVE_ARMING_PREFLIGHT,
+    TASK_TINY_LIVE_RISK_CONTRACT,
+    TASK_TINY_LIVE_TICKET_BUILDER,
+    TASK_LIVE_ENV_ARMING_CHECKLIST,
+    TASK_LIVE_ENV_BOUNDARY_REVIEW,
+    TASK_FINAL_HUMAN_REVIEW_PACKET,
+    TASK_HUMAN_CONFIRMATION_RECORDS,
+    TASK_REVIEW_RECORD_AGGREGATOR,
+}
+
 
 @dataclass(frozen=True)
 class PaperRefreshConfig:
@@ -150,6 +169,7 @@ def scheduler_status(
     return {
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
+        "paper_refresh_health_status": (runs[0] if runs else {}).get("paper_refresh_health_status"),
         "configured_poll_seconds": config.poll_seconds,
         "default_use_network": config.use_network,
         "default_write_outputs": config.write_outputs,
@@ -190,6 +210,7 @@ def run_refresh_sequence(
     task_results: dict[str, Any] = {}
 
     for task in requested_tasks:
+        task_started = time.monotonic()
         try:
             result = run_refresh_task(
                 task,
@@ -198,23 +219,40 @@ def run_refresh_sequence(
                 send_notifications=effective_send_notifications,
                 log_dir=resolved_log_dir,
             )
+            duration_ms = int((time.monotonic() - task_started) * 1000)
+            result = _normalize_task_result(task, result, duration_ms=duration_ms)
             task_results[task] = result
             if result.get("skipped") is True:
                 skipped_tasks.append(task)
             else:
                 completed_tasks.append(task)
         except Exception as exc:  # pragma: no cover - defensive for watch loop/runtime.
+            duration_ms = int((time.monotonic() - task_started) * 1000)
             failed_tasks.append(task)
             task_results[task] = {
                 "task": task,
                 "status": "failed",
+                "recoverability": task_recoverability(task),
+                "exception_class": exc.__class__.__name__,
+                "error_message": _sanitize_error_message(str(exc)),
                 "error_type": exc.__class__.__name__,
-                "error": str(exc),
+                "error": _sanitize_error_message(str(exc)),
+                "duration_ms": duration_ms,
                 "live_execution_enabled": LIVE_EXECUTION_ENABLED,
                 "order_placed": ORDER_PLACED,
             }
 
     duration_ms = int((time.monotonic() - started) * 1000)
+    critical_failed_tasks = [
+        task for task in failed_tasks if task_results.get(task, {}).get("recoverability") == RECOVERABILITY_CRITICAL
+    ]
+    non_critical_failed_tasks = [
+        task for task in failed_tasks if task_results.get(task, {}).get("recoverability") != RECOVERABILITY_CRITICAL
+    ]
+    health_status = _paper_refresh_health_status(
+        critical_failed_tasks=critical_failed_tasks,
+        non_critical_failed_tasks=non_critical_failed_tasks,
+    )
     run_record = {
         "refresh_run_id": _refresh_run_id(created_at=created_at),
         "created_at": created_at,
@@ -224,7 +262,11 @@ def run_refresh_sequence(
         "completed_tasks": completed_tasks,
         "skipped_tasks": skipped_tasks,
         "failed_tasks": failed_tasks,
+        "critical_failed_tasks": critical_failed_tasks,
+        "non_critical_failed_tasks": non_critical_failed_tasks,
         "task_results": task_results,
+        "paper_refresh_health_status": health_status,
+        "health": health_status,
         "duration_ms": duration_ms,
         "use_network": effective_use_network,
         "write_outputs": effective_write_outputs,
@@ -641,7 +683,10 @@ def load_refresh_runs(*, limit: int = 50, log_dir: str | Path | None = None) -> 
         for line in handle:
             line = line.strip()
             if line:
-                records.append(json.loads(line))
+                try:
+                    records.append(_hydrate_legacy_run_record(json.loads(line)))
+                except json.JSONDecodeError:
+                    continue
     records = list(reversed(records))
     if limit > 0:
         return records[:limit]
@@ -661,6 +706,7 @@ def build_refresh_runs_payload(*, limit: int = 50, log_dir: str | Path | None = 
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
         "btc_live_only": True,
+        "paper_refresh_health_status": (records[0] if records else {}).get("paper_refresh_health_status"),
         "runs": records,
         "runs_recorded": len(load_refresh_runs(limit=0, log_dir=log_dir)),
         "warning": WARNING,
@@ -712,6 +758,7 @@ def build_refresh_run_text(
             f"completed_tasks: {', '.join(record['completed_tasks']) if record['completed_tasks'] else 'none'}",
             f"skipped_tasks: {', '.join(record['skipped_tasks']) if record['skipped_tasks'] else 'none'}",
             f"failed_tasks: {', '.join(record['failed_tasks']) if record['failed_tasks'] else 'none'}",
+            f"paper_refresh_health_status: {record.get('paper_refresh_health_status')}",
             f"use_network: {str(record['use_network']).lower()}",
             f"write_outputs: {str(record['write_outputs']).lower()}",
             f"send_notifications: {str(record['send_notifications']).lower()}",
@@ -734,14 +781,23 @@ def build_refresh_runs_text(*, limit: int = 50, log_dir: str | Path | None = Non
         lines.append(
             f"{record.get('created_at')} | {record.get('refresh_run_id')} | "
             f"completed={len(record.get('completed_tasks') or [])} | "
-            f"failed={len(record.get('failed_tasks') or [])} | duration_ms={record.get('duration_ms')}"
+            f"failed={len(record.get('failed_tasks') or [])} | "
+            f"failed_tasks={','.join(record.get('failed_tasks') or []) or 'none'} | "
+            f"health={record.get('paper_refresh_health_status')} | duration_ms={record.get('duration_ms')}"
         )
     return "\n".join(lines)
 
 
-def watch_loop(*, log_dir: str | Path | None = None, config: PaperRefreshConfig | None = None) -> None:
+def watch_loop(
+    *,
+    log_dir: str | Path | None = None,
+    config: PaperRefreshConfig | None = None,
+    max_iterations: int | None = None,
+    sleep_func: Callable[[float], None] = time.sleep,
+) -> int:
     config = config or load_refresh_config()
-    consecutive_errors = 0
+    consecutive_critical_errors = 0
+    iterations = 0
     while True:
         try:
             record = run_refresh_sequence(
@@ -753,19 +809,33 @@ def watch_loop(*, log_dir: str | Path | None = None, config: PaperRefreshConfig 
                 log_dir=log_dir,
                 config=config,
             )
-            consecutive_errors = 0 if not record["failed_tasks"] else consecutive_errors + 1
+            has_critical_failure = bool(record.get("critical_failed_tasks"))
+            consecutive_critical_errors = consecutive_critical_errors + 1 if has_critical_failure else 0
             print(
                 "paper_refresh "
                 f"run_id={record['refresh_run_id']} completed={len(record['completed_tasks'])} "
-                f"failed={len(record['failed_tasks'])} order_placed=false"
+                f"failed={len(record['failed_tasks'])} "
+                f"failed_tasks={','.join(record['failed_tasks']) if record['failed_tasks'] else 'none'} "
+                f"health={record.get('paper_refresh_health_status')} order_placed=false"
             )
         except Exception as exc:  # pragma: no cover - defensive watcher behavior.
-            consecutive_errors += 1
-            print(f"paper_refresh error={exc.__class__.__name__} order_placed=false")
-        if consecutive_errors >= config.max_errors:
-            print("paper_refresh stopping=max_errors order_placed=false")
-            return
-        time.sleep(config.poll_seconds)
+            consecutive_critical_errors += 1
+            print(
+                "paper_refresh "
+                f"error={exc.__class__.__name__} health={PAPER_REFRESH_CRITICAL_FAILURE} "
+                "failed_tasks=watch_loop order_placed=false"
+            )
+        if consecutive_critical_errors >= config.max_errors:
+            print(
+                "paper_refresh "
+                f"stopping=max_errors health={PAPER_REFRESH_STOPPING_MAX_ERRORS} "
+                "failed_tasks=critical order_placed=false"
+            )
+            return 1
+        iterations += 1
+        if max_iterations is not None and iterations >= max_iterations:
+            return 0
+        sleep_func(config.poll_seconds)
 
 
 def _task_result(
@@ -774,15 +844,79 @@ def _task_result(
     status: str,
     detail: dict[str, Any],
     skipped: bool = False,
+    duration_ms: int | None = None,
+    recoverability: str | None = None,
 ) -> dict[str, Any]:
     return {
         "task": task,
         "status": status,
         "skipped": bool(skipped),
+        "recoverability": recoverability or task_recoverability(task),
+        "duration_ms": 0 if duration_ms is None else int(duration_ms),
         "detail": detail,
         "live_execution_enabled": LIVE_EXECUTION_ENABLED,
         "order_placed": ORDER_PLACED,
     }
+
+
+def task_recoverability(task: str) -> str:
+    if task in CRITICAL_TASKS:
+        return RECOVERABILITY_CRITICAL
+    if task in AVAILABLE_TASKS:
+        return RECOVERABILITY_NON_CRITICAL
+    return RECOVERABILITY_UNKNOWN
+
+
+def _normalize_task_result(task: str, result: dict[str, Any], *, duration_ms: int) -> dict[str, Any]:
+    normalized = dict(result)
+    normalized.setdefault("task", task)
+    normalized.setdefault("status", "completed")
+    normalized.setdefault("skipped", normalized.get("status") == "skipped")
+    normalized.setdefault("recoverability", task_recoverability(task))
+    normalized["duration_ms"] = int(duration_ms)
+    normalized["live_execution_enabled"] = LIVE_EXECUTION_ENABLED
+    normalized["order_placed"] = ORDER_PLACED
+    return normalized
+
+
+def _paper_refresh_health_status(
+    *,
+    critical_failed_tasks: list[str],
+    non_critical_failed_tasks: list[str],
+) -> str:
+    if critical_failed_tasks:
+        return PAPER_REFRESH_CRITICAL_FAILURE
+    if non_critical_failed_tasks:
+        return PAPER_REFRESH_DEGRADED_NON_CRITICAL
+    return PAPER_REFRESH_HEALTHY
+
+
+def _hydrate_legacy_run_record(record: dict[str, Any]) -> dict[str, Any]:
+    if record.get("paper_refresh_health_status"):
+        return record
+    failed_tasks = [str(task) for task in record.get("failed_tasks") or []]
+    critical_failed_tasks = [
+        str(task) for task in record.get("critical_failed_tasks") or [] if str(task)
+    ]
+    if not critical_failed_tasks:
+        critical_failed_tasks = [task for task in failed_tasks if task_recoverability(task) == RECOVERABILITY_CRITICAL]
+    non_critical_failed_tasks = [task for task in failed_tasks if task not in set(critical_failed_tasks)]
+    hydrated = dict(record)
+    hydrated.setdefault("critical_failed_tasks", critical_failed_tasks)
+    hydrated.setdefault("non_critical_failed_tasks", non_critical_failed_tasks)
+    hydrated["paper_refresh_health_status"] = _paper_refresh_health_status(
+        critical_failed_tasks=critical_failed_tasks,
+        non_critical_failed_tasks=non_critical_failed_tasks,
+    )
+    hydrated["health"] = hydrated["paper_refresh_health_status"]
+    return hydrated
+
+
+def _sanitize_error_message(message: str) -> str:
+    redacted = str(message or "")
+    redacted = re.sub(r"(?i)(api[_-]?key|secret|token|signature|authorization)(\s*[=:]\s*)\S+", r"\1\2[REDACTED]", redacted)
+    redacted = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._\-]+", r"\1[REDACTED]", redacted)
+    return redacted[:500]
 
 
 def _parse_tasks(raw: str | None) -> list[str]:
@@ -830,8 +964,7 @@ def _main() -> int:
     parser.add_argument("--log-dir", default=None)
     args = parser.parse_args()
     if args.watch:
-        watch_loop(log_dir=args.log_dir)
-        return 0
+        return watch_loop(log_dir=args.log_dir)
     print(build_refresh_run_text(log_dir=args.log_dir))
     return 0
 

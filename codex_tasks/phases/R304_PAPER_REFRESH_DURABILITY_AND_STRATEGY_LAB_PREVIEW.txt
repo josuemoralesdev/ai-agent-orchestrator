@@ -1,0 +1,355 @@
+# R304 - Paper Refresh Durability + Strategy Lab Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Branch:
+  r304-paper-refresh-durability-strategy-lab-preview
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION + EXTENSION OF EXISTING CAPABILITY
+
+Why this phase exists:
+  Tiny Live final gate is now in the correct safe waiting state:
+    FINAL_TINY_LIVE_AUTHORIZATION_WAITING_FOR_REAL_CANDIDATE
+    timer_active=true
+    timer_health_status=TIMER_HEALTH_ACTIVE
+    blockers=[]
+    Telegram polling confirmed end-to-end
+    no duplicate dangerous processes found
+  But the system has two real operational problems:
+    1. hammer-paper-refresh.service repeatedly exits after completed=5 failed=1 and stopping=max_errors, but exits with status=0/SUCCESS, so systemd does not restart it.
+    2. The current live wait is extremely narrow:
+         BTCUSDT|44m|long|ladder_close_50_618 only
+       This may be safe but too sparse. We need a paper-only Strategy Lab preview to evaluate broader candidates without changing live execution.
+
+Purpose:
+  Harden the paper refresh watcher so one non-critical paper-side failure cannot silently kill the refresh loop.
+  Expose the exact failing task by name, reason, exception class, and recoverability.
+  Add a Strategy Lab preview surface that evaluates live-qualified, near-miss, and betrayal/inverse candidates in paper-only mode.
+  Keep Tiny Live as north star but do not mutate live flags or place orders.
+
+Current observed facts to preserve:
+  - radar.service active.
+  - hammer-approval-api.service active on 127.0.0.1:8015.
+  - hammer-telegram-polling.service active and confirmed:
+      updates_seen=1
+      processed_count incremented
+      replied=1
+      telegram_ok=true
+  - hammer-autonomous-trigger-scheduler-dry-run.timer active.
+  - hammer-paper-refresh.service can run but has a history of:
+      completed=5 failed=1
+      stopping=max_errors
+      systemd status=0/SUCCESS
+  - Recent healthy paper refresh records show these six tasks:
+      market_intelligence
+      multi_symbol_scan
+      eth_paper_candidate
+      eth_paper_outcome
+      betrayal_shadow_track
+      notification_check
+  - Existing live-qualified lanes from prior packets include:
+      BTCUSDT|44m|long|ladder_close_50_618
+      BTCUSDT|44m|short|ladder_close_50_618
+      BTCUSDT|55m|long|ladder_close_50_618
+  - Near-miss lanes previously observed include:
+      BTCUSDT|22m|long|ladder_close_50_618
+      BTCUSDT|22m|short|ladder_close_50_618
+      BTCUSDT|8m|short|ladder_close_50_618
+  - Current first Tiny Live lane remains:
+      BTCUSDT|44m|long|ladder_close_50_618
+
+Critical safety principles:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO automatic promotion from lab to live.
+  Strategy Lab is read-only / paper-only / preview-only.
+  Betrayal/inverse candidates remain blocked from Tiny Live unless explicitly promoted by future stricter gate.
+  Do not weaken:
+    - one-trade limit
+    - 10x leverage cap
+    - 80 USDT notional cap
+    - protective triplet requirement
+    - fresh candidate requirement
+    - exact lane risk contract requirement
+    - timer health requirement
+    - no stale shadow outcomes requirement
+
+Non-negotiables:
+  1. Start with a capability scan before coding.
+  2. Reuse existing modules before adding new ones.
+  3. Do not duplicate existing Strategy Lab, promotion watcher, paper refresh, betrayal, or tiny-live gate logic.
+  4. Add tests.
+  5. Add or update operator docs/runbook.
+  6. Final output must include exact commands to validate.
+  7. No live execution must be enabled or made easier by this phase.
+
+Capability scan first:
+  Inspect and summarize existing files before implementation:
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    src/app/hammer_radar/operator/tiny_live_final_authorization_gate.py
+    src/app/hammer_radar/operator/tiny_live_final_console.py
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    src/app/hammer_radar/operator/betrayal* if present
+    configs/hammer_radar/autonomous_arming_state.json
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    ops/systemd/hammer-radar/*
+    docs/hammer_radar/live_readiness/* if present
+    tests/hammer_radar/*paper* if present
+    tests/hammer_radar/*strategy* if present
+    tests/hammer_radar/*betrayal* if present
+  Produce a capability reuse report in:
+    codex_tasks/reports/R304_CAPABILITY_REUSE_REPORT.md
+  Include:
+    - existing reusable modules
+    - existing endpoints/CLI surfaces
+    - existing log files
+    - duplicate risks
+    - chosen extension points
+
+Target family / scope:
+  A. Paper refresh durability
+  B. Paper refresh failure visibility
+  C. Strategy Lab preview
+  D. Betrayal/inverse lab gate preview
+  E. Read-only operator surface / CLI report
+  F. Tests and runbook
+
+A. Paper refresh durability requirements:
+  Locate the current failure accounting in paper_refresh_scheduler.
+  Make each task result include:
+    - task name
+    - status: completed / failed / skipped
+    - recoverability: critical / non_critical / unknown
+    - exception_class if failed
+    - error_message redacted/sanitized
+    - duration_ms
+    - live_execution_enabled
+    - order_placed
+  Preserve existing successful output shape as much as possible.
+  If one non-critical task fails, the watch loop must continue and write a degraded run record.
+  If a critical task fails repeatedly, the service may stop, but it must exit nonzero so systemd Restart=on-failure can work.
+  Add a clear summary:
+    paper_refresh_health_status:
+      PAPER_REFRESH_HEALTHY
+      PAPER_REFRESH_DEGRADED_NON_CRITICAL
+      PAPER_REFRESH_CRITICAL_FAILURE
+      PAPER_REFRESH_STOPPING_MAX_ERRORS
+  Add max_errors handling that distinguishes:
+    - critical failures that should stop
+    - non-critical failures that should keep the loop alive
+  Never let order_placed become true from this scheduler.
+
+B. Paper refresh failure visibility:
+  Systemd journal line must show, at minimum:
+    paper_refresh run_id=<id> completed=<n> failed=<n> failed_tasks=<names> health=<status> order_placed=false
+  This fixes the current useless:
+    completed=5 failed=1
+  without a failing task name. Because apparently logs that hide the one thing we need are a human tradition now.
+
+C. Strategy Lab preview:
+  Add a paper-only Strategy Lab preview module or extend existing one if present.
+  Preferred CLI command:
+    python -m src.app.hammer_radar.operator.strategy_lab_preview
+  or integrate with existing inspect CLI if that is the established pattern:
+    python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-preview
+  Choose whichever matches existing architecture after scan.
+
+  The preview must produce:
+    logs/hammer_radar_forward/strategy_lab_preview.ndjson
+
+  It must evaluate at least:
+    1. Current armed lane:
+       BTCUSDT|44m|long|ladder_close_50_618
+    2. Other current live-qualified lanes:
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|55m|long|ladder_close_50_618
+    3. Near-miss incubator lanes:
+       22m long/short, 8m short if available
+    4. Broader high-value paper-only lanes if existing evidence is already available:
+       4m long/short
+       8m long
+       13m long/short
+       88m long/short
+       222m long/short
+       444m long/short
+       888m long/short
+       4H / 13H / 13D if present
+    5. Betrayal/inverse candidates where existing evidence exists.
+
+  For each candidate, include:
+    - lane_key
+    - symbol
+    - timeframe
+    - direction
+    - entry_mode
+    - watch_category:
+        LIVE_QUALIFIED
+        NEAR_MISS_INCUBATOR
+        PAPER_ONLY
+        BETRAYAL_INVERSE_PREVIEW
+        BLOCKED
+    - sample_count
+    - win_rate_pct
+    - avg_pnl_pct
+    - total_pnl_pct
+    - fill_rate_pct if available
+    - stop_rate_pct if available
+    - freshness status if current candidate exists
+    - source chain / evidence files used
+    - blockers
+    - recommended_lab_action:
+        KEEP_TINY_LIVE_WAIT
+        EXPANSION_PREVIEW_ONLY
+        STRATEGY_LAB_REVIEW
+        BETRAYAL_LAB_REVIEW
+        BLOCKED_INSUFFICIENT_EVIDENCE
+        BLOCKED_NEGATIVE_PNL
+        BLOCKED_POLICY
+    - live_allowed=false
+    - final_command_available=false
+    - submit_allowed=false
+    - real_order_forbidden=true
+
+D. Betrayal / inverse lab gate preview:
+  Implement a stricter preview-only gate, not promotion.
+  Betrayal/inverse must remain blocked for Tiny Live in this phase.
+  Gate should report:
+    - original lane evidence
+    - inverse/betrayal evidence
+    - sample_count
+    - win_rate_pct
+    - avg_pnl_pct
+    - total_pnl_pct
+    - original_vs_inverse_delta
+    - signal origin/source chain
+    - exact entry_mode/lane
+    - stale shadow outcome check
+    - risk-contract compatibility preview
+  Stricter preferred criteria:
+    - win_rate_pct >= 60 preferred
+    - sample_count >= 30 minimum, 50 preferred
+    - avg_pnl_pct > 0
+    - beats normal/original candidate cleanly
+    - no stale shadow outcomes
+    - exact risk-contract mapping available
+  Output decision:
+    BETRAYAL_BLOCKED_PREVIEW_ONLY
+    BETRAYAL_PROMOTION_CANDIDATE_FOR_FUTURE_REVIEW
+    BETRAYAL_REJECTED
+  Never output BETRAYAL_LIVE_ALLOWED in this phase.
+
+E. Operator surface:
+  Add one safe script:
+    scripts/hammer_print_r304_strategy_lab_and_refresh_health.sh
+  It should print:
+    - paper refresh health summary
+    - last paper refresh run summary
+    - timer status
+    - final tiny live gate status
+    - current armed lane
+    - strategy lab top preview candidates
+    - betrayal preview candidates
+    - explicit safety flags:
+        live_execution_enabled
+        allow_live_orders
+        global_kill_switch
+        order_placed
+        real_order_placed
+        execution_attempted
+        submit_allowed
+  It must not print secrets.
+  It must not make network/trading calls.
+  It must not mutate config.
+
+F. Systemd recommendation:
+  Do not install or mutate systemd automatically unless repository already supports a no-surprise template update pattern.
+  If a systemd template is updated, add a manual operator command block only.
+  Recommended change after code support:
+    - ensure paper_refresh exits nonzero on critical max_errors
+    - optionally add Restart=always only if safe and justified
+  But do not apply sudo/systemctl changes from Codex unless explicitly required by tests. Prefer docs/runbook.
+
+Tests:
+  Add tests covering:
+    1. Paper refresh one non-critical task failure continues loop / degraded record.
+    2. Paper refresh critical repeated failure exits nonzero.
+    3. Failed task name appears in summary/log payload.
+    4. Strategy Lab preview never allows live orders.
+    5. Betrayal/inverse preview remains blocked from Tiny Live.
+    6. Current live-qualified lanes appear as preview candidates but do not become final commands.
+    7. Safety flags remain false for:
+       order_placed
+       real_order_placed
+       execution_attempted
+       submit_allowed
+       binance_order_endpoint_called
+       binance_test_order_endpoint_called
+    8. No secrets shown.
+
+Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R304_PAPER_REFRESH_DURABILITY_AND_STRATEGY_LAB_PREVIEW.md
+  Include:
+    - what changed
+    - why paper refresh was silently dying
+    - how to validate
+    - how to read Strategy Lab preview
+    - what NOT to do
+    - future R305 recommendation
+
+Future R305 recommendation:
+  R305 should be either:
+    A. Eligible Lane Expansion Dry-Run Preview:
+       Preview all live-qualified lanes in dry-run only:
+         44m long
+         44m short
+         55m long
+       No live execution mutation.
+    OR
+    B. Strategy Lab Variant Test Pack:
+       Entry/timing/TP/SL/trailing/RSI/regime/betrayal variants for near-miss lanes.
+  Do not implement R305 in this phase.
+
+Validation commands:
+  Must pass:
+    python -m pytest tests/hammer_radar -q
+  If full suite is too slow, also provide targeted tests:
+    python -m pytest tests/hammer_radar/test_*paper* tests/hammer_radar/test_*strategy* tests/hammer_radar/test_*betrayal* -q
+  Must run:
+    python -m src.app.hammer_radar.operator.strategy_lab_preview --help
+    python -m src.app.hammer_radar.operator.strategy_lab_preview --log-dir logs/hammer_radar_forward
+    bash scripts/hammer_print_r304_strategy_lab_and_refresh_health.sh
+  Must verify:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq .
+    curl -s http://127.0.0.1:8015/tiny-live/final-authorization-gate/status | jq .
+  Final response must summarize:
+    - files changed
+    - tests run
+    - safety confirmation
+    - whether paper refresh failure is now visible by task name
+    - Strategy Lab preview top candidates
+    - next recommended phase
+
+Implementation notes:
+  Be conservative.
+  Prefer extension over rewrite.
+  Keep current Tiny Live 44m long lane intact.
+  Do not change current arming state.
+  Do not promote any new lane.
+  Do not modify credentials.
+  Do not modify live env.
+  Do not touch real Binance trading endpoints.

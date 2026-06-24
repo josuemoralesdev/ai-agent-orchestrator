@@ -13,6 +13,12 @@ from src.app.hammer_radar.operator.approval_api import app
 from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     AVAILABLE_TASKS,
     DEFAULT_TASKS,
+    PAPER_REFRESH_CRITICAL_FAILURE,
+    PAPER_REFRESH_DEGRADED_NON_CRITICAL,
+    PAPER_REFRESH_STOPPING_MAX_ERRORS,
+    PaperRefreshConfig,
+    RECOVERABILITY_CRITICAL,
+    RECOVERABILITY_NON_CRITICAL,
     TASK_FINAL_HUMAN_REVIEW_PACKET,
     TASK_HUMAN_CONFIRMATION_RECORDS,
     TASK_LIVE_ARMING_PREFLIGHT,
@@ -36,6 +42,7 @@ from src.app.hammer_radar.operator.paper_refresh_scheduler import (
     load_refresh_runs,
     run_refresh_sequence,
     scheduler_status,
+    watch_loop,
 )
 from src.app.hammer_radar.operator.paths import LOG_DIR_ENV_VAR
 
@@ -153,7 +160,68 @@ class PaperRefreshSchedulerTestCase(unittest.TestCase):
 
         self.assertEqual(["notification_check"], record["completed_tasks"])
         self.assertEqual(["market_intelligence"], record["failed_tasks"])
+        self.assertEqual(PAPER_REFRESH_DEGRADED_NON_CRITICAL, record["paper_refresh_health_status"])
+        self.assertEqual(RECOVERABILITY_NON_CRITICAL, record["task_results"]["market_intelligence"]["recoverability"])
+        self.assertEqual("RuntimeError", record["task_results"]["market_intelligence"]["exception_class"])
+        self.assertIn("duration_ms", record["task_results"]["market_intelligence"])
         self.assertEqual("RuntimeError", record["task_results"]["market_intelligence"]["error_type"])
+
+    def test_non_critical_task_failure_does_not_trip_watch_loop_max_errors(self) -> None:
+        config = PaperRefreshConfig(
+            poll_seconds=1,
+            use_network=False,
+            write_outputs=False,
+            send_notifications=False,
+            tasks=("market_intelligence",),
+            max_errors=1,
+        )
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_market_intelligence_summary",
+            side_effect=RuntimeError("temporary paper failure"),
+        ), patch("builtins.print") as mocked_print:
+            exit_code = watch_loop(
+                log_dir=self.log_dir,
+                config=config,
+                max_iterations=1,
+                sleep_func=lambda _seconds: None,
+            )
+
+        self.assertEqual(0, exit_code)
+        record = load_refresh_runs(limit=1, log_dir=self.log_dir)[0]
+        self.assertEqual(PAPER_REFRESH_DEGRADED_NON_CRITICAL, record["paper_refresh_health_status"])
+        self.assertEqual(["market_intelligence"], record["failed_tasks"])
+        rendered = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list)
+        self.assertIn("failed_tasks=market_intelligence", rendered)
+        self.assertIn("health=PAPER_REFRESH_DEGRADED_NON_CRITICAL", rendered)
+
+    def test_critical_repeated_failure_exits_nonzero_for_systemd_restart(self) -> None:
+        config = PaperRefreshConfig(
+            poll_seconds=1,
+            use_network=False,
+            write_outputs=False,
+            send_notifications=False,
+            tasks=(TASK_LIVE_ARMING_PREFLIGHT,),
+            max_errors=1,
+        )
+        with patch(
+            "src.app.hammer_radar.operator.paper_refresh_scheduler.build_live_arming_preflight",
+            side_effect=RuntimeError("critical local gate failure"),
+        ), patch("builtins.print") as mocked_print:
+            exit_code = watch_loop(
+                log_dir=self.log_dir,
+                config=config,
+                max_iterations=1,
+                sleep_func=lambda _seconds: None,
+            )
+
+        self.assertEqual(1, exit_code)
+        record = load_refresh_runs(limit=1, log_dir=self.log_dir)[0]
+        self.assertEqual(PAPER_REFRESH_CRITICAL_FAILURE, record["paper_refresh_health_status"])
+        self.assertEqual([TASK_LIVE_ARMING_PREFLIGHT], record["critical_failed_tasks"])
+        self.assertEqual(RECOVERABILITY_CRITICAL, record["task_results"][TASK_LIVE_ARMING_PREFLIGHT]["recoverability"])
+        rendered = "\n".join(str(call.args[0]) for call in mocked_print.call_args_list)
+        self.assertIn("failed_tasks=live_arming_preflight", rendered)
+        self.assertIn(f"health={PAPER_REFRESH_STOPPING_MAX_ERRORS}", rendered)
 
     def test_notification_task_does_not_send_fake_alert_when_not_ready(self) -> None:
         with patch(
