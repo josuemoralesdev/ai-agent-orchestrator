@@ -36,8 +36,8 @@ from src.app.hammer_radar.operator.tiny_live_final_authorization_gate import (
 from src.app.hammer_radar.operator.tiny_live_fresh_trigger_watch import (
     build_latest_or_not_checked_fresh_trigger_watch,
 )
-from src.app.hammer_radar.operator.tiny_live_strategy_lane_selection import (
-    build_exact_lane_risk_contract_status,
+from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
+    build_expansion_risk_contract_lane_preview,
 )
 
 EVENT_TYPE = "R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW"
@@ -321,12 +321,7 @@ def _lane_packet(
     fresh: Mapping[str, Any],
 ) -> dict[str, Any]:
     symbol, timeframe, direction, entry_mode = _lane_parts(lane_key)
-    risk = build_exact_lane_risk_contract_status(lane_key=lane_key)
-    risk_preview = {
-        "exact_contract_found": risk.get("exact_contract_found") is True,
-        "risk_contract_valid": risk.get("risk_contract_valid") is True,
-        "blocked_by": list(risk.get("blocked_by") or []),
-    }
+    risk_preview = build_expansion_risk_contract_lane_preview(lane_key=lane_key, lane_role=lane_role)
     status = _expansion_status(lane_role=lane_role, evidence=evidence)
     blockers = _expansion_blockers(lane_role=lane_role, evidence=evidence, risk_preview=risk_preview)
     current_lane = fresh.get("current_candidate_lane_key")

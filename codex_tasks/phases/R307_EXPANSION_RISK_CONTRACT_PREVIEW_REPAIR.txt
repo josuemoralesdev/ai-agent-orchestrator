@@ -1,0 +1,318 @@
+# R307 - Expansion Risk Contract Preview Repair
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r306-eligible-lane-expansion-dry-run-preview
+
+New branch:
+  r307-expansion-risk-contract-preview-repair
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION
+
+Why this phase exists:
+  R306 successfully created a read-only eligible lane expansion dry-run preview.
+  It preserved the current first Tiny Live lane:
+    BTCUSDT|44m|long|ladder_close_50_618
+  It identified primary dry-run expansion candidates:
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+  It kept all live safety flags locked:
+    live_execution_enabled=false
+    allow_live_orders=false
+    global_kill_switch=true
+    submit_allowed=false
+    final_command_available=false
+    real_order_forbidden=true
+    binance_order_endpoint_called=false
+    binance_test_order_endpoint_called=false
+  But R306 also exposed a blocker:
+    exact_contract_found=false
+    risk_contract_valid=false
+    blocked_by includes:
+      exact_lane_risk_contract_missing
+      risk_contract_config_missing
+      risk_contract_symbol_not_BTCUSDT
+      risk_contract_max_loss_missing
+      risk_contract_margin_budget_missing
+      risk_contract_leverage_missing
+      risk_contract_notional_cap_missing
+  This appeared for the current baseline lane and all expansion lanes.
+  Since previous Tiny Live readiness had a configured 10x / 80 USDT / isolated risk contract, this may be a preview lookup/mapping issue, not necessarily a missing operator contract.
+
+Purpose:
+  Repair the read-only risk contract preview path used by R306 so it correctly resolves exact lane risk contracts where they already exist.
+  Add a clear missing-contract preview report for expansion lanes where contracts truly do not exist.
+  Produce operator-safe preview templates for missing contracts, but do not write them.
+  Preserve current first Tiny Live lane unchanged.
+  Preserve all live safety flags.
+  Do not mutate any config.
+
+Critical safety principles:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO risk contract write.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing the first Tiny Live lane.
+  This phase is preview-only and read-only.
+
+Non-negotiable safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  risk_contract_config_mutated=false
+  global_live_flags_changed=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+
+Capability scan first:
+  Inspect and summarize:
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    configs/hammer_radar/autonomous_arming_state.json
+    src/app/hammer_radar/operator/tiny_live_risk_contract.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    src/app/hammer_radar/operator/eligible_lane_expansion_dry_run_preview.py
+    src/app/hammer_radar/operator/strategy_lab_variant_test_pack.py
+    src/app/hammer_radar/operator/tiny_live_final_authorization_gate.py
+    src/app/hammer_radar/operator/tiny_live_final_console.py
+    src/app/hammer_radar/operator/inspect.py
+    docs/hammer_radar/live_readiness/R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW.md
+    tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py
+    tests/hammer_radar/test_tiny_live_risk_contract* if present
+    tests/hammer_radar/test_tiny_live_strategy_lane_selection.py if present
+  Produce:
+    codex_tasks/reports/R307_CAPABILITY_REUSE_REPORT.md
+  Include:
+    - actual structure of tiny_live_risk_contracts.json, with values redacted only if sensitive
+    - how lane keys are represented
+    - how exact lane lookup currently works
+    - why R306 produced exact_contract_found=false
+    - selected read-only repair path
+    - duplicate risks
+    - why this phase is not a write-gate
+
+Scope:
+  A. Risk contract preview resolver
+  B. R306 integration repair
+  C. Missing contract preview templates
+  D. Operator script
+  E. Tests
+  F. Docs
+
+A. Risk contract preview resolver:
+  Add module:
+    src/app/hammer_radar/operator/expansion_risk_contract_preview_repair.py
+
+  CLI:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_preview_repair --log-dir logs/hammer_radar_forward
+
+  Also wire into inspect.py:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-preview-repair
+
+  Output ledger:
+    logs/hammer_radar_forward/expansion_risk_contract_preview_repair.ndjson
+
+  event_type:
+    R307_EXPANSION_RISK_CONTRACT_PREVIEW_REPAIR
+
+B. Lanes to inspect:
+  Baseline:
+    BTCUSDT|44m|long|ladder_close_50_618
+
+  Primary dry-run expansion candidates:
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+
+  Secondary watch-only candidates:
+    BTCUSDT|44m|short|ladder_22_44_22
+    BTCUSDT|44m|long|ladder_382_50_618
+    BTCUSDT|55m|long|market_close
+    BTCUSDT|88m|long|ladder_382_50_618
+
+C. For each lane, output:
+  - lane_key
+  - lane_role:
+      CURRENT_FIRST_TINY_LIVE_BASELINE
+      PRIMARY_DRY_RUN_EXPANSION_CANDIDATE
+      SECONDARY_WATCH_ONLY_CANDIDATE
+  - symbol
+  - timeframe
+  - direction
+  - entry_mode
+  - exact_contract_found
+  - risk_contract_valid
+  - risk_contract_source_path
+  - matched_contract_key
+  - matched_contract_schema_version if available
+  - normalized_lane_key
+  - lookup_attempts
+  - lookup_failure_reason if missing
+  - validation_summary
+  - blocked_by
+  - safe_preview_template_if_missing
+  - safe_preview_template_status:
+      NOT_NEEDED_CONTRACT_FOUND
+      PREVIEW_TEMPLATE_AVAILABLE_NOT_WRITTEN
+      BLOCKED_UNSUPPORTED_LANE
+  - write_required_for_future:
+      true/false
+  - future_write_gate_required:
+      true/false
+  - exact risk values if non-sensitive:
+      symbol
+      timeframe
+      direction
+      entry_mode
+      leverage
+      margin_mode
+      max_position_notional_usdt
+      margin_budget_usdt
+      max_loss_usdt
+      max_trades_per_day
+      daily_loss_stop_usdt
+      protective_orders_required
+  - safety fields listed above
+
+D. Preview template rules:
+  If contract is missing, produce a preview-only template using current Tiny Live risk envelope:
+    leverage=10
+    margin_mode=isolated
+    max_position_notional_usdt=80
+    margin_budget_usdt=8
+    max_trades_per_day=1
+    daily_loss_stop_usdt=5
+    protective_orders_required=true
+  max_loss_usdt should be derived conservatively if there is already an established project helper. If not, set:
+    max_loss_usdt=null
+    blocked_by includes risk_contract_max_loss_requires_operator_review
+  Do not write template to config.
+  Do not mutate config.
+  Do not create a write gate in this phase.
+  The template is for future operator review only.
+
+E. R306 integration repair:
+  Update eligible_lane_expansion_dry_run_preview.py so it uses the repaired read-only resolver.
+  R306 preview should now:
+    - correctly show exact_contract_found=true for any lane that truly already has a valid contract
+    - still show preview template/missing blockers for lanes without contracts
+    - keep all live safety flags false/locked
+  Do not change the candidate list or arming behavior.
+
+F. Operator script:
+  Add:
+    scripts/hammer_print_r307_expansion_risk_contract_preview_repair.sh
+
+  It should print:
+    - R307 header
+    - baseline lane contract status
+    - primary dry-run candidate contract status
+    - secondary watch-only contract status
+    - missing preview templates summary
+    - R306 recommended next operator move after repair
+    - explicit safety flags
+    - recommended R308 path
+
+G. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R307_EXPANSION_RISK_CONTRACT_PREVIEW_REPAIR.md
+
+  Include:
+    - why R307 exists
+    - how R306 exposed the issue
+    - how the read-only resolver works
+    - how to read matched contracts vs preview templates
+    - what not to do
+    - why no config is written
+    - recommended R308 paths
+
+H. Tests:
+  Add:
+    tests/hammer_radar/test_expansion_risk_contract_preview_repair.py
+
+  Update:
+    tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py
+    only if necessary.
+
+  Tests must cover:
+    1. Resolver finds existing exact contract in a representative config.
+    2. Resolver reports missing contract with preview template and no write.
+    3. Baseline lane is always inspected.
+    4. Primary dry-run expansion lanes are inspected.
+    5. No safety flag is enabled.
+    6. Config is not mutated.
+    7. R306 uses repaired resolver.
+    8. Missing templates are marked PREVIEW_TEMPLATE_AVAILABLE_NOT_WRITTEN.
+    9. Inspect route works.
+    10. Operator script exists and prints required sections.
+    11. No secrets shown.
+    12. No Binance endpoints called.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_preview_repair --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_preview_repair --log-dir logs/hammer_radar_forward
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-preview-repair
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.eligible_lane_expansion_dry_run_preview --log-dir logs/hammer_radar_forward
+    bash scripts/hammer_print_r307_expansion_risk_contract_preview_repair.sh
+    bash scripts/hammer_print_r306_eligible_lane_expansion_preview.sh
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+  Must verify paper refresh:
+    systemctl is-active hammer-paper-refresh.service
+    bash scripts/hammer_print_r304_strategy_lab_and_refresh_health.sh
+
+Expected final response from Codex:
+  - files changed
+  - capability reuse summary
+  - tests run
+  - baseline contract status
+  - primary candidate contract statuses
+  - whether R306 preview improved
+  - safety confirmation
+  - recommended R308 path
+
+Recommended R308 paths:
+  If missing contracts remain:
+    R308 Expansion Risk Contract Write-Gate Preview
+    This should still not write config; it should produce a human-reviewed write gate packet only.
+  If all necessary contracts resolve:
+    R308 Multi-Lane Dry-Run Observation Scheduler
+    This should observe baseline + primary lanes in dry-run only, with no live execution and no arming mutation.
