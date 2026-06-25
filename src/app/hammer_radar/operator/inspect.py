@@ -4703,6 +4703,17 @@ def main() -> int:
                 build_strategy_lab_preview(log_dir=args.log_dir, write=not args.no_write)
             )
         )
+    elif args.command == "strategy-lab-variant-test-pack":
+        from src.app.hammer_radar.operator.strategy_lab_variant_test_pack import (
+            build_strategy_lab_variant_test_pack,
+            format_strategy_lab_variant_test_pack_json,
+        )
+
+        print(
+            format_strategy_lab_variant_test_pack_json(
+                build_strategy_lab_variant_test_pack(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7511,6 +7522,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     strategy_lab_preview_parser = subparsers.add_parser("strategy-lab-preview", parents=[parent])
     strategy_lab_preview_parser.add_argument("--no-write", action="store_true")
+
+    strategy_lab_variant_parser = subparsers.add_parser("strategy-lab-variant-test-pack", parents=[parent])
+    strategy_lab_variant_parser.add_argument("--no-write", action="store_true")
 
     return parser
 

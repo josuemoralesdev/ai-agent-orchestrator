@@ -1,0 +1,339 @@
+# R305 - Strategy Lab Variant Test Pack
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r304-paper-refresh-durability-strategy-lab-preview
+
+New branch:
+  r305-strategy-lab-variant-test-pack
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R304 successfully:
+    - hardened paper refresh durability
+    - exposed degraded task name: eth_paper_outcome
+    - kept hammer-paper-refresh.service alive past the previous ~21 minute failure window
+    - added Strategy Lab preview
+    - kept all live safety flags locked
+    - preserved current Tiny Live armed lane:
+        BTCUSDT|44m|long|ladder_close_50_618
+  R304 Strategy Lab preview surfaced stronger candidates and expansion preview rows:
+    - BTCUSDT|55m|long|ladder_close_50_618 | LIVE_QUALIFIED | samples=54 win=62.96 avg=0.1042
+    - BTCUSDT|44m|short|ladder_close_50_618 | LIVE_QUALIFIED | samples=86 win=60.47 avg=0.098
+    - BTCUSDT|44m|short|ladder_382_50_618 | LIVE_QUALIFIED | samples=62 win=67.74 avg=0.0963
+    - BTCUSDT|44m|short|ladder_22_44_22 | LIVE_QUALIFIED | samples=53 win=66.04 avg=0.068
+    - BTCUSDT|44m|long|ladder_382_50_618 | LIVE_QUALIFIED | samples=61 win=62.30 avg=0.0647
+    - BTCUSDT|88m|long|ladder_382_50_618 | LIVE_QUALIFIED | samples=42 win=57.14 avg=0.0613
+    - BTCUSDT|55m|long|market_close | LIVE_QUALIFIED | samples=55 win=60.00 avg=0.0574
+    - BTCUSDT|44m|long|ladder_22_44_22 | LIVE_QUALIFIED | samples=48 win=56.25 avg=0.0545
+  But R304 is only a preview. R305 must test strategy variants before any live lane expansion.
+
+Purpose:
+  Build a Strategy Lab Variant Test Pack that evaluates variations of entries, TP/SL, timing, trailing, freshness, and regime filters across top R304 candidates.
+  The output must rank candidate variants for future review while keeping everything paper-only.
+  The purpose is to answer:
+    - Are stronger lanes genuinely better after variant testing?
+    - Which entry mode is strongest for each lane?
+    - Can near-miss lanes become live-candidates under stricter evidence?
+    - Should current first tiny-live remain 44m long ladder_close_50_618, or should future R306 propose a dry-run expansion preview?
+    - Are betrayal/inverse candidates worth deeper paper tracking under a stricter gate?
+
+Critical safety principles:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO change to autonomous arming state.
+  ABSOLUTELY NO promotion to live.
+  R305 is paper-only, read-only, analysis-only.
+  It may write Strategy Lab report logs/docs only.
+  It must not mutate:
+    - configs/hammer_radar/autonomous_arming_state.json
+    - configs/hammer_radar/tiny_live_risk_contracts.json
+    - env files
+    - systemd units
+    - live execution flags
+  Keep current Tiny Live first lane unchanged:
+    BTCUSDT|44m|long|ladder_close_50_618
+
+Non-negotiables:
+  1. Start with capability scan.
+  2. Reuse R304 strategy_lab_preview and existing performance evidence.
+  3. Do not duplicate existing promotion watcher or strategy preview logic.
+  4. Add tests.
+  5. Add operator script.
+  6. Add docs.
+  7. All outputs must explicitly contain safety flags:
+       live_execution_enabled=false
+       allow_live_orders=false
+       global_kill_switch=true
+       order_placed=false
+       real_order_placed=false
+       execution_attempted=false
+       submit_allowed=false
+       final_command_available=false
+       binance_order_endpoint_called=false
+       binance_test_order_endpoint_called=false
+       secrets_shown=false
+  8. Betrayal/inverse remains preview-only and blocked from Tiny Live.
+
+Capability scan:
+  Inspect and summarize these before implementation:
+    src/app/hammer_radar/operator/strategy_lab_preview.py
+    src/app/hammer_radar/operator/strategy_promotion_watcher.py
+    src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/tiny_live_final_authorization_gate.py
+    src/app/hammer_radar/operator/tiny_live_final_console.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    src/app/hammer_radar/operator/betrayal* if present
+    logs/hammer_radar_forward/strategy_lab_preview.ndjson if present
+    logs/hammer_radar_forward/strategy_promotion_status.ndjson if present
+    logs/hammer_radar_forward/strategy_promotion_events.ndjson if present
+    logs/hammer_radar_forward/strategy_performance.ndjson if present
+    logs/hammer_radar_forward/outcomes.ndjson if present
+    logs/hammer_radar_forward/signals.ndjson if present
+    docs/hammer_radar/live_readiness/R304_PAPER_REFRESH_DURABILITY_AND_STRATEGY_LAB_PREVIEW.md
+    tests/hammer_radar/test_strategy_lab_preview.py
+  Produce:
+    codex_tasks/reports/R305_CAPABILITY_REUSE_REPORT.md
+  Include:
+    - reusable data sources
+    - existing scoring logic
+    - duplicate risks
+    - chosen extension points
+    - why this phase is not a live expansion
+
+Scope:
+  A. Strategy variant model
+  B. Candidate families
+  C. Variant scoring
+  D. Betrayal/inverse lab preview
+  E. Operator output
+  F. Tests and docs
+
+A. Strategy variant model:
+  Add a new paper-only module, unless existing architecture strongly suggests extending R304:
+    src/app/hammer_radar/operator/strategy_lab_variant_test_pack.py
+
+  CLI:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_test_pack --log-dir logs/hammer_radar_forward
+
+  Also wire into inspect.py if that is the existing pattern:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-variant-test-pack
+
+  Output log:
+    logs/hammer_radar_forward/strategy_lab_variant_test_pack.ndjson
+
+  Output event_type:
+    R305_STRATEGY_LAB_VARIANT_TEST_PACK
+
+  The module should read existing evidence only. It must not invent performance numbers.
+  If variant evidence is not directly available, mark it as:
+    evidence_status=INSUFFICIENT_DIRECT_VARIANT_EVIDENCE
+  and derive only conservative preview flags from existing evidence.
+
+B. Candidate families:
+  Include top R304 preview lanes:
+    Current first Tiny Live lane:
+      BTCUSDT|44m|long|ladder_close_50_618
+    Live-qualified expansion preview lanes:
+      BTCUSDT|44m|short|ladder_close_50_618
+      BTCUSDT|55m|long|ladder_close_50_618
+      BTCUSDT|44m|short|ladder_382_50_618
+      BTCUSDT|44m|short|ladder_22_44_22
+      BTCUSDT|44m|long|ladder_382_50_618
+      BTCUSDT|88m|long|ladder_382_50_618
+      BTCUSDT|55m|long|market_close
+      BTCUSDT|44m|long|ladder_22_44_22
+    Near-miss incubator lanes:
+      BTCUSDT|22m|long|ladder_close_50_618
+      BTCUSDT|22m|short|ladder_close_50_618
+      BTCUSDT|8m|short|ladder_close_50_618
+      BTCUSDT|88m|long|ladder_22_44_22 if present
+      BTCUSDT|55m|long|ladder_382_50_618 if present
+    Broader paper-only lanes:
+      4m long/short ladder_close_50_618
+      8m long ladder_close_50_618
+      13m long/short ladder_close_50_618
+      88m long/short ladder_close_50_618
+      222m/444m/888m only as insufficient-evidence or paper-only
+    Betrayal/inverse candidates from existing betrayal sources only.
+
+C. Variant dimensions:
+  For each candidate, evaluate available variants across:
+    entry_mode:
+      ladder_close_50_618
+      ladder_382_50_618
+      ladder_22_44_22
+      market_close
+      fib_618
+      fib_650
+    timing:
+      close_entry
+      delayed_one_candle
+      freshness_strict
+      freshness_relaxed_preview_only
+    TP/SL:
+      current_baseline
+      tighter_stop_preview
+      wider_stop_preview
+      earlier_take_profit_preview
+      later_take_profit_preview
+    trailing:
+      no_trailing
+      breakeven_after_partial_mfe_preview
+      trailing_after_tp1_preview
+    filters:
+      no_extra_filter
+      RSI_extreme_filter_preview
+      RSI_divergence_filter_preview
+      HTF_bias_filter_preview
+      trend_strength_filter_preview
+      volatility_filter_preview
+
+  Important:
+    Only report concrete metrics where evidence exists.
+    For variants without direct evidence, mark:
+      direct_sample_count=0 or null
+      variant_score_status=NEEDS_PAPER_CAPTURE
+      recommended_lab_action=CAPTURE_VARIANT_EVIDENCE
+    Do not pretend simulated numbers are real. The machine is already too confident for something made of files.
+
+D. Variant scoring:
+  Produce a conservative score per variant:
+    strategy_lab_score
+  Components:
+    - win_rate_score
+    - avg_pnl_score
+    - sample_count_score
+    - fill_rate_score
+    - stop_rate_penalty
+    - evidence_quality_score
+    - live_safety_compatibility_score
+    - freshness_score
+    - betrayal_penalty_or_bonus preview-only
+  Also produce:
+    confidence_class:
+      HIGH_PAPER_CONFIDENCE
+      MEDIUM_PAPER_CONFIDENCE
+      LOW_PAPER_CONFIDENCE
+      INSUFFICIENT_DIRECT_VARIANT_EVIDENCE
+      BLOCKED
+  Ranking must not override safety. It is a lab rank, not a live rank.
+
+E. Betrayal / inverse lab:
+  Reuse R304 betrayal preview.
+  Extend output to show:
+    - true_paper_outcomes_count
+    - true_paper_min_samples_required
+    - sample_progress_pct
+    - stale_shadow_outcome_check
+    - original_vs_inverse_delta if available
+    - betrayal_gate_decision
+    - recommended_next_capture_action
+  Betrayal rules remain stricter:
+    preferred win_rate >= 60
+    sample_count >= 30 minimum, 50 preferred
+    avg_pnl_pct > 0
+    must beat original cleanly
+    must have source chain
+    must map to exact lane/entry/risk contract
+    must not use stale shadow evidence
+  R305 must never output betrayal live permission.
+
+F. Operator script:
+  Add:
+    scripts/hammer_print_r305_strategy_lab_variant_pack.sh
+
+  It should print:
+    - R305 header
+    - final gate summary
+    - paper refresh health
+    - top 10 variant candidates
+    - current first tiny-live lane variant status
+    - top near-miss variant opportunities
+    - betrayal/inverse capture priorities
+    - safety flags
+    - recommended next phase
+
+  It must be read-only.
+  It must not make network/trading calls.
+  It must not print secrets.
+
+G. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R305_STRATEGY_LAB_VARIANT_TEST_PACK.md
+
+  Include:
+    - why this phase exists
+    - how to run it
+    - how to read output
+    - difference between expansion preview and live permission
+    - recommended R306 paths
+    - what not to do
+
+H. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_variant_test_pack.py
+
+  Cover:
+    1. Module runs and writes preview-only packet.
+    2. Safety flags are always locked false/true as appropriate.
+    3. Current first tiny-live lane is included.
+    4. Top R304 lanes are included.
+    5. Missing direct variant evidence is marked as insufficient, not invented.
+    6. Betrayal/inverse remains preview-only and blocked from live.
+    7. Variant rankings are produced but never set submit_allowed/final_command_available.
+    8. Operator script exists and prints expected sections.
+    9. inspect.py route works if implemented.
+    10. No secrets shown.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_test_pack --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_test_pack --log-dir logs/hammer_radar_forward
+    bash scripts/hammer_print_r305_strategy_lab_variant_pack.sh
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+  Must verify paper refresh remains alive:
+    systemctl is-active hammer-paper-refresh.service
+    bash scripts/hammer_print_r304_strategy_lab_and_refresh_health.sh
+
+Expected final response from Codex:
+  - files changed
+  - capability reuse summary
+  - tests run
+  - safety confirmation
+  - top variant candidates
+  - current first tiny-live lane status
+  - betrayal preview status
+  - recommended R306 path
+
+Recommended R306 path, depending on R305 result:
+  If variant evidence supports it:
+    R306 Eligible Lane Expansion Dry-Run Preview
+      include 44m short and 55m long as dry-run-only candidates
+      do not enable live
+      do not change current first Tiny Live lane automatically
+  If evidence is weak:
+    R306 Variant Evidence Capture Scheduler
+      start collecting direct paper evidence for missing variant dimensions
