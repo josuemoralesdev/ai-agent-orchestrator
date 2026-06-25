@@ -1,0 +1,292 @@
+# R308 - Expansion Risk Contract Write-Gate Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r307-expansion-risk-contract-preview-repair
+
+New branch:
+  r308-expansion-risk-contract-write-gate-preview
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION
+
+Why this phase exists:
+  R307 repaired expansion risk-contract preview and proved the current R306 lanes are genuinely missing exact risk-contract rows in:
+    configs/hammer_radar/tiny_live_risk_contracts.json
+
+  R307 confirmed:
+    - no config mutation
+    - no arming mutation
+    - no live execution
+    - no Binance order/test-order endpoint
+    - final Tiny Live gate still waiting safely
+    - current armed lane remains:
+        BTCUSDT|44m|long|ladder_close_50_618
+
+  Missing contract lanes from R307:
+    Baseline:
+      BTCUSDT|44m|long|ladder_close_50_618
+
+    Primary dry-run expansion candidates:
+      BTCUSDT|44m|short|ladder_382_50_618
+      BTCUSDT|44m|short|ladder_close_50_618
+      BTCUSDT|55m|long|ladder_close_50_618
+
+    Secondary watch-only candidates:
+      BTCUSDT|44m|short|ladder_22_44_22
+      BTCUSDT|44m|long|ladder_382_50_618
+      BTCUSDT|55m|long|market_close
+      BTCUSDT|88m|long|ladder_382_50_618
+
+Purpose:
+  Build a human-reviewed write-gate preview packet for missing expansion risk contracts.
+  This phase must NOT write config.
+  It must prepare exact proposed contract rows, validation previews, diffs, and operator review language for a future write-gate phase.
+  It must keep current Tiny Live operation unchanged.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO risk contract write in R308.
+  ABSOLUTELY NO config mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing the first Tiny Live lane.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  risk_contract_config_mutated=false
+  global_live_flags_changed=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  write_gate_preview_only=true
+
+Capability scan first:
+  Inspect:
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    configs/hammer_radar/autonomous_arming_state.json
+    src/app/hammer_radar/operator/expansion_risk_contract_preview_repair.py
+    src/app/hammer_radar/operator/eligible_lane_expansion_dry_run_preview.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_config_write_gate.py if present
+    src/app/hammer_radar/operator/tiny_live_risk_contract_preview.py if present
+    src/app/hammer_radar/operator/inspect.py
+    docs/hammer_radar/live_readiness/R307_EXPANSION_RISK_CONTRACT_PREVIEW_REPAIR.md
+    tests/hammer_radar/test_expansion_risk_contract_preview_repair.py
+    tests/hammer_radar/test_tiny_live_risk_contract* if present
+
+  Produce:
+    codex_tasks/reports/R308_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - current risk contract schema(s)
+    - existing write-gate modules
+    - duplicate risks
+    - exact proposed contract schema for R308 preview
+    - why R308 does not write config
+
+Scope:
+  A. Write-gate preview model
+  B. Proposed contract rows
+  C. Diff preview
+  D. Validation preview
+  E. Operator script
+  F. Tests
+  G. Docs
+
+A. Add module:
+  src/app/hammer_radar/operator/expansion_risk_contract_write_gate_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_write_gate_preview --log-dir logs/hammer_radar_forward
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-write-gate-preview
+
+Output ledger:
+  logs/hammer_radar_forward/expansion_risk_contract_write_gate_preview.ndjson
+
+event_type:
+  R308_EXPANSION_RISK_CONTRACT_WRITE_GATE_PREVIEW
+
+B. Proposed contracts:
+  Produce preview-only proposed rows for:
+
+  REQUIRED_BASELINE:
+    BTCUSDT|44m|long|ladder_close_50_618
+
+  PRIMARY_DRY_RUN_EXPANSION:
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+
+  SECONDARY_WATCH_ONLY:
+    BTCUSDT|44m|short|ladder_22_44_22
+    BTCUSDT|44m|long|ladder_382_50_618
+    BTCUSDT|55m|long|market_close
+    BTCUSDT|88m|long|ladder_382_50_618
+
+Contract template envelope:
+  symbol=BTCUSDT
+  margin_mode=isolated
+  leverage=10
+  max_position_notional_usdt=80
+  margin_budget_usdt=8
+  max_trades_per_day=1
+  daily_loss_stop_usdt=5
+  protective_orders_required=true
+  live_execution_enabled=false
+  allow_live_orders=false
+
+max_loss_usdt:
+  Do not guess loosely.
+  Derive from existing funding_config.max_loss_usdt if project code already treats it as the tiny-live max loss contract.
+  If not safely derivable, set:
+    max_loss_usdt=null
+    requires_operator_review=true
+    blocked_by includes risk_contract_max_loss_requires_operator_review
+
+C. For each proposed contract row:
+  Include:
+    - proposed_contract_key
+    - official_lane_key
+    - symbol
+    - timeframe
+    - direction
+    - entry_mode
+    - lane_role
+    - proposed_contract
+    - validation_preview
+    - missing_fields_after_preview
+    - operator_review_required
+    - write_gate_status:
+        WRITE_GATE_PREVIEW_READY
+        WRITE_GATE_PREVIEW_BLOCKED_OPERATOR_REVIEW_REQUIRED
+    - future_confirmation_phrase_preview:
+        "WRITE RISK CONTRACTS FOR R308 REVIEWED LANES"
+      but do not implement the phrase as an active write.
+    - safety fields
+
+D. Diff preview:
+  Produce a non-mutating diff-style preview:
+    - existing_contract_count
+    - proposed_new_contract_count
+    - would_add_lane_keys
+    - would_not_modify_existing_keys
+    - would_not_delete_keys
+    - config_path
+    - config_sha256_before if easy/safe
+    - config_written=false
+
+E. Operator script:
+  Add:
+    scripts/hammer_print_r308_expansion_risk_contract_write_gate_preview.sh
+
+  It prints:
+    - R308 header
+    - current config path
+    - proposed contract count
+    - baseline proposed contract status
+    - primary expansion proposed contract statuses
+    - secondary watch-only statuses
+    - missing operator review fields
+    - future confirmation phrase preview
+    - safety flags
+    - recommended R309 path
+
+F. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R308_EXPANSION_RISK_CONTRACT_WRITE_GATE_PREVIEW.md
+
+  Include:
+    - why R308 exists
+    - what it previews
+    - why it does not write
+    - how to review proposed contracts
+    - what not to do
+    - recommended R309 paths
+
+G. Tests:
+  Add:
+    tests/hammer_radar/test_expansion_risk_contract_write_gate_preview.py
+
+  Tests must cover:
+    1. Module runs and writes preview packet.
+    2. Proposed contracts include baseline and primary lanes.
+    3. No config mutation occurs.
+    4. No arming mutation occurs.
+    5. No live safety flag is enabled.
+    6. Future confirmation phrase is preview-only and not executable.
+    7. max_loss_usdt is either safely derived or explicitly blocked for operator review.
+    8. Existing keys are not modified/deleted in preview.
+    9. Inspect route works.
+    10. Operator script exists and prints required sections.
+    11. No secrets shown.
+    12. R307/R306 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_expansion_risk_contract_write_gate_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_write_gate_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.expansion_risk_contract_write_gate_preview --log-dir logs/hammer_radar_forward
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-write-gate-preview
+    bash scripts/hammer_print_r308_expansion_risk_contract_write_gate_preview.sh
+    bash scripts/hammer_print_r307_expansion_risk_contract_preview_repair.sh
+    bash scripts/hammer_print_r306_eligible_lane_expansion_preview.sh
+
+  Must verify no config diff:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - proposed contracts summary
+  - whether max_loss_usdt was safely derived or blocked
+  - safety confirmation
+  - recommended R309 path
+
+Recommended R309:
+  If R308 preview is complete and max_loss is resolved:
+    R309 Human-Reviewed Risk Contract Write Gate
+    This may write config only with explicit operator confirmation phrase.
+  If max_loss remains blocked:
+    R309 Max Loss Derivation Review
+    Resolve risk envelope before write gate.

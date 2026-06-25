@@ -2,6 +2,12 @@
 
 This index maps the R101-R183 first-live readiness path. It is documentation only and does not change runtime trading behavior.
 
+## Expansion Preview Path
+
+- R306 Eligible Lane Expansion Dry-Run Preview identifies the preserved first Tiny Live lane, primary dry-run expansion candidates, secondary watch-only lanes, evidence status, timer requirements, and missing exact risk-contract status without mutating arming state or risk config. Primary command: `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward eligible-lane-expansion-dry-run-preview`. Artifact: `docs/hammer_radar/live_readiness/R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW.md`.
+- R307 Expansion Risk Contract Preview Repair resolves exact lane risk-contract lookups for the R306 lanes and emits missing preview templates only. It does not write config, mutate arming state, enable live execution, call Binance, or create submit/final commands. Primary command: `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-preview-repair`. Artifact: `docs/hammer_radar/live_readiness/R307_EXPANSION_RISK_CONTRACT_PREVIEW_REPAIR.md`.
+- R308 Expansion Risk Contract Write-Gate Preview prepares human-reviewed proposed risk-contract rows, validation previews, diff previews, and future operator language for the R306/R307 missing lanes. It is preview-only: no risk-contract config write, arming mutation, live flag change, Binance order/test-order call, leverage/margin change, submit, or final command. Primary command: `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward expansion-risk-contract-write-gate-preview`. Artifact: `docs/hammer_radar/live_readiness/R308_EXPANSION_RISK_CONTRACT_WRITE_GATE_PREVIEW.md`.
+
 ## Current Modern Tiny-Live Gate Path
 
 - R228 Tiny Live 10 Of 10 Ready Packet is the current modern path for the official `BTCUSDT|8m|short|ladder_close_50_618` 10/10 paper-capture threshold. It consumes and reconciles the older `RUN_R177_EVIDENCE_THRESHOLD_RECHECK` recommendation without opening a new R177 branch. Primary command: `PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward tiny-live-10-of-10-ready-packet`. Safety state: packet/review only; no config writes, Binance/network calls, live authorization, order payloads, lane mode changes, or promotions. Artifact: `docs/hammer_radar/live_readiness/R228_TINY_LIVE_10_OF_10_READY_PACKET.md`.

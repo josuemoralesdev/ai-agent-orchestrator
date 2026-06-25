@@ -4736,6 +4736,17 @@ def main() -> int:
                 build_expansion_risk_contract_preview_repair(log_dir=args.log_dir, write=not args.no_write)
             )
         )
+    elif args.command == "expansion-risk-contract-write-gate-preview":
+        from src.app.hammer_radar.operator.expansion_risk_contract_write_gate_preview import (
+            build_expansion_risk_contract_write_gate_preview,
+            format_preview_json,
+        )
+
+        print(
+            format_preview_json(
+                build_expansion_risk_contract_write_gate_preview(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7559,6 +7570,12 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     expansion_risk_contract_preview_repair_parser.add_argument("--no-write", action="store_true")
+
+    expansion_risk_contract_write_gate_preview_parser = subparsers.add_parser(
+        "expansion-risk-contract-write-gate-preview",
+        parents=[parent],
+    )
+    expansion_risk_contract_write_gate_preview_parser.add_argument("--no-write", action="store_true")
 
     return parser
 
