@@ -4714,6 +4714,17 @@ def main() -> int:
                 build_strategy_lab_variant_test_pack(log_dir=args.log_dir, write=not args.no_write)
             )
         )
+    elif args.command == "eligible-lane-expansion-dry-run-preview":
+        from src.app.hammer_radar.operator.eligible_lane_expansion_dry_run_preview import (
+            build_eligible_lane_expansion_dry_run_preview,
+            format_preview_json,
+        )
+
+        print(
+            format_preview_json(
+                build_eligible_lane_expansion_dry_run_preview(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7525,6 +7536,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     strategy_lab_variant_parser = subparsers.add_parser("strategy-lab-variant-test-pack", parents=[parent])
     strategy_lab_variant_parser.add_argument("--no-write", action="store_true")
+
+    eligible_lane_expansion_parser = subparsers.add_parser(
+        "eligible-lane-expansion-dry-run-preview",
+        parents=[parent],
+    )
+    eligible_lane_expansion_parser.add_argument("--no-write", action="store_true")
 
     return parser
 
