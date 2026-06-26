@@ -1,0 +1,313 @@
+# R312 - Human-Reviewed Multi-Lane Timer Install Gate
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r311-multi-lane-dry-run-timer-unit-preview
+
+New branch:
+  r312-human-reviewed-multi-lane-timer-install-gate
+
+Phase classification:
+  WIRING / INTEGRATION + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R311 produced a clean preview for a recurring multi-lane dry-run observation systemd timer.
+
+  R311 validation showed:
+    - tests passed
+    - no systemd files installed
+    - no systemctl enable/start
+    - no daemon-reload
+    - no config diff
+    - no arming mutation
+    - no live execution
+    - submit_allowed=false
+    - final_command_available=false
+
+  Previewed service:
+    hammer-multi-lane-dry-run-observation.service
+
+  Previewed timer:
+    hammer-multi-lane-dry-run-observation.timer
+
+  Previewed command:
+    /home/josue/workspace/kernel/ai-agent-orchestrator-main/.venv/bin/python \
+      -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler \
+      --log-dir /home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward \
+      --once
+
+  Previewed cadence:
+    OnBootSec=2min
+    OnUnitActiveSec=60s
+    AccuracySec=10s
+
+Purpose:
+  Build a human-reviewed install gate for the multi-lane dry-run observation timer.
+  Default behavior must remain preview-only and must not install or enable anything.
+  Apply/install mode must require the exact operator confirmation phrase.
+  Codex must NOT run install/apply mode against real systemd during implementation or validation.
+  Apply mode may only be tested against temp directories / mocked systemctl behavior.
+
+Exact confirmation phrase:
+  INSTALL MULTI LANE DRY RUN OBSERVATION TIMER
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO real systemd install/enable/start during Codex validation.
+  ABSOLUTELY NO daemon-reload during Codex validation.
+
+Default behavior:
+  preview_only=true
+  apply_requested=false
+  confirmation_phrase_matched=false
+  systemd_unit_installed=false
+  systemd_timer_installed=false
+  systemd_unit_enabled=false
+  systemd_timer_enabled=false
+  systemd_timer_started=false
+  daemon_reload_called=false
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_dry_run_timer_unit_preview.py
+    src/app/hammer_radar/operator/multi_lane_dry_run_observation_scheduler.py
+    scripts/hammer_print_r311_multi_lane_dry_run_timer_unit_preview.sh
+    docs/hammer_radar/live_readiness/R311_MULTI_LANE_DRY_RUN_TIMER_UNIT_PREVIEW.md
+    tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py
+    existing systemd install/write gates if present
+    ops/systemd if present
+    src/app/hammer_radar/operator/inspect.py
+
+  Produce:
+    codex_tasks/reports/R312_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing timer install patterns
+    - exact service/timer content from R311
+    - duplicate risks
+    - selected guarded install implementation path
+    - why R312 still does not trade or arm lanes
+
+Scope:
+  A. Human-reviewed systemd install gate module
+  B. Preview/default mode
+  C. Apply mode for temp/mocked validation only
+  D. Operator script
+  E. Docs
+  F. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_dry_run_timer_install_gate.py
+
+CLI preview:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_install_gate --log-dir logs/hammer_radar_forward
+
+CLI apply shape:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_install_gate \
+    --log-dir logs/hammer_radar_forward \
+    --apply \
+    --confirmation "INSTALL MULTI LANE DRY RUN OBSERVATION TIMER"
+
+IMPORTANT:
+  Do not run real apply during Codex.
+  Tests may run apply only against temp install paths and mocked/no-op systemctl runners.
+
+Useful optional args:
+  --install-dir
+  --systemctl-mode mock|real
+  --no-ledger
+  --text
+
+Default:
+  systemctl-mode=mock or preview-only. Real systemctl must require explicit apply and confirmation.
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-timer-install-gate
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_dry_run_timer_install_gate.ndjson
+
+event_type:
+  R312_HUMAN_REVIEWED_MULTI_LANE_TIMER_INSTALL_GATE
+
+B. Install gate behavior:
+  Preview mode:
+    - render service/timer content
+    - show install paths
+    - show would_write_files
+    - show would_call_daemon_reload
+    - show would_enable_timer
+    - show would_start_timer
+    - do not write anything
+    - do not call systemctl
+
+  Apply mode:
+    - require exact phrase
+    - require --apply
+    - create install dir if using temp install path in tests
+    - write service/timer content only to target install path
+    - create backups if files already exist
+    - call systemctl only if systemctl-mode=real
+    - for tests, systemctl-mode=mock records intended calls without executing
+    - never call Binance, arming, final submit, risk-contract write, env write, leverage/margin mutation
+
+C. Output:
+  Include:
+    - service_name
+    - timer_name
+    - service_install_path
+    - timer_install_path
+    - service_content_sha256
+    - timer_content_sha256
+    - apply_requested
+    - confirmation_phrase_matched
+    - systemctl_mode
+    - preview_only
+    - files_written
+    - backups_created
+    - daemon_reload_called
+    - enable_called
+    - start_called
+    - mocked_systemctl_calls
+    - real_systemctl_calls
+    - install_gate_status:
+        INSTALL_GATE_PREVIEW_READY
+        INSTALL_GATE_BLOCKED_CONFIRMATION_REQUIRED
+        INSTALL_GATE_WRITTEN_TEMP_OR_REAL
+    - safety fields
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r312_multi_lane_timer_install_gate.sh
+
+  It must run preview/default mode only.
+  It must not apply.
+  It must print:
+    - R312 header
+    - service/timer names
+    - install path preview
+    - command preview
+    - confirmation phrase
+    - apply command preview
+    - safety fields
+    - recommended R313 path
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R312_HUMAN_REVIEWED_MULTI_LANE_TIMER_INSTALL_GATE.md
+
+  Include:
+    - why R312 exists
+    - exact phrase
+    - default preview behavior
+    - apply behavior
+    - mock vs real systemctl
+    - manual verification after install
+    - why it still does not trade
+    - what not to do
+    - recommended R313 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py
+
+  Tests must cover:
+    1. Default run previews only and writes nothing.
+    2. Wrong/missing phrase blocks apply.
+    3. Apply with exact phrase writes service/timer only to temp install dir.
+    4. Mock systemctl records daemon-reload/enable/start without executing.
+    5. Real systemctl mode is not used in tests.
+    6. Service command uses R310 scheduler with --once.
+    7. Service command uses repo .venv python.
+    8. Safety fields remain locked.
+    9. No config mutation.
+    10. No arming mutation.
+    11. No live flags enabled.
+    12. Inspect route works and previews only.
+    13. Operator script exists and previews only.
+    14. R311 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run preview only:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_install_gate --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_install_gate --log-dir logs/hammer_radar_forward
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-timer-install-gate
+    bash scripts/hammer_print_r312_multi_lane_timer_install_gate.sh
+    bash scripts/hammer_print_r311_multi_lane_dry_run_timer_unit_preview.sh
+
+  Must verify no real systemd install:
+    systemctl list-unit-files | grep -E 'hammer-multi-lane-dry-run-observation' || true
+    systemctl status hammer-multi-lane-dry-run-observation.service hammer-multi-lane-dry-run-observation.timer --no-pager || true
+    bash -lc 'compgen -G "/etc/systemd/system/hammer-multi-lane-dry-run-observation.*" || true'
+
+  Must verify no config/arming mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - default preview result
+  - temp apply test result
+  - no real systemd install confirmation
+  - no config/arming mutation confirmation
+  - safety confirmation
+  - recommended R313 path
+
+Recommended R313:
+  If R312 is clean and operator chooses to install:
+    R313 Operator Apply Multi-Lane Timer Install + Health Verification
+  If R312 shows blockers:
+    R313 Timer Install Gate Repair
