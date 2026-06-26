@@ -1,0 +1,322 @@
+# R314 - Multi-Lane Observation Health Panel
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r312-human-reviewed-multi-lane-timer-install-gate
+
+New branch:
+  r314-multi-lane-observation-health-panel
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R313 operator install succeeded after R312 commit.
+  The real systemd timer was installed and enabled:
+    hammer-multi-lane-dry-run-observation.timer
+
+  Verified behavior:
+    - timer enabled/active
+    - service executed R310 --once
+    - service exited status=0/SUCCESS
+    - observation ledger is receiving rows
+    - baseline lane preserved:
+        BTCUSDT|44m|long|ladder_close_50_618
+    - primary observed lanes:
+        BTCUSDT|44m|short|ladder_382_50_618
+        BTCUSDT|44m|short|ladder_close_50_618
+        BTCUSDT|55m|long|ladder_close_50_618
+    - secondary watch-only lanes visible:
+        BTCUSDT|44m|short|ladder_22_44_22
+        BTCUSDT|44m|long|ladder_382_50_618
+        BTCUSDT|55m|long|market_close
+        BTCUSDT|88m|long|ladder_382_50_618
+    - no live order
+    - submit_allowed=false
+    - final_command_available=false
+    - real_order_forbidden=true
+    - current armed lane unchanged:
+        BTCUSDT|44m|long|ladder_close_50_618
+    - paper refresh remains active/degraded only by eth_paper_outcome
+
+Problem:
+  Current verification prints too much raw JSON. Operator needs one calm health panel showing:
+    - timer state
+    - last observation tick age
+    - observed lanes
+    - current candidate visibility
+    - risk-contract validity
+    - final live safety
+    - paper refresh health
+    - safety flags
+  without flooding terminal output.
+
+Purpose:
+  Build a read-only Multi-Lane Observation Health Panel for operator use.
+  It must summarize R310/R313 status compactly and safely.
+  It must not mutate config, arming state, systemd units, live flags, risk contracts, env, or orders.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  Read-only inspection only.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_dry_run_observation_scheduler.py
+    src/app/hammer_radar/operator/multi_lane_dry_run_timer_install_gate.py
+    src/app/hammer_radar/operator/multi_lane_dry_run_timer_unit_preview.py
+    scripts/hammer_print_r310_multi_lane_dry_run_observation.sh
+    scripts/hammer_print_r312_multi_lane_timer_install_gate.sh
+    logs/hammer_radar_forward/multi_lane_dry_run_observation.ndjson
+    logs/hammer_radar_forward/multi_lane_dry_run_timer_install_gate.ndjson
+    src/app/hammer_radar/operator/tiny_live_final_console.py
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/inspect.py
+    docs/hammer_radar/live_readiness/R310_MULTI_LANE_DRY_RUN_OBSERVATION_SCHEDULER.md
+    docs/hammer_radar/live_readiness/R312_HUMAN_REVIEWED_MULTI_LANE_TIMER_INSTALL_GATE.md
+    tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py
+    tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py
+
+  Produce:
+    codex_tasks/reports/R314_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - reusable ledgers
+    - reusable final console surface
+    - reusable paper refresh status
+    - timer health sources
+    - duplicate risks
+    - chosen health-panel implementation path
+    - why R314 does not install/mutate/trade
+
+Scope:
+  A. Health panel module
+  B. Compact operator script
+  C. Optional inspect/API route if pattern exists
+  D. Docs
+  E. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_health_panel --log-dir logs/hammer_radar_forward
+
+Options:
+  --text
+  --json
+  --max-age-seconds 180
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-health-panel
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_observation_health_panel.ndjson
+
+event_type:
+  R314_MULTI_LANE_OBSERVATION_HEALTH_PANEL
+
+B. Health panel fields:
+  Top-level:
+    - event_type
+    - generated_at
+    - health_status:
+        MULTI_LANE_OBSERVATION_HEALTH_OK
+        MULTI_LANE_OBSERVATION_HEALTH_DEGRADED
+        MULTI_LANE_OBSERVATION_HEALTH_BLOCKED
+    - health_blockers
+    - recommended_next_operator_move
+    - recommended_r315_path
+
+  Timer summary:
+    - service_name
+    - timer_name
+    - timer_installed
+    - timer_enabled
+    - timer_active
+    - service_last_exit_status if available
+    - last_tick_seen
+    - last_tick_age_seconds
+    - last_tick_recent
+    - last_observation_id
+    - observation_ledger_path
+
+  Lane summary:
+    - baseline_lane
+    - primary_observed_lanes
+    - secondary_watch_only_lanes
+    - primary_observed_count
+    - secondary_watch_only_count
+    - all_primary_contracts_valid
+    - all_primary_observation_status_ok
+    - current_candidate_seen
+    - current_candidate_lane_key
+    - matching_observed_lane_keys
+    - candidate_freshness_status
+
+  Final live safety:
+    - final_gate_status
+    - final_gate_blockers
+    - real_order_forbidden
+    - submit_allowed
+    - final_command_available
+    - armed_lane_key
+    - timer_health_status from final console if available
+
+  Paper refresh summary:
+    - paper_refresh_health_status
+    - last_failed_tasks
+    - service_active if available
+    - degraded_non_critical accepted if eth_paper_outcome only
+
+  Safety fields:
+    include all required safety flags.
+
+C. Read-only systemd inspection:
+  If using systemctl, only use read-only commands:
+    systemctl is-enabled
+    systemctl is-active
+    systemctl show
+  Do not call daemon-reload, enable, start, stop, restart.
+
+  If systemctl calls are hard to test, make them injectable/mocked in tests.
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  It must print compactly:
+    - HEALTH STATUS
+    - TIMER
+    - LAST TICK
+    - LANES
+    - CANDIDATE VISIBILITY
+    - FINAL LIVE SAFETY
+    - PAPER REFRESH
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not print full lane packet JSON.
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R314_MULTI_LANE_OBSERVATION_HEALTH_PANEL.md
+
+  Include:
+    - why R314 exists
+    - what R313 changed
+    - how to run
+    - how to read panel
+    - what OK/degraded/blocked mean
+    - what not to do
+    - recommended R315 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_observation_health_panel.py
+
+  Tests must cover:
+    1. Panel reads latest observation ledger row.
+    2. Recent tick returns HEALTH_OK.
+    3. Stale tick returns HEALTH_DEGRADED/BLOCKED.
+    4. Baseline lane appears.
+    5. Primary lanes appear.
+    6. Secondary watch-only lanes appear.
+    7. Candidate visibility summary is compact.
+    8. Safety fields remain locked.
+    9. No config mutation.
+    10. No arming mutation.
+    11. No systemd mutation.
+    12. No final command.
+    13. No submit.
+    14. No Binance endpoint.
+    15. Operator script exists and avoids full JSON flood.
+    16. Inspect route works.
+    17. Paper refresh degraded eth_paper_outcome only is marked DEGRADED_NON_CRITICAL, not fatal.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_health_panel --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_health_panel --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_health_panel --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-health-panel
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - health status
+  - last tick age
+  - timer summary
+  - lane summary
+  - safety confirmation
+  - recommended R315 path
+
+Recommended R315:
+  If R314 is clean:
+    R315 Multi-Lane Observation Alerting Preview
+    Add Telegram/operator notifications only for degraded timer, stale observation, invalid contract, or safety-flag violation.
+  If R314 shows blockers:
+    R315 Health Panel Repair

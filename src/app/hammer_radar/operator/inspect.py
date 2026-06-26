@@ -4797,6 +4797,21 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "multi-lane-observation-health-panel":
+        from src.app.hammer_radar.operator.multi_lane_observation_health_panel import (
+            build_multi_lane_observation_health_panel,
+            format_health_panel_json,
+        )
+
+        print(
+            format_health_panel_json(
+                build_multi_lane_observation_health_panel(
+                    log_dir=args.log_dir,
+                    max_age_seconds=args.max_age_seconds,
+                    write=not args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7650,6 +7665,13 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     multi_lane_dry_run_timer_install_gate_parser.add_argument("--no-write", action="store_true")
+
+    multi_lane_observation_health_panel_parser = subparsers.add_parser(
+        "multi-lane-observation-health-panel",
+        parents=[parent],
+    )
+    multi_lane_observation_health_panel_parser.add_argument("--no-write", action="store_true")
+    multi_lane_observation_health_panel_parser.add_argument("--max-age-seconds", type=int, default=180)
 
     return parser
 
