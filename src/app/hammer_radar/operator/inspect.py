@@ -4772,6 +4772,17 @@ def main() -> int:
                 build_multi_lane_dry_run_observation(log_dir=args.log_dir, write=not args.no_write)
             )
         )
+    elif args.command == "multi-lane-dry-run-timer-unit-preview":
+        from src.app.hammer_radar.operator.multi_lane_dry_run_timer_unit_preview import (
+            build_multi_lane_dry_run_timer_unit_preview,
+            format_preview_json,
+        )
+
+        print(
+            format_preview_json(
+                build_multi_lane_dry_run_timer_unit_preview(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7613,6 +7624,12 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     multi_lane_dry_run_observation_parser.add_argument("--no-write", action="store_true")
+
+    multi_lane_dry_run_timer_unit_preview_parser = subparsers.add_parser(
+        "multi-lane-dry-run-timer-unit-preview",
+        parents=[parent],
+    )
+    multi_lane_dry_run_timer_unit_preview_parser.add_argument("--no-write", action="store_true")
 
     return parser
 

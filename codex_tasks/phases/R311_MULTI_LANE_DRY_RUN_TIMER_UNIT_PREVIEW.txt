@@ -1,0 +1,293 @@
+# R311 - Multi-Lane Dry-Run Timer Unit Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r310-multi-lane-dry-run-observation-scheduler
+
+New branch:
+  r311-multi-lane-dry-run-timer-unit-preview
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION
+
+Why this phase exists:
+  R310 built a multi-lane dry-run observation scheduler surface.
+  R310 validation showed:
+    - baseline lane preserved:
+        BTCUSDT|44m|long|ladder_close_50_618
+    - primary observed lanes:
+        BTCUSDT|44m|short|ladder_382_50_618
+        BTCUSDT|44m|short|ladder_close_50_618
+        BTCUSDT|55m|long|ladder_close_50_618
+    - secondary watch-only lanes visible:
+        BTCUSDT|44m|short|ladder_22_44_22
+        BTCUSDT|44m|long|ladder_382_50_618
+        BTCUSDT|55m|long|market_close
+        BTCUSDT|88m|long|ladder_382_50_618
+    - all primary risk contracts valid
+    - timer_health_status=TIMER_HEALTH_ACTIVE
+    - no config diff
+    - no arming mutation
+    - no systemd mutation
+    - scheduler_started=false
+    - live_execution_enabled=false
+    - submit_allowed=false
+    - final_command_available=false
+
+Purpose:
+  Prepare a systemd timer/unit design preview for recurring multi-lane dry-run observation.
+  This phase must NOT install, enable, start, stop, restart, or mutate systemd units.
+  It must only generate a preview packet, documentation, scripts, and tests.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO systemd install.
+  ABSOLUTELY NO systemd enable.
+  ABSOLUTELY NO systemd start.
+  ABSOLUTELY NO systemd daemon-reload.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  systemd_unit_installed=false
+  systemd_timer_installed=false
+  systemd_unit_enabled=false
+  systemd_timer_enabled=false
+  systemd_unit_started=false
+  systemd_timer_started=false
+  daemon_reload_called=false
+  scheduler_started=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_dry_run_observation_scheduler.py
+    scripts/hammer_print_r310_multi_lane_dry_run_observation.sh
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    systemd files or docs already present for:
+      hammer-autonomous-trigger-scheduler-dry-run
+      hammer-paper-refresh
+      hammer-approval-api
+      hammer-telegram-polling
+      radar
+    scripts related to systemd/timers if present
+    docs/hammer_radar/live_readiness/R310_MULTI_LANE_DRY_RUN_OBSERVATION_SCHEDULER.md
+    tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py
+    src/app/hammer_radar/operator/inspect.py
+
+  Produce:
+    codex_tasks/reports/R311_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing timer/unit naming conventions
+    - existing dry-run timer health conventions
+    - duplicate risks
+    - chosen unit/timer preview design
+    - why no systemd mutation occurs
+
+Scope:
+  A. Timer/unit preview model
+  B. Unit/timer content preview
+  C. Operator script
+  D. Docs
+  E. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_dry_run_timer_unit_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_unit_preview --log-dir logs/hammer_radar_forward
+
+  Optional:
+    --text
+    --no-write
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-timer-unit-preview
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_dry_run_timer_unit_preview.ndjson
+
+event_type:
+  R311_MULTI_LANE_DRY_RUN_TIMER_UNIT_PREVIEW
+
+B. Preview unit/timer design:
+  Suggested names:
+    hammer-multi-lane-dry-run-observation.service
+    hammer-multi-lane-dry-run-observation.timer
+
+  Service command preview:
+    /home/josue/workspace/kernel/ai-agent-orchestrator-main/.venv/bin/python \
+      -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler \
+      --log-dir /home/josue/workspace/kernel/ai-agent-orchestrator-main/logs/hammer_radar_forward \
+      --once
+
+  WorkingDirectory:
+    /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+  User:
+    josue
+
+  Timer cadence:
+    OnBootSec=2min
+    OnUnitActiveSec=60s
+    AccuracySec=10s
+
+  Important:
+    This is only a preview.
+    Do not write files under /etc/systemd/system.
+    Do not run systemctl.
+    Do not run daemon-reload.
+
+C. Output:
+  Include:
+    - service_name
+    - timer_name
+    - service_content_preview
+    - timer_content_preview
+    - install_path_preview
+    - timer_cadence_preview
+    - command_preview
+    - working_directory
+    - user
+    - unit_preview_sha256
+    - timer_preview_sha256
+    - systemd_write_gate_required=true
+    - future_confirmation_phrase_preview:
+        INSTALL MULTI LANE DRY RUN OBSERVATION TIMER
+    - future_confirmation_phrase_active=false
+    - future_confirmation_phrase_executable=false
+    - validation_summary:
+        command_uses_venv_python=true
+        command_uses_once=true
+        command_is_observation_only=true
+        no_live_flags=true
+        no_apply_flags=true
+        no_binance_endpoint_flags=true
+    - safety fields
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r311_multi_lane_dry_run_timer_unit_preview.sh
+
+  It prints:
+    - R311 header
+    - service/timer names
+    - command preview
+    - cadence
+    - systemd write gate required
+    - future confirmation phrase preview
+    - safety flags
+    - recommended R312 path
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R311_MULTI_LANE_DRY_RUN_TIMER_UNIT_PREVIEW.md
+
+  Include:
+    - why R311 exists
+    - what unit/timer would do
+    - why it is not installed
+    - how to inspect preview
+    - how to verify safety
+    - what not to do
+    - recommended R312 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py
+
+  Tests must cover:
+    1. Module runs and writes preview ledger.
+    2. Service and timer names are present.
+    3. Command uses multi_lane_dry_run_observation_scheduler with --once.
+    4. Command uses repo .venv python.
+    5. Preview does not write systemd files.
+    6. Preview does not call systemctl.
+    7. Preview does not call daemon-reload.
+    8. Safety fields remain locked.
+    9. Future confirmation phrase is preview-only and inactive.
+    10. Inspect route works.
+    11. Operator script exists and prints required sections.
+    12. R310 compatibility remains intact.
+    13. No config mutation.
+    14. No arming mutation.
+    15. No live flags enabled.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_unit_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_timer_unit_preview --log-dir logs/hammer_radar_forward
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-timer-unit-preview
+    bash scripts/hammer_print_r311_multi_lane_dry_run_timer_unit_preview.sh
+    bash scripts/hammer_print_r310_multi_lane_dry_run_observation.sh
+
+  Must verify no config/system mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - service/timer preview names
+  - command preview
+  - no systemd mutation confirmation
+  - no config mutation confirmation
+  - safety confirmation
+  - recommended R312 path
+
+Recommended R312:
+  If R311 is clean:
+    R312 Human-Reviewed Multi-Lane Timer Install Gate
+    This may install/enable the timer only with explicit operator confirmation.
+  If R311 shows blockers:
+    R312 Timer Preview Repair
