@@ -1,0 +1,342 @@
+# R310 - Multi-Lane Dry-Run Observation Scheduler
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r309-human-reviewed-risk-contract-write-gate
+
+New branch:
+  r310-multi-lane-dry-run-observation-scheduler
+
+Phase classification:
+  WIRING / INTEGRATION + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R309 was committed and then manually applied by the operator with the exact confirmation phrase:
+    WRITE RISK CONTRACTS FOR R308 REVIEWED LANES
+
+  The apply result added 8 exact risk-contract rows:
+    BTCUSDT|44m|long|ladder_close_50_618
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+    BTCUSDT|44m|short|ladder_22_44_22
+    BTCUSDT|44m|long|ladder_382_50_618
+    BTCUSDT|55m|long|market_close
+    BTCUSDT|88m|long|ladder_382_50_618
+
+  Post-apply validation showed:
+    - all added rows found after reload
+    - all added rows valid
+    - live_execution_enabled=false on every row
+    - allow_live_orders=false on every row
+    - max_loss_usdt=4.44
+    - margin_budget_usdt=8
+    - leverage=10
+    - max_position_notional_usdt=80
+    - current first Tiny Live lane unchanged:
+        BTCUSDT|44m|long|ladder_close_50_618
+
+  R307 after apply showed:
+    exact_contract_found=True
+    risk_contract_valid=True
+    blocked_by=none
+  for baseline, primary, and secondary lanes.
+
+  R306 after apply showed the same exact risk-contract readiness, while still:
+    live_execution_enabled=false
+    submit_allowed=false
+    final_command_available=false
+    real_order_forbidden=true
+    timer_health_status=TIMER_HEALTH_ACTIVE
+
+Purpose:
+  Build a multi-lane dry-run observation scheduler preview that observes the baseline and primary expansion lanes without live execution, without arming mutation, and without final submit.
+  This phase must not enable live trading. It must only add a dry-run observation surface and operator report.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing the first Tiny Live lane.
+  ABSOLUTELY NO writing risk contracts in R310.
+  ABSOLUTELY NO systemd mutation unless explicitly limited to docs/scripts preview; do not enable/start timers from Codex.
+
+Default behavior:
+  read-only / append-only observation ledger only.
+  No config writes.
+  No systemd writes.
+  No live writes.
+  No arming writes.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+
+Capability scan first:
+  Inspect and summarize:
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    configs/hammer_radar/autonomous_arming_state.json
+    src/app/hammer_radar/operator/eligible_lane_expansion_dry_run_preview.py
+    src/app/hammer_radar/operator/expansion_risk_contract_preview_repair.py
+    src/app/hammer_radar/operator/expansion_risk_contract_human_reviewed_write_gate.py
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler.py
+    src/app/hammer_radar/operator/tiny_live_autonomous_trigger_scheduler_timer_health.py
+    src/app/hammer_radar/operator/tiny_live_fresh_trigger_watch.py
+    src/app/hammer_radar/operator/tiny_live_final_authorization_gate.py
+    src/app/hammer_radar/operator/tiny_live_final_console.py
+    src/app/hammer_radar/operator/tiny_live_strategy_lane_selection.py
+    src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py
+    src/app/hammer_radar/operator/inspect.py
+    docs/hammer_radar/live_readiness/R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW.md
+    docs/hammer_radar/live_readiness/R309_HUMAN_REVIEWED_RISK_CONTRACT_WRITE_GATE.md
+    tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py
+    tests/hammer_radar/test_expansion_risk_contract_human_reviewed_write_gate.py
+    tests/hammer_radar/test_tiny_live_autonomous_trigger_scheduler* if present
+    tests/hammer_radar/test_tiny_live_fresh_trigger_watch* if present
+
+  Produce:
+    codex_tasks/reports/R310_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing dry-run scheduler surfaces
+    - existing timer health logic
+    - existing fresh-trigger watch logic
+    - exact risk-contract readiness after R309
+    - duplicate risks
+    - selected observation implementation path
+    - why R310 does not enable live or arm lanes
+
+Observation lanes:
+  Baseline lane:
+    BTCUSDT|44m|long|ladder_close_50_618
+
+  Primary dry-run expansion lanes:
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+
+  Secondary watch-only lanes remain visible but not part of primary observation:
+    BTCUSDT|44m|short|ladder_22_44_22
+    BTCUSDT|44m|long|ladder_382_50_618
+    BTCUSDT|55m|long|market_close
+    BTCUSDT|88m|long|ladder_382_50_618
+
+  Betrayal/inverse remains lab-only and blocked.
+
+Scope:
+  A. Multi-lane observation packet
+  B. Observation scheduler dry-run tick
+  C. Operator script
+  D. Docs
+  E. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_dry_run_observation_scheduler.py
+
+CLI:
+  One-shot observation tick:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --log-dir logs/hammer_radar_forward --once
+
+  Preview only:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --log-dir logs/hammer_radar_forward --preview
+
+  Help:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --help
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-observation
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_dry_run_observation.ndjson
+
+event_type:
+  R310_MULTI_LANE_DRY_RUN_OBSERVATION
+
+B. For each observed lane, output:
+  - lane_key
+  - lane_role:
+      BASELINE_CURRENT_FIRST_TINY_LIVE
+      PRIMARY_DRY_RUN_OBSERVATION
+      SECONDARY_WATCH_ONLY_VISIBLE
+  - symbol
+  - timeframe
+  - direction
+  - entry_mode
+  - exact_contract_found
+  - risk_contract_valid
+  - risk_contract_blocked_by
+  - live_execution_enabled_from_contract
+  - allow_live_orders_from_contract
+  - current_candidate_seen
+  - current_candidate_matches_lane
+  - candidate_freshness_status
+  - timer_health_status
+  - timer_active
+  - observation_status:
+      OBSERVING_DRY_RUN
+      WATCH_ONLY_VISIBLE
+      BLOCKED_RISK_CONTRACT
+      BLOCKED_TIMER_HEALTH
+      BLOCKED_POLICY
+  - observation_blockers
+  - observation_action:
+      RECORD_ONLY_NO_SUBMIT
+      WATCH_ONLY_NO_SUBMIT
+      BLOCKED_NO_ACTION
+  - dry_run_order_payload_created=false
+  - executable_payload_created=false
+  - signed_request_created=false
+  - submit_allowed=false
+  - final_command_available=false
+  - all required safety fields
+
+C. Gate matrix:
+  Add:
+    multi_lane_observation_gate_matrix
+  Include:
+    baseline_lane_preserved=true
+    observed_primary_lane_count=3
+    secondary_watch_only_count=4
+    all_primary_risk_contracts_valid=true/false
+    timer_health_active=true/false
+    live_execution_remains_disabled=true
+    arming_state_unchanged=true
+    scheduler_started=false
+    recommended_next_operator_move:
+      KEEP_OBSERVING_MULTI_LANE_DRY_RUN
+      or
+      REPAIR_OBSERVATION_BLOCKERS
+    recommended_r311_path:
+      R311 Multi-Lane Dry-Run Timer Unit Preview
+      or
+      R311 Observation Blocker Repair
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r310_multi_lane_dry_run_observation.sh
+
+  It must run preview/once safely.
+  It prints:
+    - R310 header
+    - baseline lane
+    - primary observed lanes
+    - secondary watch-only lanes
+    - risk-contract readiness
+    - timer health
+    - candidate visibility summary
+    - safety flags
+    - recommended R311 path
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R310_MULTI_LANE_DRY_RUN_OBSERVATION_SCHEDULER.md
+
+  Include:
+    - why R310 exists
+    - what R309 changed
+    - what multi-lane dry-run observation means
+    - what it does not mean
+    - how to run preview and once
+    - how to read output
+    - why it still does not arm or trade
+    - recommended R311 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py
+
+  Tests must cover:
+    1. Module help works.
+    2. Preview/default does not write config.
+    3. One-shot observation writes only observation ledger.
+    4. Baseline lane is included.
+    5. Primary lanes are included.
+    6. Secondary lanes are visible but watch-only.
+    7. Betrayal/inverse not included as observed lane.
+    8. All safety flags remain locked.
+    9. No final command.
+    10. No submit.
+    11. No executable payload.
+    12. No signed request.
+    13. No Binance endpoints.
+    14. No arming mutation.
+    15. No risk contract mutation.
+    16. Inspect route works.
+    17. Operator script exists and prints required sections.
+    18. R306/R307 compatibility after R309 contracts remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_expansion_risk_contract_human_reviewed_write_gate.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --log-dir logs/hammer_radar_forward --preview
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler --log-dir logs/hammer_radar_forward --once
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-dry-run-observation
+    bash scripts/hammer_print_r310_multi_lane_dry_run_observation.sh
+    bash scripts/hammer_print_r306_eligible_lane_expansion_preview.sh
+    bash scripts/hammer_print_r307_expansion_risk_contract_preview_repair.sh
+
+  Must verify no config/system mutation from R310:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - observed lanes
+  - secondary visible lanes
+  - risk contract readiness
+  - safety confirmation
+  - no config/system mutation confirmation
+  - recommended R311 path
+
+Recommended R311:
+  If R310 is clean:
+    R311 Multi-Lane Dry-Run Timer Unit Preview
+    It should prepare, but not install/enable, a systemd timer/unit design for recurring multi-lane dry-run observation.
+  If R310 shows blockers:
+    R311 Observation Blocker Repair

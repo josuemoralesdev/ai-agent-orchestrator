@@ -106,7 +106,7 @@ def test_no_safety_flag_is_enabled_and_config_is_not_mutated(tmp_path: Path) -> 
     assert payload["secrets_shown"] is False
 
 
-def test_r306_uses_repaired_resolver(tmp_path: Path) -> None:
+def test_r306_uses_repaired_resolver_after_r309_contract_apply(tmp_path: Path) -> None:
     from tests.hammer_radar.test_eligible_lane_expansion_dry_run_preview import (
         FINAL_GATE_PACKET,
         FRESH_PACKET,
@@ -132,7 +132,9 @@ def test_r306_uses_repaired_resolver(tmp_path: Path) -> None:
 
     assert "lookup_attempts" in preview
     assert "safe_preview_template_status" in preview
-    assert preview["safe_preview_template_status"] == PREVIEW_TEMPLATE_AVAILABLE_NOT_WRITTEN
+    assert preview["exact_contract_found"] is True
+    assert preview["risk_contract_valid"] is True
+    assert preview["safe_preview_template_status"] == "NOT_NEEDED_CONTRACT_FOUND"
 
 
 def test_inspect_route_works(tmp_path: Path) -> None:

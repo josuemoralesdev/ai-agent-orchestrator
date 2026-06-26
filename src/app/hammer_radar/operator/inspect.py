@@ -4761,6 +4761,17 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "multi-lane-dry-run-observation":
+        from src.app.hammer_radar.operator.multi_lane_dry_run_observation_scheduler import (
+            build_multi_lane_dry_run_observation,
+            format_observation_json,
+        )
+
+        print(
+            format_observation_json(
+                build_multi_lane_dry_run_observation(log_dir=args.log_dir, write=not args.no_write)
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7596,6 +7607,12 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     expansion_risk_contract_human_reviewed_write_gate_parser.add_argument("--no-write", action="store_true")
+
+    multi_lane_dry_run_observation_parser = subparsers.add_parser(
+        "multi-lane-dry-run-observation",
+        parents=[parent],
+    )
+    multi_lane_dry_run_observation_parser.add_argument("--no-write", action="store_true")
 
     return parser
 
