@@ -4812,6 +4812,36 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "multi-lane-observation-alerting-preview":
+        from src.app.hammer_radar.operator.multi_lane_observation_alerting_preview import (
+            build_multi_lane_observation_alerting_preview,
+            format_alerting_preview_json,
+        )
+
+        print(
+            format_alerting_preview_json(
+                build_multi_lane_observation_alerting_preview(
+                    log_dir=args.log_dir,
+                    max_age_seconds=args.max_age_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
+    elif args.command == "multi-lane-observation-alert-send-gate":
+        from src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate import (
+            build_multi_lane_observation_alert_send_gate,
+            format_alert_send_gate_json,
+        )
+
+        print(
+            format_alert_send_gate_json(
+                build_multi_lane_observation_alert_send_gate(
+                    log_dir=args.log_dir,
+                    max_age_seconds=args.max_age_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7672,6 +7702,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     multi_lane_observation_health_panel_parser.add_argument("--no-write", action="store_true")
     multi_lane_observation_health_panel_parser.add_argument("--max-age-seconds", type=int, default=180)
+
+    multi_lane_observation_alerting_preview_parser = subparsers.add_parser(
+        "multi-lane-observation-alerting-preview",
+        parents=[parent],
+    )
+    multi_lane_observation_alerting_preview_parser.add_argument("--no-write", action="store_true")
+    multi_lane_observation_alerting_preview_parser.add_argument("--max-age-seconds", type=int, default=180)
+
+    multi_lane_observation_alert_send_gate_parser = subparsers.add_parser(
+        "multi-lane-observation-alert-send-gate",
+        parents=[parent],
+    )
+    multi_lane_observation_alert_send_gate_parser.add_argument("--no-write", action="store_true")
+    multi_lane_observation_alert_send_gate_parser.add_argument("--max-age-seconds", type=int, default=180)
 
     return parser
 

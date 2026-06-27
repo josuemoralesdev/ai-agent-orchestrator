@@ -1,0 +1,324 @@
+# R315 - Multi-Lane Observation Alerting Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r314-multi-lane-observation-health-panel
+
+New branch:
+  r315-multi-lane-observation-alerting-preview
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R314 built a compact Multi-Lane Observation Health Panel.
+  R314 validation showed:
+    - health_status=MULTI_LANE_OBSERVATION_HEALTH_OK
+    - timer installed/enabled/active
+    - last tick recent
+    - service_last_exit_status=0
+    - baseline lane preserved:
+        BTCUSDT|44m|long|ladder_close_50_618
+    - primary observed lanes:
+        BTCUSDT|44m|short|ladder_382_50_618
+        BTCUSDT|44m|short|ladder_close_50_618
+        BTCUSDT|55m|long|ladder_close_50_618
+    - secondary watch-only lanes visible:
+        BTCUSDT|44m|short|ladder_22_44_22
+        BTCUSDT|44m|long|ladder_382_50_618
+        BTCUSDT|55m|long|market_close
+        BTCUSDT|88m|long|ladder_382_50_618
+    - final live safety locked:
+        submit_allowed=false
+        final_command_available=false
+        real_order_forbidden=true
+    - paper refresh active, degraded non-critical only from eth_paper_outcome
+    - no config or arming diff
+
+Purpose:
+  Build an alerting preview layer on top of R314.
+  It must preview operator/Telegram alerts only when something meaningful is degraded or unsafe.
+  It must NOT send Telegram messages yet.
+  It must NOT install timers.
+  It must NOT mutate config, arming, env, risk contracts, live flags, or systemd.
+  It must NOT place orders or create final commands.
+
+Alert philosophy:
+  No heartbeat spam.
+  No “everything is fine” alerts every minute.
+  Alert only when operator attention is actually needed.
+  Operator attention is the scarce resource, because apparently humans only get one brain and keep filling it with notifications.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO Telegram send in R315.
+  Preview only.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+    scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+    logs/hammer_radar_forward/multi_lane_observation_health_panel.ndjson
+    src/app/hammer_radar/operator/telegram_* if present
+    src/app/hammer_radar/operator/*alert* if present
+    existing Telegram alert/report scripts if present
+    src/app/hammer_radar/operator/inspect.py
+    tests/hammer_radar/test_multi_lane_observation_health_panel.py
+    docs/hammer_radar/live_readiness/R314_MULTI_LANE_OBSERVATION_HEALTH_PANEL.md
+
+  Produce:
+    codex_tasks/reports/R315_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - reusable health panel source
+    - existing Telegram/reporting surfaces
+    - duplicate risks
+    - alerting rules
+    - rate-limit/dedup preview strategy
+    - why R315 does not send anything
+
+Scope:
+  A. Alerting preview module
+  B. Alert rule engine
+  C. Dedup/rate-limit preview
+  D. Operator script
+  E. Docs
+  F. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_observation_alerting_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alerting_preview --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --max-age-seconds 180
+  --no-write
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-alerting-preview
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_observation_alerting_preview.ndjson
+
+event_type:
+  R315_MULTI_LANE_OBSERVATION_ALERTING_PREVIEW
+
+B. Alert rule engine:
+  Use R314 health panel output as source.
+  Alert conditions:
+    - health_status == MULTI_LANE_OBSERVATION_HEALTH_BLOCKED
+    - stale observation tick:
+        last_tick_recent=false
+        last_tick_age_seconds > max_age_seconds
+    - timer not installed/enabled/active
+    - service_last_exit_status not 0
+    - any primary contract invalid
+    - any primary observation status not OK
+    - candidate freshness status critical, if such signal exists
+    - final live safety violation:
+        real_order_forbidden != true
+        submit_allowed != false
+        final_command_available != false
+    - armed lane changed unexpectedly
+    - safety flag violation:
+        any required false flag true
+        global_kill_switch != true
+    - paper refresh critical failure
+    - paper refresh degraded for tasks beyond accepted eth_paper_outcome-only degradation
+
+Non-alert conditions:
+    - health_status OK
+    - current_candidate_seen=false
+    - candidate_freshness_status=FRESH_TRIGGER_WAIT
+    - paper_refresh_health_status=PAPER_REFRESH_DEGRADED_NON_CRITICAL with last_failed_tasks exactly or only eth_paper_outcome
+    - normal timer tick
+    - no candidate
+    - secondary watch-only present
+    - betrayal blocked preview-only
+
+Alert severity:
+  - INFO_PREVIEW_NO_SEND for no actionable alert
+  - WARNING_PREVIEW_NO_SEND for degraded but safe
+  - CRITICAL_PREVIEW_NO_SEND for blocked or safety violation
+
+C. Preview messages:
+  Produce:
+    - alert_required true/false
+    - alert_severity
+    - alert_reasons
+    - dedup_key
+    - rate_limit_bucket
+    - telegram_preview_message
+    - operator_console_preview_message
+    - telegram_send_called=false
+    - telegram_message_sent=false
+    - recommended_next_operator_move
+    - recommended_r316_path
+
+  The preview message must be concise:
+    title line
+    severity
+    reason
+    last tick age
+    timer status
+    final safety summary
+    recommended action
+
+D. Dedup/rate-limit preview:
+  No persistent state mutation except append-only ledger.
+  Include:
+    - dedup_key based on severity + reasons + affected surface
+    - rate_limit_window_seconds default 900
+    - would_suppress_duplicate=false/true only as preview if previous matching ledger entry exists within window
+  But do NOT suppress critical safety violations in preview unless explicitly documented as "would_repeat_critical=true".
+
+E. Operator script:
+  Add:
+    scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+
+  It must print:
+    - ALERT STATUS
+    - SEVERITY
+    - REASONS
+    - DEDUP/RATE LIMIT PREVIEW
+    - TELEGRAM PREVIEW MESSAGE
+    - OPERATOR CONSOLE PREVIEW MESSAGE
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not send Telegram.
+
+F. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R315_MULTI_LANE_OBSERVATION_ALERTING_PREVIEW.md
+
+  Include:
+    - why R315 exists
+    - alert philosophy
+    - alert conditions
+    - non-alert conditions
+    - severity model
+    - dedup/rate-limit preview
+    - how to run
+    - why it does not send yet
+    - recommended R316 paths
+
+G. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_observation_alerting_preview.py
+
+  Tests must cover:
+    1. Health OK produces alert_required=false.
+    2. Stale tick produces warning/critical preview.
+    3. Timer inactive produces alert.
+    4. Primary contract invalid produces alert.
+    5. Final safety violation produces critical alert.
+    6. Paper refresh eth_paper_outcome-only degradation does not alert.
+    7. Paper refresh critical failure alerts.
+    8. Dedup key is stable.
+    9. Rate-limit preview detects recent duplicate ledger entry.
+    10. Telegram send flags remain false.
+    11. No config mutation.
+    12. No arming mutation.
+    13. No systemd mutation.
+    14. No live order.
+    15. No submit.
+    16. No final command.
+    17. No Binance endpoint.
+    18. Inspect route works.
+    19. Operator script exists and prints preview only.
+    20. R314 health panel compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alerting_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alerting_preview --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alerting_preview --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-alerting-preview
+    bash scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - alert status
+  - severity
+  - whether Telegram send was called
+  - no mutation confirmation
+  - safety confirmation
+  - recommended R316 path
+
+Recommended R316:
+  If R315 is clean:
+    R316 Human-Reviewed Observation Alert Send Gate
+    Adds gated real Telegram sending for alert_required=true only, with exact phrase and no heartbeat spam.
+  If R315 shows blockers:
+    R316 Alerting Preview Repair
