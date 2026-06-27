@@ -1,0 +1,340 @@
+# R316 - Human-Reviewed Observation Alert Send Gate
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r315-multi-lane-observation-alerting-preview
+
+New branch:
+  r316-human-reviewed-observation-alert-send-gate
+
+Phase classification:
+  WIRING / INTEGRATION + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R315 built a preview-only multi-lane observation alerting layer.
+  R315 validation showed:
+    - tests passed
+    - alert_required=false in healthy state
+    - alert_severity=INFO_PREVIEW_NO_SEND
+    - telegram_send_called=false
+    - telegram_message_sent=false
+    - R314 health remains OK
+    - timer enabled/active
+    - last tick recent
+    - final live safety locked:
+        real_order_forbidden=true
+        submit_allowed=false
+        final_command_available=false
+    - no config diff
+    - no arming mutation
+    - no systemd mutation
+    - no live order
+    - no Binance endpoint
+
+Purpose:
+  Build a human-reviewed send gate for future real Telegram alerts.
+  Default behavior must remain preview-only and must not send anything.
+  Real Telegram sending must require:
+    - alert_required=true
+    - exact operator confirmation phrase
+    - no heartbeat spam
+    - safety flags locked
+    - no live/trade implication
+  Codex must NOT send real Telegram during this phase.
+  Tests may use a mocked sender only.
+
+Exact confirmation phrase:
+  SEND MULTI LANE OBSERVATION ALERTS WHEN REQUIRED
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO real Telegram send in Codex validation.
+  Default preview only.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+
+Send-gate fields:
+  send_gate_preview_only=true by default
+  apply_requested=false by default
+  confirmation_phrase_matched=false by default
+  alert_required must be true before any send path can activate
+  telegram_sender_mode=mock by default
+  telegram_send_called=false unless mock apply path in tests
+  telegram_message_sent=false unless mock apply path in tests
+  real_telegram_send_called=false always during Codex validation
+  real_telegram_message_sent=false always during Codex validation
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_observation_alerting_preview.py
+    src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+    scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    logs/hammer_radar_forward/multi_lane_observation_alerting_preview.ndjson
+    src/app/hammer_radar/operator/notification_watcher.py
+    src/app/hammer_radar/operator/telegram_operator_bridge.py
+    src/app/hammer_radar/operator/telegram_polling_worker.py
+    src/app/hammer_radar/operator/telegram_approval_challenge.py
+    src/app/hammer_radar/operator/inspect.py
+    docs/hammer_radar/live_readiness/R315_MULTI_LANE_OBSERVATION_ALERTING_PREVIEW.md
+    tests/hammer_radar/test_multi_lane_observation_alerting_preview.py
+
+  Produce:
+    codex_tasks/reports/R316_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - reusable preview alert decision source
+    - reusable Telegram send function if available
+    - how mock sender works
+    - why real Telegram is not called in R316 validation
+    - duplicate risks
+    - no-heartbeat policy
+    - exact send-gate requirements
+
+Scope:
+  A. Send gate module
+  B. Preview/default mode
+  C. Mock apply path for tests only
+  D. Operator script
+  E. Docs
+  F. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/multi_lane_observation_alert_send_gate.py
+
+CLI preview:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate --log-dir logs/hammer_radar_forward
+
+CLI apply shape:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate \
+    --log-dir logs/hammer_radar_forward \
+    --apply \
+    --confirmation "SEND MULTI LANE OBSERVATION ALERTS WHEN REQUIRED"
+
+Options:
+  --json
+  --text
+  --no-write
+  --telegram-sender-mode mock|real
+  --max-age-seconds 180
+  --rate-limit-window-seconds 900
+
+Defaults:
+  --telegram-sender-mode mock
+  preview only
+  no send
+
+IMPORTANT:
+  Do not run real Telegram send during Codex.
+  Tests may run mock apply only.
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-alert-send-gate
+
+Output ledger:
+  logs/hammer_radar_forward/multi_lane_observation_alert_send_gate.ndjson
+
+event_type:
+  R316_HUMAN_REVIEWED_OBSERVATION_ALERT_SEND_GATE
+
+B. Gate behavior:
+  Preview mode:
+    - builds R315 alert preview
+    - shows whether alert_required
+    - shows confirmation phrase required
+    - shows whether send would be blocked
+    - does not call Telegram
+    - does not mutate anything
+
+  Apply mode:
+    - requires --apply
+    - requires exact confirmation phrase
+    - requires alert_required=true
+    - requires alert_severity WARNING or CRITICAL preview no-send
+    - must not send INFO no-action previews
+    - must respect dedup/rate-limit rules
+    - mock mode records intended send without real Telegram
+    - real mode exists only for future operator use, not Codex validation
+    - real mode must still require exact phrase and alert_required=true
+
+C. Output:
+  Include:
+    - event_type
+    - generated_at
+    - send_gate_status:
+        SEND_GATE_PREVIEW_READY
+        SEND_GATE_BLOCKED_NO_ALERT_REQUIRED
+        SEND_GATE_BLOCKED_CONFIRMATION_REQUIRED
+        SEND_GATE_BLOCKED_RATE_LIMIT
+        SEND_GATE_MOCK_SENT
+        SEND_GATE_REAL_SEND_AVAILABLE_NOT_USED_IN_CODEX
+    - alert_required
+    - alert_severity
+    - alert_reasons
+    - confirmation_phrase_required
+    - confirmation_phrase_matched
+    - apply_requested
+    - telegram_sender_mode
+    - telegram_preview_message
+    - operator_console_preview_message
+    - telegram_send_called
+    - telegram_message_sent
+    - real_telegram_send_called
+    - real_telegram_message_sent
+    - dedup_key
+    - would_suppress_duplicate
+    - would_repeat_critical
+    - send_blockers
+    - recommended_next_operator_move
+    - recommended_r317_path
+    - safety fields
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r316_observation_alert_send_gate.sh
+
+  It must run preview/default mode only.
+  It must print:
+    - SEND GATE STATUS
+    - ALERT SUMMARY
+    - CONFIRMATION STATUS
+    - SEND BLOCKERS
+    - TELEGRAM PREVIEW MESSAGE
+    - MOCK/REAL SEND FLAGS
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not pass --apply.
+  It must not send Telegram.
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R316_HUMAN_REVIEWED_OBSERVATION_ALERT_SEND_GATE.md
+
+  Include:
+    - why R316 exists
+    - exact phrase
+    - preview behavior
+    - apply behavior
+    - alert_required gate
+    - no heartbeat spam
+    - mock vs real sender
+    - why Codex validation cannot send
+    - how operator would verify safely later
+    - recommended R317 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py
+
+  Tests must cover:
+    1. Default preview does not send.
+    2. Healthy R315 alert_required=false blocks apply.
+    3. Missing confirmation blocks apply.
+    4. Wrong confirmation blocks apply.
+    5. Mock apply with alert_required=true records mock send only.
+    6. INFO no-action preview never sends.
+    7. Dedup/rate-limit blocker prevents non-critical duplicate send.
+    8. Critical repeat reports repeat behavior clearly.
+    9. Real sender mode is not executed in tests.
+    10. Telegram send flags remain false in preview.
+    11. real_telegram_send_called=false in all Codex validation paths.
+    12. No config mutation.
+    13. No arming mutation.
+    14. No systemd mutation.
+    15. No live order.
+    16. No submit.
+    17. No final command.
+    18. No Binance endpoint.
+    19. Inspect route works.
+    20. Operator script exists and previews only.
+    21. R315 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.multi_lane_observation_alert_send_gate --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward multi-lane-observation-alert-send-gate
+    bash scripts/hammer_print_r316_observation_alert_send_gate.sh
+    bash scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - send gate status
+  - whether alert_required
+  - Telegram send flags
+  - real Telegram send flags
+  - no mutation confirmation
+  - safety confirmation
+  - recommended R317 path
+
+Recommended R317:
+  If R316 is clean:
+    R317 Observation Alert Send Gate Operator Drill
+    Operator-run mock/no-send drill for degraded/stale synthetic alert only, no real Telegram yet unless explicitly chosen.
+  If R316 shows blockers:
+    R317 Alert Send Gate Repair
