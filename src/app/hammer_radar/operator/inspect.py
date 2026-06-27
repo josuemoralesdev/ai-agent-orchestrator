@@ -4842,6 +4842,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "observation-alert-send-gate-operator-drill":
+        from src.app.hammer_radar.operator.observation_alert_send_gate_operator_drill import (
+            build_observation_alert_send_gate_operator_drill,
+            format_operator_drill_json,
+        )
+
+        print(
+            format_operator_drill_json(
+                build_observation_alert_send_gate_operator_drill(
+                    log_dir=args.log_dir,
+                    scenario=args.scenario,
+                    confirmation=args.confirmation,
+                    max_age_seconds=args.max_age_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7716,6 +7733,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     multi_lane_observation_alert_send_gate_parser.add_argument("--no-write", action="store_true")
     multi_lane_observation_alert_send_gate_parser.add_argument("--max-age-seconds", type=int, default=180)
+
+    observation_alert_send_gate_operator_drill_parser = subparsers.add_parser(
+        "observation-alert-send-gate-operator-drill",
+        parents=[parent],
+    )
+    observation_alert_send_gate_operator_drill_parser.add_argument("--no-write", action="store_true")
+    observation_alert_send_gate_operator_drill_parser.add_argument("--max-age-seconds", type=int, default=180)
+    observation_alert_send_gate_operator_drill_parser.add_argument(
+        "--scenario",
+        choices=("healthy", "stale_observation", "final_safety_violation", "all"),
+        default="all",
+    )
+    observation_alert_send_gate_operator_drill_parser.add_argument("--confirmation", default=None)
 
     return parser
 

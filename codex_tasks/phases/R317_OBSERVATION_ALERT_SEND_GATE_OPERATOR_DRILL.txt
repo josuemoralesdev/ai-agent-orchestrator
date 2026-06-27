@@ -1,0 +1,338 @@
+# R317 - Observation Alert Send Gate Operator Drill
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r316-human-reviewed-observation-alert-send-gate
+
+New branch:
+  r317-observation-alert-send-gate-operator-drill
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION
+
+Why this phase exists:
+  R316 built a human-reviewed observation alert send gate.
+  R316 validation showed:
+    - tests passed
+    - default state preview only
+    - alert_required=false in healthy state
+    - telegram_send_called=false
+    - telegram_message_sent=false
+    - real_telegram_send_called=false
+    - real_telegram_message_sent=false
+    - no config diff
+    - no arming mutation
+    - no systemd mutation
+    - no live order
+    - no submit
+    - no final command
+    - no Binance endpoint
+    - timer and paper refresh services active
+
+Purpose:
+  Build an operator drill that proves the R316 send gate behaves correctly using synthetic alert scenarios.
+  This drill must use mock/no-real-send behavior only.
+  It must prove:
+    - healthy state does not alert/send
+    - stale observation condition would alert
+    - critical safety violation would alert
+    - exact confirmation phrase is required
+    - mock send can record intended send only when gates pass
+    - real Telegram is never called
+    - no live/trade/config/arming/systemd mutation occurs
+
+This phase must NOT send real Telegram.
+
+Exact confirmation phrase inherited from R316:
+  SEND MULTI LANE OBSERVATION ALERTS WHEN REQUIRED
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO real Telegram send.
+  Mock/no-real-send drill only.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_observation_alert_send_gate.py
+    src/app/hammer_radar/operator/multi_lane_observation_alerting_preview.py
+    src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+    scripts/hammer_print_r316_observation_alert_send_gate.sh
+    logs/hammer_radar_forward/multi_lane_observation_alert_send_gate.ndjson
+    logs/hammer_radar_forward/multi_lane_observation_alerting_preview.ndjson
+    logs/hammer_radar_forward/multi_lane_observation_health_panel.ndjson
+    tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py
+    docs/hammer_radar/live_readiness/R316_HUMAN_REVIEWED_OBSERVATION_ALERT_SEND_GATE.md
+    src/app/hammer_radar/operator/inspect.py
+
+  Produce:
+    codex_tasks/reports/R317_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - reusable R316 send gate
+    - reusable R315 alert preview
+    - reusable R314 health panel
+    - synthetic drill strategy
+    - mock sender boundaries
+    - no-real-Telegram guarantee
+    - duplicate risks
+    - why R317 does not trade/mutate/install/send real Telegram
+
+Scope:
+  A. Operator drill module
+  B. Synthetic scenario builder
+  C. Drill report / ledger
+  D. Operator script
+  E. Docs
+  F. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/observation_alert_send_gate_operator_drill.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.observation_alert_send_gate_operator_drill --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --scenario healthy
+  --scenario stale_observation
+  --scenario final_safety_violation
+  --scenario all
+  --confirmation "SEND MULTI LANE OBSERVATION ALERTS WHEN REQUIRED"
+
+Defaults:
+  scenario=all
+  sender mode always mock
+  no real Telegram
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward observation-alert-send-gate-operator-drill
+
+Output ledger:
+  logs/hammer_radar_forward/observation_alert_send_gate_operator_drill.ndjson
+
+event_type:
+  R317_OBSERVATION_ALERT_SEND_GATE_OPERATOR_DRILL
+
+B. Synthetic scenario builder:
+  Must not mutate real ledgers or configs.
+  Use temporary in-memory or temp-dir health/alert payloads.
+
+  Scenarios:
+    1. healthy:
+       - alert_required=false
+       - expected send_gate_status blocks send/no send
+       - telegram_send_called=false
+       - real_telegram_send_called=false
+
+    2. stale_observation:
+       - simulate last_tick_age_seconds > max_age_seconds
+       - alert_required=true
+       - alert_severity WARNING_PREVIEW_NO_SEND or CRITICAL_PREVIEW_NO_SEND according to R315 behavior
+       - with missing/wrong confirmation: blocked
+       - with exact confirmation + mock mode: mock send recorded
+       - real_telegram_send_called=false
+
+    3. final_safety_violation:
+       - simulate submit_allowed=true or final_command_available=true or real_order_forbidden=false
+       - alert_required=true
+       - alert_severity CRITICAL_PREVIEW_NO_SEND
+       - with exact confirmation + mock mode: mock send recorded or critical repeat behavior visible
+       - real_telegram_send_called=false
+       - live/order safety fields in R317 output remain locked and report this as synthetic only
+
+  The drill must clearly label synthetic scenarios:
+    synthetic_scenario=true
+    synthetic_inputs_used=true
+    real_runtime_mutated=false
+
+C. Drill output:
+  Include:
+    - event_type
+    - generated_at
+    - drill_status:
+        OPERATOR_DRILL_PASSED
+        OPERATOR_DRILL_FAILED
+    - drill_blockers
+    - scenarios_run
+    - scenario_results
+    - healthy_no_send_passed
+    - stale_alert_mock_send_gate_passed
+    - final_safety_critical_mock_send_gate_passed
+    - exact_confirmation_required_passed
+    - no_real_telegram_passed
+    - no_mutation_passed
+    - recommended_next_operator_move
+    - recommended_r318_path
+    - safety fields
+
+  Each scenario result:
+    - scenario_name
+    - expected_alert_required
+    - observed_alert_required
+    - expected_send_gate_statuses
+    - observed_send_gate_status
+    - confirmation_required
+    - confirmation_matched
+    - telegram_sender_mode
+    - telegram_send_called
+    - telegram_message_sent
+    - real_telegram_send_called
+    - real_telegram_message_sent
+    - pass/fail
+    - blockers
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+
+  It must run all scenarios in mock/no-real-send mode.
+  It must print:
+    - DRILL STATUS
+    - SCENARIOS RUN
+    - HEALTHY NO-SEND RESULT
+    - STALE OBSERVATION RESULT
+    - FINAL SAFETY VIOLATION RESULT
+    - CONFIRMATION GATE RESULT
+    - MOCK/REAL SEND FLAGS
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not send Telegram.
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R317_OBSERVATION_ALERT_SEND_GATE_OPERATOR_DRILL.md
+
+  Include:
+    - why R317 exists
+    - scenarios
+    - synthetic-only guarantee
+    - mock sender behavior
+    - how to run
+    - what pass/fail means
+    - why no real Telegram yet
+    - recommended R318 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py
+
+  Tests must cover:
+    1. Healthy scenario passes no-send.
+    2. Stale observation scenario creates alert-required synthetic payload.
+    3. Stale observation missing confirmation blocks send.
+    4. Stale observation exact confirmation mock-sends only.
+    5. Final safety violation scenario creates critical alert.
+    6. Final safety violation exact confirmation mock-sends only.
+    7. Wrong confirmation blocks.
+    8. Real Telegram flags remain false in all scenarios.
+    9. Drill all scenarios returns OPERATOR_DRILL_PASSED.
+    10. Drill output marks synthetic_scenario and real_runtime_mutated=false.
+    11. No config mutation.
+    12. No arming mutation.
+    13. No systemd mutation.
+    14. No live order.
+    15. No submit.
+    16. No final command.
+    17. No Binance endpoint.
+    18. Inspect route works.
+    19. Operator script exists and prints required sections.
+    20. R316/R315/R314 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.observation_alert_send_gate_operator_drill --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.observation_alert_send_gate_operator_drill --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.observation_alert_send_gate_operator_drill --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward observation-alert-send-gate-operator-drill
+    bash scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+    bash scripts/hammer_print_r316_observation_alert_send_gate.sh
+    bash scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - drill status
+  - scenario results
+  - mock send flags
+  - real Telegram flags
+  - no mutation confirmation
+  - safety confirmation
+  - recommended R318 path
+
+Recommended R318:
+  If R317 is clean:
+    R318 Real Telegram Alert Send Gate Preview
+    It should prepare real Telegram delivery plumbing, still preview-only by default, and require a later explicit operator apply for real sends.
+  If R317 shows blockers:
+    R318 Operator Drill Repair
