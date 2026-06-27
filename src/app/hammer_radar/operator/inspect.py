@@ -4892,6 +4892,26 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "real-telegram-synthetic-alert-send-apply-gate":
+        from src.app.hammer_radar.operator.real_telegram_synthetic_alert_send_apply_gate import (
+            build_real_telegram_synthetic_alert_send_apply_gate,
+            format_real_telegram_synthetic_alert_send_apply_gate_json,
+        )
+
+        print(
+            format_real_telegram_synthetic_alert_send_apply_gate_json(
+                build_real_telegram_synthetic_alert_send_apply_gate(
+                    log_dir=args.log_dir,
+                    apply=args.apply,
+                    confirmation=args.confirmation,
+                    scenario=args.scenario,
+                    telegram_sender_mode=args.telegram_sender_mode,
+                    max_age_seconds=args.max_age_seconds,
+                    rate_limit_window_seconds=args.rate_limit_window_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7811,6 +7831,30 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scenario",
         choices=("healthy", "synthetic_stale_observation", "synthetic_final_safety_violation", "all"),
         default="all",
+    )
+
+    real_telegram_synthetic_alert_send_apply_gate_parser = subparsers.add_parser(
+        "real-telegram-synthetic-alert-send-apply-gate",
+        parents=[parent],
+    )
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument("--no-write", action="store_true")
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument("--apply", action="store_true")
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument("--confirmation", default=None)
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument(
+        "--scenario",
+        choices=("healthy", "synthetic_stale_observation", "synthetic_final_safety_violation"),
+        default="synthetic_stale_observation",
+    )
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument(
+        "--telegram-sender-mode",
+        choices=("mock", "real-disabled"),
+        default="mock",
+    )
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument("--max-age-seconds", type=int, default=180)
+    real_telegram_synthetic_alert_send_apply_gate_parser.add_argument(
+        "--rate-limit-window-seconds",
+        type=int,
+        default=900,
     )
 
     return parser
