@@ -1,0 +1,339 @@
+# R318 - Real Telegram Alert Send Gate Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r317-observation-alert-send-gate-operator-drill
+
+New branch:
+  r318-real-telegram-alert-send-gate-preview
+
+Phase classification:
+  WIRING / INTEGRATION + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R317 proved the R316 alert send gate using synthetic mock/no-real-send scenarios.
+  R317 validation showed:
+    - tests passed
+    - drill_status=OPERATOR_DRILL_PASSED
+    - healthy_no_send_passed=true
+    - stale_alert_mock_send_gate_passed=true
+    - final_safety_critical_mock_send_gate_passed=true
+    - exact_confirmation_required_passed=true
+    - no_real_telegram_passed=true
+    - no_mutation_passed=true
+    - real_telegram_send_called=false
+    - real_telegram_message_sent=false
+    - no config diff
+    - no arming mutation
+    - no systemd mutation
+    - no live order
+    - no submit
+    - no final command
+    - no Binance endpoint
+    - timer and paper refresh services active
+
+Purpose:
+  Prepare real Telegram delivery plumbing for future observation alerts, but keep R318 preview-only by default.
+  R318 must validate:
+    - Telegram credential presence without printing secrets
+    - chat id presence without printing full sensitive values
+    - real sender availability
+    - exact operator confirmation phrase for future send
+    - alert_required=true gate
+    - no heartbeat spam
+    - rate-limit/dedup compatibility
+    - no-live/no-trade safety
+  R318 must NOT send real Telegram during Codex validation.
+
+This phase must not send real Telegram.
+This phase must not mutate systemd/config/arming/env/risk contracts/live flags.
+This phase must not place orders.
+
+Exact future confirmation phrase:
+  ENABLE REAL TELEGRAM OBSERVATION ALERT SEND
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO ENV SECRET PRINTING.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO real Telegram send.
+  Preview only.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/multi_lane_observation_alert_send_gate.py
+    src/app/hammer_radar/operator/observation_alert_send_gate_operator_drill.py
+    src/app/hammer_radar/operator/multi_lane_observation_alerting_preview.py
+    src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+    src/app/hammer_radar/operator/notification_watcher.py
+    src/app/hammer_radar/operator/telegram_operator_bridge.py
+    src/app/hammer_radar/operator/telegram_polling_worker.py
+    src/app/hammer_radar/operator/telegram_approval_challenge.py
+    configs / env loading helpers used for Telegram, if present
+    scripts/hammer_print_r316_observation_alert_send_gate.sh
+    scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+    logs/hammer_radar_forward/observation_alert_send_gate_operator_drill.ndjson
+    tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py
+    tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py
+    docs/hammer_radar/live_readiness/R316_HUMAN_REVIEWED_OBSERVATION_ALERT_SEND_GATE.md
+    docs/hammer_radar/live_readiness/R317_OBSERVATION_ALERT_SEND_GATE_OPERATOR_DRILL.md
+    src/app/hammer_radar/operator/inspect.py
+
+  Produce:
+    codex_tasks/reports/R318_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - reusable Telegram config/sender surfaces
+    - credential hygiene policy
+    - real sender preview strategy
+    - exact future confirmation phrase
+    - why R318 does not send
+    - duplicate risks
+    - no-heartbeat policy
+    - recommended future apply drill
+
+Scope:
+  A. Real Telegram preview module
+  B. Credential readiness checks
+  C. Real-send capability preview packet
+  D. Operator script
+  E. Docs
+  F. Tests
+
+A. Add module:
+  src/app/hammer_radar/operator/real_telegram_observation_alert_send_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_send_preview --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --max-age-seconds 180
+  --rate-limit-window-seconds 900
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward real-telegram-observation-alert-send-preview
+
+Output ledger:
+  logs/hammer_radar_forward/real_telegram_observation_alert_send_preview.ndjson
+
+event_type:
+  R318_REAL_TELEGRAM_ALERT_SEND_GATE_PREVIEW
+
+B. Credential readiness checks:
+  Reuse existing Telegram config loading helpers if present.
+  Do not print token.
+  Do not print full chat id if considered sensitive.
+  Output only:
+    - telegram_token_present true/false
+    - telegram_chat_id_present true/false
+    - telegram_config_source_kind, e.g. env/config/unknown
+    - telegram_token_preview: masked only, e.g. first 4 chars + last 4 chars or "present_masked"
+    - telegram_chat_id_preview: masked only
+    - telegram_config_valid_for_future_send true/false
+    - telegram_config_blockers
+
+  Must set:
+    secrets_shown=false
+
+C. Real-send capability preview:
+  Build R316 send gate preview and R315 alert preview.
+  Output:
+    - alert_required
+    - alert_severity
+    - alert_reasons
+    - send_gate_status
+    - future_confirmation_phrase_required:
+        ENABLE REAL TELEGRAM OBSERVATION ALERT SEND
+    - future_confirmation_phrase_active=false
+    - future_confirmation_phrase_executable=false
+    - real_send_available_for_future=true/false
+    - real_send_blockers
+    - real_send_preview_only=true
+    - would_send_real_telegram_now=false
+    - telegram_send_called=false
+    - telegram_message_sent=false
+    - real_telegram_send_called=false
+    - real_telegram_message_sent=false
+    - telegram_preview_message
+    - operator_console_preview_message
+    - no_heartbeat_policy_enforced=true
+    - healthy_state_send_blocked=true if alert_required=false
+    - recommended_next_operator_move
+    - recommended_r319_path
+    - safety fields
+
+  In healthy state, expected:
+    alert_required=false
+    real_send_available_for_future may be true only if credentials exist, but would_send_real_telegram_now=false
+    healthy_state_send_blocked=true
+    recommended_next_operator_move=continue_observation_no_send
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r318_real_telegram_observation_alert_send_preview.sh
+
+  It must print:
+    - R318 header
+    - TELEGRAM CONFIG READINESS
+    - REAL SEND PREVIEW
+    - ALERT SUMMARY
+    - CONFIRMATION PHRASE PREVIEW
+    - SEND BLOCKERS
+    - NO-HEARTBEAT POLICY
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not pass any apply/send flag.
+  It must not send Telegram.
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R318_REAL_TELEGRAM_ALERT_SEND_GATE_PREVIEW.md
+
+  Include:
+    - why R318 exists
+    - what R317 proved
+    - credential hygiene
+    - masked secret policy
+    - preview-only behavior
+    - exact future confirmation phrase
+    - no-heartbeat policy
+    - how to run
+    - what not to do
+    - recommended R319 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py
+
+  Tests must cover:
+    1. Default preview does not send.
+    2. Missing Telegram token blocks future real send.
+    3. Missing chat id blocks future real send.
+    4. Present token/chat id marks future send config ready without printing secrets.
+    5. Token is masked.
+    6. Chat id is masked.
+    7. secrets_shown=false.
+    8. Healthy alert_required=false blocks send now even if credentials exist.
+    9. Preview exposes exact future confirmation phrase inactive/non-executable.
+    10. No heartbeat policy enforced.
+    11. No real Telegram send called.
+    12. No mock Telegram send called unless inherited preview says mock only, but R318 itself should not call send.
+    13. No config mutation.
+    14. No arming mutation.
+    15. No env mutation.
+    16. No systemd mutation.
+    17. No live order.
+    18. No submit.
+    19. No final command.
+    20. No Binance endpoint.
+    21. Inspect route works.
+    22. Operator script exists and previews only.
+    23. R317/R316/R315/R314 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_send_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_send_preview --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_send_preview --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward real-telegram-observation-alert-send-preview
+    bash scripts/hammer_print_r318_real_telegram_observation_alert_send_preview.sh
+    bash scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+    bash scripts/hammer_print_r316_observation_alert_send_gate.sh
+    bash scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - telegram config readiness
+  - whether credentials are present, masked only
+  - whether alert_required
+  - whether real send is available for future
+  - confirmation phrase inactive/non-executable
+  - real Telegram send flags false
+  - no mutation confirmation
+  - safety confirmation
+  - recommended R319 path
+
+Recommended R319:
+  If R318 is clean and credentials are present:
+    R319 Real Telegram Observation Alert Synthetic Send Drill Preview
+    Still no real send by default; prepare an operator-run exact-phrase dry drill for a synthetic stale alert.
+  If credentials are missing:
+    R319 Telegram Credential Readiness Repair
+    Add/fix env/config documentation and masked readiness checks only.
+  If R318 shows blockers:
+    R319 Real Telegram Preview Repair

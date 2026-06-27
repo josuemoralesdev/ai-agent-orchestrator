@@ -4859,6 +4859,22 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "real-telegram-observation-alert-send-preview":
+        from src.app.hammer_radar.operator.real_telegram_observation_alert_send_preview import (
+            build_real_telegram_observation_alert_send_preview,
+            format_real_telegram_preview_json,
+        )
+
+        print(
+            format_real_telegram_preview_json(
+                build_real_telegram_observation_alert_send_preview(
+                    log_dir=args.log_dir,
+                    max_age_seconds=args.max_age_seconds,
+                    rate_limit_window_seconds=args.rate_limit_window_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7746,6 +7762,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default="all",
     )
     observation_alert_send_gate_operator_drill_parser.add_argument("--confirmation", default=None)
+
+    real_telegram_observation_alert_send_preview_parser = subparsers.add_parser(
+        "real-telegram-observation-alert-send-preview",
+        parents=[parent],
+    )
+    real_telegram_observation_alert_send_preview_parser.add_argument("--no-write", action="store_true")
+    real_telegram_observation_alert_send_preview_parser.add_argument("--max-age-seconds", type=int, default=180)
+    real_telegram_observation_alert_send_preview_parser.add_argument(
+        "--rate-limit-window-seconds",
+        type=int,
+        default=900,
+    )
 
     return parser
 
