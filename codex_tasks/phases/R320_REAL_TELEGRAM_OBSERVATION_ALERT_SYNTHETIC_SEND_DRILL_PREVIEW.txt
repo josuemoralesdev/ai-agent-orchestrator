@@ -1,0 +1,402 @@
+# R320 - Real Telegram Observation Alert Synthetic Send Drill Preview
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r319-telegram-credential-readiness-repair
+
+New branch:
+  r320-real-telegram-observation-alert-synthetic-send-drill-preview
+
+Phase classification:
+  DIAGNOSTIC / AUDIT + WIRING / INTEGRATION
+
+Why this phase exists:
+  R319 repaired Telegram credential readiness.
+  The preview now safely detects credentials from:
+    /home/josue/.config/hammer-radar/notifications.env
+  while masking values and keeping no-send safety locked.
+
+Known clean state from R319:
+  - telegram_token_present=true
+  - telegram_chat_id_present=true
+  - telegram_config_source_kind=private_env_file
+  - telegram_config_valid_for_future_send=true
+  - real_send_available_for_future=true
+  - real_send_blockers=[]
+  - real_send_preview_only=true
+  - would_send_real_telegram_now=false
+  - telegram_send_called=false
+  - telegram_message_sent=false
+  - real_telegram_send_called=false
+  - real_telegram_message_sent=false
+  - secrets_shown=false
+  - no config diff
+  - no env mutation
+  - no arming mutation
+  - no systemd mutation
+  - no live order
+  - no submit
+  - no final command
+  - no Binance endpoint
+
+Purpose:
+  Build a synthetic real-Telegram send drill preview.
+  This phase proves that a future real Telegram alert could be sent for a synthetic actionable alert, but R320 itself must remain preview-only and must not send real Telegram.
+  The drill must confirm:
+    - credentials are available from the private env file
+    - secrets remain masked
+    - healthy state is blocked by no-heartbeat policy
+    - synthetic stale alert is actionable
+    - synthetic final-safety violation is actionable
+    - future exact phrase is required
+    - future real-send path remains inactive/non-executable
+    - no Telegram network call occurs
+    - no mutation occurs
+
+This phase must NOT send real Telegram.
+This phase must NOT mutate systemd/config/arming/env/risk contracts/live flags.
+This phase must NOT place orders.
+
+Exact future real-send confirmation phrase:
+  ENABLE REAL TELEGRAM OBSERVATION ALERT SEND
+
+Critical safety:
+  ABSOLUTELY NO REAL TELEGRAM SEND.
+  ABSOLUTELY NO TOKEN PRINTING.
+  ABSOLUTELY NO FULL CHAT ID PRINTING.
+  ABSOLUTELY NO ENV SECRET WRITES.
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for readiness/drill preview.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+  would_send_real_telegram_now=false
+  real_send_preview_only=true
+
+Capability scan first:
+  Inspect and summarize:
+    src/app/hammer_radar/operator/real_telegram_observation_alert_send_preview.py
+    src/app/hammer_radar/operator/multi_lane_observation_alert_send_gate.py
+    src/app/hammer_radar/operator/observation_alert_send_gate_operator_drill.py
+    src/app/hammer_radar/operator/multi_lane_observation_alerting_preview.py
+    src/app/hammer_radar/operator/multi_lane_observation_health_panel.py
+    src/app/hammer_radar/operator/notification_watcher.py
+    scripts/hammer_print_r319_telegram_credential_readiness_repair.sh
+    scripts/hammer_print_r318_real_telegram_observation_alert_send_preview.sh
+    scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+    tests/hammer_radar/test_telegram_credential_readiness_repair.py
+    tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py
+    tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py
+    docs/hammer_radar/live_readiness/R319_TELEGRAM_CREDENTIAL_READINESS_REPAIR.md
+    docs/hammer_radar/live_readiness/R318_REAL_TELEGRAM_ALERT_SEND_GATE_PREVIEW.md
+    docs/hammer_radar/live_readiness/R317_OBSERVATION_ALERT_SEND_GATE_OPERATOR_DRILL.md
+    src/app/hammer_radar/operator/inspect.py
+
+  Produce:
+    codex_tasks/reports/R320_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - credentials now available via private env file
+    - why this is still preview-only
+    - no-real-send boundary
+    - synthetic scenarios
+    - reuse of R315/R316/R317/R318/R319
+    - duplicate risks
+    - future R321 operator real-send apply gate path
+
+Scope:
+  A. Synthetic real-send drill preview module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/real_telegram_observation_alert_synthetic_send_drill_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_synthetic_send_drill_preview --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --scenario healthy
+  --scenario synthetic_stale_observation
+  --scenario synthetic_final_safety_violation
+  --scenario all
+  --max-age-seconds 180
+  --rate-limit-window-seconds 900
+
+Defaults:
+  scenario=all
+  preview-only
+  no real Telegram send
+  no mock send counted as actual R320 send; R320 may report would_send fields only
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward real-telegram-observation-alert-synthetic-send-drill-preview
+
+Output ledger:
+  logs/hammer_radar_forward/real_telegram_observation_alert_synthetic_send_drill_preview.ndjson
+
+event_type:
+  R320_REAL_TELEGRAM_OBSERVATION_ALERT_SYNTHETIC_SEND_DRILL_PREVIEW
+
+B. Scenario behavior:
+  1. healthy:
+     - real credentials detected
+     - alert_required=false
+     - no-heartbeat blocks send
+     - would_send_real_telegram_now=false
+     - real_telegram_send_called=false
+     - real_telegram_message_sent=false
+     - pass=true
+
+  2. synthetic_stale_observation:
+     - synthetic R314-compatible stale payload
+     - alert_required=true
+     - severity WARNING_PREVIEW_NO_SEND or CRITICAL_PREVIEW_NO_SEND according to reused R315 behavior
+     - real credentials detected
+     - future real send would be eligible only after future exact phrase
+     - future_confirmation_phrase_required=ENABLE REAL TELEGRAM OBSERVATION ALERT SEND
+     - future_confirmation_phrase_active=false
+     - future_confirmation_phrase_executable=false
+     - would_send_real_telegram_now=false
+     - real_telegram_send_called=false
+     - real_telegram_message_sent=false
+     - pass=true
+
+  3. synthetic_final_safety_violation:
+     - synthetic unsafe final-safety source fields
+     - alert_required=true
+     - severity CRITICAL_PREVIEW_NO_SEND
+     - real credentials detected
+     - future real send would be eligible only after future exact phrase
+     - no send now
+     - pass=true
+
+All synthetic scenarios must include:
+  synthetic_scenario=true
+  synthetic_inputs_used=true
+  real_runtime_mutated=false
+
+C. Drill output:
+  Include:
+    - event_type
+    - generated_at
+    - drill_status:
+        REAL_TELEGRAM_SYNTHETIC_SEND_DRILL_PREVIEW_PASSED
+        REAL_TELEGRAM_SYNTHETIC_SEND_DRILL_PREVIEW_FAILED
+    - drill_blockers
+    - telegram_config_readiness
+    - credentials_ready
+    - real_send_available_for_future
+    - scenarios_run
+    - scenario_results
+    - healthy_no_heartbeat_block_passed
+    - stale_future_real_send_eligibility_passed
+    - final_safety_future_real_send_eligibility_passed
+    - future_confirmation_inactive_passed
+    - no_real_telegram_send_passed
+    - no_secret_leak_passed
+    - no_mutation_passed
+    - recommended_next_operator_move
+    - recommended_r321_path
+    - safety fields
+
+Each scenario result:
+  - scenario_name
+  - synthetic_scenario
+  - synthetic_inputs_used
+  - expected_alert_required
+  - observed_alert_required
+  - observed_alert_severity
+  - real_credentials_ready
+  - real_send_available_for_future
+  - future_confirmation_phrase_required
+  - future_confirmation_phrase_active
+  - future_confirmation_phrase_executable
+  - would_send_real_telegram_now
+  - telegram_send_called
+  - telegram_message_sent
+  - real_telegram_send_called
+  - real_telegram_message_sent
+  - pass
+  - blockers
+
+D. Operator script:
+  Add:
+    scripts/hammer_print_r320_real_telegram_observation_alert_synthetic_send_drill_preview.sh
+
+  It must print:
+    - R320 header
+    - TELEGRAM CREDENTIAL READINESS
+    - DRILL STATUS
+    - SCENARIOS RUN
+    - HEALTHY NO-HEARTBEAT RESULT
+    - SYNTHETIC STALE OBSERVATION RESULT
+    - SYNTHETIC FINAL SAFETY VIOLATION RESULT
+    - FUTURE CONFIRMATION PHRASE STATUS
+    - REAL SEND PREVIEW FLAGS
+    - SAFETY FLAGS
+    - RECOMMENDED NEXT PHASE
+
+  It must not pass an apply/send flag.
+  It must not send Telegram.
+
+E. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R320_REAL_TELEGRAM_OBSERVATION_ALERT_SYNTHETIC_SEND_DRILL_PREVIEW.md
+
+  Include:
+    - why R320 exists
+    - what R319 proved
+    - synthetic scenario descriptions
+    - credential readiness behavior
+    - no-real-send guarantee
+    - future exact phrase
+    - how to run
+    - what pass/fail means
+    - what not to do
+    - recommended R321 paths
+
+F. Tests:
+  Add:
+    tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py
+
+  Tests must cover:
+    1. Credentials ready from injected env.
+    2. Credentials ready from injected private env-file fallback.
+    3. Missing credentials fail drill or block future real-send eligibility.
+    4. Healthy scenario blocks send by no-heartbeat policy.
+    5. Synthetic stale observation produces alert_required=true.
+    6. Synthetic final safety violation produces CRITICAL_PREVIEW_NO_SEND.
+    7. Future confirmation phrase is present, inactive, and non-executable.
+    8. No real Telegram send called.
+    9. No Telegram send called.
+    10. would_send_real_telegram_now=false.
+    11. Secrets are masked only.
+    12. Full token and full chat id never appear in JSON/text.
+    13. No config mutation.
+    14. No env mutation.
+    15. No arming mutation.
+    16. No systemd mutation.
+    17. No live order.
+    18. No submit.
+    19. No final command.
+    20. No Binance endpoint.
+    21. Inspect route works.
+    22. Operator script exists and previews only.
+    23. R319/R318/R317/R316/R315/R314 compatibility remains intact.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_synthetic_send_drill_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_synthetic_send_drill_preview --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.real_telegram_observation_alert_synthetic_send_drill_preview --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward real-telegram-observation-alert-synthetic-send-drill-preview
+    bash scripts/hammer_print_r320_real_telegram_observation_alert_synthetic_send_drill_preview.sh
+    bash scripts/hammer_print_r319_telegram_credential_readiness_repair.sh
+    bash scripts/hammer_print_r318_real_telegram_observation_alert_send_preview.sh
+    bash scripts/hammer_print_r317_observation_alert_send_gate_operator_drill.sh
+    bash scripts/hammer_print_r316_observation_alert_send_gate.sh
+    bash scripts/hammer_print_r315_multi_lane_observation_alerting_preview.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no secret leak in new files:
+    grep -RInE '([0-9]{8,12}:[A-Za-z0-9_-]{25,}|REAL_TOKEN_PREFIX|REAL_TOKEN_SUFFIX|REAL_CHAT_PREFIX|REAL_CHAT_SUFFIX)' \
+      codex_tasks/phases/R320_REAL_TELEGRAM_OBSERVATION_ALERT_SYNTHETIC_SEND_DRILL_PREVIEW.txt \
+      codex_tasks/reports/R320_CAPABILITY_REUSE_REPORT.md \
+      docs/hammer_radar/live_readiness/R320_REAL_TELEGRAM_OBSERVATION_ALERT_SYNTHETIC_SEND_DRILL_PREVIEW.md \
+      scripts/hammer_print_r320_real_telegram_observation_alert_synthetic_send_drill_preview.sh \
+      src/app/hammer_radar/operator/real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      2>/dev/null || true
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - credential readiness source
+  - drill status
+  - scenario results
+  - future confirmation inactive/non-executable
+  - real Telegram send flags false
+  - no secret leak confirmation
+  - no mutation confirmation
+  - recommended R321 path
+
+Recommended R321:
+  If R320 is clean:
+    R321 Human-Reviewed Real Telegram Synthetic Alert Send Apply Gate
+    This should be the first phase that prepares a real-send apply gate, still requiring exact phrase and operator action. Codex validation must still not send real Telegram.
+  If R320 shows blockers:
+    R321 Real Telegram Synthetic Send Drill Preview Repair

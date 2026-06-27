@@ -4875,6 +4875,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "real-telegram-observation-alert-synthetic-send-drill-preview":
+        from src.app.hammer_radar.operator.real_telegram_observation_alert_synthetic_send_drill_preview import (
+            build_real_telegram_observation_alert_synthetic_send_drill_preview,
+            format_synthetic_send_drill_json,
+        )
+
+        print(
+            format_synthetic_send_drill_json(
+                build_real_telegram_observation_alert_synthetic_send_drill_preview(
+                    log_dir=args.log_dir,
+                    scenario=args.scenario,
+                    max_age_seconds=args.max_age_seconds,
+                    rate_limit_window_seconds=args.rate_limit_window_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7773,6 +7790,27 @@ def _build_parser() -> argparse.ArgumentParser:
         "--rate-limit-window-seconds",
         type=int,
         default=900,
+    )
+
+    real_telegram_observation_alert_synthetic_send_drill_preview_parser = subparsers.add_parser(
+        "real-telegram-observation-alert-synthetic-send-drill-preview",
+        parents=[parent],
+    )
+    real_telegram_observation_alert_synthetic_send_drill_preview_parser.add_argument("--no-write", action="store_true")
+    real_telegram_observation_alert_synthetic_send_drill_preview_parser.add_argument(
+        "--max-age-seconds",
+        type=int,
+        default=180,
+    )
+    real_telegram_observation_alert_synthetic_send_drill_preview_parser.add_argument(
+        "--rate-limit-window-seconds",
+        type=int,
+        default=900,
+    )
+    real_telegram_observation_alert_synthetic_send_drill_preview_parser.add_argument(
+        "--scenario",
+        choices=("healthy", "synthetic_stale_observation", "synthetic_final_safety_violation", "all"),
+        default="all",
     )
 
     return parser
