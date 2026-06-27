@@ -327,6 +327,7 @@ def _preview(
     return build_real_telegram_observation_alert_send_preview(
         log_dir=tmp_path,
         env=env,
+        env_file_path=tmp_path / "missing-notifications.env",
         alert_preview=alert_preview or _alert(alert_required=False),
         now=NOW,
         write=write,

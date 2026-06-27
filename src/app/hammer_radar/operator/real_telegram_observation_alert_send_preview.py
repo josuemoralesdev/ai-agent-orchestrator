@@ -34,6 +34,8 @@ from src.app.hammer_radar.operator.notification_watcher import (
 EVENT_TYPE = "R318_REAL_TELEGRAM_ALERT_SEND_GATE_PREVIEW"
 CREATED_BY_PHASE = "R318_REAL_TELEGRAM_ALERT_SEND_GATE_PREVIEW"
 LEDGER_FILENAME = "real_telegram_observation_alert_send_preview.ndjson"
+PRIVATE_TELEGRAM_ENV_FILE_PATH = Path("/home/josue/.config/hammer-radar/notifications.env")
+TELEGRAM_CREDENTIAL_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
 
 FUTURE_CONFIRMATION_PHRASE = "ENABLE REAL TELEGRAM OBSERVATION ALERT SEND"
 RECOMMENDED_R319_SYNTHETIC_SEND_DRILL = "R319 Real Telegram Observation Alert Synthetic Send Drill Preview"
@@ -60,14 +62,27 @@ def build_real_telegram_observation_alert_send_preview(
     write: bool | None = None,
     now: datetime | None = None,
     alert_preview: Mapping[str, Any] | None = None,
+    env_file_path: str | Path | None = None,
 ) -> dict[str, Any]:
     resolved_log_dir = get_log_dir(log_dir, use_env=True)
     generated_at = now or datetime.now(UTC)
     should_write = (not no_write) if write is None else bool(write)
-    notification_config = config or load_notification_config(dict(env) if env is not None else None)
+    if config is None:
+        notification_config, telegram_source = _load_notification_config_for_readiness(
+            env=env,
+            env_file_path=env_file_path,
+        )
+    else:
+        notification_config = config
+        telegram_source = {
+            "kind": _telegram_config_source_kind(env),
+            "path": None,
+        }
     telegram_readiness = build_telegram_config_readiness(
         notification_config,
         env=env,
+        source_kind=str(telegram_source["kind"]),
+        source_path=telegram_source["path"],
         real_sender_available=callable(send_telegram_message),
     )
     send_gate = build_multi_lane_observation_alert_send_gate(
@@ -99,6 +114,7 @@ def build_real_telegram_observation_alert_send_preview(
         real_send_blockers=real_send_blockers,
     )
     safety = dict(SAFETY)
+    telegram_config_readiness = dict(telegram_readiness)
     payload = {
         "event_type": EVENT_TYPE,
         "created_by_phase": CREATED_BY_PHASE,
@@ -106,6 +122,7 @@ def build_real_telegram_observation_alert_send_preview(
         "generated_at": generated_at.isoformat(),
         "archive_log_dir": str(resolved_log_dir),
         "ledger_path": str(records_path(resolved_log_dir)),
+        "telegram_config_readiness": telegram_config_readiness,
         **telegram_readiness,
         "alert_required": alert_required,
         "alert_severity": str(send_gate.get("alert_severity") or ""),
@@ -150,6 +167,8 @@ def build_telegram_config_readiness(
     config: NotificationConfig,
     *,
     env: Mapping[str, str] | None = None,
+    source_kind: str | None = None,
+    source_path: str | Path | None = None,
     real_sender_available: bool = True,
 ) -> dict[str, Any]:
     token = config.telegram_bot_token or ""
@@ -161,10 +180,13 @@ def build_telegram_config_readiness(
         blockers.append("telegram_token_missing")
     if not chat_id_present:
         blockers.append("telegram_chat_id_missing")
+    source_path_text = str(source_path) if source_path else None
     return {
         "telegram_token_present": token_present,
         "telegram_chat_id_present": chat_id_present,
-        "telegram_config_source_kind": _telegram_config_source_kind(env),
+        "telegram_config_source_kind": source_kind or _telegram_config_source_kind(env),
+        "telegram_config_source_path": source_path_text,
+        "telegram_config_source_path_present": bool(source_path_text),
         "telegram_token_preview": _mask_secret(token),
         "telegram_chat_id_preview": _mask_secret(chat_id),
         "telegram_config_valid_for_future_send": token_present and chat_id_present and real_sender_available,
@@ -202,9 +224,11 @@ def format_real_telegram_preview_text(payload: Mapping[str, Any]) -> str:
         "R318 REAL TELEGRAM OBSERVATION ALERT SEND GATE PREVIEW",
         "",
         "TELEGRAM CONFIG READINESS",
+        f"telegram_config_readiness_present: {isinstance(payload.get('telegram_config_readiness'), Mapping)}",
         f"telegram_token_present: {payload.get('telegram_token_present')}",
         f"telegram_chat_id_present: {payload.get('telegram_chat_id_present')}",
         f"telegram_config_source_kind: {payload.get('telegram_config_source_kind')}",
+        f"telegram_config_source_path_present: {payload.get('telegram_config_source_path_present')}",
         f"telegram_token_preview: {payload.get('telegram_token_preview')}",
         f"telegram_chat_id_preview: {payload.get('telegram_chat_id_preview')}",
         f"telegram_config_valid_for_future_send: {payload.get('telegram_config_valid_for_future_send')}",
@@ -280,7 +304,70 @@ def _recommended_r319_path(*, credential_ready: bool, real_send_blockers: Sequen
 def _telegram_config_source_kind(env: Mapping[str, str] | None) -> str:
     source = os.environ if env is None else env
     has_env_keys = any(key in source for key in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"))
-    return "env" if has_env_keys else "unknown"
+    if has_env_keys:
+        return "process_env" if env is None else "env"
+    return "unknown"
+
+
+def _load_notification_config_for_readiness(
+    *,
+    env: Mapping[str, str] | None,
+    env_file_path: str | Path | None,
+) -> tuple[NotificationConfig, dict[str, str | None]]:
+    source_env = dict(os.environ if env is None else env)
+    source_kind = _telegram_config_source_kind(env)
+    if _credentials_present(source_env):
+        return load_notification_config(source_env), {"kind": source_kind, "path": None}
+
+    fallback_path = Path(env_file_path) if env_file_path is not None else PRIVATE_TELEGRAM_ENV_FILE_PATH
+    file_values = _read_private_telegram_env_file(fallback_path)
+    merged_env = dict(source_env)
+    filled_from_file = False
+    for key in TELEGRAM_CREDENTIAL_KEYS:
+        if not _secret_present(merged_env.get(key)) and _secret_present(file_values.get(key)):
+            merged_env[key] = str(file_values[key])
+            filled_from_file = True
+
+    config = load_notification_config(merged_env)
+    if filled_from_file:
+        return config, {"kind": "private_env_file", "path": str(fallback_path)}
+    return config, {"kind": source_kind, "path": None}
+
+
+def _read_private_telegram_env_file(path: Path) -> dict[str, str]:
+    if not path.is_file():
+        return {}
+    parsed: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in TELEGRAM_CREDENTIAL_KEYS:
+            continue
+        parsed[key] = _strip_optional_quotes(value.strip())
+    return parsed
+
+
+def _strip_optional_quotes(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _credentials_present(env: Mapping[str, str]) -> bool:
+    return all(_secret_present(env.get(key)) for key in TELEGRAM_CREDENTIAL_KEYS)
+
+
+def _secret_present(value: str | None) -> bool:
+    return bool(str(value or "").strip())
 
 
 def _mask_secret(value: str | None) -> str:
