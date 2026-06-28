@@ -1,0 +1,441 @@
+# R324 - Strategy Lab Variant Batch Runner
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r323-strategy-lab-expansion-reentry-candidate-surface-map
+
+New branch:
+  r324-strategy-lab-variant-batch-runner
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R323 mapped the Strategy Lab candidate surface after Telegram completion.
+  The next objective is to generate more structured paper/lab evidence for:
+    - more lanes
+    - more entry modes
+    - more strategy variants
+    - more candidate surface
+    - more signals
+    - future Tiny Live readiness
+
+Known R323 surface:
+  Baseline first Tiny Live lane:
+    BTCUSDT|44m|long|ladder_close_50_618
+
+  Promotion-ready / primary:
+    BTCUSDT|44m|short|ladder_382_50_618
+    BTCUSDT|44m|short|ladder_close_50_618
+    BTCUSDT|55m|long|ladder_close_50_618
+
+  Watch-only:
+    BTCUSDT|44m|short|ladder_22_44_22
+    BTCUSDT|44m|long|ladder_382_50_618
+    BTCUSDT|55m|long|market_close
+    BTCUSDT|88m|long|ladder_382_50_618
+
+  Near-miss / repair:
+    BTCUSDT|13m|long|ladder_close_50_618
+    BTCUSDT|13m|short|ladder_close_50_618
+    BTCUSDT|8m|short|ladder_close_50_618
+
+  Lab-only:
+    Betrayal / inverse variants
+
+Purpose:
+  Build a Strategy Lab batch runner that composes existing strategy-lab preview and variant test capabilities into a structured R324 batch packet.
+
+  R324 must produce actionable batch outputs for:
+    1. 44m short variants
+    2. 55m long variants
+    3. 13m near-miss repair variants
+    4. 8m short capture-improvement variants
+    5. 88m watch-only evidence variants
+    6. Betrayal/inverse lab-only variants
+    7. MA/WMA200 anchor variants
+    8. exit/TP/SL/trailing variants
+
+  R324 must not promote anything to live.
+  R324 must not write risk contracts.
+  R324 must not alter Tiny Live lane.
+  R324 must prepare the evidence packet for R325 promotion review.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this read-only lab runner.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R323_STRATEGY_LAB_EXPANSION_REENTRY_AND_CANDIDATE_SURFACE_MAP.md
+    docs/hammer_radar/live_readiness/R305_STRATEGY_LAB_VARIANT_TEST_PACK.md
+    docs/hammer_radar/live_readiness/R304_STRATEGY_LAB_PREVIEW.md
+    docs/hammer_radar/live_readiness/R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW.md
+    src/app/hammer_radar/operator/strategy_lab_expansion_surface_map.py
+    src/app/hammer_radar/operator/strategy_lab_variant_test_pack.py
+    src/app/hammer_radar/operator/strategy_lab_preview.py
+    src/app/hammer_radar/operator/eligible_lane_expansion_dry_run_preview.py
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    logs/hammer_radar_forward/strategy_lab_preview.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_test_pack.ndjson
+    logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+    logs/hammer_radar_forward/strategy_promotion_events.ndjson
+    src/app/hammer_radar/operator/inspect.py
+    tests/hammer_radar/test_strategy_lab_expansion_surface_map.py
+    tests/hammer_radar/test_strategy_lab_variant_test_pack.py
+    tests/hammer_radar/test_strategy_lab_preview.py
+
+  Produce:
+    codex_tasks/reports/R324_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing strategy lab capability reuse
+    - existing variant pack reuse
+    - existing surface map reuse
+    - duplicate risk report
+    - why R324 is a batch runner, not a promotion engine
+    - how R324 feeds R325 promotion review
+
+Scope:
+  A. Batch runner module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_variant_batch_runner.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_batch_runner --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --batch all
+  --batch 44m_short
+  --batch 55m_long
+  --batch 13m_near_miss
+  --batch 8m_short_capture
+  --batch 88m_watch
+  --batch betrayal_inverse_lab
+  --batch ma_wma_anchor
+  --batch exits
+  --min-sample-count 30
+  --preferred-sample-count 50
+  --standard-min-win-rate-pct 55
+  --betrayal-min-win-rate-pct 60
+
+Defaults:
+  batch=all
+  no live mutation
+  no risk contract writes
+  no promotion writes
+  include betrayal lab only
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-variant-batch-runner
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_variant_batch_runner.ndjson
+
+event_type:
+  R324_STRATEGY_LAB_VARIANT_BATCH_RUNNER
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - batch_runner_status:
+        STRATEGY_LAB_VARIANT_BATCH_RUNNER_READY
+        STRATEGY_LAB_VARIANT_BATCH_RUNNER_BLOCKED
+    - blockers
+    - source_surface_map_status
+    - telegram_scope_status
+    - tiny_live_baseline_lane
+    - first_live_lane_change_allowed=false
+    - batch_results
+    - batch_counts
+    - top_candidate_observations
+    - promotion_review_candidates
+    - near_miss_repair_candidates
+    - watch_only_candidates
+    - lab_only_candidates
+    - betrayal_inverse_lab_packet
+    - ma_wma_anchor_packet
+    - exit_variant_packet
+    - missing_data_adapters
+    - recommended_r325_promotion_review
+    - recommended_r326_candidate_feed_expansion
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Batch results:
+  Each batch result must include:
+    - batch_id
+    - batch_name
+    - objective
+    - candidate_lanes
+    - variants_to_test
+    - evidence_source
+    - current_evidence_snapshot if available
+    - min_sample_count
+    - preferred_sample_count
+    - promotion_policy
+    - live_permission=false
+    - tiny_live_eligible_now=false unless already baseline and still final-gated
+    - recommended_next_action
+    - blockers
+
+D. Required batch groups:
+  1. 44m short variants
+     Candidate lanes:
+       BTCUSDT|44m|short|ladder_382_50_618
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|44m|short|ladder_22_44_22
+     Variants:
+       entry modes, exit modes, trailing, RSI/regime filters, WMA/MA anchor
+
+  2. 55m long variants
+     Candidate lanes:
+       BTCUSDT|55m|long|ladder_close_50_618
+       BTCUSDT|55m|long|market_close
+     Variants:
+       ladder vs market close, exit modes, WMA/MA anchor, HTF bias
+
+  3. 13m near-miss repair
+     Candidate lanes:
+       BTCUSDT|13m|long|ladder_close_50_618
+       BTCUSDT|13m|short|ladder_close_50_618
+     Variants:
+       partial entry, timing repair, early/late exit, RSI/regime filter, WMA/MA anchor
+
+  4. 8m short capture improvement
+     Candidate lane:
+       BTCUSDT|8m|short|ladder_close_50_618
+     Variants:
+       faster capture, tighter invalidation, partial exits, trailing, regime filter
+
+  5. 88m watch-only evidence
+     Candidate lane:
+       BTCUSDT|88m|long|ladder_382_50_618
+     Variants:
+       durability, slow signal confirmation, HTF bias, exit variants
+
+  6. Betrayal/inverse lab-only
+     Must include:
+       lab_only=true
+       tiny_live_eligible_now=false
+       standard_55_policy_applies=false
+       preferred_win_rate_pct=60
+       min_sample_count=30
+       preferred_sample_count=50
+       avg_pnl_requirement=positive
+       original_vs_inverse_required=true
+       source_chain_required=true
+       exact_risk_mapping_required=true
+       stale_shadow_outcomes_forbidden=true
+
+  7. MA/WMA200 anchor variants
+     Variants:
+       WMA200 support/resistance anchor
+       MA200 support/resistance anchor
+       close above/below anchor
+       anchor slope / trend filter
+       golden-pocket + anchor confluence
+
+  8. Exit / TP / SL / trailing variants
+     Variants:
+       fixed TP/SL
+       early exit
+       late exit
+       trailing
+       partial exit
+       invalidation tightening
+
+E. Promotion review candidates:
+  Must separate:
+    - ready_for_R325_review
+    - needs_more_samples
+    - watch_only
+    - lab_only
+    - blocked
+  Do not write promotion events.
+
+F. Tiny Live path:
+  Must state:
+    - First Tiny Live remains BTCUSDT|44m|long|ladder_close_50_618.
+    - Expanded lanes increase candidate surface but do not become live automatically.
+    - Future live candidates require evidence + risk contract + human review + final gate.
+    - Current final gate still waits for real candidate detection.
+
+G. Operator script:
+  Add:
+    scripts/hammer_print_r324_strategy_lab_variant_batch_runner.sh
+
+  It must print:
+    - R324 header
+    - batch runner status
+    - Telegram scope status
+    - Tiny Live baseline lane
+    - batch results summary
+    - promotion review candidates
+    - near-miss repair candidates
+    - betrayal/inverse lab-only packet
+    - MA/WMA anchor packet
+    - exit variant packet
+    - recommended R325 and R326
+    - safety flags
+
+H. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R324_STRATEGY_LAB_VARIANT_BATCH_RUNNER.md
+
+  Include:
+    - why R324 exists
+    - what R323 mapped
+    - batch groups
+    - promotion separation
+    - Betrayal/inverse lab-only rule
+    - how R325 should use this
+    - Tiny Live path
+    - what not to mutate
+
+I. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_variant_batch_runner.py
+
+  Tests must cover:
+    1. Builds ready batch runner packet.
+    2. Includes all 8 required batch groups.
+    3. 44m short batch includes three candidate lanes.
+    4. 55m long batch includes ladder and market close.
+    5. 13m near-miss batch included.
+    6. 8m short capture batch included.
+    7. 88m watch-only batch included.
+    8. Betrayal/inverse batch marked lab-only.
+    9. Betrayal/inverse standard 55 policy false.
+    10. Betrayal/inverse stricter gate fields present.
+    11. MA/WMA anchor batch included.
+    12. Exit/TP/SL/trailing batch included.
+    13. Promotion candidates separated from lab-only.
+    14. Tiny Live baseline lane preserved.
+    15. First live lane change allowed false.
+    16. No promotion write.
+    17. No risk contract write.
+    18. No config mutation.
+    19. No env mutation.
+    20. No arming mutation.
+    21. No systemd mutation.
+    22. No live order.
+    23. No submit.
+    24. No final command.
+    25. No Binance endpoint.
+    26. No Telegram send.
+    27. Inspect route works.
+    28. Operator script exists and prints required sections.
+    29. R323/R322/R314/strategy-lab tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_batch_runner --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_batch_runner --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_variant_batch_runner --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-variant-batch-runner
+    bash scripts/hammer_print_r324_strategy_lab_variant_batch_runner.sh
+    bash scripts/hammer_print_r323_strategy_lab_expansion_surface_map.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - batch runner status
+  - all 8 batch groups
+  - promotion review candidates
+  - near-miss repair candidates
+  - betrayal lab-only packet
+  - R325/R326 recommendations
+  - no mutation confirmation
+
+Recommended R325:
+  R325 Strategy Lab Promotion Review Packet

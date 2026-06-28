@@ -4736,6 +4736,25 @@ def main() -> int:
                 build_strategy_lab_expansion_surface_map(log_dir=args.log_dir, write=not args.no_write)
             )
         )
+    elif args.command == "strategy-lab-variant-batch-runner":
+        from src.app.hammer_radar.operator.strategy_lab_variant_batch_runner import (
+            build_strategy_lab_variant_batch_runner,
+            format_batch_runner_json,
+        )
+
+        print(
+            format_batch_runner_json(
+                build_strategy_lab_variant_batch_runner(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    batch=args.batch,
+                    min_sample_count=args.min_sample_count,
+                    preferred_sample_count=args.preferred_sample_count,
+                    standard_min_win_rate_pct=args.standard_min_win_rate_pct,
+                    betrayal_min_win_rate_pct=args.betrayal_min_win_rate_pct,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -7763,6 +7782,31 @@ def _build_parser() -> argparse.ArgumentParser:
         parents=[parent],
     )
     strategy_lab_expansion_surface_map_parser.add_argument("--no-write", action="store_true")
+
+    strategy_lab_variant_batch_runner_parser = subparsers.add_parser(
+        "strategy-lab-variant-batch-runner",
+        parents=[parent],
+    )
+    strategy_lab_variant_batch_runner_parser.add_argument("--no-write", action="store_true")
+    strategy_lab_variant_batch_runner_parser.add_argument(
+        "--batch",
+        choices=(
+            "all",
+            "44m_short",
+            "55m_long",
+            "13m_near_miss",
+            "8m_short_capture",
+            "88m_watch",
+            "betrayal_inverse_lab",
+            "ma_wma_anchor",
+            "exits",
+        ),
+        default="all",
+    )
+    strategy_lab_variant_batch_runner_parser.add_argument("--min-sample-count", type=int, default=30)
+    strategy_lab_variant_batch_runner_parser.add_argument("--preferred-sample-count", type=int, default=50)
+    strategy_lab_variant_batch_runner_parser.add_argument("--standard-min-win-rate-pct", type=float, default=55.0)
+    strategy_lab_variant_batch_runner_parser.add_argument("--betrayal-min-win-rate-pct", type=float, default=60.0)
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",
