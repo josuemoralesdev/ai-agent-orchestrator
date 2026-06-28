@@ -4912,6 +4912,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "real-telegram-synthetic-alert-activation-packet":
+        from src.app.hammer_radar.operator.real_telegram_synthetic_alert_activation_packet import (
+            build_real_telegram_synthetic_alert_activation_packet,
+            format_real_telegram_synthetic_alert_activation_packet_json,
+        )
+
+        print(
+            format_real_telegram_synthetic_alert_activation_packet_json(
+                build_real_telegram_synthetic_alert_activation_packet(
+                    log_dir=args.log_dir,
+                    scenario=args.scenario,
+                    max_age_seconds=args.max_age_seconds,
+                    rate_limit_window_seconds=args.rate_limit_window_seconds,
+                    no_write=args.no_write,
+                )
+            )
+        )
     else:
         parser.error(f"unsupported command: {args.command}")
     return 0
@@ -7852,6 +7869,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     real_telegram_synthetic_alert_send_apply_gate_parser.add_argument("--max-age-seconds", type=int, default=180)
     real_telegram_synthetic_alert_send_apply_gate_parser.add_argument(
+        "--rate-limit-window-seconds",
+        type=int,
+        default=900,
+    )
+
+    real_telegram_synthetic_alert_activation_packet_parser = subparsers.add_parser(
+        "real-telegram-synthetic-alert-activation-packet",
+        parents=[parent],
+    )
+    real_telegram_synthetic_alert_activation_packet_parser.add_argument("--no-write", action="store_true")
+    real_telegram_synthetic_alert_activation_packet_parser.add_argument(
+        "--scenario",
+        choices=("synthetic_stale_observation", "synthetic_final_safety_violation"),
+        default="synthetic_stale_observation",
+    )
+    real_telegram_synthetic_alert_activation_packet_parser.add_argument(
+        "--max-age-seconds",
+        type=int,
+        default=180,
+    )
+    real_telegram_synthetic_alert_activation_packet_parser.add_argument(
         "--rate-limit-window-seconds",
         type=int,
         default=900,
