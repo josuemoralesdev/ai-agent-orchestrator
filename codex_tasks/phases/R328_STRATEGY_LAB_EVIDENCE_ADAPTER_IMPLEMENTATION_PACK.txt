@@ -1,0 +1,503 @@
+# R328 - Strategy Lab Evidence Adapter Implementation Pack
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r326-candidate-feed-expansion-for-strategy-lab-variants
+
+New branch:
+  r328-strategy-lab-evidence-adapter-implementation-pack
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + WIRING / INTEGRATION
+
+Why this phase exists:
+  R326 mapped missing evidence adapters for Strategy Lab variants.
+  The project now needs deterministic, read-only paper/lab adapters that can enrich Strategy Lab evidence for:
+    - 13m near-miss repair
+    - 8m short capture improvement
+    - MA/WMA200 anchor confluence
+    - exit / TP / SL / trailing comparisons
+    - Betrayal/inverse lab-only source-chain evidence
+    - 88m watch-only durability
+    - 44m/55m review-ready enrichment
+
+Purpose:
+  Implement a Strategy Lab evidence adapter pack that creates normalized, deterministic, paper/lab-only evidence rows from existing Strategy Lab packets and observed lane data.
+
+  R328 must:
+    - implement adapter builders
+    - create normalized evidence rows
+    - create an operator packet summarizing adapter outputs
+    - write only its own lab adapter output ledger unless --no-write is used
+    - keep all outputs read-only and non-live
+    - feed R329 deep batch execution / comparison
+
+  R328 must not:
+    - promote candidates
+    - write promotion events
+    - write risk contracts
+    - alter observed expansion
+    - change Tiny Live
+    - start schedulers
+    - execute trades
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this adapter pack.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO scheduler start.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R326_CANDIDATE_FEED_EXPANSION_FOR_STRATEGY_LAB_VARIANTS.md
+    docs/hammer_radar/live_readiness/R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET.md
+    docs/hammer_radar/live_readiness/R324_STRATEGY_LAB_VARIANT_BATCH_RUNNER.md
+    docs/hammer_radar/live_readiness/R305_STRATEGY_LAB_VARIANT_TEST_PACK.md
+    docs/hammer_radar/live_readiness/R304_PAPER_REFRESH_DURABILITY_AND_STRATEGY_LAB_PREVIEW.md
+    src/app/hammer_radar/operator/strategy_lab_candidate_feed_expansion.py
+    src/app/hammer_radar/operator/strategy_lab_promotion_review_packet.py
+    src/app/hammer_radar/operator/strategy_lab_variant_batch_runner.py
+    src/app/hammer_radar/operator/strategy_lab_variant_test_pack.py
+    src/app/hammer_radar/operator/strategy_lab_preview.py
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/inspect.py
+    logs/hammer_radar_forward/strategy_lab_candidate_feed_expansion.ndjson
+    logs/hammer_radar_forward/strategy_lab_promotion_review_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_batch_runner.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_test_pack.ndjson
+    logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+    tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py
+    tests/hammer_radar/test_strategy_lab_promotion_review_packet.py
+    tests/hammer_radar/test_strategy_lab_variant_batch_runner.py
+    tests/hammer_radar/test_strategy_lab_variant_test_pack.py
+
+  Produce:
+    codex_tasks/reports/R328_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing feed map reuse
+    - existing Strategy Lab packet reuse
+    - existing evidence registry reuse
+    - duplicate risk report
+    - why R328 implements adapters but not schedulers
+    - how R328 feeds R329 batch execution
+
+Scope:
+  A. Evidence adapter module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_evidence_adapter_pack.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_evidence_adapter_pack --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --adapter all
+  --adapter near_miss_13m
+  --adapter capture_8m_short
+  --adapter ma_wma_anchor
+  --adapter exits
+  --adapter betrayal_inverse_lab
+  --adapter watch_88m
+  --adapter review_ready_enrichment
+  --min-sample-count 30
+  --preferred-sample-count 50
+
+Defaults:
+  adapter=all
+  no live mutation
+  no risk-contract writes
+  no promotion writes
+  no observed expansion writes
+  no scheduler start
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-evidence-adapter-pack
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_evidence_adapter_pack.ndjson
+
+event_type:
+  R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - evidence_adapter_pack_status:
+        STRATEGY_LAB_EVIDENCE_ADAPTER_PACK_READY
+        STRATEGY_LAB_EVIDENCE_ADAPTER_PACK_BLOCKED
+    - blockers
+    - source_candidate_feed_expansion_status
+    - source_promotion_review_status
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - adapter_results
+    - adapter_counts
+    - normalized_evidence_rows
+    - near_miss_adapter_packet
+    - capture_8m_short_adapter_packet
+    - ma_wma_anchor_adapter_packet
+    - exit_variant_adapter_packet
+    - betrayal_inverse_lab_adapter_packet
+    - watch_88m_adapter_packet
+    - review_ready_enrichment_adapter_packet
+    - implemented_adapter_summary
+    - remaining_adapter_gaps
+    - recommended_r329_path
+    - recommended_r330_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Normalized evidence row schema:
+  Every adapter-created row must include:
+    - adapter_id
+    - row_id
+    - lane_key
+    - timeframe
+    - side
+    - entry_mode
+    - variant_family
+    - variant_name
+    - evidence_status:
+        ADAPTER_READY
+        ADAPTER_NEEDS_SOURCE_DATA
+        LAB_ONLY
+        WATCH_ONLY
+    - source_chain
+    - input_fields
+    - derived_fields
+    - sample_count_source
+    - win_rate_source
+    - avg_pnl_source
+    - live_permission=false
+    - tiny_live_eligible_now=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - scheduler_required=false
+    - blockers
+
+D. Adapter implementations:
+
+  1. near_miss_13m adapter:
+     Candidate lanes:
+       BTCUSDT|13m|long|ladder_close_50_618
+       BTCUSDT|13m|short|ladder_close_50_618
+     Generate rows for:
+       timing_repair
+       partial_entry
+       early_exit
+       late_exit
+       rsi_regime_filter
+       ma_wma_anchor_context
+       golden_pocket_context
+     Must mark:
+       evidence_status=ADAPTER_READY or ADAPTER_NEEDS_SOURCE_DATA
+       live_permission=false
+       tiny_live_eligible_now=false
+
+  2. capture_8m_short adapter:
+     Candidate lane:
+       BTCUSDT|8m|short|ladder_close_50_618
+     Generate rows for:
+       faster_capture
+       tighter_invalidation
+       partial_exit
+       trailing
+       regime_filter
+       entry_timing_delta
+     Must mark near-threshold but no live permission.
+
+  3. ma_wma_anchor adapter:
+     Candidate lanes:
+       review-ready + near-miss + watch lanes from R326
+     Generate rows for:
+       wma200_side
+       ma200_side
+       close_vs_anchor
+       anchor_slope
+       golden_pocket_anchor_confluence
+     Must normalize anchor context fields.
+
+  4. exits adapter:
+     Candidate lanes:
+       review-ready + near-miss + watch lanes from R326
+     Generate rows for:
+       fixed_tp_sl
+       early_exit
+       late_exit
+       trailing_stop
+       partial_exit
+       invalidation_tightening
+     Must normalize exit-comparison fields.
+
+  5. betrayal_inverse_lab adapter:
+     Candidate lane:
+       BETRAYAL_INVERSE_LANES
+     Generate lab-only rows for:
+       original_signal_source_chain
+       inverse_signal_source_chain
+       original_vs_inverse_comparison
+       exact_risk_mapping
+       stale_shadow_outcome_rejection
+     Must include:
+       lab_only=true
+       standard_55_policy_applies=false
+       preferred_win_rate_pct=60
+       min_sample_count=30
+       preferred_sample_count=50
+       avg_pnl_requirement=positive
+       original_vs_inverse_required=true
+       source_chain_required=true
+       exact_risk_mapping_required=true
+       stale_shadow_outcomes_forbidden=true
+       live_permission=false
+       tiny_live_eligible_now=false
+
+  6. watch_88m adapter:
+     Candidate lane:
+       BTCUSDT|88m|long|ladder_382_50_618
+     Generate rows for:
+       durability
+       slow_confirmation
+       htf_bias
+       exit_variant
+       anchor_filter
+     Must mark watch_only=true and live_permission=false.
+
+  7. review_ready_enrichment adapter:
+     Candidate lanes:
+       BTCUSDT|44m|short|ladder_382_50_618
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|44m|short|ladder_22_44_22
+       BTCUSDT|55m|long|ladder_close_50_618
+       BTCUSDT|55m|long|market_close
+     Generate rows for:
+       recent_sample_stability
+       regime_split
+       adverse_excursion
+       exit_sensitivity
+       anchor_confluence
+     Must prepare enrichment for R329/R330, not live permission.
+
+E. Implemented adapter summary:
+  Include:
+    - implemented_adapters
+    - adapter_row_counts
+    - rows_ready
+    - rows_needing_source_data
+    - lab_only_rows
+    - watch_only_rows
+    - live_permission_count=0
+    - promotion_event_written_count=0
+    - risk_contract_write_required_count=0
+    - scheduler_required_count=0
+
+F. Remaining adapter gaps:
+  It is acceptable for R328 to emit ADAPTER_NEEDS_SOURCE_DATA for fields that need future paper capture.
+  Report remaining gaps clearly:
+    - missing raw anchor timeseries if not available
+    - missing exit outcome comparison if not available
+    - missing betrayal source-chain data if not available
+    - missing MAE/MFE if not available
+  Do not fake data.
+
+G. Recommended paths:
+  R329:
+    Strategy Lab Adapter Output Batch Execution Packet
+  R330:
+    Human-Reviewed Observed Expansion Promotion Gate
+  Explain:
+    - R329 should run comparisons over R328 normalized rows.
+    - R330 can later alter observed expansion after human review.
+    - Tiny Live remains separately gated.
+
+H. Operator script:
+  Add:
+    scripts/hammer_print_r328_strategy_lab_evidence_adapter_pack.sh
+
+  It must print:
+    - R328 header
+    - adapter pack status
+    - first Tiny Live lane
+    - adapter summary
+    - normalized evidence row counts
+    - near-miss adapter summary
+    - 8m capture adapter summary
+    - anchor adapter summary
+    - exit adapter summary
+    - betrayal lab adapter summary
+    - watch 88m adapter summary
+    - review-ready enrichment summary
+    - remaining adapter gaps
+    - recommended R329/R330
+    - safety flags
+
+I. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK.md
+
+  Include:
+    - why R328 exists
+    - what R326 mapped
+    - adapter implementation list
+    - normalized evidence row schema
+    - remaining source-data gaps
+    - betrayal/inverse lab-only behavior
+    - R329/R330 path
+    - Tiny Live path
+    - what not to mutate
+
+J. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py
+
+  Tests must cover:
+    1. Builds ready evidence adapter pack.
+    2. Includes all seven adapters.
+    3. Generates normalized rows.
+    4. Normalized rows include required schema fields.
+    5. near_miss_13m rows generated.
+    6. capture_8m_short rows generated.
+    7. ma_wma_anchor rows generated.
+    8. exits rows generated.
+    9. betrayal_inverse_lab rows generated and lab_only.
+    10. watch_88m rows generated and watch_only.
+    11. review_ready_enrichment rows generated.
+    12. Betrayal standard 55 policy false.
+    13. Betrayal source chain required.
+    14. First Tiny Live lane preserved.
+    15. first_live_lane_change_allowed=false.
+    16. live_permission_count=0.
+    17. promotion_event_written_count=0.
+    18. risk_contract_write_required_count=0.
+    19. scheduler_required_count=0.
+    20. No promotion event write.
+    21. No risk contract write.
+    22. No config mutation.
+    23. No env mutation.
+    24. No arming mutation.
+    25. No systemd mutation.
+    26. No live order.
+    27. No submit.
+    28. No final command.
+    29. No Binance endpoint.
+    30. No Telegram send.
+    31. Inspect route works.
+    32. Operator script exists and prints required sections.
+    33. R326/R325/R324/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_evidence_adapter_pack --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_evidence_adapter_pack --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_evidence_adapter_pack --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-evidence-adapter-pack
+    bash scripts/hammer_print_r328_strategy_lab_evidence_adapter_pack.sh
+    bash scripts/hammer_print_r326_strategy_lab_candidate_feed_expansion.sh
+    bash scripts/hammer_print_r325_strategy_lab_promotion_review_packet.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - adapter pack status
+  - implemented adapters
+  - normalized evidence row counts
+  - remaining adapter gaps
+  - betrayal lab status
+  - R329/R330 recommendations
+  - no mutation confirmation
+
+Recommended R329:
+  Strategy Lab Adapter Output Batch Execution Packet

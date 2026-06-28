@@ -4793,6 +4793,23 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "strategy-lab-evidence-adapter-pack":
+        from src.app.hammer_radar.operator.strategy_lab_evidence_adapter_pack import (
+            build_strategy_lab_evidence_adapter_pack,
+            format_evidence_adapter_pack_json,
+        )
+
+        print(
+            format_evidence_adapter_pack_json(
+                build_strategy_lab_evidence_adapter_pack(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    adapter=args.adapter,
+                    min_sample_count=args.min_sample_count,
+                    preferred_sample_count=args.preferred_sample_count,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -7880,6 +7897,28 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     strategy_lab_candidate_feed_expansion_parser.add_argument("--min-sample-count", type=int, default=30)
     strategy_lab_candidate_feed_expansion_parser.add_argument("--preferred-sample-count", type=int, default=50)
+
+    strategy_lab_evidence_adapter_pack_parser = subparsers.add_parser(
+        "strategy-lab-evidence-adapter-pack",
+        parents=[parent],
+    )
+    strategy_lab_evidence_adapter_pack_parser.add_argument("--no-write", action="store_true")
+    strategy_lab_evidence_adapter_pack_parser.add_argument(
+        "--adapter",
+        choices=(
+            "all",
+            "near_miss_13m",
+            "capture_8m_short",
+            "ma_wma_anchor",
+            "exits",
+            "betrayal_inverse_lab",
+            "watch_88m",
+            "review_ready_enrichment",
+        ),
+        default="all",
+    )
+    strategy_lab_evidence_adapter_pack_parser.add_argument("--min-sample-count", type=int, default=30)
+    strategy_lab_evidence_adapter_pack_parser.add_argument("--preferred-sample-count", type=int, default=50)
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",
