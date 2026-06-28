@@ -1,0 +1,466 @@
+# R326 - Candidate Feed Expansion for Strategy Lab Variants
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r325-strategy-lab-promotion-review-packet
+
+New branch:
+  r326-candidate-feed-expansion-for-strategy-lab-variants
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R325 produced a read-only Strategy Lab promotion review packet.
+  It confirmed:
+    - review-ready candidates exist
+    - no promotion was written
+    - no risk contracts were written
+    - first Tiny Live lane remains BTCUSDT|44m|long|ladder_close_50_618
+    - Tiny Live still waits for real candidate detection
+    - 13m long/short and 8m short need more evidence or repair
+    - MA/WMA200 anchors and exit variants need feed expansion
+    - Betrayal/inverse needs lab-only source-chain evidence
+
+Purpose:
+  Build a read-only candidate feed expansion packet that defines and validates new evidence-feed adapters for Strategy Lab variants.
+
+  R326 must expand evidence capture surfaces for:
+    1. 13m near-miss repair
+    2. 8m short capture improvement
+    3. MA/WMA200 anchor variants
+    4. exit / TP / SL / trailing variants
+    5. Betrayal/inverse lab-only source-chain evidence
+    6. optional 88m watch-only durability feed
+    7. optional 44m/55m review-ready feed enrichment
+
+  R326 must not promote anything.
+  R326 must not write risk contracts.
+  R326 must not change observed expansion.
+  R326 must not alter Tiny Live.
+  R326 must prepare inputs for later R327 observed expansion review and later R328/R329 deeper batch execution.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this read-only feed expansion.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET.md
+    docs/hammer_radar/live_readiness/R324_STRATEGY_LAB_VARIANT_BATCH_RUNNER.md
+    docs/hammer_radar/live_readiness/R323_STRATEGY_LAB_EXPANSION_REENTRY_AND_CANDIDATE_SURFACE_MAP.md
+    docs/hammer_radar/live_readiness/R305_STRATEGY_LAB_VARIANT_TEST_PACK.md
+    docs/hammer_radar/live_readiness/R304_PAPER_REFRESH_DURABILITY_AND_STRATEGY_LAB_PREVIEW.md
+    src/app/hammer_radar/operator/strategy_lab_promotion_review_packet.py
+    src/app/hammer_radar/operator/strategy_lab_variant_batch_runner.py
+    src/app/hammer_radar/operator/strategy_lab_expansion_surface_map.py
+    src/app/hammer_radar/operator/strategy_lab_variant_test_pack.py
+    src/app/hammer_radar/operator/strategy_lab_preview.py
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/inspect.py
+    logs/hammer_radar_forward/strategy_lab_promotion_review_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_batch_runner.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_test_pack.ndjson
+    logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+    logs/hammer_radar_forward/strategy_promotion_events.ndjson
+    tests/hammer_radar/test_strategy_lab_promotion_review_packet.py
+    tests/hammer_radar/test_strategy_lab_variant_batch_runner.py
+    tests/hammer_radar/test_strategy_lab_variant_test_pack.py
+    tests/hammer_radar/test_strategy_lab_preview.py
+
+  Produce:
+    codex_tasks/reports/R326_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - existing evidence feed capability reuse
+    - existing variant pack reuse
+    - missing adapter map
+    - duplicate risk report
+    - why R326 is feed expansion, not promotion
+    - how R326 feeds R327/R328
+
+Scope:
+  A. Candidate feed expansion module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_candidate_feed_expansion.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_candidate_feed_expansion --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --feed all
+  --feed near_miss_13m
+  --feed capture_8m_short
+  --feed ma_wma_anchor
+  --feed exits
+  --feed betrayal_inverse_lab
+  --feed watch_88m
+  --feed review_ready_enrichment
+  --min-sample-count 30
+  --preferred-sample-count 50
+
+Defaults:
+  feed=all
+  no live mutation
+  no risk-contract writes
+  no promotion writes
+  no observed expansion writes
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-candidate-feed-expansion
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_candidate_feed_expansion.ndjson
+
+event_type:
+  R326_CANDIDATE_FEED_EXPANSION_FOR_STRATEGY_LAB_VARIANTS
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - candidate_feed_expansion_status:
+        STRATEGY_LAB_CANDIDATE_FEED_EXPANSION_READY
+        STRATEGY_LAB_CANDIDATE_FEED_EXPANSION_BLOCKED
+    - blockers
+    - source_promotion_review_status
+    - source_batch_runner_status
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - feed_expansion_packets
+    - feed_counts
+    - missing_adapter_summary
+    - near_miss_feed_packet
+    - capture_8m_short_feed_packet
+    - ma_wma_anchor_feed_packet
+    - exit_variant_feed_packet
+    - betrayal_inverse_lab_feed_packet
+    - watch_88m_feed_packet
+    - review_ready_enrichment_packet
+    - recommended_r327_path
+    - recommended_r328_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Feed expansion packets:
+  Each feed packet must include:
+    - feed_id
+    - feed_name
+    - candidate_lanes
+    - evidence_gap
+    - feed_dimensions
+    - required_adapter_inputs
+    - output_artifact_plan
+    - scheduler_required=false unless future phase explicitly adds it
+    - live_permission=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - tiny_live_eligible_now=false
+    - recommended_next_action
+    - blockers
+
+D. Required feed packets:
+
+  1. near_miss_13m:
+     Candidate lanes:
+       BTCUSDT|13m|long|ladder_close_50_618
+       BTCUSDT|13m|short|ladder_close_50_618
+     Feed dimensions:
+       timing repair
+       partial entry
+       early/late exit
+       RSI/regime filter
+       MA/WMA anchor
+       golden-pocket support/resistance context
+     Evidence gap:
+       win rate below standard live threshold despite high sample count
+     Recommended action:
+       add paper/lab capture adapters for variants
+
+  2. capture_8m_short:
+     Candidate lane:
+       BTCUSDT|8m|short|ladder_close_50_618
+     Feed dimensions:
+       faster capture
+       tighter invalidation
+       partial exit
+       trailing
+       regime filter
+       entry timing
+     Evidence gap:
+       near 55% threshold but not ready
+     Recommended action:
+       add capture-improvement evidence adapter
+
+  3. ma_wma_anchor:
+     Candidate lanes:
+       review-ready + near-miss + watch lanes
+     Feed dimensions:
+       WMA200 support/resistance anchor
+       MA200 support/resistance anchor
+       close above/below anchor
+       anchor slope
+       golden-pocket + anchor confluence
+     Recommended action:
+       add anchor enrichment fields to strategy lab variants
+
+  4. exits:
+     Candidate lanes:
+       review-ready + near-miss + watch lanes
+     Feed dimensions:
+       fixed TP/SL
+       early exit
+       late exit
+       trailing
+       partial exit
+       invalidation tightening
+     Recommended action:
+       add exit-comparison evidence artifacts
+
+  5. betrayal_inverse_lab:
+     Candidate lanes:
+       BETRAYAL_INVERSE_LANES
+     Must include:
+       lab_only=true
+       standard_55_policy_applies=false
+       live_permission=false
+       tiny_live_eligible_now=false
+       original_vs_inverse_required=true
+       source_chain_required=true
+       exact_risk_mapping_required=true
+       stale_shadow_outcomes_forbidden=true
+       preferred_win_rate_pct=60
+       min_sample_count=30
+       preferred_sample_count=50
+       avg_pnl_requirement=positive
+     Recommended action:
+       source-chain and original-vs-inverse capture adapter only
+
+  6. watch_88m:
+     Candidate lane:
+       BTCUSDT|88m|long|ladder_382_50_618
+     Feed dimensions:
+       durability
+       slow confirmation
+       HTF bias
+       exit variants
+       anchor filters
+     Recommended action:
+       keep watch-only and deepen evidence
+
+  7. review_ready_enrichment:
+     Candidate lanes:
+       BTCUSDT|44m|short|ladder_382_50_618
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|44m|short|ladder_22_44_22
+       BTCUSDT|55m|long|ladder_close_50_618
+       BTCUSDT|55m|long|market_close
+     Feed dimensions:
+       stability over recent samples
+       regime split
+       adverse excursion
+       exit sensitivity
+       anchor confluence
+     Recommended action:
+       enrich evidence before observed expansion gate
+
+E. Missing adapter summary:
+  Include:
+    - near_miss_variant_capture_adapter
+    - short_capture_improvement_adapter
+    - ma_wma_anchor_enrichment_adapter
+    - exit_variant_comparison_adapter
+    - betrayal_inverse_source_chain_adapter
+    - watch_88m_durability_adapter
+    - review_ready_enrichment_adapter
+  Must be planning only. Do not implement schedulers unless existing modules already support it safely.
+
+F. Recommended paths:
+  R327:
+    Human-Reviewed Observed Expansion Promotion Gate
+  R328:
+    Strategy Lab Evidence Adapter Implementation Pack
+  Explain:
+    - R327 can alter observed expansion only after human review
+    - R328 can implement actual evidence adapters from R326 feed map
+    - Tiny Live remains separately gated and still waits for a real candidate
+
+G. Operator script:
+  Add:
+    scripts/hammer_print_r326_strategy_lab_candidate_feed_expansion.sh
+
+  It must print:
+    - R326 header
+    - feed expansion status
+    - first Tiny Live lane
+    - feed packet summary
+    - missing adapter summary
+    - betrayal/inverse lab feed
+    - recommended R327/R328
+    - Tiny Live path
+    - safety flags
+
+H. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R326_CANDIDATE_FEED_EXPANSION_FOR_STRATEGY_LAB_VARIANTS.md
+
+  Include:
+    - why R326 exists
+    - what R325 decided
+    - feed packets
+    - adapter gaps
+    - betrayal/inverse lab-only feed
+    - R327/R328 path
+    - Tiny Live path
+    - what not to mutate
+
+I. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py
+
+  Tests must cover:
+    1. Builds ready candidate feed expansion packet.
+    2. Includes near_miss_13m feed.
+    3. Includes capture_8m_short feed.
+    4. Includes ma_wma_anchor feed.
+    5. Includes exits feed.
+    6. Includes betrayal_inverse_lab feed.
+    7. Includes watch_88m feed.
+    8. Includes review_ready_enrichment feed.
+    9. Missing adapter summary includes all expected adapters.
+    10. Betrayal feed lab_only true.
+    11. Betrayal standard 55 policy false.
+    12. Betrayal source chain required.
+    13. First Tiny Live lane preserved.
+    14. first_live_lane_change_allowed=false.
+    15. Recommended R327 present.
+    16. Recommended R328 present.
+    17. No promotion event write.
+    18. No risk contract write.
+    19. No config mutation.
+    20. No env mutation.
+    21. No arming mutation.
+    22. No systemd mutation.
+    23. No live order.
+    24. No submit.
+    25. No final command.
+    26. No Binance endpoint.
+    27. No Telegram send.
+    28. Inspect route works.
+    29. Operator script exists and prints required sections.
+    30. R325/R324/R323/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_candidate_feed_expansion --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_candidate_feed_expansion --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_candidate_feed_expansion --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-candidate-feed-expansion
+    bash scripts/hammer_print_r326_strategy_lab_candidate_feed_expansion.sh
+    bash scripts/hammer_print_r325_strategy_lab_promotion_review_packet.sh
+    bash scripts/hammer_print_r324_strategy_lab_variant_batch_runner.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - feed expansion status
+  - feed packet summary
+  - missing adapter summary
+  - betrayal lab feed status
+  - R327/R328 recommendations
+  - no mutation confirmation
+
+Recommended R327:
+  Human-Reviewed Observed Expansion Promotion Gate
