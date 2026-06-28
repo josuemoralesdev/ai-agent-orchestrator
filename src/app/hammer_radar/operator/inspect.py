@@ -4755,6 +4755,27 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "strategy-lab-promotion-review-packet":
+        from src.app.hammer_radar.operator.strategy_lab_promotion_review_packet import (
+            build_strategy_lab_promotion_review_packet,
+            format_promotion_review_packet_json,
+        )
+
+        print(
+            format_promotion_review_packet_json(
+                build_strategy_lab_promotion_review_packet(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    include_watch_only=args.include_watch_only,
+                    include_near_miss=args.include_near_miss,
+                    include_betrayal_lab=args.include_betrayal_lab,
+                    min_sample_count=args.min_sample_count,
+                    preferred_sample_count=args.preferred_sample_count,
+                    standard_min_win_rate_pct=args.standard_min_win_rate_pct,
+                    betrayal_min_win_rate_pct=args.betrayal_min_win_rate_pct,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -7807,6 +7828,19 @@ def _build_parser() -> argparse.ArgumentParser:
     strategy_lab_variant_batch_runner_parser.add_argument("--preferred-sample-count", type=int, default=50)
     strategy_lab_variant_batch_runner_parser.add_argument("--standard-min-win-rate-pct", type=float, default=55.0)
     strategy_lab_variant_batch_runner_parser.add_argument("--betrayal-min-win-rate-pct", type=float, default=60.0)
+
+    strategy_lab_promotion_review_packet_parser = subparsers.add_parser(
+        "strategy-lab-promotion-review-packet",
+        parents=[parent],
+    )
+    strategy_lab_promotion_review_packet_parser.add_argument("--no-write", action="store_true")
+    strategy_lab_promotion_review_packet_parser.add_argument("--include-watch-only", action="store_true", default=True)
+    strategy_lab_promotion_review_packet_parser.add_argument("--include-near-miss", action="store_true", default=True)
+    strategy_lab_promotion_review_packet_parser.add_argument("--include-betrayal-lab", action="store_true", default=True)
+    strategy_lab_promotion_review_packet_parser.add_argument("--min-sample-count", type=int, default=30)
+    strategy_lab_promotion_review_packet_parser.add_argument("--preferred-sample-count", type=int, default=50)
+    strategy_lab_promotion_review_packet_parser.add_argument("--standard-min-win-rate-pct", type=float, default=55.0)
+    strategy_lab_promotion_review_packet_parser.add_argument("--betrayal-min-win-rate-pct", type=float, default=60.0)
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",

@@ -1,0 +1,450 @@
+# R325 - Strategy Lab Promotion Review Packet
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r324-strategy-lab-variant-batch-runner
+
+New branch:
+  r325-strategy-lab-promotion-review-packet
+
+Phase classification:
+  DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R324 organized the Strategy Lab candidate surface into 8 batch groups and separated:
+    - ready_for_R325_review
+    - needs_more_samples
+    - watch_only
+    - lab_only
+    - blocked
+
+  R325 must turn that into a human-readable promotion review packet.
+  It must not promote anything automatically.
+  It must not write promotion events.
+  It must not write risk contracts.
+  It must not alter Tiny Live.
+
+Known R324 review-ready candidates:
+  BTCUSDT|44m|short|ladder_382_50_618
+  BTCUSDT|44m|short|ladder_close_50_618
+  BTCUSDT|44m|short|ladder_22_44_22
+  BTCUSDT|55m|long|ladder_close_50_618
+  BTCUSDT|55m|long|market_close
+
+Known R324 needs-more-samples candidates:
+  BTCUSDT|13m|long|ladder_close_50_618
+  BTCUSDT|13m|short|ladder_close_50_618
+  BTCUSDT|8m|short|ladder_close_50_618
+
+Known R324 watch-only:
+  BTCUSDT|88m|long|ladder_382_50_618
+
+Known R324 lab-only:
+  BETRAYAL_INVERSE_LANES
+
+First Tiny Live lane remains:
+  BTCUSDT|44m|long|ladder_close_50_618
+
+Purpose:
+  Build a read-only Strategy Lab Promotion Review Packet that answers:
+    - Which candidates are ready for human promotion review?
+    - Which candidates have direct evidence?
+    - Which candidates have risk contracts?
+    - Which candidates are observed already?
+    - Which candidates remain watch-only?
+    - Which candidates need more samples?
+    - Which candidates are lab-only?
+    - Which candidates are blocked?
+    - Which candidates, if any, should be considered for future observed expansion?
+    - Which candidates, if any, should be considered for future Tiny Live after separate human approval?
+    - What exact blockers remain before Tiny Live?
+
+Critical scope boundary:
+  R325 is a review packet only.
+  It must not write promotions.
+  It must not write risk contracts.
+  It must not mutate config.
+  It must not mutate arming.
+  It must not change the first Tiny Live lane.
+  It must not submit final commands.
+  It must not execute.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this review packet.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R324_STRATEGY_LAB_VARIANT_BATCH_RUNNER.md
+    docs/hammer_radar/live_readiness/R323_STRATEGY_LAB_EXPANSION_REENTRY_AND_CANDIDATE_SURFACE_MAP.md
+    docs/hammer_radar/live_readiness/R306_ELIGIBLE_LANE_EXPANSION_DRY_RUN_PREVIEW.md
+    docs/hammer_radar/live_readiness/R307_ELIGIBLE_LANE_EXPANSION_HUMAN_REVIEW_PACKET.md
+    docs/hammer_radar/live_readiness/R308_EXPANSION_RISK_CONTRACT_PREVIEW_REPAIR.md
+    docs/hammer_radar/live_readiness/R309_HUMAN_REVIEWED_RISK_CONTRACT_WRITE_GATE.md
+    src/app/hammer_radar/operator/strategy_lab_variant_batch_runner.py
+    src/app/hammer_radar/operator/strategy_lab_expansion_surface_map.py
+    src/app/hammer_radar/operator/eligible_lane_expansion_dry_run_preview.py
+    src/app/hammer_radar/operator/expansion_risk_contract_preview_repair.py if present
+    src/app/hammer_radar/operator/inspect.py
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    logs/hammer_radar_forward/strategy_lab_variant_batch_runner.ndjson
+    logs/hammer_radar_forward/strategy_lab_expansion_surface_map.ndjson
+    logs/hammer_radar_forward/strategy_promotion_events.ndjson
+    logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+    tests/hammer_radar/test_strategy_lab_variant_batch_runner.py
+    tests/hammer_radar/test_strategy_lab_expansion_surface_map.py
+    tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py
+    tests/hammer_radar/test_expansion_risk_contract_preview_repair.py
+
+  Produce:
+    codex_tasks/reports/R325_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - R324 batch runner reuse
+    - R323 surface map reuse
+    - R306/R307/R308/R309 promotion/risk-contract separation reuse
+    - duplicate risk report
+    - why R325 is a review packet, not a promotion writer
+    - how R325 feeds R326 candidate feed expansion or R326/R327 observed expansion review
+
+Scope:
+  A. Promotion review packet module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_promotion_review_packet.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_promotion_review_packet --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --include-watch-only
+  --include-near-miss
+  --include-betrayal-lab
+  --min-sample-count 30
+  --preferred-sample-count 50
+  --standard-min-win-rate-pct 55
+  --betrayal-min-win-rate-pct 60
+
+Defaults:
+  include_watch_only=true
+  include_near_miss=true
+  include_betrayal_lab=true
+  no promotion writes
+  no risk contract writes
+  no live mutation
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-promotion-review-packet
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_promotion_review_packet.ndjson
+
+event_type:
+  R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - promotion_review_status:
+        STRATEGY_LAB_PROMOTION_REVIEW_READY
+        STRATEGY_LAB_PROMOTION_REVIEW_BLOCKED
+    - blockers
+    - source_batch_runner_status
+    - source_surface_map_status
+    - telegram_scope_status
+    - current_tiny_live_status
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - review_ready_candidates
+    - observed_expansion_review_candidates
+    - future_tiny_live_review_candidates
+    - needs_more_samples_candidates
+    - watch_only_candidates
+    - lab_only_candidates
+    - blocked_candidates
+    - betrayal_inverse_review_packet
+    - risk_contract_review_summary
+    - evidence_quality_summary
+    - promotion_policy_summary
+    - human_review_required=true
+    - promotion_event_written=false
+    - risk_contract_config_mutated=false
+    - recommended_operator_decisions
+    - recommended_r326_path
+    - recommended_r327_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Review-ready candidate packet:
+  For each review-ready candidate:
+    - lane_key
+    - source_bucket
+    - sample_count
+    - win_rate_pct
+    - avg_pnl_pct
+    - evidence_status
+    - risk_contract_present
+    - risk_contract_valid
+    - observed_status
+    - recommended_decision:
+        KEEP_OBSERVED_DRY_RUN
+        CONSIDER_OBSERVED_EXPANSION_REVIEW
+        CONSIDER_FUTURE_TINY_LIVE_REVIEW
+        NEEDS_MORE_EVIDENCE
+    - live_permission=false
+    - tiny_live_eligible_now=false
+    - human_review_required=true
+    - blockers
+
+D. Candidate classification policy:
+  Review-ready for R325:
+    - standard candidates with sample_count >= 30 and win_rate >= 55 and avg_pnl positive
+    - risk contract present/valid preferred but not sufficient for live
+    - observed dry-run/watch state must be reported
+  Future Tiny Live review:
+    - may include 44m short and 55m long candidates if evidence strong and risk contract valid
+    - must still state separate human review + final gate required
+    - must not change first live lane
+  Needs more samples:
+    - 13m long/short and 8m short remain paper/lab repair unless future variants improve evidence
+  Watch-only:
+    - 88m stays watch-only unless explicitly moved later
+  Betrayal/inverse:
+    - must remain lab-only
+    - standard 55% policy does not apply
+    - no tiny-live eligibility
+    - stricter gate required
+
+E. Betrayal/inverse packet:
+  Must include:
+    - lab_only=true
+    - tiny_live_eligible_now=false
+    - standard_55_policy_applies=false
+    - preferred_win_rate_pct=60
+    - min_sample_count=30
+    - preferred_sample_count=50
+    - avg_pnl_requirement=positive
+    - original_vs_inverse_required=true
+    - source_chain_required=true
+    - exact_risk_mapping_required=true
+    - stale_shadow_outcomes_forbidden=true
+    - promotion_review_allowed=false unless stricter future gate exists
+    - live_permission=false
+
+F. Risk contract review summary:
+  Read configs/hammer_radar/tiny_live_risk_contracts.json.
+  Report:
+    - total_contracts
+    - contracts_present_for_review_ready
+    - contracts_missing_for_review_ready
+    - all_review_ready_contracts_valid
+    - risk_contract_config_mutated=false
+  Do not write this file.
+
+G. Recommended operator decisions:
+  Include:
+    - keep baseline Tiny Live lane unchanged
+    - keep current primary observed lanes observing
+    - consider moving strong watch-only 44m/55m lanes into human observed-expansion review only
+    - collect more samples for 13m and 8m
+    - keep Betrayal/inverse lab-only
+    - prepare candidate feed expansion for anchor/exit/near-miss variants
+    - wait for real candidate detection before Tiny Live
+
+H. Recommended R326/R327 path:
+  Recommended R326:
+    R326 Candidate Feed Expansion for Strategy Lab Variants
+  Recommended R327:
+    R327 Human-Reviewed Observed Expansion Promotion Gate
+  R325 should explain:
+    - R326 expands data capture / evidence feeds
+    - R327 would be a later human-reviewed gate to alter observed expansion, not live execution
+    - Tiny Live remains separately gated
+
+I. Operator script:
+  Add:
+    scripts/hammer_print_r325_strategy_lab_promotion_review_packet.sh
+
+  It must print:
+    - R325 header
+    - review status
+    - first Tiny Live lane
+    - review-ready candidates
+    - observed expansion review candidates
+    - future tiny-live review candidates
+    - needs-more-samples candidates
+    - watch-only candidates
+    - betrayal/inverse lab-only packet
+    - risk contract summary
+    - recommended operator decisions
+    - recommended R326/R327 path
+    - safety flags
+
+J. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET.md
+
+  Include:
+    - why R325 exists
+    - what R324 produced
+    - candidate classifications
+    - promotion vs live separation
+    - risk-contract separation
+    - Betrayal/inverse lab-only rule
+    - recommended R326/R327
+    - Tiny Live path
+    - what not to mutate
+
+K. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_promotion_review_packet.py
+
+  Tests must cover:
+    1. Builds ready promotion review packet.
+    2. Review-ready candidates included.
+    3. Needs-more-samples candidates included.
+    4. Watch-only candidates included.
+    5. Betrayal/inverse lab-only included.
+    6. Betrayal standard 55 policy false.
+    7. Betrayal stricter gate fields present.
+    8. First Tiny Live lane preserved.
+    9. first_live_lane_change_allowed=false.
+    10. Review-ready candidates have live_permission=false.
+    11. Review-ready candidates have tiny_live_eligible_now=false.
+    12. Human review required true.
+    13. Promotion event written false.
+    14. Risk contract config mutated false.
+    15. Risk contracts read but not written.
+    16. Review-ready contracts present/valid summarized.
+    17. R326 recommendation present.
+    18. R327 recommendation present.
+    19. Tiny Live path says wait for real candidate.
+    20. No config mutation.
+    21. No env mutation.
+    22. No arming mutation.
+    23. No systemd mutation.
+    24. No live order.
+    25. No submit.
+    26. No final command.
+    27. No Binance endpoint.
+    28. No Telegram send.
+    29. Inspect route works.
+    30. Operator script exists and prints required sections.
+    31. R324/R323/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_promotion_review_packet --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_promotion_review_packet --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_promotion_review_packet --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-promotion-review-packet
+    bash scripts/hammer_print_r325_strategy_lab_promotion_review_packet.sh
+    bash scripts/hammer_print_r324_strategy_lab_variant_batch_runner.sh
+    bash scripts/hammer_print_r323_strategy_lab_expansion_surface_map.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - promotion review status
+  - review-ready candidates
+  - future tiny-live review candidates
+  - needs-more-samples
+  - watch-only
+  - lab-only
+  - risk contract summary
+  - R326/R327 recommendations
+  - no mutation confirmation
+
+Recommended R326:
+  R326 Candidate Feed Expansion for Strategy Lab Variants
