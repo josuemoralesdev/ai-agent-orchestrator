@@ -1,0 +1,505 @@
+# R332 - Strategy Lab Captured Source Data Merge Into Adapter Rows
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r331-strategy-lab-source-data-capture-adapter-implementation
+
+New branch:
+  r332-strategy-lab-captured-source-data-merge-into-adapter-rows
+
+Phase classification:
+  WIRING / INTEGRATION + DIAGNOSTIC / AUDIT
+
+Why this phase exists:
+  R328 implemented normalized Strategy Lab evidence adapter rows.
+  R329 ranked adapter usefulness and source-data gaps.
+  R331 emitted normalized source-data capture rows:
+    - 164 normalized source-data rows
+    - 18 capture-ready rows
+    - 135 pending rows
+    - 6 lab-only rows
+    - 5 watch-only rows
+    - synthetic_performance_created_count=0
+    - live_permission_count=0
+    - promotion_event_written_count=0
+    - risk_contract_write_required_count=0
+    - observed_expansion_written_count=0
+    - scheduler_required_count=0
+
+  R332 must merge R331 source-data rows back into R328/R329 adapter rows so downstream review can see one coherent evidence state.
+
+Purpose:
+  Build a read-only merge packet that:
+    - consumes R328 normalized evidence adapter rows
+    - consumes R329 adapter rankings
+    - consumes R331 source-data capture rows
+    - merges source-data status into adapter rows
+    - preserves pending/lab-only/watch-only classifications
+    - does not invent missing data
+    - produces a merged adapter evidence view for R333/R330
+
+  R332 must not:
+    - promote candidates
+    - write promotion events
+    - write risk contracts
+    - alter observed expansion
+    - change Tiny Live
+    - start schedulers
+    - execute trades
+    - create synthetic performance
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO observed expansion write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this merge packet.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO scheduler start.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+  ABSOLUTELY NO synthetic performance creation.
+
+Allowed write:
+  R332 may write only its own output ledger:
+    logs/hammer_radar_forward/strategy_lab_captured_source_data_merge.ndjson
+  unless --no-write is supplied.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  observed_expansion_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+  synthetic_performance_created=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R331_STRATEGY_LAB_SOURCE_DATA_CAPTURE_ADAPTER_IMPLEMENTATION.md
+    docs/hammer_radar/live_readiness/R329_STRATEGY_LAB_ADAPTER_OUTPUT_BATCH_EXECUTION_PACKET.md
+    docs/hammer_radar/live_readiness/R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK.md
+    docs/hammer_radar/live_readiness/R326_CANDIDATE_FEED_EXPANSION_FOR_STRATEGY_LAB_VARIANTS.md
+    src/app/hammer_radar/operator/strategy_lab_source_data_capture_adapter.py
+    src/app/hammer_radar/operator/strategy_lab_adapter_output_batch_execution_packet.py
+    src/app/hammer_radar/operator/strategy_lab_evidence_adapter_pack.py
+    src/app/hammer_radar/operator/strategy_lab_candidate_feed_expansion.py
+    src/app/hammer_radar/operator/inspect.py
+    logs/hammer_radar_forward/strategy_lab_source_data_capture_adapter.ndjson
+    logs/hammer_radar_forward/strategy_lab_adapter_output_batch_execution_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_evidence_adapter_pack.ndjson
+    logs/hammer_radar_forward/strategy_lab_candidate_feed_expansion.ndjson
+    tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py
+    tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py
+    tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py
+    tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py
+
+  Produce:
+    codex_tasks/reports/R332_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - R331 source-data row reuse
+    - R328 adapter row reuse
+    - R329 ranking reuse
+    - existing local ledger reuse
+    - duplicate risk report
+    - why R332 merges rows but does not create new performance
+    - how R332 feeds R333/R330
+
+Scope:
+  A. Captured source-data merge module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_captured_source_data_merge.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_captured_source_data_merge --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --adapter all
+  --adapter exit_variant_comparison
+  --adapter ma_wma_anchor_enrichment
+  --adapter review_ready_enrichment
+  --adapter short_capture_improvement
+  --adapter near_miss_variant_capture
+  --adapter betrayal_inverse_source_chain
+  --adapter watch_88m_durability
+  --include-lab-only
+  --include-watch-only
+  --include-pending
+  --max-rows 1000
+
+Defaults:
+  adapter=all
+  include_lab_only=true
+  include_watch_only=true
+  include_pending=true
+  no live mutation
+  no risk-contract writes
+  no promotion writes
+  no observed expansion writes
+  no scheduler start
+  no synthetic performance creation
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-captured-source-data-merge
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_captured_source_data_merge.ndjson
+
+event_type:
+  R332_STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_INTO_ADAPTER_ROWS
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - captured_source_data_merge_status:
+        STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_READY
+        STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_PARTIAL
+        STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_BLOCKED
+    - blockers
+    - source_data_capture_status
+    - source_adapter_batch_execution_status
+    - source_evidence_adapter_pack_status
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - merge_counts
+    - merged_adapter_rows
+    - adapter_merge_summaries
+    - ready_merge_summary
+    - pending_merge_summary
+    - lab_only_merge_summary
+    - watch_only_merge_summary
+    - remaining_merge_gaps
+    - recommended_r333_path
+    - recommended_r330_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Merged adapter row schema:
+  Every merged row must include:
+    - merge_row_id
+    - adapter_row_id
+    - source_row_id
+    - adapter_id
+    - capture_adapter_id
+    - lane_key
+    - timeframe
+    - side
+    - entry_mode
+    - variant_family
+    - variant_name
+    - evidence_status_from_adapter
+    - capture_status_from_source
+    - merged_status:
+        MERGED_READY
+        MERGED_PENDING_SOURCE_DATA
+        MERGED_LAB_ONLY
+        MERGED_WATCH_ONLY
+        MERGED_UNMATCHED_ADAPTER_ROW
+        MERGED_UNMATCHED_SOURCE_ROW
+    - source_gap_id
+    - adapter_input_fields
+    - source_capture_fields
+    - source_chain
+    - used_existing_data_only=true
+    - synthetic_performance_created=false
+    - live_permission=false
+    - tiny_live_eligible_now=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - observed_expansion_written=false
+    - scheduler_required=false
+    - blockers
+
+D. Merge logic:
+  Match R331 source-data rows to R328 adapter rows by:
+    1. source_row_id == adapter row_id when exact match exists
+    2. lane_key + adapter/capture family + variant/capture name mapping when source_row_id differs
+    3. preserve unmatched rows explicitly
+
+  Mapping examples:
+    - R328 adapter_id exits maps to R331 capture_adapter_id exit_variant_comparison
+    - R328 adapter_id ma_wma_anchor maps to R331 ma_wma_anchor_enrichment
+    - R328 adapter_id review_ready_enrichment maps to R331 review_ready_enrichment
+    - R328 adapter_id capture_8m_short maps to R331 short_capture_improvement
+    - R328 adapter_id near_miss_13m maps to R331 near_miss_variant_capture
+    - R328 adapter_id betrayal_inverse_lab maps to R331 betrayal_inverse_source_chain
+    - R328 adapter_id watch_88m maps to R331 watch_88m_durability
+
+  Status rules:
+    - Adapter ready + source ready => MERGED_READY
+    - Source pending => MERGED_PENDING_SOURCE_DATA
+    - Lab-only source or adapter => MERGED_LAB_ONLY
+    - Watch-only source or adapter => MERGED_WATCH_ONLY
+    - Unmatched adapter row => MERGED_UNMATCHED_ADAPTER_ROW
+    - Unmatched source row => MERGED_UNMATCHED_SOURCE_ROW
+
+  Do not invent source data.
+  Do not convert pending rows to ready.
+  Do not create synthetic performance.
+
+E. Merge counts:
+  Include:
+    - adapter_rows_seen
+    - source_rows_seen
+    - merged_row_count
+    - merged_ready_rows
+    - merged_pending_rows
+    - merged_lab_only_rows
+    - merged_watch_only_rows
+    - unmatched_adapter_rows
+    - unmatched_source_rows
+    - synthetic_performance_created_count=0
+    - live_permission_count=0
+    - promotion_event_written_count=0
+    - risk_contract_write_required_count=0
+    - observed_expansion_written_count=0
+    - scheduler_required_count=0
+
+F. Adapter merge summaries:
+  For each adapter/capture family:
+    - adapter_id
+    - capture_adapter_id
+    - candidate_lanes
+    - merged_row_count
+    - merged_ready_rows
+    - merged_pending_rows
+    - merged_lab_only_rows
+    - merged_watch_only_rows
+    - unmatched_adapter_rows
+    - unmatched_source_rows
+    - dominant_gaps
+    - recommended_next_action
+    - live_permission=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - observed_expansion_written=false
+    - scheduler_required=false
+
+G. Required summaries:
+
+  ready_merge_summary:
+    - show which rows are ready after merge
+    - include 8m short ready rows
+    - include 13m near-miss ready rows
+    - include review-ready enrichment ready rows
+    - no live permission
+
+  pending_merge_summary:
+    - group pending rows by source_gap_id
+    - include affected lanes
+    - include row counts
+    - do_not_fake_data=true
+
+  lab_only_merge_summary:
+    - betrayal/inverse remains lab-only
+    - standard_55_policy_applies=false
+    - source_chain_required=true
+    - exact_risk_mapping_required=true
+    - stale_shadow_outcomes_forbidden=true
+    - live_permission=false
+    - tiny_live_eligible_now=false
+
+  watch_only_merge_summary:
+    - 88m remains watch-only
+    - live_permission=false
+    - tiny_live_eligible_now=false
+
+H. Recommended paths:
+  R333:
+    Strategy Lab Merged Evidence Ranking Packet
+  R330:
+    Human-Reviewed Observed Expansion Promotion Gate
+  Explain:
+    - R333 should rank merged evidence after source-data status is attached.
+    - R330 can later alter observed expansion only after human review.
+    - Tiny Live remains separately gated.
+
+I. Operator script:
+  Add:
+    scripts/hammer_print_r332_strategy_lab_captured_source_data_merge.sh
+
+  It must print:
+    - R332 header
+    - merge status
+    - first Tiny Live lane
+    - merge counts
+    - adapter merge summaries
+    - ready merge summary
+    - pending merge summary
+    - betrayal lab-only summary
+    - watch-only summary
+    - recommended R333/R330
+    - safety flags
+
+J. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R332_STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_INTO_ADAPTER_ROWS.md
+
+  Include:
+    - why R332 exists
+    - what R331 produced
+    - merge row schema
+    - merge matching logic
+    - status rules
+    - summaries
+    - remaining gaps
+    - betrayal lab-only handling
+    - R333/R330 path
+    - Tiny Live path
+    - what not to mutate
+
+K. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py
+
+  Tests must cover:
+    1. Builds captured source-data merge packet.
+    2. Reads/uses R328 adapter rows.
+    3. Reads/uses R331 source-data rows.
+    4. Produces merged adapter rows.
+    5. Merged rows include required schema fields.
+    6. Includes all seven adapter/capture mappings.
+    7. Status rules produce MERGED_READY for source-ready rows.
+    8. Status rules preserve MERGED_PENDING_SOURCE_DATA.
+    9. Betrayal rows remain MERGED_LAB_ONLY.
+    10. 88m rows remain MERGED_WATCH_ONLY.
+    11. Unmatched rows are represented if present.
+    12. ready merge summary present.
+    13. pending merge summary present.
+    14. lab-only merge summary present.
+    15. watch-only merge summary present.
+    16. synthetic_performance_created_count=0.
+    17. First Tiny Live lane preserved.
+    18. first_live_lane_change_allowed=false.
+    19. live_permission_count=0.
+    20. promotion_event_written_count=0.
+    21. risk_contract_write_required_count=0.
+    22. observed_expansion_written_count=0.
+    23. scheduler_required_count=0.
+    24. No promotion event write.
+    25. No risk contract write.
+    26. No config mutation.
+    27. No env mutation.
+    28. No arming mutation.
+    29. No systemd mutation.
+    30. No scheduler start.
+    31. No live order.
+    32. No submit.
+    33. No final command.
+    34. No Binance endpoint.
+    35. No Telegram send.
+    36. Inspect route works.
+    37. Operator script exists and prints required sections.
+    38. R331/R329/R328/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py \
+      tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py \
+      tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py \
+      tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_captured_source_data_merge --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_captured_source_data_merge --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_captured_source_data_merge --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-captured-source-data-merge
+    bash scripts/hammer_print_r332_strategy_lab_captured_source_data_merge.sh
+    bash scripts/hammer_print_r331_strategy_lab_source_data_capture_adapter.sh
+    bash scripts/hammer_print_r329_strategy_lab_adapter_output_batch_execution_packet.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify no promotion/risk writes:
+    git diff -- logs/hammer_radar_forward/strategy_promotion_events.ndjson configs/hammer_radar/tiny_live_risk_contracts.json || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - merge status
+  - merge counts
+  - adapter merge summaries
+  - ready/pending/lab/watch summaries
+  - R333/R330 recommendations
+  - no mutation confirmation
+
+Recommended R333:
+  Strategy Lab Merged Evidence Ranking Packet
