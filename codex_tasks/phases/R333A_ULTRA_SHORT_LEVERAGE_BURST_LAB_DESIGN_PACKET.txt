@@ -1,0 +1,559 @@
+# R333A - Ultra-Short Leverage Burst Lab Design Packet
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r332-strategy-lab-captured-source-data-merge-into-adapter-rows
+
+New branch:
+  r333a-ultra-short-leverage-burst-lab-design-packet
+
+Phase classification:
+  NEW CAPABILITY
+
+Critical naming:
+  This must be a separate strategy family:
+    ULTRA_SHORT_LEVERAGE_BURST
+
+  Do not mix this with:
+    - Tiny Live
+    - R271 standard 55% policy
+    - normal Strategy Lab promotion
+    - observed expansion gate
+    - betrayal/inverse gate
+    - existing 10x live risk contracts
+
+Why this phase exists:
+  The operator wants to test a distinct ultra-short high-leverage paper strategy for very short 4m and 8m signals.
+
+  Hypothesis:
+    - Open immediately when a valid 4m or 8m signal appears.
+    - Use very short holding windows and checkpoint loops.
+    - Test leverage grid: 22x, 44x, 88x, 150x.
+    - Test exit checkpoint grid: 22s, 44s, 66s, 88s, 132s, 176s.
+    - Target fast ROE capture, especially around 150x.
+    - Evaluate net-after-fees and slippage, not gross fantasy ROE.
+
+Purpose:
+  Create a deterministic, read-only design packet defining:
+    - separate strategy family
+    - candidate lanes
+    - leverage grid
+    - hold/checkpoint grid
+    - gross/net ROE model
+    - fees/slippage model requirements
+    - liquidation proximity model requirements
+    - evidence contract
+    - paper-only backtest adapter requirements
+    - visual terminal panel requirements
+    - future risk contract preview requirements
+
+  R333A does not implement the actual backtest engine yet.
+  R333A does not implement the visual terminal yet.
+  R333A defines the exact lab contract for R333B/R333C/R333D.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO observed expansion write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this design packet.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO scheduler start.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+  ABSOLUTELY NO synthetic performance creation.
+  ABSOLUTELY NO live permission for 150x.
+
+Allowed write:
+  R333A may write only its own diagnostic/design output ledger:
+    logs/hammer_radar_forward/ultra_short_leverage_burst_lab_design.ndjson
+  unless --no-write is supplied.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  observed_expansion_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+  synthetic_performance_created=false
+  burst_live_permission=false
+  burst_family_isolated=true
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R332_STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_INTO_ADAPTER_ROWS.md
+    docs/hammer_radar/live_readiness/R331_STRATEGY_LAB_SOURCE_DATA_CAPTURE_ADAPTER_IMPLEMENTATION.md
+    docs/hammer_radar/live_readiness/R329_STRATEGY_LAB_ADAPTER_OUTPUT_BATCH_EXECUTION_PACKET.md
+    docs/hammer_radar/live_readiness/R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK.md
+    docs/hammer_radar/live_readiness/R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET.md
+    src/app/hammer_radar/operator/strategy_lab_captured_source_data_merge.py
+    src/app/hammer_radar/operator/strategy_lab_source_data_capture_adapter.py
+    src/app/hammer_radar/operator/strategy_lab_adapter_output_batch_execution_packet.py
+    src/app/hammer_radar/operator/strategy_lab_evidence_adapter_pack.py
+    src/app/hammer_radar/operator/inspect.py
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    configs/hammer_radar/autonomous_arming_state.json
+    logs/hammer_radar_forward/strategy_lab_captured_source_data_merge.ndjson
+    logs/hammer_radar_forward/strategy_lab_source_data_capture_adapter.ndjson
+    logs/hammer_radar_forward/strategy_lab_adapter_output_batch_execution_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_evidence_adapter_pack.ndjson
+    logs/hammer_radar_forward/multi_lane_dry_run_observation.ndjson
+    tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py
+    tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py
+    tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py
+
+  Produce:
+    codex_tasks/reports/R333A_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - duplicate risk report
+    - why this is NEW CAPABILITY
+    - why this must be isolated from Tiny Live and standard Strategy Lab
+    - current reusable signal surfaces
+    - current missing data surfaces
+    - why second/tick-level data may be required
+    - why candle-only OHLC sequencing is unsafe for 44s/88s burst evidence
+
+Scope:
+  A. Burst lab design module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/ultra_short_leverage_burst_lab_design.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_leverage_burst_lab_design --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --timeframe all
+  --timeframe 4m
+  --timeframe 8m
+  --include-150x
+  --include-visual-spec
+  --include-risk-contract-preview-spec
+
+Defaults:
+  timeframe=all
+  include_150x=true
+  include_visual_spec=true
+  include_risk_contract_preview_spec=true
+  design only
+  paper only
+  no live mutation
+  no risk-contract writes
+  no promotion writes
+  no observed expansion writes
+  no scheduler start
+  no synthetic performance creation
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-leverage-burst-lab-design
+
+Output ledger:
+  logs/hammer_radar_forward/ultra_short_leverage_burst_lab_design.ndjson
+
+event_type:
+  R333A_ULTRA_SHORT_LEVERAGE_BURST_LAB_DESIGN_PACKET
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - burst_lab_design_status:
+        ULTRA_SHORT_LEVERAGE_BURST_LAB_DESIGN_READY
+        ULTRA_SHORT_LEVERAGE_BURST_LAB_DESIGN_BLOCKED
+    - blockers
+    - strategy_family=ULTRA_SHORT_LEVERAGE_BURST
+    - strategy_family_isolated=true
+    - paper_only=true
+    - burst_live_permission=false
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - candidate_timeframes
+    - signal_source_policy
+    - leverage_grid
+    - checkpoint_grid_seconds
+    - exit_policy_design
+    - fee_slippage_model_design
+    - liquidation_proximity_model_design
+    - required_market_data_design
+    - evidence_contract
+    - visual_terminal_design_spec
+    - future_backtest_adapter_spec
+    - future_visual_panel_spec
+    - future_risk_contract_preview_spec
+    - recommended_r333b_path
+    - recommended_r333c_path
+    - recommended_r333d_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Candidate timeframes:
+  Include:
+    - 4m
+    - 8m
+
+  Candidate mode:
+    - paper_only
+    - burst_lab_only
+    - no standard promotion
+    - no Tiny Live permission
+    - no observed expansion write
+
+D. Signal source policy:
+  Define:
+    - signal must come from existing radar/strategy signal surfaces
+    - entry timestamp must be exact signal detection time if available
+    - if only candle close is available, mark fill model as approximate
+    - no stale signal replay for live-like evidence
+    - signal age must be measured
+    - immediate entry means first valid paper fill after detection timestamp, not next candle close unless that is the only available proxy
+
+E. Leverage grid:
+  Include:
+    - 22x
+    - 44x
+    - 88x
+    - 150x
+
+  For each leverage:
+    - gross ROE target examples
+    - approximate price move required for 15% gross ROE
+    - liquidation proximity warning
+    - fee drag sensitivity
+    - live_permission=false
+
+  Required approximate formula:
+    price_move_pct_for_gross_roe = gross_roe_pct / leverage
+
+  Example:
+    15% gross ROE at 150x requires about 0.10% favorable price move before fees/slippage.
+
+F. Checkpoint grid:
+  Include:
+    - 22 seconds
+    - 44 seconds
+    - 66 seconds
+    - 88 seconds
+    - 132 seconds
+    - 176 seconds
+
+  Include:
+    - first 44s checkpoint as primary operator concept
+    - 66s and 88s as second-wave checks
+    - 22s increments as optional micro-checks
+    - hard timeout exit design
+    - early take profit design
+    - adverse velocity exit design
+
+G. Exit policy design:
+  Include:
+    - gross_roe_target_grid:
+        5%, 10%, 15%, 22%
+    - minimum_net_roe_target_grid:
+        2%, 3%, 5%, 8%
+    - hard_loss_roe_grid:
+        -5%, -8%, -10%, -12%
+    - timeout_seconds_grid:
+        44, 66, 88, 132, 176
+    - trailing-after-target design
+    - close at first net target design
+    - close at hard timeout design
+    - close on adverse velocity design
+    - no averaging down
+    - no second entry unless new independent signal
+    - no gross-only success classification
+
+H. Fee/slippage model design:
+  Include:
+    - gross_roe is insufficient
+    - net_roe_after_fees required
+    - fee model must account for round-trip maker/taker assumptions
+    - slippage model must account for entry and exit
+    - latency model must be represented separately
+    - unknown fees/slippage must make result lower-confidence
+    - never mark a burst candidate ready using gross ROE only
+
+  Include formula fields:
+    notional_fee_pct_round_trip
+    fee_drag_roe = notional_fee_pct_round_trip * leverage
+    estimated_slippage_roe = estimated_slippage_pct_round_trip * leverage
+    net_roe = gross_roe - fee_drag_roe - estimated_slippage_roe
+
+I. Liquidation proximity design:
+  Include:
+    - estimated adverse price move to danger zone
+    - liquidation proximity should be modeled, not ignored
+    - 150x requires explicit liquidation warning
+    - position sizing must be microscopic in any future tiny-burst-live
+    - isolated margin only in any future preview
+    - no cross margin
+    - no live permission in R333A/R333B/R333C/R333D
+
+J. Required market data design:
+  Include:
+    - best: tick/trade data or second-level mark/last price
+    - acceptable for early lab: sub-minute replay if available
+    - poor: candle-only OHLC
+    - candle-only OHLC cannot prove whether TP or SL happened first
+    - candle-only OHLC must be marked sequence_unknown
+    - sequence_unknown rows cannot promote to live
+    - capture requirements for future R333B
+
+K. Evidence contract:
+  For any future promotion from burst paper lab to any live preview, require:
+    - sample_count >= 100 minimum per side/timeframe/leverage/exit profile
+    - preferred sample_count >= 300
+    - net win rate after fees/slippage >= 60%
+    - profit factor > 1.3
+    - max adverse excursion known
+    - timeout behavior known
+    - fee model included
+    - slippage model included
+    - latency model included
+    - liquidation proximity model included
+    - sequence_known=true preferred
+    - no gross-only ROE readiness
+    - no candle-only fantasy fills
+    - no stale shadow outcomes
+    - no standard 55% policy
+    - no Tiny Live inheritance
+    - separate human-reviewed burst risk contract required
+
+L. Visual terminal design spec:
+  Define a future terminal panel, not a website.
+
+  Include ASCII/Unicode visual blocks such as:
+    - leverage ladder
+    - checkpoint timeline
+    - net ROE bars
+    - fee drag warning
+    - liquidation proximity warning
+    - verdict line
+    - paper-only/live-permission line
+    - reason codes
+
+  Example sections:
+    - ULTRA BURST LAB - BTCUSDT
+    - Signal TF / side / age
+    - Entry mode: instant paper
+    - Leverage grid: 22x / 44x / 88x / 150x
+    - 22s / 44s / 66s / 88s / 132s / 176s map
+    - Best net window
+    - Worst adverse window
+    - Fee drag warning
+    - Verdict
+    - Live Permission: FALSE
+
+M. Future phase recommendations:
+  R333B:
+    Ultra-Short Burst Backtest Adapter
+
+  R333C:
+    Ultra-Short Burst Visual Terminal Panel
+
+  R333D:
+    Human-Reviewed Burst Risk Contract Preview
+
+  R333E:
+    Burst Lab Evidence Audit And Anti-Fantasy Fill Gate
+
+  R333F:
+    Tiny Burst Live Activation Gate, only if evidence contract passes
+
+N. Operator script:
+  Add:
+    scripts/hammer_print_r333a_ultra_short_leverage_burst_lab_design.sh
+
+  It must print:
+    - R333A header
+    - strategy family
+    - family isolation
+    - paper-only status
+    - first Tiny Live lane unchanged
+    - candidate timeframes
+    - leverage grid
+    - checkpoint grid
+    - evidence contract summary
+    - fee/slippage/liquidation warnings
+    - visual terminal design preview
+    - recommended R333B/R333C/R333D
+    - safety flags
+
+O. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R333A_ULTRA_SHORT_LEVERAGE_BURST_LAB_DESIGN_PACKET.md
+
+  Include:
+    - why R333A exists
+    - why this is a different strategy family
+    - candidate timeframes
+    - leverage and checkpoint grids
+    - exit policy
+    - net ROE / fees / slippage model
+    - liquidation proximity warning
+    - required market data
+    - evidence contract
+    - visual terminal concept
+    - future phase plan
+    - Tiny Live separation
+    - what not to mutate
+
+P. Tests:
+  Add:
+    tests/hammer_radar/test_ultra_short_leverage_burst_lab_design.py
+
+  Tests must cover:
+    1. Builds burst lab design packet.
+    2. Strategy family is ULTRA_SHORT_LEVERAGE_BURST.
+    3. strategy_family_isolated=true.
+    4. paper_only=true.
+    5. burst_live_permission=false.
+    6. Candidate timeframes include 4m and 8m.
+    7. Leverage grid includes 22x, 44x, 88x, 150x.
+    8. Checkpoint grid includes 22, 44, 66, 88, 132, 176 seconds.
+    9. 150x includes liquidation warning.
+    10. 15% gross ROE at 150x approximate price move is about 0.10%.
+    11. Fee drag formula is present.
+    12. Net ROE formula is present.
+    13. Gross-only success is forbidden.
+    14. Candle-only OHLC sequence risk is described.
+    15. sequence_unknown cannot promote to live.
+    16. Evidence contract sample_count minimum >= 100.
+    17. Evidence contract preferred sample_count >= 300.
+    18. Evidence contract net win rate >= 60%.
+    19. Evidence contract profit factor > 1.3.
+    20. Standard 55% policy does not apply.
+    21. Tiny Live inheritance is false.
+    22. Visual terminal spec is present.
+    23. Future R333B/R333C/R333D paths present.
+    24. First Tiny Live lane preserved.
+    25. first_live_lane_change_allowed=false.
+    26. live_permission_count=0 or equivalent safety false.
+    27. promotion_event_written=false.
+    28. risk_contract_config_mutated=false.
+    29. observed_expansion_written=false.
+    30. scheduler_started=false.
+    31. synthetic_performance_created=false.
+    32. No config mutation.
+    33. No env mutation.
+    34. No arming mutation.
+    35. No systemd mutation.
+    36. No live order.
+    37. No submit.
+    38. No final command.
+    39. No Binance endpoint.
+    40. No Telegram send.
+    41. Inspect route works.
+    42. Operator script exists and prints required sections.
+    43. R332/R331/R329/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_ultra_short_leverage_burst_lab_design.py \
+      tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py \
+      tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py \
+      tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py \
+      tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_leverage_burst_lab_design --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_leverage_burst_lab_design --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_leverage_burst_lab_design --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-leverage-burst-lab-design
+    bash scripts/hammer_print_r333a_ultra_short_leverage_burst_lab_design.sh
+    bash scripts/hammer_print_r332_strategy_lab_captured_source_data_merge.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify no promotion/risk writes:
+    git diff -- logs/hammer_radar_forward/strategy_promotion_events.ndjson configs/hammer_radar/tiny_live_risk_contracts.json || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - burst lab design status
+  - strategy family isolation proof
+  - leverage/checkpoint grids
+  - evidence contract summary
+  - visual terminal design preview
+  - future R333B/R333C/R333D recommendations
+  - no mutation confirmation
+
+Recommended next:
+  R333B Ultra-Short Burst Backtest Adapter

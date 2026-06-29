@@ -4866,6 +4866,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "ultra-short-leverage-burst-lab-design":
+        from src.app.hammer_radar.operator.ultra_short_leverage_burst_lab_design import (
+            build_ultra_short_leverage_burst_lab_design,
+            format_ultra_short_leverage_burst_lab_design_json,
+        )
+
+        print(
+            format_ultra_short_leverage_burst_lab_design_json(
+                build_ultra_short_leverage_burst_lab_design(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    timeframe=args.timeframe,
+                    include_150x=args.include_150x,
+                    include_visual_spec=args.include_visual_spec,
+                    include_risk_contract_preview_spec=args.include_risk_contract_preview_spec,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -8048,6 +8066,20 @@ def _build_parser() -> argparse.ArgumentParser:
     strategy_lab_captured_source_data_merge_parser.add_argument("--include-watch-only", action="store_true", default=True)
     strategy_lab_captured_source_data_merge_parser.add_argument("--include-pending", action="store_true", default=True)
     strategy_lab_captured_source_data_merge_parser.add_argument("--max-rows", type=int, default=1000)
+
+    ultra_short_leverage_burst_lab_design_parser = subparsers.add_parser(
+        "ultra-short-leverage-burst-lab-design",
+        parents=[parent],
+    )
+    ultra_short_leverage_burst_lab_design_parser.add_argument("--no-write", action="store_true")
+    ultra_short_leverage_burst_lab_design_parser.add_argument("--timeframe", choices=("all", "4m", "8m"), default="all")
+    ultra_short_leverage_burst_lab_design_parser.add_argument("--include-150x", action="store_true", default=True)
+    ultra_short_leverage_burst_lab_design_parser.add_argument("--include-visual-spec", action="store_true", default=True)
+    ultra_short_leverage_burst_lab_design_parser.add_argument(
+        "--include-risk-contract-preview-spec",
+        action="store_true",
+        default=True,
+    )
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",
