@@ -1,0 +1,537 @@
+# R331 - Strategy Lab Source Data Capture Adapter Implementation
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r329-strategy-lab-adapter-output-batch-execution-packet
+
+New branch:
+  r331-strategy-lab-source-data-capture-adapter-implementation
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + WIRING / INTEGRATION
+
+Why this phase exists:
+  R329 consumed R328 normalized evidence rows and ranked the most important source-data gaps:
+    - missing_exit_outcome_comparison
+    - missing_raw_anchor_timeseries
+    - missing_betrayal_source_chain_data
+    - missing_mae_mfe
+    - missing_regime_split_capture
+    - 8m short capture gap
+    - 13m near-miss exit gap
+    - 88m durability capture gap
+
+  R331 must implement deterministic paper/lab source-data capture adapters that produce structured source-data capture packets from existing local Strategy Lab data.
+
+  R331 must not start schedulers.
+  R331 must not mutate runtime services.
+  R331 must not trade.
+  R331 must not promote.
+  R331 must not write risk contracts.
+  R331 must not alter observed expansion.
+  R331 must not change Tiny Live.
+
+Purpose:
+  Implement a read-only/source-ledger-only source-data capture adapter packet that prepares the missing data required by R329/R328:
+    1. exit_variant_comparison_adapter
+    2. ma_wma_anchor_enrichment_adapter
+    3. review_ready_enrichment_adapter
+    4. short_capture_improvement_adapter
+    5. near_miss_variant_capture_adapter
+    6. betrayal_inverse_source_chain_adapter, lab-only
+    7. watch_88m_durability_adapter
+
+  R331 should create deterministic capture rows/artifacts from available local data and mark unavailable data as SOURCE_DATA_CAPTURE_PENDING rather than inventing it.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO observed expansion write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this capture packet.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO scheduler start.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+
+Allowed write:
+  R331 may write only its own output ledger:
+    logs/hammer_radar_forward/strategy_lab_source_data_capture_adapter.ndjson
+  unless --no-write is supplied.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  observed_expansion_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R329_STRATEGY_LAB_ADAPTER_OUTPUT_BATCH_EXECUTION_PACKET.md
+    docs/hammer_radar/live_readiness/R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK.md
+    docs/hammer_radar/live_readiness/R326_CANDIDATE_FEED_EXPANSION_FOR_STRATEGY_LAB_VARIANTS.md
+    docs/hammer_radar/live_readiness/R325_STRATEGY_LAB_PROMOTION_REVIEW_PACKET.md
+    src/app/hammer_radar/operator/strategy_lab_adapter_output_batch_execution_packet.py
+    src/app/hammer_radar/operator/strategy_lab_evidence_adapter_pack.py
+    src/app/hammer_radar/operator/strategy_lab_candidate_feed_expansion.py
+    src/app/hammer_radar/operator/strategy_lab_variant_batch_runner.py
+    src/app/hammer_radar/operator/strategy_lab_preview.py
+    src/app/hammer_radar/operator/paper_refresh_scheduler.py
+    src/app/hammer_radar/operator/inspect.py
+    logs/hammer_radar_forward/strategy_lab_adapter_output_batch_execution_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_evidence_adapter_pack.ndjson
+    logs/hammer_radar_forward/strategy_lab_candidate_feed_expansion.ndjson
+    logs/hammer_radar_forward/strategy_lab_variant_batch_runner.ndjson
+    logs/hammer_radar_forward/strategy_lab_preview.ndjson
+    logs/hammer_radar_forward/strategy_evidence_registry.ndjson
+    tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py
+    tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py
+    tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py
+
+  Produce:
+    codex_tasks/reports/R331_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - R329 gap ranking reuse
+    - R328 normalized row reuse
+    - existing local data/ledger reuse
+    - duplicate risk report
+    - why R331 captures source-data artifacts but does not start schedulers
+    - how R331 feeds R332/R330
+
+Scope:
+  A. Source data capture adapter module
+  B. Operator script
+  C. Docs
+  D. Tests
+  E. Inspect route
+
+A. Add module:
+  src/app/hammer_radar/operator/strategy_lab_source_data_capture_adapter.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_source_data_capture_adapter --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --adapter all
+  --adapter exit_variant_comparison
+  --adapter ma_wma_anchor_enrichment
+  --adapter review_ready_enrichment
+  --adapter short_capture_improvement
+  --adapter near_miss_variant_capture
+  --adapter betrayal_inverse_source_chain
+  --adapter watch_88m_durability
+  --include-lab-only
+  --include-watch-only
+  --max-source-rows 500
+
+Defaults:
+  adapter=all
+  include_lab_only=true
+  include_watch_only=true
+  no live mutation
+  no risk-contract writes
+  no promotion writes
+  no observed expansion writes
+  no scheduler start
+
+Inspect route:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-source-data-capture-adapter
+
+Output ledger:
+  logs/hammer_radar_forward/strategy_lab_source_data_capture_adapter.ndjson
+
+event_type:
+  R331_STRATEGY_LAB_SOURCE_DATA_CAPTURE_ADAPTER_IMPLEMENTATION
+
+B. Output contract:
+  Include:
+    - event_type
+    - generated_at
+    - source_data_capture_status:
+        STRATEGY_LAB_SOURCE_DATA_CAPTURE_READY
+        STRATEGY_LAB_SOURCE_DATA_CAPTURE_PARTIAL
+        STRATEGY_LAB_SOURCE_DATA_CAPTURE_BLOCKED
+    - blockers
+    - source_adapter_batch_execution_status
+    - source_evidence_adapter_pack_status
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - capture_adapter_results
+    - capture_counts
+    - normalized_source_data_rows
+    - exit_variant_comparison_packet
+    - ma_wma_anchor_enrichment_packet
+    - review_ready_enrichment_packet
+    - short_capture_improvement_packet
+    - near_miss_variant_capture_packet
+    - betrayal_inverse_source_chain_packet
+    - watch_88m_durability_packet
+    - remaining_capture_gaps
+    - recommended_r332_path
+    - recommended_r330_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+C. Normalized source data row schema:
+  Every source-data row must include:
+    - capture_adapter_id
+    - source_row_id
+    - lane_key
+    - timeframe
+    - side
+    - entry_mode
+    - source_gap_id
+    - capture_family
+    - capture_name
+    - capture_status:
+        SOURCE_DATA_CAPTURE_READY
+        SOURCE_DATA_CAPTURE_PENDING
+        SOURCE_DATA_CAPTURE_LAB_ONLY
+        SOURCE_DATA_CAPTURE_WATCH_ONLY
+    - source_inputs
+    - derived_capture_fields
+    - source_chain
+    - used_existing_data_only=true
+    - synthetic_performance_created=false
+    - live_permission=false
+    - tiny_live_eligible_now=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - observed_expansion_written=false
+    - scheduler_required=false
+    - blockers
+
+D. Required capture adapters:
+
+  1. exit_variant_comparison:
+     Source gap:
+       missing_exit_outcome_comparison
+     Candidate lanes:
+       44m review-ready lanes
+       55m review-ready lanes
+       13m near-miss lanes
+       8m short
+       88m watch
+     Capture names:
+       fixed_tp_sl_outcome
+       early_exit_outcome
+       late_exit_outcome
+       trailing_stop_outcome
+       partial_exit_outcome
+       invalidation_tightening_outcome
+     If exact local outcome fields are unavailable, emit SOURCE_DATA_CAPTURE_PENDING with blocker:
+       exit_outcome_source_missing
+     Do not invent outcomes.
+
+  2. ma_wma_anchor_enrichment:
+     Source gap:
+       missing_raw_anchor_timeseries
+     Candidate lanes:
+       review-ready + near-miss + watch lanes
+     Capture names:
+       wma200_value
+       ma200_value
+       close_vs_wma200
+       close_vs_ma200
+       anchor_slope
+       golden_pocket_anchor_confluence
+     If raw candle/MA source is unavailable, emit SOURCE_DATA_CAPTURE_PENDING with blocker:
+       anchor_timeseries_source_missing
+     Do not invent anchor values.
+
+  3. review_ready_enrichment:
+     Source gaps:
+       missing_mae_mfe
+       missing_regime_split_capture
+       missing_exit_outcome_comparison
+       missing_raw_anchor_timeseries
+     Candidate lanes:
+       BTCUSDT|44m|short|ladder_382_50_618
+       BTCUSDT|44m|short|ladder_close_50_618
+       BTCUSDT|44m|short|ladder_22_44_22
+       BTCUSDT|55m|long|ladder_close_50_618
+       BTCUSDT|55m|long|market_close
+     Capture names:
+       recent_sample_stability
+       regime_split
+       mae_mfe
+       exit_sensitivity
+       anchor_confluence
+     Use existing evidence counts if available.
+     Mark unavailable fields pending.
+
+  4. short_capture_improvement:
+     Candidate lane:
+       BTCUSDT|8m|short|ladder_close_50_618
+     Capture names:
+       faster_capture_signal_delta
+       tighter_invalidation_outcome
+       partial_exit_outcome
+       trailing_outcome
+       regime_filter_snapshot
+       entry_timing_delta
+     Use existing evidence counts if available.
+     Mark unavailable fields pending.
+     Must not promote even if near threshold.
+
+  5. near_miss_variant_capture:
+     Candidate lanes:
+       BTCUSDT|13m|long|ladder_close_50_618
+       BTCUSDT|13m|short|ladder_close_50_618
+     Capture names:
+       timing_repair_observation
+       partial_entry_outcome
+       early_exit_outcome
+       late_exit_outcome
+       rsi_regime_filter_snapshot
+       ma_wma_anchor_context
+       golden_pocket_context
+     Use existing evidence counts if available.
+     Mark unavailable fields pending.
+
+  6. betrayal_inverse_source_chain:
+     Candidate lane:
+       BETRAYAL_INVERSE_LANES
+     Capture names:
+       original_signal_identity
+       inverse_signal_identity
+       original_vs_inverse_comparison
+       exact_lane_entry_risk_mapping
+       paper_outcome_freshness
+       stale_shadow_outcome_audit
+     Must include:
+       lab_only=true
+       standard_55_policy_applies=false
+       source_chain_required=true
+       exact_risk_mapping_required=true
+       stale_shadow_outcomes_forbidden=true
+       synthetic_performance_created=false
+       live_permission=false
+       tiny_live_eligible_now=false
+     If source data is missing, emit SOURCE_DATA_CAPTURE_LAB_ONLY with blockers.
+
+  7. watch_88m_durability:
+     Candidate lane:
+       BTCUSDT|88m|long|ladder_382_50_618
+     Capture names:
+       slow_lane_durability_observation
+       confirmation_delay_state
+       htf_bias_state
+       exit_variant_outcome
+       anchor_filter_state
+     Must include watch_only=true and live_permission=false.
+
+E. Capture counts:
+  Include:
+    - normalized_source_data_row_count
+    - capture_ready_rows
+    - capture_pending_rows
+    - lab_only_rows
+    - watch_only_rows
+    - synthetic_performance_created_count=0
+    - live_permission_count=0
+    - promotion_event_written_count=0
+    - risk_contract_write_required_count=0
+    - observed_expansion_written_count=0
+    - scheduler_required_count=0
+
+F. Remaining capture gaps:
+  Report grouped gaps:
+    - exit_outcome_source_missing
+    - anchor_timeseries_source_missing
+    - mae_mfe_source_missing
+    - regime_split_source_missing
+    - betrayal_source_chain_source_missing
+    - watch_88m_durability_source_missing
+  Include row counts and affected lanes.
+  Do not fake data.
+
+G. Recommended paths:
+  R332:
+    Strategy Lab Captured Source Data Merge Into Adapter Rows
+  R330:
+    Human-Reviewed Observed Expansion Promotion Gate
+  Explain:
+    - R332 merges captured/pending source-data rows back into R328/R329 comparison flow.
+    - R330 can later alter observed expansion only after human review.
+    - Tiny Live remains separately gated.
+
+H. Operator script:
+  Add:
+    scripts/hammer_print_r331_strategy_lab_source_data_capture_adapter.sh
+
+  It must print:
+    - R331 header
+    - capture status
+    - first Tiny Live lane
+    - capture counts
+    - adapter result summary
+    - pending gap summary
+    - betrayal lab-only source-chain packet
+    - watch-only durability packet
+    - recommended R332/R330
+    - safety flags
+
+I. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R331_STRATEGY_LAB_SOURCE_DATA_CAPTURE_ADAPTER_IMPLEMENTATION.md
+
+  Include:
+    - why R331 exists
+    - what R329 ranked
+    - source-data row schema
+    - capture adapters
+    - remaining source-data gaps
+    - betrayal lab-only source-chain rules
+    - R332/R330 path
+    - Tiny Live path
+    - what not to mutate
+
+J. Tests:
+  Add:
+    tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py
+
+  Tests must cover:
+    1. Builds source data capture packet.
+    2. Includes all seven capture adapters.
+    3. Generates normalized source-data rows.
+    4. Rows include required schema fields.
+    5. exit_variant_comparison rows generated.
+    6. ma_wma_anchor_enrichment rows generated.
+    7. review_ready_enrichment rows generated.
+    8. short_capture_improvement rows generated.
+    9. near_miss_variant_capture rows generated.
+    10. betrayal_inverse_source_chain rows generated and lab-only.
+    11. watch_88m_durability rows generated and watch-only.
+    12. Missing source data is marked pending, not invented.
+    13. synthetic_performance_created_count=0.
+    14. First Tiny Live lane preserved.
+    15. first_live_lane_change_allowed=false.
+    16. live_permission_count=0.
+    17. promotion_event_written_count=0.
+    18. risk_contract_write_required_count=0.
+    19. observed_expansion_written_count=0.
+    20. scheduler_required_count=0.
+    21. No promotion event write.
+    22. No risk contract write.
+    23. No config mutation.
+    24. No env mutation.
+    25. No arming mutation.
+    26. No systemd mutation.
+    27. No scheduler start.
+    28. No live order.
+    29. No submit.
+    30. No final command.
+    31. No Binance endpoint.
+    32. No Telegram send.
+    33. Inspect route works.
+    34. Operator script exists and prints required sections.
+    35. R329/R328/R326/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py \
+      tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py \
+      tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_source_data_capture_adapter --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_source_data_capture_adapter --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.strategy_lab_source_data_capture_adapter --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward strategy-lab-source-data-capture-adapter
+    bash scripts/hammer_print_r331_strategy_lab_source_data_capture_adapter.sh
+    bash scripts/hammer_print_r329_strategy_lab_adapter_output_batch_execution_packet.sh
+    bash scripts/hammer_print_r328_strategy_lab_evidence_adapter_pack.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify no promotion/risk writes:
+    git diff -- logs/hammer_radar_forward/strategy_promotion_events.ndjson configs/hammer_radar/tiny_live_risk_contracts.json || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - source data capture status
+  - capture counts
+  - adapter result summary
+  - pending gap summary
+  - betrayal lab-only packet
+  - R332/R330 recommendations
+  - no mutation confirmation
+
+Recommended R332:
+  Strategy Lab Captured Source Data Merge Into Adapter Rows

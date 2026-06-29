@@ -4829,6 +4829,24 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "strategy-lab-source-data-capture-adapter":
+        from src.app.hammer_radar.operator.strategy_lab_source_data_capture_adapter import (
+            build_strategy_lab_source_data_capture_adapter,
+            format_source_data_capture_adapter_json,
+        )
+
+        print(
+            format_source_data_capture_adapter_json(
+                build_strategy_lab_source_data_capture_adapter(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    adapter=args.adapter,
+                    include_lab_only=args.include_lab_only,
+                    include_watch_only=args.include_watch_only,
+                    max_source_rows=args.max_source_rows,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -7964,6 +7982,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--include-lab-only", action="store_true", default=True)
     strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--include-watch-only", action="store_true", default=True)
+
+    strategy_lab_source_data_capture_adapter_parser = subparsers.add_parser(
+        "strategy-lab-source-data-capture-adapter",
+        parents=[parent],
+    )
+    strategy_lab_source_data_capture_adapter_parser.add_argument("--no-write", action="store_true")
+    strategy_lab_source_data_capture_adapter_parser.add_argument(
+        "--adapter",
+        choices=(
+            "all",
+            "exit_variant_comparison",
+            "ma_wma_anchor_enrichment",
+            "review_ready_enrichment",
+            "short_capture_improvement",
+            "near_miss_variant_capture",
+            "betrayal_inverse_source_chain",
+            "watch_88m_durability",
+        ),
+        default="all",
+    )
+    strategy_lab_source_data_capture_adapter_parser.add_argument("--include-lab-only", action="store_true", default=True)
+    strategy_lab_source_data_capture_adapter_parser.add_argument("--include-watch-only", action="store_true", default=True)
+    strategy_lab_source_data_capture_adapter_parser.add_argument("--max-source-rows", type=int, default=500)
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",
