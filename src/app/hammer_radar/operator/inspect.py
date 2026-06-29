@@ -4810,6 +4810,25 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "strategy-lab-adapter-output-batch-execution-packet":
+        from src.app.hammer_radar.operator.strategy_lab_adapter_output_batch_execution_packet import (
+            build_strategy_lab_adapter_output_batch_execution_packet,
+            format_adapter_output_batch_execution_packet_json,
+        )
+
+        print(
+            format_adapter_output_batch_execution_packet_json(
+                build_strategy_lab_adapter_output_batch_execution_packet(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    adapter=args.adapter,
+                    min_ready_rows=args.min_ready_rows,
+                    include_source_data_gaps=args.include_source_data_gaps,
+                    include_lab_only=args.include_lab_only,
+                    include_watch_only=args.include_watch_only,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -7919,6 +7938,32 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     strategy_lab_evidence_adapter_pack_parser.add_argument("--min-sample-count", type=int, default=30)
     strategy_lab_evidence_adapter_pack_parser.add_argument("--preferred-sample-count", type=int, default=50)
+
+    strategy_lab_adapter_output_batch_execution_packet_parser = subparsers.add_parser(
+        "strategy-lab-adapter-output-batch-execution-packet",
+        parents=[parent],
+    )
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--no-write", action="store_true")
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument(
+        "--adapter",
+        choices=(
+            "all",
+            "near_miss_13m",
+            "capture_8m_short",
+            "ma_wma_anchor",
+            "exits",
+            "betrayal_inverse_lab",
+            "watch_88m",
+            "review_ready_enrichment",
+        ),
+        default="all",
+    )
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--min-ready-rows", type=int, default=1)
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument(
+        "--include-source-data-gaps", action="store_true", default=True
+    )
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--include-lab-only", action="store_true", default=True)
+    strategy_lab_adapter_output_batch_execution_packet_parser.add_argument("--include-watch-only", action="store_true", default=True)
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",
