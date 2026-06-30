@@ -1,0 +1,132 @@
+{
+  "system": "Hammer Radar",
+  "scope": "trading research, paper execution, live-readiness, and operator-safety subsystem",
+  "runtime_contract_version": "R334-runtime-self-extraction",
+  "primary_runtime_loop": {
+    "market_source": "Binance Futures BTCUSDT market reader",
+    "observations": [
+      "candles",
+      "resampled timeframes",
+      "hammer and shooting-star shape annotations",
+      "RSI state",
+      "divergence",
+      "higher-timeframe bias",
+      "trend context"
+    ],
+    "memory_writes": [
+      "signals.ndjson",
+      "outcomes.ndjson",
+      "paper positions",
+      "candle archive"
+    ],
+    "default_execution_mode": "paper"
+  },
+  "core_contract": {
+    "machine_may": [
+      "observe candles",
+      "extract signals",
+      "score candidates",
+      "write local paper and review records",
+      "build non-executable tickets",
+      "build dry-run previews",
+      "evaluate readiness",
+      "surface blockers",
+      "send or prepare operator notifications where configured"
+    ],
+    "machine_must": [
+      "keep paper and live paths separate",
+      "preserve operator approval gates",
+      "preserve execution gates",
+      "preserve global kill-switch authority",
+      "preserve risk contract limits",
+      "hide secrets",
+      "report blockers explicitly",
+      "treat readiness and approval records as evidence, not automatic execution permission"
+    ],
+    "machine_must_not": [
+      "place real orders by default",
+      "enable live execution flags without an explicit approved phase",
+      "disable the kill switch without explicit approval",
+      "call Binance order endpoints without explicit authorization",
+      "expose secrets or raw credentials",
+      "convert paper/operator visibility into live approval",
+      "bypass exact phrase, hash-chain, or human review requirements"
+    ]
+  },
+  "operator_authority": {
+    "operator_controls": [
+      "watch",
+      "reject",
+      "paper_only",
+      "approve paper ticket",
+      "execute paper ticket",
+      "record manual-live intent",
+      "record exact human confirmations",
+      "record final approval intent",
+      "arm dry-run lane",
+      "record manual outcomes"
+    ],
+    "authority_boundary": "Operator records can satisfy review prerequisites, but they do not by themselves enable live execution or place orders.",
+    "required_for_live_review": [
+      "exact candidate identity",
+      "risk contract hash",
+      "packet hash",
+      "exact operator phrase",
+      "final preflight",
+      "activation gate",
+      "execution gate"
+    ]
+  },
+  "external_reality": {
+    "market_reality": [
+      "Binance Futures candles",
+      "local candle archive replay",
+      "read-only exchange metadata when explicitly allowed"
+    ],
+    "execution_reality": [
+      "paper positions in local ledgers",
+      "rejected live attempt records",
+      "future explicit live connector attempts only after all gates"
+    ],
+    "not_default_reality": [
+      "real account balances",
+      "fund transfers",
+      "live order placement",
+      "live order fills"
+    ]
+  },
+  "safety_invariants": {
+    "live_execution_enabled_default": false,
+    "allow_live_orders_default": false,
+    "global_kill_switch_default_active": true,
+    "order_placed_default": false,
+    "real_order_placed_default": false,
+    "secrets_shown_default": false,
+    "paper_live_separation_required": true
+  },
+  "execution_boundaries": {
+    "paper": "local paper positions and paper execution ledgers",
+    "dry_run": "validation and payload preview without live order placement",
+    "live_stub": "records rejected live attempt metadata and places no order",
+    "live": "requires explicit future/live gates, exact approvals, safe flags, risk contracts, protective readiness, and connector readiness"
+  },
+  "memory_contract": {
+    "append_only_preferred": true,
+    "memory_types": [
+      "signals",
+      "outcomes",
+      "paper positions",
+      "paper executions",
+      "manual outcomes",
+      "tickets",
+      "review packets",
+      "human confirmations",
+      "approval intents",
+      "risk contracts",
+      "lane controls",
+      "candle archives",
+      "readiness reports",
+      "connector attempts"
+    ]
+  }
+}

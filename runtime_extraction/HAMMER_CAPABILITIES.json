@@ -1,0 +1,139 @@
+{
+  "system": "Hammer Radar",
+  "capabilities": [
+    {
+      "name": "Signal Engine",
+      "status": "active",
+      "description": "Extracts latest hammer or shooting-star signals from candle data and enriches them with Fibonacci levels, invalidation, RSI, divergence, trigger metadata, and higher-timeframe bias.",
+      "primary_modules": [
+        "src/app/hammer_radar/signal_engine.py",
+        "src/app/hammer_radar/hammer_detector.py",
+        "src/app/hammer_radar/rsi.py",
+        "src/app/hammer_radar/divergence.py"
+      ],
+      "safety_boundary": "Produces signal records only; does not place orders."
+    },
+    {
+      "name": "Runtime Market Loop",
+      "status": "active",
+      "description": "Reads BTCUSDT market data, resamples Hammer timeframes, captures candles, appends signals and outcomes, and opens/closes local paper positions when paper mode is enabled.",
+      "primary_modules": [
+        "src/app/hammer_radar/main.py",
+        "src/app/hammer_radar/market_reader.py"
+      ],
+      "safety_boundary": "Uses paper execution adapter by default."
+    },
+    {
+      "name": "Signal Candidate Gate",
+      "status": "active",
+      "description": "Filters signals by enabled timeframe, minimum hammer strength, higher-timeframe bias alignment, and recent same-direction duplicate spacing.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/gate.py",
+        "src/app/hammer_radar/operator/strategy_config.py"
+      ],
+      "safety_boundary": "Marks tradable candidate status for paper/operator workflows only."
+    },
+    {
+      "name": "Paper Trading",
+      "status": "active",
+      "description": "Creates and closes deterministic local paper positions and records paper executions without contacting an exchange.",
+      "primary_modules": [
+        "src/app/hammer_radar/execution/paper.py",
+        "src/app/hammer_radar/operator/positions.py",
+        "src/app/hammer_radar/operator/paper_execution.py"
+      ],
+      "safety_boundary": "No live order, no Binance order endpoint, no real balance dependency."
+    },
+    {
+      "name": "Strategy Memory",
+      "status": "active",
+      "description": "Stores signals, outcomes, paper positions, paper executions, manual outcomes, strategy performance summaries, promotion status, and source-chain evidence.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/archive.py",
+        "src/app/hammer_radar/operator/truth.py",
+        "src/app/hammer_radar/operator/strategy_performance.py"
+      ],
+      "safety_boundary": "Memory can inform readiness but cannot bypass approval or execution gates."
+    },
+    {
+      "name": "Risk Engine",
+      "status": "active",
+      "description": "Validates tiny-live risk contracts, notional caps, leverage caps, max loss, margin meaning, lane identity, exchange minimum compatibility, and live-disabled fields.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/tiny_live_risk_contract_validation.py",
+        "src/app/hammer_radar/operator/tiny_live_risk_contract.py",
+        "configs/hammer_radar/tiny_live_risk_contracts.json"
+      ],
+      "safety_boundary": "Risk contract validity is prerequisite evidence, not execution permission."
+    },
+    {
+      "name": "Lane System",
+      "status": "active",
+      "description": "Classifies exact lane keys by configured mode, freshness windows, risk limits, live eligibility, and global gate state.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/lane_control.py",
+        "src/app/hammer_radar/operator/lane_control_cockpit.py",
+        "configs/hammer_radar/lane_controls.json"
+      ],
+      "safety_boundary": "Lane controls express operator intent only and do not create order payloads."
+    },
+    {
+      "name": "Approval Gates",
+      "status": "active",
+      "description": "Records operator decisions, exact approval phrases, human confirmations, final approval intent, Telegram challenges, and review packets.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/trade_ticket.py",
+        "src/app/hammer_radar/operator/final_approval_intent.py",
+        "src/app/hammer_radar/operator/human_confirmation_records.py",
+        "src/app/hammer_radar/operator/final_human_review_packet.py",
+        "src/app/hammer_radar/operator/telegram_approval_challenge.py"
+      ],
+      "safety_boundary": "Approval records are review artifacts unless separate execution gates pass."
+    },
+    {
+      "name": "Execution Gates",
+      "status": "active",
+      "description": "Composes final preflight, activation gate, first-live execution gate, connector readiness, protective readiness, exact confirmation, and idempotency.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/final_live_preflight.py",
+        "src/app/hammer_radar/operator/first_live_activation_gate.py",
+        "src/app/hammer_radar/operator/first_live_execution_gate.py",
+        "src/app/hammer_radar/execution/binance_futures_connector.py"
+      ],
+      "safety_boundary": "Default output remains blocked/no-order unless future explicit live gates authorize otherwise."
+    },
+    {
+      "name": "Kill Switches",
+      "status": "active",
+      "description": "Keeps global kill switch and lane-level kill-switch rehearsal visible as authoritative blockers for live paths.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/live_safety.py",
+        "src/app/hammer_radar/operator/live_lane_kill_switch_rehearsal.py",
+        "src/app/hammer_radar/execution/binance_futures_connector.py"
+      ],
+      "safety_boundary": "Kill switch is active by default and must not be bypassed."
+    },
+    {
+      "name": "Operator API and CLI",
+      "status": "active",
+      "description": "Provides local operator endpoints and inspect commands for readiness, tickets, paper, live-safety, live-arming, Telegram, strategy performance, and lane status.",
+      "primary_modules": [
+        "src/app/hammer_radar/operator/approval_api.py",
+        "src/app/hammer_radar/operator/inspect.py"
+      ],
+      "safety_boundary": "Operator surfaces must stay local/private and must not imply live approval."
+    },
+    {
+      "name": "External Reality Adapters",
+      "status": "guarded",
+      "description": "Reads market data and can report safe connector or Binance status fields while keeping secrets hidden.",
+      "primary_modules": [
+        "src/app/hammer_radar/market_reader.py",
+        "src/app/hammer_radar/operator/binance_live_status.py",
+        "src/app/hammer_radar/operator/binance_readonly.py",
+        "src/app/hammer_radar/execution/binance_futures_connector.py"
+      ],
+      "safety_boundary": "Live order, account, and signed request behavior is default-blocked and must be explicitly authorized."
+    }
+  ]
+}
