@@ -4884,6 +4884,76 @@ def main() -> int:
                 )
             )
         )
+    elif args.command == "ultra-short-burst-backtest-adapter":
+        from src.app.hammer_radar.operator.ultra_short_burst_backtest_adapter import (
+            build_ultra_short_burst_backtest_adapter,
+            format_ultra_short_burst_backtest_adapter_json,
+        )
+
+        print(
+            format_ultra_short_burst_backtest_adapter_json(
+                build_ultra_short_burst_backtest_adapter(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    timeframe=args.timeframe,
+                    leverage=args.leverage,
+                    max_signals=args.max_signals,
+                )
+            )
+        )
+    elif args.command == "ultra-short-burst-visual-terminal-panel":
+        from src.app.hammer_radar.operator.ultra_short_burst_visual_terminal_panel import (
+            build_ultra_short_burst_visual_terminal_panel,
+            format_ultra_short_burst_visual_terminal_panel_json,
+        )
+
+        print(
+            format_ultra_short_burst_visual_terminal_panel_json(
+                build_ultra_short_burst_visual_terminal_panel(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    timeframe=args.timeframe,
+                    leverage=args.leverage,
+                    compact=args.compact,
+                    wide=args.wide,
+                )
+            )
+        )
+    elif args.command == "ultra-short-burst-risk-contract-preview":
+        from src.app.hammer_radar.operator.ultra_short_burst_risk_contract_preview import (
+            build_ultra_short_burst_risk_contract_preview,
+            format_ultra_short_burst_risk_contract_preview_json,
+        )
+
+        print(
+            format_ultra_short_burst_risk_contract_preview_json(
+                build_ultra_short_burst_risk_contract_preview(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    timeframe=args.timeframe,
+                    leverage=args.leverage,
+                    include_150x=args.include_150x,
+                )
+            )
+        )
+    elif args.command == "ultra-short-burst-lab-implementation-pack":
+        from src.app.hammer_radar.operator.ultra_short_burst_lab_implementation_pack import (
+            build_ultra_short_burst_lab_implementation_pack,
+            format_ultra_short_burst_lab_implementation_pack_json,
+        )
+
+        print(
+            format_ultra_short_burst_lab_implementation_pack_json(
+                build_ultra_short_burst_lab_implementation_pack(
+                    log_dir=args.log_dir,
+                    write=not args.no_write,
+                    timeframe=args.timeframe,
+                    leverage=args.leverage,
+                    compact=args.compact,
+                    wide=args.wide,
+                )
+            )
+        )
     elif args.command == "expansion-risk-contract-preview-repair":
         from src.app.hammer_radar.operator.expansion_risk_contract_preview_repair import (
             build_expansion_risk_contract_preview_repair,
@@ -8080,6 +8150,60 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=True,
     )
+
+    ultra_short_burst_backtest_adapter_parser = subparsers.add_parser(
+        "ultra-short-burst-backtest-adapter",
+        parents=[parent],
+    )
+    ultra_short_burst_backtest_adapter_parser.add_argument("--no-write", action="store_true")
+    ultra_short_burst_backtest_adapter_parser.add_argument("--timeframe", choices=("all", "4m", "8m"), default="all")
+    ultra_short_burst_backtest_adapter_parser.add_argument(
+        "--leverage",
+        choices=("all", "22", "44", "88", "150"),
+        default="all",
+    )
+    ultra_short_burst_backtest_adapter_parser.add_argument("--max-signals", type=int, default=500)
+
+    ultra_short_burst_visual_terminal_panel_parser = subparsers.add_parser(
+        "ultra-short-burst-visual-terminal-panel",
+        parents=[parent],
+    )
+    ultra_short_burst_visual_terminal_panel_parser.add_argument("--no-write", action="store_true")
+    ultra_short_burst_visual_terminal_panel_parser.add_argument("--timeframe", choices=("all", "4m", "8m"), default="all")
+    ultra_short_burst_visual_terminal_panel_parser.add_argument(
+        "--leverage",
+        choices=("all", "22", "44", "88", "150"),
+        default="all",
+    )
+    ultra_short_burst_visual_terminal_panel_parser.add_argument("--compact", action="store_true")
+    ultra_short_burst_visual_terminal_panel_parser.add_argument("--wide", action="store_true")
+
+    ultra_short_burst_risk_contract_preview_parser = subparsers.add_parser(
+        "ultra-short-burst-risk-contract-preview",
+        parents=[parent],
+    )
+    ultra_short_burst_risk_contract_preview_parser.add_argument("--no-write", action="store_true")
+    ultra_short_burst_risk_contract_preview_parser.add_argument("--timeframe", choices=("all", "4m", "8m"), default="all")
+    ultra_short_burst_risk_contract_preview_parser.add_argument(
+        "--leverage",
+        choices=("all", "22", "44", "88", "150"),
+        default="all",
+    )
+    ultra_short_burst_risk_contract_preview_parser.add_argument("--include-150x", action="store_true")
+
+    ultra_short_burst_lab_implementation_pack_parser = subparsers.add_parser(
+        "ultra-short-burst-lab-implementation-pack",
+        parents=[parent],
+    )
+    ultra_short_burst_lab_implementation_pack_parser.add_argument("--no-write", action="store_true")
+    ultra_short_burst_lab_implementation_pack_parser.add_argument("--timeframe", choices=("all", "4m", "8m"), default="all")
+    ultra_short_burst_lab_implementation_pack_parser.add_argument(
+        "--leverage",
+        choices=("all", "22", "44", "88", "150"),
+        default="all",
+    )
+    ultra_short_burst_lab_implementation_pack_parser.add_argument("--compact", action="store_true")
+    ultra_short_burst_lab_implementation_pack_parser.add_argument("--wide", action="store_true")
 
     expansion_risk_contract_preview_repair_parser = subparsers.add_parser(
         "expansion-risk-contract-preview-repair",

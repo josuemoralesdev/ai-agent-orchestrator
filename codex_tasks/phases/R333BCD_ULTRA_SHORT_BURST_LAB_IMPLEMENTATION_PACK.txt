@@ -1,0 +1,652 @@
+# R333BCD - Ultra-Short Burst Lab Implementation Pack
+
+Repo:
+  /home/josue/workspace/kernel/ai-agent-orchestrator-main
+
+Base branch:
+  r333a-ultra-short-leverage-burst-lab-design-packet
+
+New branch:
+  r333bcd-ultra-short-burst-lab-implementation-pack
+
+Phase classification:
+  EXTENSION OF EXISTING CAPABILITY + WIRING / INTEGRATION
+
+Included subphases:
+  R333B Ultra-Short Burst Backtest Adapter
+  R333C Ultra-Short Burst Visual Terminal Panel
+  R333D Human-Reviewed Burst Risk Contract Preview
+
+Critical strategy family:
+  ULTRA_SHORT_LEVERAGE_BURST
+
+Critical isolation:
+  This implementation must remain isolated from:
+    - Tiny Live
+    - R271 standard 55% policy
+    - normal Strategy Lab promotion
+    - observed expansion gate
+    - betrayal/inverse gate
+    - existing 10x live risk contracts
+    - live order execution
+    - final command creation
+
+Why this phase exists:
+  R333A created the read-only design/evidence contract for the ultra-short high-leverage burst lab.
+  R333BCD implements the first usable paper-lab tooling:
+    - a paper-only replay/backtest adapter
+    - a terminal-only visual panel
+    - a preview-only burst risk contract packet
+
+  This is not live trading.
+  This is not Tiny Live.
+  This is not standard Strategy Lab promotion.
+  This is not observed expansion.
+  This is an isolated paper-only burst lab.
+
+Purpose:
+  Build a combined read-only implementation pack that:
+    1. Reads existing local signal/evidence surfaces for 4m and 8m candidates.
+    2. Produces burst backtest/replay candidate rows using available local data.
+    3. Marks rows as sequence_known=false / sequence_unknown when only candle-level data is available.
+    4. Computes gross ROE and estimated net ROE fields only when enough fields are available.
+    5. Emits no synthetic performance.
+    6. Renders a terminal-only visual diagnostic panel.
+    7. Produces a preview-only burst risk contract recommendation object.
+    8. Keeps live permission false everywhere.
+
+Critical safety:
+  ABSOLUTELY NO LIVE ORDER.
+  ABSOLUTELY NO BINANCE ORDER ENDPOINT.
+  ABSOLUTELY NO BINANCE TEST ORDER ENDPOINT.
+  ABSOLUTELY NO LEVERAGE CHANGE.
+  ABSOLUTELY NO MARGIN CHANGE.
+  ABSOLUTELY NO LIVE FLAG MUTATION.
+  ABSOLUTELY NO KILL SWITCH DISABLING.
+  ABSOLUTELY NO arming mutation.
+  ABSOLUTELY NO final command.
+  ABSOLUTELY NO submit.
+  ABSOLUTELY NO changing first Tiny Live lane.
+  ABSOLUTELY NO promotion event write.
+  ABSOLUTELY NO risk-contract write.
+  ABSOLUTELY NO observed expansion write.
+  ABSOLUTELY NO config write except docs/scripts/tests/code for this implementation pack.
+  ABSOLUTELY NO env write.
+  ABSOLUTELY NO systemd install/enable/start/stop/restart/daemon-reload.
+  ABSOLUTELY NO scheduler start.
+  ABSOLUTELY NO Telegram send.
+  ABSOLUTELY NO real Telegram send.
+  ABSOLUTELY NO synthetic performance creation.
+  ABSOLUTELY NO live permission for 150x.
+  ABSOLUTELY NO gross-only live readiness.
+  ABSOLUTELY NO candle-only sequence_unknown promotion.
+
+Allowed writes:
+  R333BCD may write only its own diagnostic/paper ledgers:
+    logs/hammer_radar_forward/ultra_short_burst_backtest_adapter.ndjson
+    logs/hammer_radar_forward/ultra_short_burst_visual_terminal_panel.ndjson
+    logs/hammer_radar_forward/ultra_short_burst_risk_contract_preview.ndjson
+    logs/hammer_radar_forward/ultra_short_burst_lab_implementation_pack.ndjson
+
+  unless --no-write is supplied.
+
+Required safety fields in every output:
+  live_execution_enabled=false
+  allow_live_orders=false
+  global_kill_switch=true
+  order_placed=false
+  real_order_placed=false
+  execution_attempted=false
+  submit_allowed=false
+  final_command_available=false
+  real_order_forbidden=true
+  binance_order_endpoint_called=false
+  binance_test_order_endpoint_called=false
+  leverage_change_called=false
+  margin_change_called=false
+  secrets_shown=false
+  paper_live_separation_intact=true
+  autonomous_arming_state_changed=false
+  global_live_flags_changed=false
+  risk_contract_config_mutated=false
+  promotion_event_written=false
+  observed_expansion_written=false
+  config_written=false
+  env_written=false
+  env_mutated=false
+  systemd_unit_mutated=false
+  scheduler_started=false
+  telegram_send_called=false
+  telegram_message_sent=false
+  real_telegram_send_called=false
+  real_telegram_message_sent=false
+  synthetic_performance_created=false
+  burst_live_permission=false
+  burst_family_isolated=true
+  risk_contract_preview_only=true
+  risk_contract_written=false
+
+Capability scan first:
+  Inspect and summarize:
+    docs/hammer_radar/live_readiness/R333A_ULTRA_SHORT_LEVERAGE_BURST_LAB_DESIGN_PACKET.md
+    docs/hammer_radar/live_readiness/R332_STRATEGY_LAB_CAPTURED_SOURCE_DATA_MERGE_INTO_ADAPTER_ROWS.md
+    docs/hammer_radar/live_readiness/R331_STRATEGY_LAB_SOURCE_DATA_CAPTURE_ADAPTER_IMPLEMENTATION.md
+    docs/hammer_radar/live_readiness/R329_STRATEGY_LAB_ADAPTER_OUTPUT_BATCH_EXECUTION_PACKET.md
+    docs/hammer_radar/live_readiness/R328_STRATEGY_LAB_EVIDENCE_ADAPTER_IMPLEMENTATION_PACK.md
+    src/app/hammer_radar/operator/ultra_short_leverage_burst_lab_design.py
+    src/app/hammer_radar/operator/strategy_lab_captured_source_data_merge.py
+    src/app/hammer_radar/operator/strategy_lab_source_data_capture_adapter.py
+    src/app/hammer_radar/operator/strategy_lab_adapter_output_batch_execution_packet.py
+    src/app/hammer_radar/operator/strategy_lab_evidence_adapter_pack.py
+    src/app/hammer_radar/operator/inspect.py
+    configs/hammer_radar/tiny_live_risk_contracts.json
+    configs/hammer_radar/autonomous_arming_state.json
+    logs/hammer_radar_forward/ultra_short_leverage_burst_lab_design.ndjson
+    logs/hammer_radar_forward/strategy_lab_captured_source_data_merge.ndjson
+    logs/hammer_radar_forward/strategy_lab_source_data_capture_adapter.ndjson
+    logs/hammer_radar_forward/strategy_lab_adapter_output_batch_execution_packet.ndjson
+    logs/hammer_radar_forward/strategy_lab_evidence_adapter_pack.ndjson
+    logs/hammer_radar_forward/multi_lane_dry_run_observation.ndjson
+    logs/hammer_radar_forward/strategy_promotion_events.ndjson
+    tests/hammer_radar/test_ultra_short_leverage_burst_lab_design.py
+    tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py
+
+  Produce:
+    codex_tasks/reports/R333BCD_CAPABILITY_REUSE_REPORT.md
+
+  Include:
+    - why this can combine R333B/R333C/R333D safely
+    - duplicate risk report
+    - existing signal/evidence surfaces reused
+    - missing second/tick-level data limitations
+    - candle-only sequence_unknown limitations
+    - why preview risk contract is not a risk-contract write
+    - why visual panel is terminal-only and not a hosted UI
+    - how this feeds R333E anti-fantasy fill gate
+
+Scope:
+  A. Burst backtest adapter module
+  B. Burst visual terminal module
+  C. Burst risk contract preview module
+  D. Combined implementation pack module
+  E. Operator scripts
+  F. Docs
+  G. Tests
+  H. Inspect routes
+
+A. Add module:
+  src/app/hammer_radar/operator/ultra_short_burst_backtest_adapter.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_backtest_adapter --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --timeframe all
+  --timeframe 4m
+  --timeframe 8m
+  --leverage all
+  --leverage 22
+  --leverage 44
+  --leverage 88
+  --leverage 150
+  --max-signals 500
+  --fee-pct-round-trip 0.08
+  --slippage-pct-round-trip 0.02
+
+Output ledger:
+  logs/hammer_radar_forward/ultra_short_burst_backtest_adapter.ndjson
+
+event_type:
+  R333B_ULTRA_SHORT_BURST_BACKTEST_ADAPTER
+
+Backtest adapter behavior:
+  - Build paper-only burst replay rows from available local signal/evidence surfaces.
+  - Candidate timeframes: 4m and 8m.
+  - Candidate sides: long and short if source evidence exists.
+  - Candidate leverage: 22x, 44x, 88x, 150x.
+  - Checkpoints: 22s, 44s, 66s, 88s, 132s, 176s.
+  - If exact signal detection timestamp is missing, set detection_timestamp_status=MISSING_OR_APPROXIMATE.
+  - If second/tick price path is missing, set sequence_known=false and sequence_status=SEQUENCE_UNKNOWN_CANDLE_ONLY_OR_NO_INTRABAR_PATH.
+  - If price path is unavailable, do not invent checkpoint prices.
+  - If only paper evidence summary exists, emit SOURCE_SUMMARY_ONLY rows with no fake burst result.
+  - Compute formula previews where possible:
+      price_move_pct_for_gross_roe = gross_roe_pct / leverage
+      fee_drag_roe = fee_pct_round_trip * leverage
+      estimated_slippage_roe = slippage_pct_round_trip * leverage
+      net_roe = gross_roe - fee_drag_roe - estimated_slippage_roe
+  - Mark any formula-only row as MODEL_PREVIEW_NOT_TRADE_RESULT.
+  - Never mark MODEL_PREVIEW_NOT_TRADE_RESULT as live-ready.
+  - Never mark sequence_unknown rows as live-ready.
+
+Backtest row schema:
+  Every burst backtest row must include:
+    - burst_row_id
+    - strategy_family=ULTRA_SHORT_LEVERAGE_BURST
+    - timeframe
+    - side
+    - lane_key
+    - source_signal_id
+    - source_signal_status
+    - detection_timestamp_status
+    - entry_model
+    - entry_timestamp_status
+    - leverage
+    - checkpoint_seconds
+    - fee_pct_round_trip
+    - slippage_pct_round_trip
+    - fee_drag_roe
+    - estimated_slippage_roe
+    - gross_roe_target_pct
+    - price_move_pct_for_gross_roe
+    - net_roe_formula
+    - sequence_known
+    - sequence_status
+    - result_status:
+        SOURCE_SUMMARY_ONLY
+        MODEL_PREVIEW_NOT_TRADE_RESULT
+        REPLAY_READY
+        REPLAY_PENDING_INTRABAR_DATA
+    - evidence_quality:
+        TICK_OR_SECOND_LEVEL_REQUIRED
+        SEQUENCE_UNKNOWN
+        SUMMARY_ONLY
+        REPLAY_READY
+    - liquidation_proximity_warning
+    - live_permission=false
+    - burst_live_permission=false
+    - tiny_live_eligible_now=false
+    - standard_55_policy_applies=false
+    - tiny_live_inheritance=false
+    - promotion_event_written=false
+    - risk_contract_write_required=false
+    - risk_contract_written=false
+    - observed_expansion_written=false
+    - scheduler_required=false
+    - synthetic_performance_created=false
+    - blockers
+
+B. Add module:
+  src/app/hammer_radar/operator/ultra_short_burst_visual_terminal_panel.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_visual_terminal_panel --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --timeframe all
+  --leverage all
+  --compact
+  --wide
+
+Output ledger:
+  logs/hammer_radar_forward/ultra_short_burst_visual_terminal_panel.ndjson
+
+event_type:
+  R333C_ULTRA_SHORT_BURST_VISUAL_TERMINAL_PANEL
+
+Visual panel behavior:
+  - Consume R333B backtest adapter output or build it in-memory if missing.
+  - Render a terminal-only diagnostic panel.
+  - No hosted UI.
+  - No web app.
+  - Include clear “PAPER ONLY / LIVE PERMISSION FALSE” banner.
+  - Include strategy family isolation.
+  - Include leverage ladder.
+  - Include checkpoint timeline.
+  - Include fee drag warning.
+  - Include liquidation proximity warning for 150x.
+  - Include sequence_unknown warning.
+  - Include verdict line.
+  - Include reason codes.
+
+Visual output fields:
+  - visual_panel_status:
+      ULTRA_SHORT_BURST_VISUAL_PANEL_READY
+      ULTRA_SHORT_BURST_VISUAL_PANEL_PARTIAL
+  - panel_lines
+  - leverage_ladder
+  - checkpoint_timeline
+  - warning_blocks
+  - verdict_blocks
+  - reason_codes
+  - live_permission=false
+  - terminal_only=true
+  - hosted_ui=false
+
+C. Add module:
+  src/app/hammer_radar/operator/ultra_short_burst_risk_contract_preview.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_risk_contract_preview --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --timeframe all
+  --leverage all
+  --include-150x
+
+Output ledger:
+  logs/hammer_radar_forward/ultra_short_burst_risk_contract_preview.ndjson
+
+event_type:
+  R333D_ULTRA_SHORT_BURST_RISK_CONTRACT_PREVIEW
+
+Risk contract preview behavior:
+  - Preview-only object, no config write.
+  - No risk contract write.
+  - No live permission.
+  - Shows hypothetical burst risk envelope requirements.
+  - Uses isolated margin only in any future preview.
+  - Cross margin forbidden.
+  - 150x marked extreme danger.
+  - Position sizing marked microscopic-only for any future tiny-burst-live.
+  - Requires R333E anti-fantasy fill gate before any future live discussion.
+  - Requires separate human-reviewed burst risk contract.
+  - Must not touch configs/hammer_radar/tiny_live_risk_contracts.json.
+
+Preview fields:
+  - risk_contract_preview_status:
+      ULTRA_SHORT_BURST_RISK_CONTRACT_PREVIEW_READY
+  - preview_only=true
+  - risk_contract_written=false
+  - config_written=false
+  - isolated_margin_only=true
+  - cross_margin_allowed=false
+  - max_future_position_sizing_policy=MICROSCOPIC_ONLY
+  - leverage_grid
+  - timeout_grid
+  - hard_loss_roe_grid
+  - min_net_roe_target_grid
+  - evidence_contract_required=true
+  - anti_fantasy_fill_gate_required=true
+  - live_permission=false
+
+D. Add combined module:
+  src/app/hammer_radar/operator/ultra_short_burst_lab_implementation_pack.py
+
+CLI:
+  PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_lab_implementation_pack --log-dir logs/hammer_radar_forward
+
+Options:
+  --json
+  --text
+  --no-write
+  --timeframe all
+  --leverage all
+  --compact
+  --wide
+
+Output ledger:
+  logs/hammer_radar_forward/ultra_short_burst_lab_implementation_pack.ndjson
+
+event_type:
+  R333BCD_ULTRA_SHORT_BURST_LAB_IMPLEMENTATION_PACK
+
+Combined output contract:
+  Include:
+    - event_type
+    - generated_at
+    - implementation_pack_status:
+        ULTRA_SHORT_BURST_LAB_IMPLEMENTATION_PACK_READY
+        ULTRA_SHORT_BURST_LAB_IMPLEMENTATION_PACK_PARTIAL
+        ULTRA_SHORT_BURST_LAB_IMPLEMENTATION_PACK_BLOCKED
+    - blockers
+    - strategy_family=ULTRA_SHORT_LEVERAGE_BURST
+    - strategy_family_isolated=true
+    - paper_only=true
+    - burst_live_permission=false
+    - first_tiny_live_lane
+    - first_live_lane_change_allowed=false
+    - backtest_adapter_summary
+    - visual_terminal_summary
+    - risk_contract_preview_summary
+    - burst_backtest_rows
+    - visual_panel_lines
+    - risk_contract_preview
+    - data_limitations
+    - sequence_unknown_summary
+    - evidence_readiness_summary
+    - recommended_r333e_path
+    - recommended_r333f_path
+    - recommended_tiny_live_path
+    - no_live_mutation_summary
+    - safety
+
+E. Evidence readiness summary:
+  Include:
+    - rows_seen
+    - replay_ready_rows
+    - replay_pending_intrabar_data_rows
+    - source_summary_only_rows
+    - model_preview_not_trade_result_rows
+    - sequence_known_rows
+    - sequence_unknown_rows
+    - live_permission_count=0
+    - burst_live_permission_count=0
+    - risk_contract_written_count=0
+    - synthetic_performance_created_count=0
+    - gross_only_ready_rows=0
+    - sequence_unknown_live_ready_rows=0
+
+F. Data limitations:
+  Must include:
+    - exact detection timestamps may be missing
+    - second/tick-level price path may be missing
+    - candle-only OHLC cannot prove TP/SL sequence
+    - sequence_unknown cannot promote to live
+    - formula previews are not trade results
+    - no live readiness without R333E anti-fantasy fill gate
+
+G. Recommended paths:
+  R333E:
+    Burst Lab Evidence Audit And Anti-Fantasy Fill Gate
+
+  R333F:
+    Tiny Burst Live Activation Gate, only if R333E and evidence contract pass
+
+  R333G:
+    Ultra-Short Burst Terminal Operator Console Refinement
+
+  Explain:
+    - R333E must audit sequence_known, fees, slippage, latency, liquidation proximity, and sample count.
+    - R333F remains future-only and must not be implemented now.
+    - Tiny Live remains separately gated.
+
+H. Inspect routes:
+  Add read-only inspect routes:
+    - ultra-short-burst-backtest-adapter
+    - ultra-short-burst-visual-terminal-panel
+    - ultra-short-burst-risk-contract-preview
+    - ultra-short-burst-lab-implementation-pack
+
+I. Operator scripts:
+  Add:
+    scripts/hammer_print_r333b_ultra_short_burst_backtest_adapter.sh
+    scripts/hammer_print_r333c_ultra_short_burst_visual_terminal_panel.sh
+    scripts/hammer_print_r333d_ultra_short_burst_risk_contract_preview.sh
+    scripts/hammer_print_r333bcd_ultra_short_burst_lab_implementation_pack.sh
+
+  Combined script must print:
+    - R333BCD header
+    - strategy family
+    - paper-only / live false banner
+    - backtest summary
+    - visual panel preview
+    - risk contract preview summary
+    - sequence_unknown summary
+    - evidence readiness summary
+    - recommended R333E/R333F
+    - safety flags
+
+J. Docs:
+  Add:
+    docs/hammer_radar/live_readiness/R333BCD_ULTRA_SHORT_BURST_LAB_IMPLEMENTATION_PACK.md
+
+  Include:
+    - why R333B/C/D were combined
+    - backtest adapter behavior
+    - visual terminal panel behavior
+    - risk contract preview behavior
+    - row schemas
+    - sequence_unknown policy
+    - gross-only forbidden policy
+    - fee/slippage model
+    - liquidation proximity warning
+    - evidence readiness summary
+    - R333E/R333F path
+    - Tiny Live separation
+    - what not to mutate
+
+K. Tests:
+  Add:
+    tests/hammer_radar/test_ultra_short_burst_lab_implementation_pack.py
+
+  Tests must cover:
+    1. Builds R333B backtest adapter packet.
+    2. Builds R333C visual terminal panel.
+    3. Builds R333D risk contract preview.
+    4. Builds combined R333BCD implementation pack.
+    5. Strategy family is ULTRA_SHORT_LEVERAGE_BURST.
+    6. strategy_family_isolated=true.
+    7. paper_only=true.
+    8. burst_live_permission=false.
+    9. Candidate timeframes include 4m and 8m.
+    10. Leverage grid includes 22, 44, 88, 150.
+    11. Checkpoint grid includes 22, 44, 66, 88, 132, 176.
+    12. Backtest rows include required schema fields.
+    13. Rows with no intrabar path are sequence_unknown.
+    14. sequence_unknown rows cannot be live-ready.
+    15. Formula previews are marked MODEL_PREVIEW_NOT_TRADE_RESULT.
+    16. Gross-only success is forbidden.
+    17. Fee drag formula present.
+    18. Net ROE formula present.
+    19. Slippage drag formula present.
+    20. 150x liquidation warning present.
+    21. Visual panel includes terminal-only status.
+    22. Visual panel includes paper-only/live false banner.
+    23. Visual panel includes leverage ladder.
+    24. Visual panel includes checkpoint timeline.
+    25. Visual panel includes fee drag warning.
+    26. Visual panel includes liquidation warning.
+    27. Visual panel includes sequence_unknown warning.
+    28. Risk contract preview is preview_only=true.
+    29. Risk contract_written=false.
+    30. Config_written=false.
+    31. Cross margin forbidden.
+    32. Isolated margin only preview.
+    33. Evidence contract required.
+    34. Anti-fantasy fill gate required.
+    35. First Tiny Live lane preserved.
+    36. first_live_lane_change_allowed=false.
+    37. live_permission_count=0.
+    38. burst_live_permission_count=0.
+    39. promotion_event_written=false.
+    40. risk_contract_config_mutated=false.
+    41. risk_contract_written=false.
+    42. observed_expansion_written=false.
+    43. scheduler_started=false.
+    44. synthetic_performance_created=false.
+    45. No config mutation.
+    46. No env mutation.
+    47. No arming mutation.
+    48. No systemd mutation.
+    49. No live order.
+    50. No submit.
+    51. No final command.
+    52. No Binance endpoint.
+    53. No Telegram send.
+    54. Inspect routes work.
+    55. Operator scripts exist and print required sections.
+    56. R333A/R332/R331/R314 tests remain compatible.
+
+Validation commands:
+  Must pass:
+    PYTHONPATH=. .venv/bin/python -m pytest \
+      tests/hammer_radar/test_ultra_short_burst_lab_implementation_pack.py \
+      tests/hammer_radar/test_ultra_short_leverage_burst_lab_design.py \
+      tests/hammer_radar/test_strategy_lab_captured_source_data_merge.py \
+      tests/hammer_radar/test_strategy_lab_source_data_capture_adapter.py \
+      tests/hammer_radar/test_strategy_lab_adapter_output_batch_execution_packet.py \
+      tests/hammer_radar/test_strategy_lab_evidence_adapter_pack.py \
+      tests/hammer_radar/test_strategy_lab_candidate_feed_expansion.py \
+      tests/hammer_radar/test_strategy_lab_promotion_review_packet.py \
+      tests/hammer_radar/test_strategy_lab_variant_batch_runner.py \
+      tests/hammer_radar/test_strategy_lab_expansion_surface_map.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_activation_packet.py \
+      tests/hammer_radar/test_real_telegram_synthetic_alert_send_apply_gate.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_synthetic_send_drill_preview.py \
+      tests/hammer_radar/test_telegram_credential_readiness_repair.py \
+      tests/hammer_radar/test_real_telegram_observation_alert_send_preview.py \
+      tests/hammer_radar/test_observation_alert_send_gate_operator_drill.py \
+      tests/hammer_radar/test_multi_lane_observation_alert_send_gate.py \
+      tests/hammer_radar/test_multi_lane_observation_alerting_preview.py \
+      tests/hammer_radar/test_multi_lane_observation_health_panel.py \
+      tests/hammer_radar/test_multi_lane_dry_run_observation_scheduler.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_install_gate.py \
+      tests/hammer_radar/test_multi_lane_dry_run_timer_unit_preview.py \
+      tests/hammer_radar/test_expansion_risk_contract_preview_repair.py \
+      tests/hammer_radar/test_eligible_lane_expansion_dry_run_preview.py \
+      tests/hammer_radar/test_strategy_lab_variant_test_pack.py \
+      tests/hammer_radar/test_strategy_lab_preview.py \
+      tests/hammer_radar/test_paper_refresh_scheduler.py \
+      -q
+
+  Must run:
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_backtest_adapter --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_visual_terminal_panel --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_risk_contract_preview --help
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_lab_implementation_pack --help
+
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_backtest_adapter --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_visual_terminal_panel --log-dir logs/hammer_radar_forward --text
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_risk_contract_preview --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_lab_implementation_pack --log-dir logs/hammer_radar_forward --json
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.ultra_short_burst_lab_implementation_pack --log-dir logs/hammer_radar_forward --text
+
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-burst-backtest-adapter
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-burst-visual-terminal-panel
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-burst-risk-contract-preview
+    PYTHONPATH=. .venv/bin/python -m src.app.hammer_radar.operator.inspect --log-dir logs/hammer_radar_forward ultra-short-burst-lab-implementation-pack
+
+    bash scripts/hammer_print_r333b_ultra_short_burst_backtest_adapter.sh
+    bash scripts/hammer_print_r333c_ultra_short_burst_visual_terminal_panel.sh
+    bash scripts/hammer_print_r333d_ultra_short_burst_risk_contract_preview.sh
+    bash scripts/hammer_print_r333bcd_ultra_short_burst_lab_implementation_pack.sh
+    bash scripts/hammer_print_r333a_ultra_short_leverage_burst_lab_design.sh
+    bash scripts/hammer_print_r314_multi_lane_observation_health_panel.sh
+
+  Must verify no config/arming/system/env mutation:
+    git diff -- configs/hammer_radar/tiny_live_risk_contracts.json configs/hammer_radar/autonomous_arming_state.json
+    git status --short | grep -E '(^ M .*\.env|^\?\? .*\.env|\.env)' || true
+    systemctl is-active hammer-multi-lane-dry-run-observation.timer || true
+    systemctl is-active hammer-paper-refresh.service || true
+
+  Must verify no promotion/risk writes:
+    git diff -- logs/hammer_radar_forward/strategy_promotion_events.ndjson configs/hammer_radar/tiny_live_risk_contracts.json || true
+
+  Must verify live safety:
+    curl -s http://127.0.0.1:8015/tiny-live/final-console | jq '.final_tiny_live_authorization_gate_panel | {status, blockers, real_order_forbidden, submit_allowed, final_command_available, current_real_candidate_lane_key, armed: .exact_lane_armed_state, timer: {timer_active: .readiness_matrix.timer_active, timer_health_status: .readiness_matrix.timer_health_status}}'
+
+Expected final response from Codex:
+  - files changed
+  - tests run
+  - R333B backtest status
+  - R333C visual panel status
+  - R333D preview status
+  - combined implementation status
+  - evidence readiness summary
+  - sequence_unknown summary
+  - visual terminal preview
+  - risk contract preview summary
+  - R333E/R333F recommendations
+  - no mutation confirmation
+
+Recommended next:
+  R333E Burst Lab Evidence Audit And Anti-Fantasy Fill Gate
